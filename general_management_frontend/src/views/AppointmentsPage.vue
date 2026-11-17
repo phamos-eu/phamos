@@ -1,6 +1,6 @@
 <template>
-	<!-- Company appointments (#1949): the Events table of the General Management Department's
-	     Company, as a list or a calendar. Saving sends the Mailcow invites. -->
+	<!-- Company appointments (#1949): the Event Schedule of the General Management Department,
+	     as a list or a calendar. Saving sends the Mailcow invites. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-white dark:bg-surface-gray-1">
 		<div class="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 bg-surface-gray-1 px-3 py-2 dark:bg-surface-gray-2">
 			<div class="flex items-center rounded border border-outline-gray-2 bg-surface-gray-2 p-0.5" role="group">
@@ -21,7 +21,7 @@
 				</button>
 			</div>
 			<FormControl v-if="view === 'List'" v-model="showPast" :label="__('Show past')" type="checkbox" size="sm" />
-			<span v-if="company" class="text-xs text-ink-gray-5">{{ company }}</span>
+			<span v-if="departmentLabel" class="text-xs text-ink-gray-5">{{ departmentLabel }}</span>
 			<Button class="ml-auto" variant="solid" size="sm" :disabled="Boolean(error)" @click="openNew()">
 				<template #prefix><FeatherIcon name="plus" class="h-3.5 w-3.5" /></template>
 				{{ __("New appointment") }}
@@ -32,7 +32,7 @@
 			{{ error }}
 		</div>
 		<div v-else-if="loading && !loaded" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">
-			Loading…
+			{{ __("Loading…") }}
 		</div>
 
 		<div v-else-if="view === 'List'" class="min-h-0 flex-1 overflow-y-auto">
@@ -85,19 +85,20 @@
 			:appointment="editing"
 			:suggested="suggested"
 			:options="options"
-			@saved="load"
-			@deleted="load"
+			@saved="onChanged"
+			@deleted="onChanged"
 		/>
 	</div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Button, Calendar, call, FeatherIcon, FormControl } from "frappe-ui"
 import AppointmentDialog from "../components/AppointmentDialog.vue"
 import { listAppointments, occurrencesBetween, repeatFrequency, weeklyDays } from "@spa/utils/appointments.js"
 import { formatDate } from "@spa/utils/datetime"
 import { __ } from "@spa/utils/i18n.js"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import spaConfig from "@/config"
 
 const VIEWS = ["List", "Calendar"]
@@ -114,7 +115,7 @@ const showPast = ref(false)
 const loading = ref(false)
 const loaded = ref(false)
 const error = ref("")
-const company = ref("")
+const departmentLabel = ref("")
 const appointments = ref([])
 const options = ref({ mailboxes: [], departments: [] })
 const dialogOpen = ref(false)
@@ -150,8 +151,9 @@ const calendarEvents = computed(() => {
 			appointment: a.name,
 			title: a.subject,
 			participant: a.location || "",
-			fromDate: start.toISOString(),
-			toDate: end.toISOString(),
+			// Local wall time, as frappe-ui's Calendar examples use (AI review of !1203).
+			fromDate: toLocalIso(start),
+			toDate: toLocalIso(end),
 			color: "amber",
 		}))
 	)
@@ -170,15 +172,21 @@ function repeatText(a) {
 	return text
 }
 
+// The user's date format (System Settings) and translated weekdays, as elsewhere in the cockpits,
+// not the browser's locale.
 function formatDay(date) {
-	return date.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })
+	const weekday = __(DAY_LABELS[(date.getDay() + 6) % 7])
+	return `${weekday}, ${formatDate(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`)}`
 }
 
 function formatTime(date) {
-	return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+	return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const pad = (n) => String(n).padStart(2, "0")
+/** "2026-12-01T10:00:00" in local time; without the "Z", Date parses it back as local. */
+const toLocalIso = (d) =>
+	`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 const toFrappe = (d) =>
 	`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 
@@ -220,7 +228,7 @@ async function load() {
 			call(`${spaConfig.api}.get_company_appointments`),
 			call(`${spaConfig.api}.get_appointment_options`),
 		])
-		company.value = data.company
+		departmentLabel.value = data.department_label || data.department
 		appointments.value = data.appointments
 		options.value = opts
 		error.value = ""
@@ -233,6 +241,31 @@ async function load() {
 	}
 }
 
+// Invites go out in a background job after the save (decision 10, #1949): the job tells this
+// user when it is done (phamos.events.team_daily_schedule.SYNC_DONE_EVENT). Without a socket,
+// poll a few times while an appointment is still pending.
+const POLL_MS = 3000
+const POLL_TRIES = 10
+const realtime = useUserRealtime("mailcow_schedule_synced", load, { debounceMs: 200 })
+let pollTimer = null
+
+const hasPending = computed(() => appointments.value.some((a) => !a.synced && !a.sync_error))
+
+function pollWhilePending(tries = POLL_TRIES) {
+	clearTimeout(pollTimer)
+	if (realtime.available || tries <= 0) return
+	pollTimer = setTimeout(async () => {
+		await load()
+		if (hasPending.value) pollWhilePending(tries - 1)
+	}, POLL_MS)
+}
+
+async function onChanged() {
+	await load()
+	if (hasPending.value) pollWhilePending()
+}
+
+onBeforeUnmount(() => clearTimeout(pollTimer))
 onMounted(load)
 </script>
 
@@ -251,5 +284,14 @@ onMounted(load)
 
 [data-theme="dark"] .gm-calendar .border-gray-200 {
 	border-color: var(--outline-gray-2);
+}
+
+/* Event cards: amber on the dark surface instead of a light box. */
+[data-theme="dark"] .gm-calendar .bg-amber-100 {
+	background-color: var(--surface-amber-2);
+}
+
+[data-theme="dark"] .gm-calendar .text-gray-800 {
+	color: var(--ink-gray-8);
 }
 </style>

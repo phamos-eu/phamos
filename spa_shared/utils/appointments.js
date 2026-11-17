@@ -10,8 +10,10 @@
 
 export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Yearly"]
-// Safety cap for the expansion loops (a daily repeat over 10 years is ~3650 steps).
+// Safety cap for the expansion loops. They start at the window, not at the first occurrence
+// (AI review of !1203), so this only limits how far one window reaches.
 const MAX_STEPS = 5000
+const DAY_MS = 86400000
 
 /** "2026-12-01 10:00:00" (site time, as Frappe sends it) -> local Date. */
 export function parseDateTime(value) {
@@ -62,8 +64,11 @@ function shiftMonths(start, months) {
 	return d.getDate() === start.getDate() ? d : null
 }
 
-/** Every occurrence start, in order, from the first one; stops after `limitDate` or `repeat_till`. */
-function* occurrenceStarts(appointment, limitDate) {
+/**
+ * Occurrence starts in order, from the first one that can end at or after `fromDate` (the loops
+ * jump there, one step early for daylight saving), up to `limitDate` or `repeat_till`.
+ */
+function* occurrenceStarts(appointment, fromDate, limitDate) {
 	const start = parseDateTime(appointment.start)
 	if (!start) return
 	const freq = repeatFrequency(appointment)
@@ -75,8 +80,10 @@ function* occurrenceStarts(appointment, limitDate) {
 	const stop = until && until < limitDate ? until : limitDate
 	const within = (d) => d <= stop
 
+	const behind = fromDate ? fromDate - start : 0
 	if (freq === "Daily") {
-		for (let i = 0; i < MAX_STEPS; i++) {
+		const first = Math.max(0, Math.floor(behind / DAY_MS) - 1)
+		for (let i = first; i < first + MAX_STEPS; i++) {
 			const d = addDays(start, i)
 			if (!within(d)) return
 			yield d
@@ -84,7 +91,8 @@ function* occurrenceStarts(appointment, limitDate) {
 	} else if (freq === "Weekly") {
 		const days = weeklyDays(appointment)
 		const weekStart = addDays(start, -weekdayIndex(start))
-		for (let w = 0; w < MAX_STEPS; w++) {
+		const first = Math.max(0, Math.floor((fromDate ? fromDate - weekStart : 0) / (7 * DAY_MS)) - 1)
+		for (let w = first; w < first + MAX_STEPS; w++) {
 			for (const day of days) {
 				const d = addDays(weekStart, w * 7 + day)
 				if (d < start) continue
@@ -94,7 +102,11 @@ function* occurrenceStarts(appointment, limitDate) {
 		}
 	} else {
 		const step = freq === "Monthly" ? 1 : 12
-		for (let i = 0; i < MAX_STEPS; i++) {
+		const monthsBehind = fromDate
+			? (fromDate.getFullYear() - start.getFullYear()) * 12 + fromDate.getMonth() - start.getMonth()
+			: 0
+		const first = Math.max(0, Math.floor(monthsBehind / step) - 1)
+		for (let i = first; i < first + MAX_STEPS; i++) {
 			const d = shiftMonths(start, i * step)
 			if (!d) continue
 			if (!within(d)) return
@@ -113,7 +125,8 @@ function duration(appointment) {
 export function occurrencesBetween(appointment, from, to) {
 	const length = duration(appointment)
 	const result = []
-	for (const start of occurrenceStarts(appointment, to)) {
+	// An occurrence that started before `from` can still overlap it by its length.
+	for (const start of occurrenceStarts(appointment, new Date(from.getTime() - length), to)) {
 		const end = new Date(start.getTime() + length)
 		if (end >= from && start <= to) result.push({ start, end })
 	}
@@ -123,7 +136,7 @@ export function occurrencesBetween(appointment, from, to) {
 /** The first occurrence that hasn't ended at `now`, or null when all are past. */
 export function nextOccurrence(appointment, now, horizonDays = 3660) {
 	const length = duration(appointment)
-	for (const start of occurrenceStarts(appointment, addDays(now, horizonDays))) {
+	for (const start of occurrenceStarts(appointment, new Date(now.getTime() - length), addDays(now, horizonDays))) {
 		const end = new Date(start.getTime() + length)
 		if (end >= now) return { start, end }
 	}

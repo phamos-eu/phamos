@@ -2296,3 +2296,9 @@ Remove {0},{0} entfernen
 Until,Bis
 No department,Keine Abteilung
 Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.
+Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
+Remove everyone in {0},Alle aus {0} entfernen
+The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
+Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
+Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
+Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
