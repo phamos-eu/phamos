@@ -1,5 +1,5 @@
 <template>
-	<!-- New / edit a company appointment (#1949): a row of the Company's Events table. -->
+	<!-- New / edit a company appointment (#1949): a row of the General Management Department's Event Schedule. -->
 	<Dialog :options="dialogOptions" :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)">
 		<template #body-content>
 			<form ref="formEl" class="space-y-4" @submit.prevent="save">

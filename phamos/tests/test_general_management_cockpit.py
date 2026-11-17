@@ -275,8 +275,8 @@ class TestCompanyTasks(FrappeTestCase):
 
 
 class TestCompanyAppointments(FrappeTestCase):
-	"""Company appointments (#1949): the Company Events rows, planned from the cockpit. The
-	Mailcow calls are patched, as in test_company_event_schedule."""
+	"""Company appointments (#1949): the General Management Department's Event Schedule rows,
+	planned from the cockpit. The Mailcow calls are patched, as in test_company_event_schedule."""
 
 	MAILBOX = "gm-appointments@example.com"
 
@@ -297,6 +297,22 @@ class TestCompanyAppointments(FrappeTestCase):
 		team_daily_schedule._email_for_account.cache_clear()
 		self.put = patch.object(team_daily_schedule, "_put_ics_upsert", return_value=(True, None)).start()
 		self.delete = patch.object(team_daily_schedule, "_delete_uid_for_mailbox", return_value=(True, None)).start()
+		# The cockpit sends in the background (decision 10): capture the job, run it with run_jobs().
+		self.enqueue = patch.object(frappe, "enqueue").start()
+
+	def run_jobs(self):
+		from unittest.mock import patch
+
+		from phamos.events import team_daily_schedule
+
+		job = "phamos.events.team_daily_schedule.run_sync_plan_in_background"
+		for call in self.enqueue.call_args_list:
+			if call.args[:1] != (job,):
+				continue  # other jobs of a Department save, e.g. the web profile mirror
+			kwargs = call.kwargs
+			with patch.object(frappe, "publish_realtime"), patch.object(frappe.db, "commit"):
+				team_daily_schedule.run_sync_plan_in_background(kwargs["doctype"], kwargs["name"], kwargs["plan"], kwargs["user"])
+		self.enqueue.reset_mock()
 
 	def tearDown(self):
 		from unittest.mock import patch
@@ -334,27 +350,38 @@ class TestCompanyAppointments(FrappeTestCase):
 			**values,
 		}
 
-	def _company_fields(self):
-		doc = frappe.get_doc("Company", self.company).as_dict()
-		return {k: v for k, v in doc.items() if k not in ("event_schedule", "modified", "modified_by")}
+	def _department_fields(self):
+		doc = frappe.get_doc("Department", self.department).as_dict()
+		# lft / rgt / old_parent are the tree's own bookkeeping, which every Department save updates.
+		ignored = ("event_schedule", "modified", "modified_by", "lft", "rgt", "old_parent")
+		return {k: v for k, v in doc.items() if k not in ignored}
 
 	def test_the_role_alone_plans_an_appointment(self):
-		before = self._company_fields()
+		before = self._department_fields()
 		frappe.set_user(_make_user(MANAGER, [setup.GENERAL_MANAGEMENT_ROLE]))
-		self.assertFalse(frappe.has_permission("Company", "write"))
+		self.assertFalse(frappe.has_permission("Department", "write"))
 
 		saved = gm.save_appointment(self._appointment())
 		self.assertEqual(saved["required_attendees"], ["a@example.com", "b@example.com"])
 		self.assertEqual(saved["optional_attendees"], ["c@example.com"])
-		self.assertTrue(saved["synced"])
+		# Returned right away: the invite goes out after the commit.
+		self.assertFalse(saved["synced"])
+		self.put.assert_not_called()
+		sync_jobs = [c for c in self.enqueue.call_args_list if c.args[:1] == ("phamos.events.team_daily_schedule.run_sync_plan_in_background",)]
+		self.assertEqual(len(sync_jobs), 1)
+		self.assertTrue(sync_jobs[0].kwargs["enqueue_after_commit"])
+		self.run_jobs()
 		self.put.assert_called_once()
 
 		listed = gm.get_company_appointments()
-		self.assertEqual(listed["company"], self.company)
+		self.assertEqual(listed["department"], self.department)
 		self.assertIn(saved["name"], [a["name"] for a in listed["appointments"]])
+		# Stored on the Department, so the invite's source link points there (not to Company).
+		self.assertEqual(frappe.db.get_value("Team Daily Schedule", saved["name"], "parenttype"), "Department")
+		self.assertIn("/app/department/", frappe.db.get_value("Team Daily Schedule", saved["name"], "description"))
 
 		frappe.set_user("Administrator")
-		self.assertEqual(self._company_fields(), before)
+		self.assertEqual(self._department_fields(), before)
 
 	def test_update_and_delete(self):
 		saved = gm.save_appointment(self._appointment())
@@ -362,7 +389,10 @@ class TestCompanyAppointments(FrappeTestCase):
 		self.assertEqual(updated["name"], saved["name"])
 		self.assertEqual(updated["subject"], "All-hands, moved")
 
+		self.run_jobs()
 		gm.delete_appointment(saved["name"])
+		self.delete.assert_not_called()
+		self.run_jobs()
 		self.delete.assert_called()
 		self.assertNotIn(saved["name"], [a["name"] for a in gm.get_company_appointments()["appointments"]])
 
@@ -377,6 +407,13 @@ class TestCompanyAppointments(FrappeTestCase):
 			gm.save_appointment(self._appointment(end="2026-12-01 09:00:00"))
 		with self.assertRaises(frappe.ValidationError):
 			gm.save_appointment(self._appointment(required_attendees=["not an email"]))
+		# AI review of !1203: lists only, a repeat needs its frequency, until not before start
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(required_attendees="a@example.com"))
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on=""))
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on="Weekly", repeat_till="2026-11-01"))
 
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))

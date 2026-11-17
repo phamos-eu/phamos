@@ -87,3 +87,24 @@ describe("appointment list", () => {
 		])
 	})
 })
+
+describe("long-running repeats (AI review of !1203)", () => {
+	it("a daily repeat without an end still occurs after more than 13 years", () => {
+		const a = appt({ repeat_this_event: 1, repeat_on: "Daily" })
+		const from = day("2041-06-01")
+		expect(starts(occurrencesBetween(a, from, day("2041-06-02 23:59:59")))).toEqual(["2041-06-01", "2041-06-02"])
+		expect(nextOccurrence(a, from, 3)).not.toBeNull()
+	})
+
+	it("weekly and monthly repeats start right at the window, years later", () => {
+		const weekly = appt({ repeat_this_event: 1, repeat_on: "Weekly", tuesday: 1 })
+		expect(starts(occurrencesBetween(weekly, day("2040-01-01"), day("2040-01-14")))).toEqual(["2040-01-03", "2040-01-10"])
+		const monthly = appt({ repeat_this_event: 1, repeat_on: "Monthly" })
+		expect(starts(occurrencesBetween(monthly, day("2045-03-01"), day("2045-04-30")))).toEqual(["2045-03-01", "2045-04-01"])
+	})
+
+	it("an occurrence that started before the window but still runs is included", () => {
+		const long = appt({ start: "2026-12-01 22:00:00", end: "2026-12-02 02:00:00", repeat_this_event: 1, repeat_on: "Daily" })
+		expect(starts(occurrencesBetween(long, day("2026-12-05 01:00:00"), day("2026-12-05 01:30:00")))).toEqual(["2026-12-04"])
+	})
+})
