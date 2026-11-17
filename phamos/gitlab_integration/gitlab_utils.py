@@ -1229,8 +1229,10 @@ def _handle_issue_webhook(payload):
     # A label change does not start CI on its own. This starts the
     # ai_issue_analysis job, which uses ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
     from phamos.gitlab_integration.issue_analysis import enqueue_issue_analysis
+    from phamos.gitlab_integration.issue_plan import enqueue_issue_plan
 
     enqueue_issue_analysis(payload, labels_list, gl_project_id)
+    enqueue_issue_plan(payload, labels_list, gl_project_id)
 
     frappe.db.commit()
 
@@ -1378,6 +1380,10 @@ def _handle_note_webhook(payload):
     # (e.g. "changed label to X", "closed") — those aren't real discussion.
     if obj_attrs.get("noteable_type") != "Issue" or obj_attrs.get("system"):
         return
+
+    from phamos.gitlab_integration.issue_plan import enqueue_plan_from_note
+
+    enqueue_plan_from_note(payload)
 
     project_info = payload.get("project", {})
     gl_project_id = project_info.get("id")
