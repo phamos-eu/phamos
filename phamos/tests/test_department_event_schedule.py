@@ -218,10 +218,11 @@ class TestMoveCompanyEvents(EventScheduleCase):
 	"""The patch moves the Company rows of #1814 to the General Management Department."""
 
 	def company_row(self, subject):
-		from frappe.utils import get_url_to_form
+		from urllib.parse import quote
 
 		row = frappe.new_doc("Team Daily Schedule")
-		description = f"Agenda\n\n{team_daily_schedule.AUTO_GENERATED_MARKER}\n{get_url_to_form('Company', self.company)}"
+		# Built in a request on another host than migrate's get_url() (e.g. a custom domain).
+		description = f"Agenda\n\n{team_daily_schedule.AUTO_GENERATED_MARKER}\nhttps://erp.example.com/app/company/{quote(self.company)}"
 		row.update({**self.event(subject=subject), "description": description, "parent": self.company, "parenttype": "Company",
 			"parentfield": "event_schedule", "idx": 1, "mailcow_uid": f"uid-{subject}", "mailcow_seq": 3, "mailcow_synced": 1})
 		row.db_insert()
@@ -238,7 +239,7 @@ class TestMoveCompanyEvents(EventScheduleCase):
 		self.assertEqual((moved.mailcow_uid, moved.mailcow_seq, moved.mailcow_synced), ("uid-Old company event", 3, 1))
 		self.assertFalse(frappe.db.exists("Custom Field", "Company-event_schedule"))
 		description = frappe.db.get_value("Team Daily Schedule", name, "description")
-		self.assertIn("/app/department/", description)
+		self.assertIn("https://erp.example.com/app/department/", description)
 		self.assertNotIn("/app/company/", description)
 		self.put.assert_not_called()
 		self.delete.assert_not_called()

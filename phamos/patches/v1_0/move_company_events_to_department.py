@@ -15,7 +15,7 @@ Event Schedule holds the company-wide appointments of the General Management Coc
 """
 
 import frappe
-from frappe.utils import get_url_to_form
+from frappe.utils.data import quoted, slug
 
 from phamos.setup.event_schedule import ensure_event_schedule_fields
 
@@ -26,6 +26,13 @@ COMPANY_FIELDS = ("Company-event_schedule", "Company-events_tab")
 def execute():
 	ensure_event_schedule_fields()  # the Department table must exist before rows move there
 	move_company_events(log_if_blocked=True)
+
+
+def _form_path(doctype, name):
+	"""The path part of get_url_to_form. The stored link was built in a request, whose host can
+	differ from the one get_url() finds during migrate (no host_name in site_config), so only the
+	path is matched and the host is kept."""
+	return f"/app/{quoted(slug(doctype))}/{quoted(name)}"
 
 
 def has_company_events():
@@ -57,13 +64,13 @@ def move_company_events(log_if_blocked=False):
 			)[0][0]
 			or 0
 		)
-		department_url = get_url_to_form("Department", department)
+		department_path = _form_path("Department", department)
 		for offset, row in enumerate(rows, start=1):
 			values = {"parenttype": "Department", "parent": department, "parentfield": "event_schedule", "idx": last_idx + offset}
 			description = row.description or ""
-			company_url = get_url_to_form("Company", row.parent)
-			if company_url in description:
-				values["description"] = description.replace(company_url, department_url)
+			company_path = _form_path("Company", row.parent)
+			if company_path in description:
+				values["description"] = description.replace(company_path, department_path)
 			frappe.db.set_value(ROW_DOCTYPE, row.name, values, update_modified=False)
 
 	for name in COMPANY_FIELDS:
