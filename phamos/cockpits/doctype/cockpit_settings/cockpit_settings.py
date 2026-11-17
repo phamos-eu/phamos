@@ -11,6 +11,20 @@ MIN_PRIVACY_REVEAL_SECONDS = 10
 
 
 class CockpitSettings(Document):
+	def on_update(self):
+		# Company events of #1814 move once the General Management Department is known (#1949).
+		# A site getting this release has no such department at migrate time, so the patch leaves
+		# them for this save.
+		from phamos.patches.v1_0 import move_company_events_to_department as move
+
+		if self.general_management_department and move.has_company_events():
+			moved = move.move_company_events()
+			if moved:
+				frappe.msgprint(
+					frappe._("{0} company events moved to the General Management Department.").format(moved),
+					alert=True,
+				)
+
 	def validate(self):
 		seconds = self.human_resources_privacy_reveal_seconds
 		if seconds is not None and seconds < MIN_PRIVACY_REVEAL_SECONDS:

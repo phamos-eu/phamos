@@ -157,7 +157,7 @@ class TestCockpitSettingsValidation(FrappeTestCase):
 		# the routes behind the buttons live in cockpit_settings.js (COCKPIT_ROUTES)
 		fields = frappe.get_meta(NEW).fields
 		tabs = [i for i, field in enumerate(fields) if field.fieldtype == "Tab Break"]
-		self.assertEqual(len(tabs), 6)
+		self.assertEqual(len(tabs), len(COCKPITS))
 		with open(frappe.get_app_path("phamos", "cockpits", "doctype", "cockpit_settings", "cockpit_settings.js")) as js:
 			script = js.read()
 		for i in tabs:

@@ -2262,3 +2262,43 @@ Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
 GitLab issue not linked,GitLab-Issue nicht verknüpft
 "The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.","Das GitLab-Issue wurde angelegt, ist aber nicht mit dieser Anfrage verknüpft. Meist ist sein Projekt noch nicht in ERPNext: Bitte vor dem nächsten „Sync Projects“ in {0} ausführen. Sonst siehe {1}."
+General Management,Geschäftsführung
+General Management Cockpit,Geschäftsführung-Cockpit
+General Management Department,Abteilung Geschäftsführung
+General Management Timesheet Project,Zeiterfassungsprojekt Geschäftsführung
+You do not have permission to access the General Management Cockpit,Sie haben keine Berechtigung für das Geschäftsführung-Cockpit
+Own department,Eigene Abteilung
+All departments,Alle Abteilungen
+Open in {0} Cockpit,Im {0}-Cockpit öffnen
+Dates,Zeitraum
+This task is not in a department with a cockpit.,Diese Aufgabe gehört zu keiner Abteilung mit Cockpit.
+Appointments,Termine
+New appointment,Neuer Termin
+Edit appointment,Termin bearbeiten
+Cancel appointment,Termin absagen
+This cancels the invite for all attendees,Damit wird die Einladung für alle Teilnehmenden abgesagt
+Keep it,Behalten
+Show past,Vergangene anzeigen
+No upcoming appointments,Keine anstehenden Termine
+{0} attendees,{0} Teilnehmende
+Not sent,Nicht gesendet
+Sent from,Gesendet von
+Pick a mailbox…,Postfach wählen…
+Save and send,Speichern und senden
+Attendees,Teilnehmende
+Required,Pflicht
+Nobody yet,Noch niemand
+Drag people here,Personen hierher ziehen
+Search people…,Personen suchen…
+Add everyone in {0},Alle aus {0} hinzufügen
+No people found,Keine Personen gefunden
+Remove {0},{0} entfernen
+Until,Bis
+No department,Keine Abteilung
+Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.
+Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
+Remove everyone in {0},Alle aus {0} entfernen
+The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
+Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
+Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
+Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein

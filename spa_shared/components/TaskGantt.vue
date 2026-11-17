@@ -40,11 +40,29 @@
 							:key="task.id"
 							type="button"
 							class="hr-gantt-list-row flex w-full items-center gap-2 border-b border-outline-gray-1 px-3 text-left text-xs text-ink-gray-8 hover:bg-surface-gray-2"
-							:class="{ 'hr-gantt-list-row--selected': task.id === selectedName }"
+							:class="{
+								'hr-gantt-list-row--selected': task.id === selectedName,
+								'hr-gantt-list-row--group': rowMeta(task.id).is_group,
+							}"
 							:style="{ height: `${ROW_HEIGHT}px` }"
 							@click="emit('select', task.id)"
 						>
-							<span class="min-w-0 flex-1 truncate font-medium">{{ task.name }}</span>
+							<template v-if="rowMeta(task.id).is_group">
+								<!-- Department header row of the company view (#1948): click collapses it. -->
+								<FeatherIcon
+									:name="rowMeta(task.id).collapsed ? 'chevron-right' : 'chevron-down'"
+									class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5"
+								/>
+								<span
+									class="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+									:style="{ backgroundColor: rowMeta(task.id).color }"
+								/>
+								<span class="min-w-0 flex-1 truncate font-semibold">{{ task.name }}</span>
+								<span class="flex-shrink-0 text-[10px] text-ink-gray-5">
+									{{ rowMeta(task.id).group_count }}
+								</span>
+							</template>
+							<span v-else class="min-w-0 flex-1 truncate font-medium">{{ task.name }}</span>
 							<span
 								v-if="taskStatus(task.id)"
 								class="flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] text-ink-gray-5"
@@ -142,6 +160,8 @@
 					>
 						Link
 					</Button>
+					<!-- Extra controls of the hosting view, e.g. "Own / All departments" (#1948). -->
+					<slot name="toolbar" />
 					<label class="ml-auto flex items-center gap-2 text-[11px] text-ink-gray-5">
 						Zoom
 						<input
@@ -250,6 +270,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import Gantt from "frappe-gantt"
+import { FeatherIcon } from "frappe-ui"
 import InboxStatusFilter from "@spa/components/InboxStatusFilter.vue"
 import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime"
@@ -360,6 +381,10 @@ const ganttTasks = computed(() =>
 			const colorCls = taskColorClass(t.color)
 			if (colorCls) classes.push(colorCls)
 			if (t.name === props.selectedName) classes.push("bar-selected")
+			// Rows the hosting view marks read-only can't be dragged, resized or linked (#1948).
+			if (t.locked || t.is_group) classes.push("bar-locked")
+			if (t.is_group) classes.push("gantt-dept-header")
+			if (t.empty) classes.push("gantt-dept-header-empty")
 			return {
 				id: t.name,
 				name: t.subject || t.name,
@@ -432,6 +457,26 @@ const taskStatusMap = computed(() => {
 
 function taskStatus(id) {
 	return taskStatusMap.value[id] || ""
+}
+
+const rowMetaMap = computed(() => Object.fromEntries(props.tasks.map((t) => [t.name, t])))
+
+/** The row as the hosting view passed it (is_group, collapsed, group_count, locked …). */
+function rowMeta(id) {
+	return rowMetaMap.value[id] || {}
+}
+
+function isLocked(id) {
+	const row = rowMeta(id)
+	return Boolean(row.locked || row.is_group)
+}
+
+/** frappe-gantt has no read-only bars: it starts a drag on a mousedown delegated from its SVG.
+ *  Stopping that mousedown on the host (capture phase) for locked bars keeps them in place,
+ *  while clicks still select them. */
+function onHostMouseDown(e) {
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (wrapper && isLocked(wrapper.getAttribute("data-id"))) e.stopPropagation()
 }
 
 function toggleLinkMode() {
@@ -633,6 +678,7 @@ function applyGanttFrame() {
 }
 
 function handleLinkClick(taskId) {
+	if (isLocked(taskId)) return
 	if (!linkFrom.value) {
 		linkFrom.value = taskId
 		updateBarStateClasses()
@@ -677,6 +723,11 @@ function buildGantt() {
 				emit("select", task.id)
 			},
 			on_date_change: (task, start, end) => {
+				// A locked bar only moves along with a predecessor it depends on: redraw, don't save.
+				if (isLocked(task.id)) {
+					applyGanttFrame()
+					return
+				}
 				emit("date-change", {
 					name: task.id,
 					exp_start_date: formatDateIso(start),
@@ -858,6 +909,7 @@ watch(linkFrom, () => updateBarStateClasses())
 onMounted(() => {
 	initFrame()
 	document.addEventListener("keydown", onKeyDown)
+	ganttHost.value?.addEventListener("mousedown", onHostMouseDown, true)
 	ganttTasksSignature = tasksSignature(ganttTasks.value)
 	buildGantt()
 	bodyScroll.value?.addEventListener("wheel", onWheel, { passive: false })
@@ -890,6 +942,7 @@ onUnmounted(() => {
 	listFooterResizeObserver?.disconnect()
 	listFooterResizeObserver = null
 	document.removeEventListener("keydown", onKeyDown)
+	ganttHost.value?.removeEventListener("mousedown", onHostMouseDown, true)
 	bodyScroll.value?.removeEventListener("wheel", onWheel)
 	document.getElementById(BAR_COLOR_STYLE_ID)?.remove()
 	destroyGantt()
@@ -928,5 +981,33 @@ onUnmounted(() => {
 
 .hr-gantt--link-mode .hr-gantt-body {
 	cursor: crosshair;
+}
+
+/* Read-only rows of the company view (#1948): no resize or progress handles. */
+:deep(.bar-locked .handle) {
+	display: none;
+}
+
+:deep(.bar-locked) {
+	cursor: pointer;
+}
+
+/* Department header row: a thin summary bar over the department's span. */
+:deep(.gantt-dept-header .bar) {
+	transform: scaleY(0.35);
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+:deep(.gantt-dept-header .bar-progress) {
+	display: none;
+}
+
+:deep(.gantt-dept-header-empty) {
+	display: none;
+}
+
+.hr-gantt-list-row--group {
+	background-color: var(--surface-gray-1);
 }
 </style>
