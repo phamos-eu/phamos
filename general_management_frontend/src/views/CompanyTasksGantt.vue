@@ -164,6 +164,10 @@ async function openOwnTask(name) {
 	detailLoading.value = true
 	try {
 		selectedTask.value = await call(`${API}.get_task`, { name })
+	} catch (e) {
+		// Not an own Task (e.g. a pasted link to another department's): no empty panel.
+		closeTask()
+		toast({ title: e?.messages?.[0] || "Could not load task", icon: "x-circle", iconClasses: "text-ink-red-4" })
 	} finally {
 		detailLoading.value = false
 	}
@@ -244,6 +248,8 @@ useUserRealtime("cockpit_todos_changed", loadGroups)
 onMounted(async () => {
 	await loadOptions()
 	await loadGroups()
-	if (route.params.name) onSelect(route.params.name)
+	// /tasks/gantt/<name> is for own Tasks only, also own subtasks and completed ones that the
+	// company view doesn't list, so a link always opens the editable detail (as the route watcher).
+	if (route.params.name) openOwnTask(route.params.name)
 })
 </script>
