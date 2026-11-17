@@ -27,6 +27,7 @@ from frappe.utils import add_to_date, cint, date_diff, get_datetime, now_datetim
 from phamos.api import issue_chat
 from phamos.api.personal_focus import _minutes_between
 from phamos.cockpits.permissions import can_read_idea, is_colleague
+from phamos.cockpits.settings import COCKPIT_SETTINGS as SETTINGS
 from phamos.cockpits.defaults import (
 	IDEA_AIM_FACTORS,
 	IDEA_CLOSED_STAGES,
@@ -45,7 +46,6 @@ SESSION_DOCTYPE = "Idea Writing Session"
 EVENT = "cockpit_idea_changed"
 VOTE_DOCTYPE = "Idea Vote"
 VOTE_EVENT = "cockpit_idea_vote_changed"
-SETTINGS = "phamos Settings"
 SNAPSHOT_FIELDS = ("title", "stage", "content")
 LIST_FIELDS = [
 	"name",
