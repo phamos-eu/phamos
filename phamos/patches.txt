@@ -66,4 +66,6 @@ phamos.patches.v1_0.set_delivery_note_monthly_implementation_summary
 phamos.patches.v1_0.set_employment_contract_leave_days
 phamos.patches.v1_0.set_personal_ideas_show_author_default
 phamos.patches.v1_0.backfill_lead_direction
+phamos.patches.v1_0.move_cockpit_settings
+phamos.patches.v1_0.set_cockpit_window_defaults #2026-11-17 glow edges and breathing
 phamos.patches.v1_0.rename_phriend_type_idea_to_improvement
