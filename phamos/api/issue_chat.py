@@ -48,8 +48,12 @@ COCKPIT_PATHS = (
 	("accounting_department", "/accounting-cockpit"),
 	("project_management_department", "/project-management-cockpit"),
 	("software_development_department", "/software-development-cockpit"),
+	("general_management_department", "/general-management-cockpit"),
 )
 PERSONAL_COCKPIT_PATH = "/personal-cockpit"
+# Cockpits that only some users may open: a record there opens in the Personal Cockpit for the
+# others, instead of a "Not Permitted" page (#1946).
+GATED_COCKPITS = {"/general-management-cockpit": "phamos.api.general_management_spa.check_app_permission"}
 
 
 def is_raven_installed():
@@ -841,7 +845,8 @@ def document_link(doctype, docname):
 def record_cockpit_path(doctype, name):
 	"""The cockpit a record belongs to: the one whose department is the record's own department
 	(Issue: custom_department, Task: department) or else its project's department; otherwise the
-	Personal Cockpit. Ideas live in the Personal Cockpit only."""
+	Personal Cockpit. Ideas live in the Personal Cockpit only. A gated cockpit (GATED_COCKPITS) the
+	session user may not open also falls back to the Personal Cockpit."""
 	if doctype == "Idea":
 		return PERSONAL_COCKPIT_PATH
 	department_field = "custom_department" if doctype == "Issue" else "department"
@@ -858,6 +863,9 @@ def record_cockpit_path(doctype, name):
 			if settings_meta.has_field(fieldname) and (
 				frappe.db.get_single_value(COCKPIT_SETTINGS, fieldname) == department
 			):
+				gate = GATED_COCKPITS.get(path)
+				if gate and not frappe.get_attr(gate)():
+					return PERSONAL_COCKPIT_PATH
 				return path
 	return PERSONAL_COCKPIT_PATH
 

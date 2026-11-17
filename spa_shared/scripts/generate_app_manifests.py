@@ -82,6 +82,14 @@ APPS = [
 		"symbol": "code",
 	},
 	{
+		"slug": "general-management",
+		"name": "General Management",
+		"description": "Company targets, the departments' work and company-wide appointments",
+		"route": "/general-management-cockpit",
+		"color": "#a16207",
+		"symbol": "compass",
+	},
+	{
 		"slug": "personal",
 		"name": "Personal Cockpit",
 		"description": "Issues, tasks and checklists assigned to me",
