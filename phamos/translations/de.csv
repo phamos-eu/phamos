@@ -2098,3 +2098,6 @@ Add note,Notiz hinzufügen
 1 note,1 Notiz
 {0} notes,{0} Notizen
 last {0},zuletzt {0}
+Cockpit Settings,Cockpit-Einstellungen
+{0} Department is not configured in Cockpit Settings.,Die Abteilung für {0} ist in den Cockpit-Einstellungen nicht festgelegt.
+Task department must match {0} department in Cockpit Settings.,Die Abteilung der Aufgabe muss der Abteilung für {0} in den Cockpit-Einstellungen entsprechen.

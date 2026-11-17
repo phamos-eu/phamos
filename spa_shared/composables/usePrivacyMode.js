@@ -37,7 +37,7 @@ function hide() {
 	stopTicker()
 }
 
-/** Turn privacy mode on for this cockpit; `seconds` comes from Phamos Settings. */
+/** Turn privacy mode on for this cockpit; `seconds` comes from Cockpit Settings. */
 export function enablePrivacyMode(seconds) {
 	if (Number(seconds) > 0) revealSeconds.value = Number(seconds)
 	enabled.value = true
