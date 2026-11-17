@@ -1,5 +1,6 @@
 import { createSpaRouter } from "@spa/router.js"
 import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
+import TasksGanttPage from "./views/TasksGanttPage.vue"
 import spaConfig from "./config"
 
 export default createSpaRouter({
@@ -9,6 +10,18 @@ export default createSpaRouter({
 			path: "/checklists/home",
 			name: "ChecklistsHome",
 			component: ChecklistsHome,
+		},
+		// Same names as the shared routes, so they replace them (#1604): the Tasks Gantt gets
+		// "Own department / All departments" (#1948).
+		{
+			path: "/tasks/gantt",
+			name: "TasksGantt",
+			component: TasksGanttPage,
+		},
+		{
+			path: "/tasks/gantt/:name",
+			name: "TaskDetail",
+			component: TasksGanttPage,
 		},
 	],
 })
