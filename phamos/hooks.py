@@ -130,7 +130,9 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
-    "Customer": "public/js/customer.js",
+    # party_account.js before customer.js / supplier.js: they call phamos.party_account (#1529)
+    "Customer": ["public/js/party_account.js", "public/js/customer.js"],
+    "Supplier": ["public/js/party_account.js", "public/js/supplier.js"],
     "Company": "public/js/company.js",
     "Delivery Note": "public/js/delivery_note.js",
 
@@ -464,6 +466,8 @@ doc_events = {
         "before_validate": "phamos.marketing.crm.lead_set_direction",
     },
     "Customer": {
+        # Debtor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
         "on_update": [
             "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer",
             "phamos.web_profile.mirror.push_to_profiles",
@@ -484,7 +488,11 @@ doc_events = {
         ]
     },
     "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Supplier": {
+        # Creditor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
+        "on_update": "phamos.web_profile.mirror.push_to_profiles",
+    },
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
