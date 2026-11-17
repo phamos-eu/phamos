@@ -7,7 +7,8 @@ Called from `after_migrate`. Idempotent.
 
 Placement follows the convention in phamos/cockpits/setup.py: the section "Implementation Specific" at the
 very top of the form. Issue starts with a Section Break (subject_section), which closes the section. The
-section is shown only on Issues that Phriend created (phriend_type is set).
+section is shown on Issues that Phriend created (phriend_type is set) and on Issues with a GitLab issue
+(gitlab_issue_url, the first one, is set); the Phriend-only fields inside it stay hidden on the others.
 """
 
 import frappe
@@ -17,6 +18,7 @@ MODULE = "Phriend"
 REPORT_DOCTYPE = "Issue"
 IMPLEMENTATION_SECTION = "custom_implementation_specific"
 ONLY_PHRIEND = "eval:doc.phriend_type"
+PHRIEND_OR_GITLAB = "eval:doc.phriend_type || doc.gitlab_issue_url"
 
 _FIELDS = [
 	{
@@ -25,7 +27,7 @@ _FIELDS = [
 		"fieldtype": "Section Break",
 		"insert_after": "",
 		"collapsible": 0,
-		"depends_on": ONLY_PHRIEND,
+		"depends_on": PHRIEND_OR_GITLAB,
 	},
 	{
 		"fieldname": "phriend_reported_by",
@@ -59,24 +61,34 @@ _FIELDS = [
 		"fieldtype": "Select",
 		"options": "\nBug\nImprovement\nQuestion\nOther",
 		"in_standard_filter": 1,
+		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_source_system",
 	},
 	{
 		"fieldname": "phriend_comment",
 		"label": "Reporter Comment",
 		"fieldtype": "Small Text",
+		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_type",
 	},
+	# the first GitLab issue; the block below lists all of them (GitLab Issue.issue)
 	{
 		"fieldname": "gitlab_issue_url",
 		"label": "GitLab Issue",
 		"fieldtype": "Data",
 		"options": "URL",
 		"read_only": 1,
+		"hidden": 1,
 		"no_copy": 1,
 		"insert_after": "phriend_comment",
 	},
-	{"fieldname": "phriend_col", "fieldtype": "Column Break", "insert_after": "gitlab_issue_url"},
+	{
+		"fieldname": "phriend_gitlab_issues",
+		"label": "GitLab Issues",
+		"fieldtype": "HTML",
+		"insert_after": "gitlab_issue_url",
+	},
+	{"fieldname": "phriend_col", "fieldtype": "Column Break", "insert_after": "phriend_gitlab_issues"},
 	{
 		"fieldname": "phriend_screenshot_preview",
 		"label": "Screenshot Preview",
@@ -87,6 +99,7 @@ _FIELDS = [
 		"fieldname": "phriend_screenshot",
 		"label": "Screenshot",
 		"fieldtype": "Attach Image",
+		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_screenshot_preview",
 	},
 	# where it happened + raw context, collapsed

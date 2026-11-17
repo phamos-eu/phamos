@@ -9,10 +9,16 @@ import frappe
 
 
 def execute():
+	# Percent Billable is a Select, stored as text. Records from the short-lived "Internal" option
+	# (added in d61c0d0a, reverted in 369670d8) still hold that text, and MariaDB in strict mode refuses
+	# arithmetic on it. Like compute_billable_hours (flt), anything that isn't a number counts as 0.
 	frappe.db.sql(
 		"""
 		UPDATE `tabTimesheet Record`
-		SET billable_hours = IFNULL(actual_time, 0) / 3600 * IFNULL(percent_billable, 0) / 100
+		SET billable_hours = IFNULL(actual_time, 0) / 3600 * (
+			CASE WHEN percent_billable REGEXP '^[0-9]+([.][0-9]+)?$'
+			THEN CAST(percent_billable AS DECIMAL(10, 4)) ELSE 0 END
+		) / 100
 		WHERE docstatus = 1
 		"""
 	)
