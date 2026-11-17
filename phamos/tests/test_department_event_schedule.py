@@ -250,3 +250,18 @@ class TestMoveCompanyEvents(EventScheduleCase):
 			move_patch.execute()
 		log.assert_called_once()
 		self.assertEqual(frappe.db.get_value("Team Daily Schedule", name, "parenttype"), "Company")
+
+	def test_setting_the_department_later_moves_them(self):
+		"""Production: the department setting is new in this release, so it is empty at migrate time."""
+		frappe.db.set_single_value("Cockpit Settings", "general_management_department", None)
+		name = self.company_row("Waits for the department")
+		with patch.object(frappe, "log_error"):
+			move_patch.execute()
+
+		settings = frappe.get_doc("Cockpit Settings")
+		settings.general_management_department = self.department
+		settings.save()
+		self.assertEqual(
+			frappe.db.get_value("Team Daily Schedule", name, ["parenttype", "parent"]), ("Department", self.department)
+		)
+		self.put.assert_not_called()
