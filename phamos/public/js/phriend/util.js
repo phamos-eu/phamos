@@ -80,8 +80,9 @@ export function watch_theme(apply, root = document.documentElement, os_dark = os
 
 function is_transparent(color) {
 	if (!color || color === "transparent") return true;
-	// rgba(0, 0, 0, 0) and rgb(0 0 0 / 0), as getComputedStyle reports an unset background
-	return /(,|\/)\s*0(\.0*)?\s*\)$/.test(color);
+	// rgba(0, 0, 0, 0) and rgb(0 0 0 / 0), as getComputedStyle reports an unset background;
+	// only the alpha counts, so solid black rgb(0, 0, 0) is not transparent
+	return /^rgba\((?:[^,]*,){3}\s*0(\.0*)?\s*\)$/.test(color) || /\/\s*0(\.0*)?\s*\)$/.test(color);
 }
 
 // The colour behind the page, for the screenshot: the first of the given computed backgrounds

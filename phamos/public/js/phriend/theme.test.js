@@ -10,6 +10,10 @@ describe("page_background", () => {
 		for (const c of ["", "transparent", "rgba(0, 0, 0, 0)", "rgb(0 0 0 / 0)", "rgba(10, 10, 10, 0.0)"])
 			expect(page_background([c], "light")).toBe("#ffffff")
 	})
+	it("keeps a solid black background", () => {
+		expect(page_background(["rgb(0, 0, 0)"], "light")).toBe("rgb(0, 0, 0)")
+		expect(page_background(["rgb(0 0 0)"], "light")).toBe("rgb(0 0 0)")
+	})
 	it("keeps half-transparent backgrounds", () => {
 		expect(page_background(["rgba(0, 0, 0, 0.5)"], "light")).toBe("rgba(0, 0, 0, 0.5)")
 	})
