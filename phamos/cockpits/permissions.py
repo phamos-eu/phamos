@@ -75,6 +75,9 @@ def idea_has_permission(doc, ptype=None, user=None):
 	user = user or frappe.session.user
 	if not _private(user) or doc.user == user:
 		return True
+	# A new idea from the Desk form has no user yet; Idea.validate makes it the creator's (#1951).
+	if doc.is_new() and not doc.user:
+		return True
 	# Handed in for a vote: everyone may read it; only the owner changes it.
 	return doc.get("vote_status") == IDEA_VOTE_OPEN and (ptype or "read") in ("read", "select")
 
