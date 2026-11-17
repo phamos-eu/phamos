@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { call, toast } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
@@ -80,11 +80,29 @@ async function switchTeam(name) {
 	window.location.assign(spaConfig.basePath)
 }
 
-onMounted(async () => {
+async function loadTeams() {
 	const data = await call(`${spaConfig.api}.get_teams`)
+	// The active team is stored per user, not per window: when it was switched in another window,
+	// this one would still show the old team's name while the server already works with the new
+	// one. Start over on the new team instead.
+	if (team.value && data.active && data.active !== team.value) {
+		window.location.assign(spaConfig.basePath)
+		return
+	}
 	team.value = data.active || ""
 	teams.value = data.teams || []
+}
+
+function onVisible() {
+	if (document.visibilityState === "visible") loadTeams()
+}
+
+onMounted(() => {
+	loadTeams()
+	document.addEventListener("visibilitychange", onVisible)
 })
+
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible))
 
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {

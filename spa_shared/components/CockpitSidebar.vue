@@ -12,7 +12,7 @@
 				<Dropdown v-if="menu.length" :options="menu" placement="left">
 					<button
 						type="button"
-						class="-ml-1 flex min-w-0 items-center gap-1 rounded px-1 py-1 text-sm font-semibold text-ink-gray-9 hover:bg-surface-gray-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+						class="-ml-1 flex max-w-[9.5rem] items-center gap-1 rounded px-1 py-1 text-sm font-semibold text-ink-gray-9 hover:bg-surface-gray-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 						:title="__('Switch cockpit')"
 					>
 						<span class="truncate">{{ label }}</span>

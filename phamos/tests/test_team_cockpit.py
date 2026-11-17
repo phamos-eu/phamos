@@ -183,6 +183,12 @@ class TestTeamCockpitAccess(TeamCockpitTestCase):
 		self.assertIn(ALPHA, names)
 		self.assertIn(BETA, names)
 
+	def test_system_manager_opens_every_team_without_being_a_member(self):
+		frappe.set_user(_make_user(MANAGER, ["System Manager"]))
+		self.assertEqual(teams.member_teams(), [])
+		self.assertTrue({ALPHA, BETA} <= set(teams.available_teams()))
+		self.assertEqual(tc.set_active_team(BETA)["active"], BETA)
+
 	def test_an_inactive_employee_is_no_member(self):
 		frappe.db.set_value("Employee", {"user_id": MEMBER}, "status", "Left")
 		frappe.set_user(MEMBER)
@@ -299,6 +305,51 @@ class TestTeamScope(TeamCockpitTestCase):
 		frappe.set_user(MEMBER)
 		with self.assertRaises(frappe.ValidationError):
 			tc.create_checklist("Task", theirs.name)
+
+	def test_link_search_for_a_new_checklist_finds_the_teams_records(self):
+		# Called the way the "Linked record" field calls it: through the link search, which passes
+		# the arguments by position. A decorator in the wrong order breaks exactly this.
+		from frappe.desk.search import search_widget
+
+		mine, theirs = self.task("Alpha searchable task", ALPHA), self.task("Beta searchable task", BETA)
+		frappe.set_user(MEMBER)
+		rows = search_widget(
+			"Task", "searchable", query="phamos.api.team_cockpit.checklist_reference_query", page_length=20
+		)
+		names = {row[0] for row in rows}
+		self.assertIn(mine.name, names)
+		self.assertNotIn(theirs.name, names)
+
+	def test_another_teams_records_cannot_be_changed(self):
+		issue, task, mine = self.issue("Beta issue", BETA), self.task("Beta task", BETA), self.task("Alpha task", ALPHA)
+		frappe.set_user(MEMBER)
+		for change in (
+			lambda: tc.update_issue(issue.name, subject="Taken over"),
+			lambda: tc.update_status(issue.name, "Closed"),
+			lambda: tc.set_assignees(issue.name, [MEMBER]),
+			lambda: tc.update_task(task.name, subject="Taken over"),
+			lambda: tc.update_task_status(task.name, "Working"),
+			lambda: tc.set_task_assignees(task.name, [MEMBER]),
+			lambda: tc.add_task_dependency(mine.name, task.name),
+			lambda: tc.create_task_from_issue(
+				issue.name, exp_start_date=today(), exp_end_date=add_days(today(), 1), assignees=[MEMBER]
+			),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				change()
+		self.assertEqual(frappe.db.get_value("Issue", issue.name, ["subject", "status"]), ("Beta issue", "Open"))
+		self.assertEqual(frappe.db.get_value("Task", task.name, "subject"), "Beta task")
+
+	def test_the_timesheet_task_list_stays_empty(self):
+		# a team has no timesheet project; the endpoint must not list any project's Tasks instead
+		project = frappe.get_doc({"doctype": "Project", "project_name": "_Test Team Cockpit Other"}).insert(
+			ignore_permissions=True
+		)
+		frappe.get_doc({"doctype": "Task", "subject": "Not the team's", "project": project.name}).insert(
+			ignore_permissions=True
+		)
+		frappe.set_user(MEMBER)
+		self.assertEqual(tc.get_timesheet_project_tasks(project=project.name), [])
 
 
 class TestCockpitSwitcher(TeamCockpitTestCase):

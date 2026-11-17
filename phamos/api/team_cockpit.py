@@ -257,9 +257,11 @@ def create_checklist(
 	)
 
 
+# _require_access goes outside the search decorator: that one maps the positional arguments the
+# link search passes by the function's own argument names, which a wrapper below it would hide.
 @frappe.whitelist()
-@frappe.validate_and_sanitize_search_inputs
 @_require_access
+@frappe.validate_and_sanitize_search_inputs
 def checklist_reference_query(doctype, txt, searchfield, start, page_len, filters):
 	"""Search team-scoped Issue/Task parents for Checklist creation."""
 	return dc.checklist_reference_query(CONFIG, doctype, txt, searchfield, start, page_len, filters)

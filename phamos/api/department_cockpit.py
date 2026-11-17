@@ -368,6 +368,9 @@ def get_timesheet_project_tasks(config: CockpitConfig, project=None):
 	"""Return open Tasks for the configured timesheet/standard project."""
 	frappe.has_permission("Task", "read", throw=True)
 	department = _require_department(config)
+	if config.is_team:
+		# a team has no timesheet project yet; without this any project's Tasks could be listed
+		return []
 	project = project or _get_project(config)
 	if not project:
 		return []
