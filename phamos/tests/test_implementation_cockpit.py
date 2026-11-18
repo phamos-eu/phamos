@@ -8,6 +8,8 @@ and that are shown on the customer portal; nothing else is reachable, and intern
 leave the server.
 """
 
+import unittest.mock
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -326,6 +328,12 @@ class TestImplementationCockpit(FrappeTestCase):
 			ic.get_links(self.hidden)
 
 
+	def test_wide_ranges_give_a_bounded_chart(self):
+		summary = ic.get_timesheet_summary(self.by_contact, from_date="1900-01-01", to_date="2999-12-31", group_by="week")
+		self.assertLessEqual(len(summary["periods"]), ic.MAX_PERIODS)
+		self.assertEqual(summary["hours"], 14)
+
+
 def _issue(name, implementation, reporter="Administrator", route="", ref_doctype=None, ref_docname=None, status="Open"):
 	frappe.get_doc(
 		{
@@ -446,3 +454,19 @@ class TestImplementationCockpitIssues(FrappeTestCase):
 		self.assertEqual(ic.get_issue_counts(self.impl), {"open": 3, "mine": 2})
 		frappe.set_user(USER)
 		self.assertIsNone(ic.get_issue_counts(self.impl))
+
+
+	def test_issue_reads_follow_desk_permissions(self):
+		from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
+
+		staff = frappe.get_doc("User", self.staff)
+		staff.add_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertTrue(ic.get_issues(self.impl, scope="implementation")["issues"])
+		# a staff member Desk keeps away from Issues sees none here either
+		with unittest.mock.patch("frappe.has_permission", return_value=False), unittest.mock.patch(
+			"frappe.get_list", return_value=[]
+		):
+			self.assertEqual(ic.get_issues(self.impl, scope="implementation")["issues"], [])
+			with self.assertRaises(frappe.PermissionError):
+				ic.get_issue(self.impl, self.on_page)

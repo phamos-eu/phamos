@@ -237,6 +237,8 @@ TIMESHEET_SORT_FIELDS = {
 }
 MAX_PAGE_LENGTH = 500
 MAX_EXPORT_ROWS = 10000
+# Bars in the timesheet chart: five years of weeks, or about 20 years of months.
+MAX_PERIODS = 260
 
 
 def _implementation_projects(implementation):
@@ -382,11 +384,15 @@ def get_timesheet_summary(implementation, from_date=None, to_date=None, project=
 	dates = [r.start_date for r in rows]
 	first = getdate(from_date) if from_date else (min(dates) if dates else None)
 	last = getdate(to_date) if to_date else (max(dates) if dates else None)
+	# A very wide range (dates come from the caller) would mean thousands of empty periods:
+	# then show the span that has timesheets, and never more than MAX_PERIODS bars.
+	if first and last and _period_count(first, last, group_by) > MAX_PERIODS and dates:
+		first, last = max(first, min(dates)), min(last, max(dates))
 	periods = []
 	if first and last:
 		key = _period_start(first, group_by)
 		end = _period_start(last, group_by)
-		while key <= end:
+		while key <= end and len(periods) < MAX_PERIODS:
 			total, bill = buckets.get(key, (0.0, 0.0))
 			periods.append({"start": key, "hours": round(total, 2), "billable": round(bill, 2)})
 			key = add_days(key, 7) if group_by == "week" else add_months(key, 1)
@@ -399,6 +405,13 @@ def get_timesheet_summary(implementation, from_date=None, to_date=None, project=
 		"group_by": group_by,
 		"periods": periods,
 	}
+
+
+def _period_count(first, last, group_by):
+	first, last = getdate(first), getdate(last)
+	if group_by == "week":
+		return (last - first).days // 7 + 1
+	return (last.year - first.year) * 12 + last.month - first.month + 1
 
 
 def _period_start(value, group_by):
@@ -583,6 +596,15 @@ def _issue_filters(implementation, scope, route=None, ref_doctype=None, ref_docn
 	return filters
 
 
+def _count_issues(filters):
+	"""Issues the user may read in Desk (role and User Permissions), counted.
+
+	The cockpit never shows more reports than Desk would: `frappe.get_list` applies the
+	doctype permissions and User Permissions that `frappe.db.count` skips.
+	"""
+	return len(frappe.get_list("Issue", filters=filters, pluck="name", limit_page_length=0))
+
+
 def issue_stage(status, gitlab_issues):
 	"""Where an Issue stands, from its own status and its GitLab issues' state and labels."""
 	if status in CLOSED_ISSUE_STATUSES:
@@ -620,10 +642,10 @@ def get_issues(implementation, scope=None, route=None, ref_doctype=None, ref_doc
 
 	status_filter = {} if cint(include_closed) else {"status": ["not in", CLOSED_ISSUE_STATUSES]}
 	counts = {
-		s: frappe.db.count("Issue", {**_issue_filters(implementation, s, route, ref_doctype, ref_docname), **status_filter})
+		s: _count_issues({**_issue_filters(implementation, s, route, ref_doctype, ref_docname), **status_filter})
 		for s in available
 	}
-	rows = frappe.get_all(
+	rows = frappe.get_list(  # as Desk shows them: role and User Permissions apply
 		"Issue",
 		filters={**_issue_filters(implementation, scope, route, ref_doctype, ref_docname), **status_filter},
 		fields=ISSUE_LIST_FIELDS,
@@ -644,8 +666,8 @@ def get_issue_counts(implementation):
 		return None
 	open_filter = {"custom_implementation": implementation, "status": ["not in", CLOSED_ISSUE_STATUSES]}
 	return {
-		"open": frappe.db.count("Issue", open_filter),
-		"mine": frappe.db.count("Issue", {**open_filter, "phriend_reported_by": frappe.session.user}),
+		"open": _count_issues(open_filter),
+		"mine": _count_issues({**open_filter, "phriend_reported_by": frappe.session.user}),
 	}
 
 
@@ -656,6 +678,9 @@ def get_issue(implementation, name):
 	_require_internal()
 	if frappe.db.get_value("Issue", name, "custom_implementation") != implementation:
 		frappe.throw(_("This issue does not belong to the implementation."), frappe.PermissionError)
+	# what Desk would allow, including User Permissions; screenshot and comment are part of it
+	if not frappe.has_permission("Issue", "read", doc=name):
+		frappe.throw(_("You do not have access to this issue."), frappe.PermissionError)
 	from phamos.phriend.gitlab_issues import issue_gitlab_issues
 
 	row = frappe.db.get_value(
@@ -680,7 +705,8 @@ def resolve_status(route=None, ref_doctype=None, ref_docname=None, issue=None):
 	"""
 	_require_internal()
 	if issue:
-		implementation = frappe.db.get_value("Issue", issue, "custom_implementation")
+		readable = frappe.db.exists("Issue", issue) and frappe.has_permission("Issue", "read", doc=issue)
+		implementation = frappe.db.get_value("Issue", issue, "custom_implementation") if readable else None
 	else:
 		from phamos.phriend.api import report_implementation
 

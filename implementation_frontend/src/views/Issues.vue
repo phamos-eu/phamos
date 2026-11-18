@@ -99,11 +99,22 @@ const emptyText = computed(() =>
 	includeClosed.value ? __("No issues reported here.") : __("No open issues reported here.")
 )
 
-watch(() => [props.implementation, route.query.scope, route.query.route, route.query.ref_docname, includeClosed.value], load, {
+// The scope the server picked; writing it into the URL must not load the list a second time.
+let echoedScope = null
+let requestId = 0
+
+watch(() => [props.implementation, route.query.scope, route.query.route, route.query.ref_docname, includeClosed.value], () => {
+	if (echoedScope && route.query.scope === echoedScope) {
+		echoedScope = null
+		return
+	}
+	load()
+}, {
 	immediate: true,
 })
 
 async function load() {
+	const id = ++requestId
 	loading.value = true
 	error.value = ""
 	try {
@@ -115,15 +126,19 @@ async function load() {
 			ref_docname: route.query.ref_docname || null,
 			include_closed: includeClosed.value ? 1 : 0,
 		})
+		if (id !== requestId) return // a newer request (other scope or implementation) wins
 		issues.value = data?.issues || []
 		available.value = data?.available || []
 		counts.value = data?.counts || {}
 		stages.value = data?.stages || stages.value
-		if (data?.scope && data.scope !== route.query.scope) router.replace({ query: { ...route.query, scope: data.scope } })
+		if (data?.scope && data.scope !== route.query.scope) {
+			echoedScope = data.scope
+			router.replace({ query: { ...route.query, scope: data.scope } })
+		}
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || __("Could not load the issues")
+		if (id === requestId) error.value = e?.messages?.[0] || e?.message || __("Could not load the issues")
 	} finally {
-		loading.value = false
+		if (id === requestId) loading.value = false
 	}
 }
 

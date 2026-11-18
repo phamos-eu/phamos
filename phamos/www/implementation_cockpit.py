@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from phamos.www.spa_boot import get_spa_boot, theme_color
-from phamos.api.implementation_cockpit import check_app_permission, is_internal_user
+from phamos.api.implementation_cockpit import has_internal_access, is_internal_user
 
 no_cache = 1
 
@@ -14,7 +14,11 @@ def get_context(context):
 		frappe.local.flags.redirect_location = "/login?redirect-to=/implementation-cockpit"
 		raise frappe.Redirect
 
-	if not check_app_permission():
+	# Staff need the cockpit role. Customers may always open the page: without a shared
+	# implementation the cockpit shows "No implementation shared with you yet" instead of an
+	# error. The data endpoints check the scope themselves; the Apps screen keeps the stricter
+	# check_app_permission.
+	if is_internal_user() and not has_internal_access():
 		frappe.throw(
 			_("You do not have permission to access the Implementation Cockpit"), frappe.PermissionError
 		)

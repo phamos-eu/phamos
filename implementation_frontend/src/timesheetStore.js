@@ -30,9 +30,20 @@ export async function initTimesheets(implementation, query = {}) {
 		sheets.projects = []
 		sheets.rows = []
 		sheets.summary = null
-		const data = await call(`${spaConfig.api}.get_timesheet_filters`, { implementation })
-		sheets.projects = data?.projects || []
-		sheets.defaults = { from: data?.default_from || "", to: data?.default_to || "" }
+		sheets.error = ""
+		try {
+			const data = await call(`${spaConfig.api}.get_timesheet_filters`, { implementation })
+			// the user may have switched implementation while this was loading
+			if (sheets.implementation !== implementation) return
+			sheets.projects = data?.projects || []
+			sheets.defaults = { from: data?.default_from || "", to: data?.default_to || "" }
+		} catch (e) {
+			if (sheets.implementation !== implementation) return
+			// load the filters again on the next visit
+			sheets.implementation = null
+			sheets.error = e?.messages?.[0] || e?.message || __("Could not load the timesheets")
+			return
+		}
 	}
 	sheets.filters = {
 		from: query.from ?? sheets.defaults.from,
