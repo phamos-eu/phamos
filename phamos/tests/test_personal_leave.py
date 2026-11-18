@@ -9,6 +9,7 @@ and a leave-without-pay type (both rolled back). version-15 has no leave calenda
 """
 
 import unittest
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
