@@ -166,7 +166,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Implementation Status",
-   "options": "1 ☀️ - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 🌤️ - zu viele neue Issues, feedback langsam\n3 ☁️ - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 🌧️ - Anforderungen ändern sich sehr häufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 ⛈️ - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
+   "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
   },
   {
    "fieldname": "section_break_uiri",

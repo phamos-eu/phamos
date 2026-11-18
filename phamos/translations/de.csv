@@ -2239,7 +2239,6 @@ Responsible,Verantwortlich
 Depends On,Hängt ab von
 In Testing,Im Test
 Take over Features from Sales,Features aus dem Vertrieb übernehmen
-Features,Features
 {0} features taken over from sales,{0} Features aus dem Vertrieb übernommen
 No features from sales to take over,Keine Features aus dem Vertrieb zu übernehmen
 "A feature belongs to an Implementation or, while in sales, to an Opportunity.","Ein Feature gehört zu einer Implementierung oder, solange es im Vertrieb ist, zu einer Opportunity."
@@ -2265,3 +2264,9 @@ Used In,Verwendet in
 Work Done,Erledigte Arbeit
 Doctypes,Doctypes
 Set who reviewed the entry before it can be shown to prospects.,"Gib an, wer den Eintrag geprüft hat, bevor er Interessenten gezeigt werden kann."
+Feature {0} does not exist.,Feature {0} existiert nicht.
+Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
+Agreed,Vereinbart
+Planned,Geplant
+In Progress,In Arbeit
+Live,Live
