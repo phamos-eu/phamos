@@ -2105,6 +2105,8 @@ Reload,Neu laden
 Next,Weiter
 Black out private data,Private Daten schwärzen
 Redacted,Geschwärzt
+Delete,Löschen
+Del,Entf
 "The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
 not a PNG or JPEG image,kein PNG- oder JPEG-Bild
 larger than {0} MB,größer als {0} MB
