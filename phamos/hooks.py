@@ -60,11 +60,25 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.general_management_spa.check_app_permission",
 	},
 	{
+		"name": "team_cockpit",
+		"logo": "/assets/phamos/manifest/team-icon-192.png",
+		"title": "Team Cockpit",
+		"route": "/team-cockpit",
+		"has_permission": "phamos.api.team_cockpit.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
+	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
 	},
 ]
 
@@ -134,6 +148,7 @@ doctype_js = {
     "Customer": ["public/js/party_account.js", "public/js/customer.js"],
     "Supplier": ["public/js/party_account.js", "public/js/supplier.js"],
     "Company": "public/js/company.js",
+    "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 
 }
@@ -167,6 +182,10 @@ website_route_rules = [
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
+    {"from_route": "/team-cockpit", "to_route": "team_cockpit"},
+    {"from_route": "/team-cockpit/<path:app_path>", "to_route": "team_cockpit"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -265,13 +284,14 @@ after_migrate = [
 	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
+	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751), Team on Issue and Task (#1955)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
-	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
 # Uninstallation
@@ -390,12 +410,6 @@ doc_events = {
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
-    # Company-wide events (Events tab from phamos/setup/event_schedule.py), synced like Team's.
-    "Company": {
-        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
-    },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },
@@ -495,7 +509,15 @@ doc_events = {
     },
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Event Schedule (phamos/setup/event_schedule.py, #1949), synced like Team's.
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+        ],
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
+    },
     "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",

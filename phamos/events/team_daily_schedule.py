@@ -126,8 +126,53 @@ def _row_uid(row_name: str) -> str:
 
 
 def _truncate_error(error_text: str, limit: int = 1400) -> str:
+    """Fit an error into mailcow_last_error. Keeps the END: for a traceback that is the exception
+    line, which the cockpit shows (general_management_spa._sync_error_line). Keeping the start cut
+    long tracebacks mid-frame and showed a 'File "env/lib/..."' fragment instead (#1949)."""
     txt = (error_text or "").strip()
-    return txt[:limit]
+    return txt if len(txt) <= limit else "…" + txt[-(limit - 1):]
+
+
+# (connect, read) seconds for the invite PUT. The read part is long because SOGo answers only after
+# delivering to every attendee (15 people timed out at 30 s on production, #1949). The sync runs in
+# a background job (SYNC_JOB_TIMEOUT), so nobody waits on it.
+PUT_TIMEOUT = (10, 120)
+SYNC_JOB_TIMEOUT_PER_ROW = 150
+
+
+def _stored_version_matches(url: str, ics: str, auth) -> bool:
+    """After a timed-out PUT: does the calendar hold exactly this PUT? SEQUENCE alone is not
+    enough: a retry after a failed send reuses the sequence (mailcow_seq only moves on success),
+    so DTSTAMP, written per PUT to the second, must match too. Any doubt (no answer, other status,
+    other version, a server that rewrote DTSTAMP) counts as not stored, and the next save resends."""
+    marks = [re.search(rf"^{name}:[^\r\n]+", ics, re.MULTILINE) for name in ("SEQUENCE", "DTSTAMP")]
+    if not all(marks):
+        return False
+    try:
+        r = requests.get(url, auth=auth, timeout=30)
+    except requests.RequestException:
+        return False
+    if r.status_code != 200:
+        return False
+    return all(re.search(rf"^{re.escape(m.group(0))}\r?$", r.text or "", re.MULTILINE) for m in marks)
+
+
+def _request_error_message(action: str, error: Exception) -> str:
+    """A network failure towards Mailcow (no connection, SSL, timeout) as one readable line."""
+    return f"Mailcow {action} failed, server not reachable: {type(error).__name__}: {error}"[:500]
+
+
+def _http_error_message(action: str, mailbox_email: str, response) -> str:
+    """A refused Mailcow request as one readable line. 401/403 means Mailcow rejected the login:
+    the mailbox address with the password of its Mailcow DAV Password record. Other statuses keep
+    the server's text, without its HTML (nginx sends a whole error page)."""
+    if response.status_code in (401, 403):
+        return (
+            f"Mailcow refused the login of {mailbox_email} ({response.status_code}). "
+            "Check its app password in Mailcow (CalDAV allowed) and in its Mailcow DAV Password record."
+        )
+    text = " ".join(re.sub(r"<[^>]+>", " ", response.text or "").split())[:300]
+    return f"Mailcow {action} failed ({response.status_code})" + (f": {text}" if text else "")
 
 
 def _update_row_sync_fields(row_name: str, values: dict):
@@ -374,15 +419,29 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.put(
-        url,
-        data=ics.encode("utf-8"),
-        headers={"Content-Type": "text/calendar"},
-        auth=(mailbox_email, pw),
-        timeout=30,
-    )
+    try:
+        r = requests.put(
+            url,
+            data=ics.encode("utf-8"),
+            headers={"Content-Type": "text/calendar"},
+            auth=(mailbox_email, pw),
+            timeout=PUT_TIMEOUT,
+        )
+    except requests.ReadTimeout as e:
+        # A connect timeout never reached the server and falls through to RequestException.
+        # SOGo answers only after it has written the event into every attendee's calendar and
+        # mailed their invites; with a whole team that can outlast the wait, while the save
+        # itself goes through. Ask whether this version arrived before calling it failed (#1949).
+        if _stored_version_matches(url, ics, (mailbox_email, pw)):
+            return True, None
+        return False, (
+            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite could not be found "
+            f"in {mailbox_email}'s calendar. Saving again sends it again. ({type(e).__name__})"
+        )
+    except requests.RequestException as e:
+        return False, _request_error_message("PUT", e)
     if r.status_code not in (200, 201, 204):
-        return False, f"Mailcow PUT failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("PUT", mailbox_email, r)
 
     return True, None
 
@@ -397,9 +456,12 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    try:
+        r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    except requests.RequestException as e:
+        return False, _request_error_message("DELETE", e)
     if r.status_code not in (200, 204, 404):
-        return False, f"Mailcow DELETE failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("DELETE", mailbox_email, r)
 
     return True, None
 
@@ -415,66 +477,53 @@ def _sync_row_to_mailcow(doc, row, mailbox_email: str):
     _mark_row_synced(row.name, uid=uid, seq=seq, mailbox_email=mailbox_email)
 
 
-def _cleanup_removed_row_events(doc):
-    previous_doc = doc.get_doc_before_save()
-    if not previous_doc:
-        return
-
-    previous_rows = {
-        row.name
-        for row in (previous_doc.get(SCHEDULE_TABLE_FIELD) or [])
-        if row.name
-    }
-    current_rows = {
-        row.name
-        for row in (doc.get(SCHEDULE_TABLE_FIELD) or [])
-        if row.name
-    }
-
-    previous_rows_by_name = {
-        row.name: row
-        for row in (previous_doc.get(SCHEDULE_TABLE_FIELD) or [])
-        if row.name
-    }
-
-    for removed_row_name in previous_rows - current_rows:
-        try:
-            removed_row = previous_rows_by_name.get(removed_row_name)
-            mailbox_email = _row_mailbox_email(removed_row)
-            if mailbox_email:
-                uid = (removed_row.get("mailcow_uid") or "").strip() or _row_uid(removed_row_name)
-                ok, error = _delete_uid_for_mailbox(uid, mailbox_email)
-                if not ok:
-                    frappe.log_error(error or "Unknown delete error", "Team Daily Schedule Mailcow DELETE")
-        except Exception:
-            frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow DELETE")
-
-
-
 def _has_schedule_table(doc) -> bool:
     return frappe.get_meta(doc.doctype).has_field(SCHEDULE_TABLE_FIELD)
 
 
+# Background sync (#1949, decision 10): a caller sets this flag on the parent before saving, and
+# the Mailcow PUT/DELETE then run in a job after the commit instead of inside the request. The
+# General Management Cockpit does so for its appointments; Desk saves stay synchronous (#1558).
+BACKGROUND_FLAG = "mailcow_sync_in_background"
+# Sent to the saving user when a background sync is done, so open pages can reload.
+SYNC_DONE_EVENT = "mailcow_schedule_synced"
 
-def sync_events_from_parent(doc, method=None):
-    """Sync schedule child rows directly to Mailcow for any parent doctype."""
-    if not _has_schedule_table(doc):
-        return
 
-    _cleanup_removed_row_events(doc)
-
+def _removed_row_deletes(doc) -> list[dict]:
+    """UID and mailbox of each row removed since the last save (their invites get cancelled)."""
     previous_doc = doc.get_doc_before_save()
-    previous_rows = (previous_doc.get(SCHEDULE_TABLE_FIELD) or []) if previous_doc else []
-    previous_rows_by_name = {
-        row.name: row
-        for row in previous_rows
-        if row.name
-    }
+    if not previous_doc:
+        return []
+    current_rows = {row.name for row in (doc.get(SCHEDULE_TABLE_FIELD) or []) if row.name}
+    deletes = []
+    for removed_row in previous_doc.get(SCHEDULE_TABLE_FIELD) or []:
+        if not removed_row.name or removed_row.name in current_rows:
+            continue
+        mailbox_email = _row_mailbox_email(removed_row)
+        if mailbox_email:
+            uid = (removed_row.get("mailcow_uid") or "").strip() or _row_uid(removed_row.name)
+            deletes.append({"uid": uid, "mailbox": mailbox_email})
+    return deletes
 
-    for row in (doc.get(SCHEDULE_TABLE_FIELD) or []):
+
+def _sync_plan(doc) -> dict:
+    """What Mailcow needs after this save, worked out while the copy from before the save exists.
+
+    Plain data, so a background job can run it. Row steps:
+    - {"action": "put", "row", "mailbox", "old_mailbox"}: send the invite (after cancelling it in
+      old_mailbox when the sending mailbox changed)
+    - {"action": "delete", "row", "uid", "mailbox"}: the row became incomplete; cancel its invite
+    Rows without a resolvable mailbox are marked with an error right here (no network involved).
+    Unchanged rows are left out: a resend raises SEQUENCE and can mail attendees (#1814).
+    """
+    previous_doc = doc.get_doc_before_save()
+    previous_rows_by_name = {
+        row.name: row for row in ((previous_doc.get(SCHEDULE_TABLE_FIELD) or []) if previous_doc else []) if row.name
+    }
+    steps = []
+    for row in doc.get(SCHEDULE_TABLE_FIELD) or []:
         if not row.name:
             continue
-
         mailbox_email = None
         try:
             previous_row = previous_rows_by_name.get(row.name)
@@ -492,31 +541,110 @@ def sync_events_from_parent(doc, method=None):
                 delete_mailbox = mailbox_email or previous_mailbox
                 if delete_mailbox:
                     uid = (row.get("mailcow_uid") or "").strip() or _row_uid(row.name)
-                    ok, error = _delete_uid_for_mailbox(uid, delete_mailbox)
-                    if not ok:
-                        _mark_row_error(row.name, error or "Unknown delete error", mailbox_email=delete_mailbox)
-                    else:
-                        _mark_row_deleted_or_skipped(row.name)
+                    steps.append({"action": "delete", "row": row.name, "uid": uid, "mailbox": delete_mailbox})
                 continue
-
-            if previous_mailbox and mailbox_email and previous_mailbox.lower() != mailbox_email.lower():
-                uid = (row.get("mailcow_uid") or "").strip() or _row_uid(row.name)
-                ok, error = _delete_uid_for_mailbox(uid, previous_mailbox)
-                if not ok:
-                    _mark_row_error(row.name, error or "Unknown mailbox move delete error", mailbox_email=previous_mailbox)
-                    continue
 
             if not mailbox_email:
-                _mark_row_error(
-                    row.name,
-                    f"No mailbox resolved for {doc.doctype} {doc.name} row {row.name}",
-                )
+                _mark_row_error(row.name, f"No mailbox resolved for {doc.doctype} {doc.name} row {row.name}")
                 continue
 
-            _sync_row_to_mailcow(doc, row, mailbox_email=mailbox_email)
+            moved_from = (
+                previous_mailbox
+                if previous_mailbox and previous_mailbox.lower() != mailbox_email.lower()
+                else None
+            )
+            steps.append({"action": "put", "row": row.name, "mailbox": mailbox_email, "old_mailbox": moved_from})
         except Exception:
             _mark_row_error(row.name, frappe.get_traceback(), mailbox_email=mailbox_email)
             frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow Sync")
+    return {"removed": _removed_row_deletes(doc), "rows": steps}
+
+
+def _run_sync_plan(doc, plan: dict):
+    """Talk to Mailcow for a plan from _sync_plan. `doc` is the parent as saved (None: it is gone)."""
+    for removed in plan.get("removed") or []:
+        try:
+            ok, error = _delete_uid_for_mailbox(removed["uid"], removed["mailbox"])
+            if not ok:
+                frappe.log_error(error or "Unknown delete error", "Team Daily Schedule Mailcow DELETE")
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow DELETE")
+
+    rows_by_name = {row.name: row for row in ((doc.get(SCHEDULE_TABLE_FIELD) or []) if doc else [])}
+    for step in plan.get("rows") or []:
+        row = rows_by_name.get(step["row"])
+        if not row:
+            continue  # removed again before a background run; that save cancels it
+        try:
+            if step["action"] == "delete":
+                ok, error = _delete_uid_for_mailbox(step["uid"], step["mailbox"])
+                if not ok:
+                    _mark_row_error(row.name, error or "Unknown delete error", mailbox_email=step["mailbox"])
+                else:
+                    _mark_row_deleted_or_skipped(row.name)
+                continue
+
+            if step.get("old_mailbox"):
+                uid = (row.get("mailcow_uid") or "").strip() or _row_uid(row.name)
+                ok, error = _delete_uid_for_mailbox(uid, step["old_mailbox"])
+                if not ok:
+                    _mark_row_error(row.name, error or "Unknown mailbox move delete error", mailbox_email=step["old_mailbox"])
+                    continue
+
+            _sync_row_to_mailcow(doc, row, mailbox_email=step["mailbox"])
+        except Exception:
+            _mark_row_error(row.name, frappe.get_traceback(), mailbox_email=step.get("mailbox"))
+            frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow Sync")
+
+
+def run_sync_plan_in_background(doctype: str, name: str, plan: dict, user: str | None = None):
+    """Background job (enqueued after the commit by sync_events_from_parent).
+
+    The rows were marked pending in the request; a crash outside a single step (loading the
+    parent, …) must not leave them pending for good, so it marks every planned row with the error.
+    """
+    try:
+        doc = frappe.get_doc(doctype, name) if frappe.db.exists(doctype, name) else None
+        _run_sync_plan(doc, plan)
+    except Exception:
+        for step in plan.get("rows") or []:
+            _mark_row_error(step["row"], frappe.get_traceback(), mailbox_email=step.get("mailbox"))
+        frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow Sync")
+    finally:
+        frappe.db.commit()  # nosemgrep: the row status must be visible before the page reloads
+        if user:
+            frappe.publish_realtime(SYNC_DONE_EVENT, {"doctype": doctype, "name": name}, user=user)
+
+
+def sync_events_from_parent(doc, method=None):
+    """Sync schedule child rows to Mailcow for any parent doctype.
+
+    With doc.flags.mailcow_sync_in_background, only the plan is made here: rows to send show
+    "pending" (mailcow_synced 0, no error) until the job after the commit has run.
+    """
+    if not _has_schedule_table(doc):
+        return
+
+    plan = _sync_plan(doc)
+    if not doc.flags.get(BACKGROUND_FLAG):
+        _run_sync_plan(doc, plan)
+        return
+    if not (plan["removed"] or plan["rows"]):
+        return
+    for step in plan["rows"]:
+        _update_row_sync_fields(step["row"], {"mailcow_synced": 0, "mailcow_last_error": ""})
+    frappe.enqueue(
+        "phamos.events.team_daily_schedule.run_sync_plan_in_background",
+        queue="short",
+        # each row may wait PUT_TIMEOUT plus the check after a timeout; the short queue's 300 s
+        # default would kill a team-wide save midway
+        timeout=max(300, SYNC_JOB_TIMEOUT_PER_ROW * (len(plan["rows"]) + len(plan["removed"])) + 60),
+        enqueue_after_commit=True,
+        doctype=doc.doctype,
+        name=doc.name,
+        plan=plan,
+        user=frappe.session.user,
+    )
 
 
 

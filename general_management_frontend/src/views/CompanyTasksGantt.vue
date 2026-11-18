@@ -15,7 +15,7 @@
 				v-else-if="loading && !hasLoadedOnce"
 				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
-				Loading…
+				{{ __("Loading…") }}
 			</div>
 			<TaskGantt
 				v-else
@@ -66,6 +66,7 @@ import TaskReadOnlyDetail from "@spa/components/TaskReadOnlyDetail.vue"
 import { buildCompanyRows, GROUP_ROW_PREFIX, isGroupRow } from "@spa/utils/companyGantt.js"
 import { todayIsoInUserTz } from "@spa/utils/datetime"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
@@ -127,7 +128,7 @@ async function loadOptions() {
 		formOptions.value = await call(`${API}.get_form_options`)
 		configError.value = formOptions.value[spaConfig.departmentField]
 			? ""
-			: `Configure ${spaConfig.label} Department in Cockpit Settings.`
+			: __("Configure {0} Department in Cockpit Settings.", [spaConfig.label])
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}

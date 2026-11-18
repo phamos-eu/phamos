@@ -32,7 +32,15 @@ def phriend_boot():
 		"shortcut": user_shortcut(),
 		"default_shortcut": site_shortcut(),
 		"has_target": 1 if frappe.get_cached_doc("Phriend Settings").target_url else 0,
+		# "Status in the Implementation Cockpit" in the report flow (#1671)
+		"implementation_cockpit": 1 if _may_open_implementation_cockpit() else 0,
 	}
+
+
+def _may_open_implementation_cockpit():
+	from phamos.api.implementation_cockpit import has_internal_access, is_internal_user
+
+	return is_internal_user() and has_internal_access()
 
 
 def boot_session(bootinfo):

@@ -9,6 +9,7 @@
   "column_break_gen",
   "assign_to",
   "default_project",
+  "system_implementation",
   "shortcut",
   "gitlab_section",
   "gitlab_url",
@@ -55,6 +56,13 @@
    "fieldtype": "Link",
    "label": "Default Project",
    "options": "Project"
+  },
+  {
+   "description": "Reports made on this system belong to this Implementation unless the page they were made on belongs to another one. It is how the Implementation Cockpit finds them.",
+   "fieldname": "system_implementation",
+   "fieldtype": "Link",
+   "label": "Implementation of this System",
+   "options": "Implementation"
   },
   {
    "default": "Mod+P",
@@ -139,7 +147,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 10:00:00.000000",
+ "modified": "2026-11-18 07:43:12.890923",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",

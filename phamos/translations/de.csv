@@ -1997,6 +1997,8 @@ Reload,Neu laden
 Next,Weiter
 Black out private data,Private Daten schwärzen
 Redacted,Geschwärzt
+Delete,Löschen
+Del,Entf
 "The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
 not a PNG or JPEG image,kein PNG- oder JPEG-Bild
 larger than {0} MB,größer als {0} MB
@@ -2150,6 +2152,7 @@ GitLab Issues,GitLab-Issues
 GitLab issues,GitLab-Issues
 Create GitLab Issue,GitLab-Issue anlegen
 Open in GitLab,In GitLab öffnen
+Open {0} in GitLab,{0} in GitLab öffnen
 Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
 GitLab issue not linked,GitLab-Issue nicht verknüpft
@@ -2225,3 +2228,24 @@ Row #{0}: {1} and {2} are required.,Zeile #{0}: {1} und {2} sind erforderlich.
 Row #{0}: The first number ({1}) must not be greater than the last number ({2}).,Zeile #{0}: Die erste Nummer ({1}) darf nicht größer sein als die letzte Nummer ({2}).
 Row #{0}: The debtor and creditor number ranges overlap.,Zeile #{0}: Die Nummernkreise für Debitoren und Kreditoren überschneiden sich.
 Row #{0}: Account {1} does not exist.,Zeile #{0}: Das Konto {1} existiert nicht.
+Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
+Remove everyone in {0},Alle aus {0} entfernen
+The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
+Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
+Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
+Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
+Open in Cockpit,Im Cockpit öffnen
+Project Management,Projektmanagement
+Software Development,Softwareentwicklung
+Team Cockpit,Team-Cockpit
+Cockpits,Cockpits
+Switch cockpit,Cockpit wechseln
+Could not switch the team,Das Team konnte nicht gewechselt werden
+You are not a member of any team.,Sie gehören keinem Team an.
+You are not a member of team {0}.,Sie gehören dem Team {0} nicht an.
+This issue does not belong to your team.,Diese Anfrage gehört nicht zu Ihrem Team.
+This task does not belong to your team.,Diese Aufgabe gehört nicht zu Ihrem Team.
+Select an Issue or Task of your team.,Bitte eine Anfrage oder Aufgabe Ihres Teams wählen.
+You do not have permission to access the Team Cockpit,Sie haben keine Berechtigung für das Team-Cockpit
+The team this task belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Aufgabe gehört. Sie erscheint im Team-Cockpit dieses Teams."
+The team this issue belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Anfrage gehört. Sie erscheint im Team-Cockpit dieses Teams."

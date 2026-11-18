@@ -39,10 +39,16 @@ export class Sender {
 			ball.hop();
 			// a system with a target system sends the report there and gets that Issue's address back
 			const url = result.url || host.issue_url(result.name);
+			// follow it where its status is shown, for users who may open the Implementation Cockpit (#1671)
+			const follow =
+				host.open_status && !result.url
+					? ` · <button type="button" class="link" data-follow>${escape_html(__("Follow its status"))}</button>`
+					: "";
 			ball.say(
-				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>`,
-				8000
+				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>${follow}`,
+				follow ? 12000 : 8000
 			);
+			if (follow) this.phriend.bind_bubble_link("[data-follow]", () => host.open_status({ issue: result.name }));
 			this.phriend.refresh_badge();
 		} catch (error) {
 			const e = error instanceof RequestError ? error : new RequestError("server", error && error.message);
