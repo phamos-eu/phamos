@@ -152,9 +152,11 @@ VERIFY_GET_TIMEOUT = (10, 15)
 # Upper bound for one step in the background job: the PUT, then the wait above with its last GET.
 # The sync runs in a background job, so nobody waits on it.
 SYNC_JOB_TIMEOUT_PER_CALL = PUT_TIMEOUT[0] + PUT_TIMEOUT[1] + VERIFY_WINDOW + VERIFY_INTERVAL + sum(VERIFY_GET_TIMEOUT)
-# How long a row can stay "being sent" (row_is_being_sent): two calls (a row moved to another
-# mailbox), plus time for the job to start behind others in its queue.
-MAX_ROW_SEND_SECONDS = 2 * SYNC_JOB_TIMEOUT_PER_CALL + 300
+# How long a row stays "being sent" (row_is_being_sent) after its last stamp. The job renews the
+# stamp of every row it hasn't finished before each Mailcow call (_keep_rows_marked_sending), so one
+# call is enough, plus time for the job to start behind others in the long queue.
+QUEUE_SLACK_SECONDS = 900
+MAX_ROW_SEND_SECONDS = SYNC_JOB_TIMEOUT_PER_CALL + QUEUE_SLACK_SECONDS
 
 
 def _wait_for(check) -> bool:
@@ -632,10 +634,29 @@ def _sync_plan(doc) -> dict:
     return {"removed": _removed_row_deletes(doc), "rows": steps}
 
 
+def _keep_rows_marked_sending(row_names: list[str]):
+    """Background job: renew the "being sent" stamp of the rows it hasn't finished, so the cockpit
+    keeps refusing changes to them while the job works through the plan, however long the queue or
+    the earlier rows took (AI review of !1231). Committed at once, so other requests see it."""
+    if not row_names:
+        return
+    now = frappe.utils.now_datetime()
+    for row_name in row_names:
+        _update_row_sync_fields(row_name, {"mailcow_last_sync_at": now})
+    frappe.db.commit()  # nosemgrep: the stamp must be visible to the cockpit while the job runs
+
+
 def _run_sync_plan(doc, plan: dict, wait: bool = False):
     """Talk to Mailcow for a plan from _sync_plan. `doc` is the parent as saved (None: it is gone).
     wait: True in the background job only (see _put_ics_upsert)."""
+    steps = plan.get("rows") or []
+
+    def before_mailcow_call(from_step: int = 0):
+        if wait:
+            _keep_rows_marked_sending([step["row"] for step in steps[from_step:]])
+
     for removed in plan.get("removed") or []:
+        before_mailcow_call()
         try:
             ok, error = _delete_uid_for_mailbox(removed["uid"], removed["mailbox"], wait=wait)
             if not ok:
@@ -644,11 +665,12 @@ def _run_sync_plan(doc, plan: dict, wait: bool = False):
             frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow DELETE")
 
     rows_by_name = {row.name: row for row in ((doc.get(SCHEDULE_TABLE_FIELD) or []) if doc else [])}
-    for step in plan.get("rows") or []:
+    for index, step in enumerate(steps):
         row = rows_by_name.get(step["row"])
         if not row:
             continue  # removed again before a background run; that save cancels it
         try:
+            before_mailcow_call(index)
             if step["action"] == "delete":
                 ok, error = _delete_uid_for_mailbox(step["uid"], step["mailbox"], wait=wait)
                 if not ok:
@@ -663,6 +685,7 @@ def _run_sync_plan(doc, plan: dict, wait: bool = False):
                 if not ok:
                     _mark_row_error(row.name, error or "Unknown mailbox move delete error", mailbox_email=step["old_mailbox"])
                     continue
+                before_mailcow_call(index)
 
             _sync_row_to_mailcow(doc, row, mailbox_email=step["mailbox"], wait=wait)
         except Exception:

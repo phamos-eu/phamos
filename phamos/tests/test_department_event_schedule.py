@@ -201,6 +201,25 @@ class TestBackgroundSync(EventScheduleCase):
 		self.assertTrue(self.put.call_args.kwargs["wait"])
 		self.assertEqual(frappe.db.get_value("Team Daily Schedule", row.name, "mailcow_synced"), 1)
 
+	def test_the_job_keeps_its_rows_marked_while_it_works(self):
+		"""A job that started late (busy long queue) or reaches a row after slow earlier ones must
+		still show the row as being sent, so the cockpit refuses a second save (AI review of !1231)."""
+		_, row = self.save_department_with_event(background=True)
+		long_ago = frappe.utils.add_to_date(
+			frappe.utils.now_datetime(), seconds=-team_daily_schedule.MAX_ROW_SEND_SECONDS - 1
+		)
+		frappe.db.set_value("Team Daily Schedule", row.name, "mailcow_last_sync_at", long_ago)
+		seen = []
+
+		def put(*args, **kwargs):
+			seen.append(team_daily_schedule.row_is_being_sent(frappe.get_doc("Team Daily Schedule", row.name)))
+			return True, None
+
+		self.put.side_effect = put
+		self.run_job()
+		self.assertEqual(seen, [True])
+		self.assertFalse(team_daily_schedule.row_is_being_sent(frappe.get_doc("Team Daily Schedule", row.name)))
+
 	def test_a_removed_row_is_cancelled_by_the_job(self):
 		_, row = self.save_department_with_event(background=True)
 		self.run_job()
