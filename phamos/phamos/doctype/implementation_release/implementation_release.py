@@ -334,7 +334,7 @@ def get_released_features_awaiting_live(implementation):
 	features = frappe.get_all(
 		"Implementation Release Feature",
 		filters={"parent": ["in", released or [""]], "parenttype": "Implementation Release"},
-		fields=["feature", "parent as release"],
+		fields=["feature", "parent"],
 	)
 	statuses = dict(
 		frappe.get_all(
@@ -344,4 +344,9 @@ def get_released_features_awaiting_live(implementation):
 			as_list=True,
 		)
 	)
-	return [row for row in features if statuses.get(row.feature) not in DONE_FEATURE_STATUSES]
+	# "release" is a reserved word in MariaDB, so the alias is made here
+	return [
+		{"feature": row.feature, "release": row.parent}
+		for row in features
+		if statuses.get(row.feature) not in DONE_FEATURE_STATUSES
+	]

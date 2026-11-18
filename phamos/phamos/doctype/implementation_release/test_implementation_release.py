@@ -193,5 +193,5 @@ class TestImplementationRelease(FrappeTestCase):
 		self.assertEqual((release.status, release.gitlab_release), ("Released", published.name))
 		self.assertEqual(frappe.db.get_value("Implementation Feature", feature.name, "status"), "In Testing")
 		self.assertEqual(
-			[row.feature for row in get_released_features_awaiting_live(self.implementation)], [feature.name]
+			get_released_features_awaiting_live(self.implementation), [{"feature": feature.name, "release": release.name}]
 		)
