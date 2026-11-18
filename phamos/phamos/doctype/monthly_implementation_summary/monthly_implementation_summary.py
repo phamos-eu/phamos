@@ -1420,6 +1420,7 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 		if mis_name in stamp:
 			_mirror_dn_items_into_mis(mis_name, dn_name)
 			m.reload()  # mirror wrote delivery_note_item via a separate doc instance — pick it back up
+			_restamp_amended_delivery_note(m, doc)
 			m._sync_timesheet_delivery_note_column()  # windowed per-DN stamps, not a blanket overwrite
 			m.flags.ignore_permissions = True
 			m.flags.ignore_validate_update_after_submit = True
@@ -1428,6 +1429,17 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 			m.sync_and_auto_close()
 		except Exception:
 			frappe.log_error(title="MIS refresh after Delivery Note submit", message=frappe.get_traceback())
+
+
+def _restamp_amended_delivery_note(mis, dn):
+	"""Cancelling a Delivery Note cleared its Timesheet stamps (clear_timesheet_stamps_on_delivery_note_cancel);
+	its amendment delivers the same hours again, so stamp the MIS's open Timesheets for it as the MIS does
+	for a new Delivery Note."""
+	if not dn.get("amended_from") or frappe.db.exists("Timesheet", {"custom_delivery_note": dn.name}):
+		return
+	own = next((d for d in _delivery_notes_of_mis(mis.name) if d.delivery_note == dn.name), None)
+	if own and own.hours > 0:
+		mis._stamp_timesheets_for_delivered_hours(dn.name, own.hours, own.project)
 
 
 def clear_timesheet_stamps_on_delivery_note_cancel(doc, method=None):
@@ -1475,7 +1487,7 @@ def sync_mis_status_for_source_doc(doc, method=None):
 			))
 		mis_names.update(_open_mis_for_implementations(_implementations_for_sales_invoice(doc)))
 	else:
-		mis_names = _open_mis_for_implementations([getattr(doc, "custom_implementation", None)])
+		mis_names = set(_open_mis_for_implementations([getattr(doc, "custom_implementation", None)]))
 	mis_names.discard(None)
 	_sync_and_auto_close_mis(mis_names)
 

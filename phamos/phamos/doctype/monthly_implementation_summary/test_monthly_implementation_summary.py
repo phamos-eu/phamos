@@ -290,6 +290,34 @@ class TestMisOneWayLinks(FrappeTestCase):
 		self.assertIsNone(frappe.db.get_value("Timesheet", "_T-MIS-TS-1", "custom_delivery_note"))
 		self.assertIsNone(frappe.db.get_value("Timesheets", "_T-MIS-TSROW-1", "delivery_note"))
 
+	def test_amended_dn_gets_the_timesheets_back(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			_restamp_amended_delivery_note,
+		)
+
+		mis = self._mis()
+		for i, hours in enumerate((1, 1), start=1):
+			frappe.get_doc({"doctype": "Timesheet", "name": f"_T-MIS-TS-{i}", "docstatus": 1}).db_insert()
+			frappe.get_doc({
+				"doctype": "Timesheets", "name": f"_T-MIS-TSROW-{i}", "parent": mis.name, "docstatus": 1, "idx": i,
+				"parenttype": "Monthly Implementation Summary", "parentfield": "timesheets_table",
+				"timesheet": f"_T-MIS-TS-{i}", "project": PROJECT, "billable_hours": hours,
+			}).db_insert()
+		self._dn("_T-DN-1", mis.name, 2, status="Cancelled", docstatus=2)  # its stamps were cleared on cancel
+		self._dn("_T-DN-1-1", mis.name, 2)
+		frappe.db.set_value("Delivery Note", "_T-DN-1-1", "amended_from", "_T-DN-1")
+		mis.reload()
+
+		with patch(f"{MOD}._get_hour_uom", return_value="Hour"):
+			_restamp_amended_delivery_note(mis, frappe.get_doc("Delivery Note", "_T-DN-1-1"))
+			# a DN that is not an amendment is left to _create_dn_for_so_hours
+			_restamp_amended_delivery_note(mis, frappe.get_doc("Delivery Note", "_T-DN-1"))
+
+		self.assertEqual(
+			[frappe.db.get_value("Timesheet", f"_T-MIS-TS-{i}", "custom_delivery_note") for i in (1, 2)],
+			["_T-DN-1-1", "_T-DN-1-1"],
+		)
+
 	def test_overview_and_delivered_hours_come_from_the_dns_pointing_at_the_mis(self):
 		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
 			get_deliveries_overview,
