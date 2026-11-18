@@ -147,7 +147,6 @@ doctype_js = {
     # party_account.js before customer.js / supplier.js: they call phamos.party_account (#1529)
     "Customer": ["public/js/party_account.js", "public/js/customer.js"],
     "Supplier": ["public/js/party_account.js", "public/js/supplier.js"],
-    "Company": "public/js/company.js",
     "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 

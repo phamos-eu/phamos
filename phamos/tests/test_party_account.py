@@ -16,7 +16,9 @@ from phamos.accounting.party_account import (
 
 # ERPNext's test records: "_Test Company" with its chart, "_Test Customer Group", the test
 # territories and "_Test Supplier Group". A CI site has none of them before this runs.
-test_dependencies = ["Company", "Customer", "Supplier"]
+# Not "Customer" / "Supplier": their link chain reaches Payment Gateway (payments app), which
+# the CI site doesn't have.
+test_dependencies = ["Company", "Customer Group", "Territory", "Supplier Group"]
 
 COMPANY = "_Test Company"
 DEBTOR_PARENT = "Accounts Receivable - _TC"
