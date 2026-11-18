@@ -2222,3 +2222,15 @@ No e-mail account delivers to Accounting Receipt. Ask your administrator to set 
 Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
 The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
 "The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
+GitLab Release,GitLab-Release
+GitLab Release Milestone,GitLab-Release-Meilenstein
+Release Notes,Versionshinweise
+Released At,Veröffentlicht am
+Tag,Tag
+Last Synced,Zuletzt synchronisiert
+Time Estimate (Hours),Zeitschätzung (Stunden)
+Time Spent (Hours),Aufgewendete Zeit (Stunden)
+GitLab's upcoming release: its date lies in the future.,Anstehendes Release in GitLab: Sein Datum liegt in der Zukunft.
+From GitLab's time estimate on the issue. Used by release planning.,Aus der Zeitschätzung des Issues in GitLab. Wird für die Release-Planung verwendet.
+Time logged on the issue in GitLab.,In GitLab auf dem Issue erfasste Zeit.
+Releases synced successfully,Releases erfolgreich synchronisiert

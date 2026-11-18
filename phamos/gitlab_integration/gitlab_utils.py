@@ -354,6 +354,19 @@ def _get_issue_timestamp_fields(issue):
     }
 
 
+def _get_issue_time_fields(issue):
+	"""Time estimate and time spent in hours (#1985), from the REST issue (`time_stats`) or a
+	webhook payload (top-level seconds). Keys GitLab did not send are left out, so a payload
+	without time tracking never overwrites stored values with 0."""
+	stats = issue.get("time_stats") or issue
+	fields = {}
+	if stats.get("time_estimate") is not None:
+		fields["time_estimate_hours"] = round((stats.get("time_estimate") or 0) / 3600, 2)
+	if stats.get("total_time_spent") is not None:
+		fields["time_spent_hours"] = round((stats.get("total_time_spent") or 0) / 3600, 2)
+	return fields
+
+
 def _normalize_issue_text(value):
     """Keep text storage format stable so form editors don't mark docs dirty on load."""
     if value is None:
@@ -669,6 +682,7 @@ def sync_all_issues():
                         "labels": ", ".join(issue.get("labels", [])),
                     }
                     fields.update(_get_issue_timestamp_fields(issue))
+                    fields.update(_get_issue_time_fields(issue))
                     if milestone_name:
                         fields["gitlab_milestone"] = milestone_name
 
@@ -812,6 +826,7 @@ def sync_issues_for_project(project_name):
                     "labels": ", ".join(issue.get("labels", [])),
                 }
                 fields.update(_get_issue_timestamp_fields(issue))
+                fields.update(_get_issue_time_fields(issue))
 
                 if milestone_name:
                     fields["gitlab_milestone"] = milestone_name
@@ -1034,6 +1049,7 @@ def sync_gitlab_data():
     sync_projects_only()
     sync_gitlab_milestones()
     sync_all_issues()
+    sync_gitlab_releases()
     return "Sync complete"
 
 
@@ -1172,6 +1188,7 @@ def _handle_issue_webhook(payload):
         "gitlab_milestone": milestone_name,
     }
     data.update(timestamp_data)
+    data.update(_get_issue_time_fields(issue_attrs))
 
     existing = frappe.db.get_value(
         "GitLab Issue",
@@ -1637,3 +1654,77 @@ def backfill_issue_comments_background(project_name=None):
         "status": "queued",
         "message": "Issue comment backfill queued as background job",
     }
+
+
+# Releases (#1985) -----------------------------------------------------------------------------
+
+
+def get_releases_for_project(project_id):
+	"""All releases of a GitLab project, newest first, with their milestones."""
+	settings = frappe.get_single("GitLab Settings")
+	base_url = settings.gitlab_url.rstrip("/")
+	headers = get_gitlab_headers()
+	releases, page = [], 1
+	while True:
+		response = requests.get(
+			f"{base_url}/api/v4/projects/{project_id}/releases",
+			headers=headers,
+			params={"per_page": 100, "page": page},
+			timeout=60,
+		)
+		if response.status_code != 200:
+			break
+		data = response.json()
+		if not data:
+			break
+		releases.extend(data)
+		page += 1
+	return releases
+
+
+@frappe.whitelist()
+def sync_gitlab_releases():
+	"""Releases of every GitLab Project that belongs to an Implementation, with their milestones.
+
+	Read-only: nothing is written back to GitLab. Planning happens in Implementation Release (#1986).
+	"""
+	projects = frappe.get_all(
+		"GitLab Project", filters={"implementation": ["is", "set"]}, fields=["name", "project_id"]
+	)
+	for project in projects:
+		for release in get_releases_for_project(project.project_id):
+			try:
+				upsert_release(project.name, release)
+			except Exception:
+				frappe.db.rollback()
+				frappe.log_error(frappe.get_traceback(), f"GitLab Release Sync Error - {project.name}")
+	frappe.db.commit()
+	return "Releases synced successfully"
+
+
+def upsert_release(gitlab_project, release):
+	"""Create or update one GitLab Release from the API payload; returns its name."""
+	name = f"{gitlab_project}-{release['tag_name']}"
+	doc = (
+		frappe.get_doc("GitLab Release", name)
+		if frappe.db.exists("GitLab Release", name)
+		else frappe.new_doc("GitLab Release")
+	)
+	if doc.is_new():
+		doc.gitlab_project = gitlab_project
+		doc.tag_name = release["tag_name"]
+	doc.title = release.get("name") or release["tag_name"]
+	doc.description = release.get("description") or ""
+	doc.released_at = _parse_gitlab_datetime(release.get("released_at"))
+	doc.upcoming = 1 if release.get("upcoming_release") else 0
+	doc.web_url = (release.get("_links") or {}).get("self") or ""
+	doc.last_synced = frappe.utils.now_datetime()
+	doc.set("milestones", [])
+	for milestone in release.get("milestones") or []:
+		milestone_name = frappe.db.get_value(
+			"GitLab Milestones", {"milestone_id": int(milestone["id"]), "gitlab_project": gitlab_project}, "name"
+		)
+		if milestone_name:
+			doc.append("milestones", {"gitlab_milestone": milestone_name})
+	doc.save(ignore_permissions=True)
+	return doc.name
