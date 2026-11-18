@@ -133,6 +133,26 @@ def _truncate_error(error_text: str, limit: int = 1400) -> str:
     return txt if len(txt) <= limit else "…" + txt[-(limit - 1):]
 
 
+# (connect, read) seconds for the invite PUT. The read part is long because SOGo answers only after
+# delivering to every attendee (15 people timed out at 30 s on production, #1949). The sync runs in
+# a background job (SYNC_JOB_TIMEOUT), so nobody waits on it.
+PUT_TIMEOUT = (10, 120)
+SYNC_JOB_TIMEOUT_PER_ROW = 150
+
+
+def _stored_version_matches(url: str, ics: str, auth) -> bool:
+    """After a timed-out PUT: is the event in the calendar with this PUT's SEQUENCE? Then the save
+    went through. Any doubt (no answer, other status, older sequence) counts as not stored."""
+    sequence = re.search(r"^SEQUENCE:\d+", ics, re.MULTILINE)
+    if not sequence:
+        return False
+    try:
+        r = requests.get(url, auth=auth, timeout=30)
+    except requests.RequestException:
+        return False
+    return r.status_code == 200 and re.search(rf"^{sequence.group(0)}\r?$", r.text or "", re.MULTILINE) is not None
+
+
 def _request_error_message(action: str, error: Exception) -> str:
     """A network failure towards Mailcow (no connection, SSL, timeout) as one readable line."""
     return f"Mailcow {action} failed, server not reachable: {type(error).__name__}: {error}"[:500]
@@ -401,7 +421,17 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
             data=ics.encode("utf-8"),
             headers={"Content-Type": "text/calendar"},
             auth=(mailbox_email, pw),
-            timeout=30,
+            timeout=PUT_TIMEOUT,
+        )
+    except requests.Timeout as e:
+        # SOGo answers only after it has written the event into every attendee's calendar and
+        # mailed their invites; with a whole team that can outlast the wait, while the save
+        # itself goes through. Ask whether this version arrived before calling it failed (#1949).
+        if _stored_version_matches(url, ics, (mailbox_email, pw)):
+            return True, None
+        return False, (
+            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite is not in "
+            f"{mailbox_email}'s calendar. ({type(e).__name__})"
         )
     except requests.RequestException as e:
         return False, _request_error_message("PUT", e)
@@ -601,6 +631,9 @@ def sync_events_from_parent(doc, method=None):
     frappe.enqueue(
         "phamos.events.team_daily_schedule.run_sync_plan_in_background",
         queue="short",
+        # each row may wait PUT_TIMEOUT plus the check after a timeout; the short queue's 300 s
+        # default would kill a team-wide save midway
+        timeout=max(300, SYNC_JOB_TIMEOUT_PER_ROW * (len(plan["rows"]) + len(plan["removed"])) + 60),
         enqueue_after_commit=True,
         doctype=doc.doctype,
         name=doc.name,

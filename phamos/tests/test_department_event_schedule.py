@@ -320,3 +320,29 @@ class TestReadableSyncError(FrappeTestCase):
 		self.assertEqual(
 			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
 		)
+
+	def _put_that_times_out(self, stored_text, stored_status=200):
+		import requests
+		from types import SimpleNamespace
+
+		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
+			patch.object(
+				team_daily_schedule.requests, "get", return_value=SimpleNamespace(status_code=stored_status, text=stored_text)
+			),
+		):
+			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
+
+	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+
+	def test_a_slow_answer_with_an_older_version_stored_is_an_error(self):
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nSEQUENCE:2\r\nEND:VEVENT\r\n")
+		self.assertFalse(ok)
+		self.assertIn("did not answer within 120 s", error)
+		ok, _error = self._put_that_times_out("", stored_status=404)
+		self.assertFalse(ok)
