@@ -63,6 +63,18 @@
 #   version-15. The script reads this app's major version and uses only the
 #   standard apps on that same version. Set AI_ISSUE_PLAN_ENABLED=false to
 #   turn the job off.
+#
+# ai_issue_implement
+#   For an open issue labelled plan-drafted, reads the draft plan and opens
+#   one merge request. The branch is the issue reference plus the target, for
+#   example phamos/phamos#1952_develop. The merge request targets the pipeline
+#   ref (develop on the schedule). The job comments the link and
+#   replaces plan-drafted with mr-opened. When the plan states that no code
+#   change is required, it comments that finding and uses no-change instead.
+#   A reply the job cannot apply uses implement-failed. It does not merge.
+#   Adding plan-drafted again retries a failed attempt. GITLAB_API_TOKEN must
+#   be allowed to push a branch and to open a merge request.
+#   Set AI_ISSUE_IMPLEMENT_ENABLED=false to turn the job off.
 
 workflow:
   rules:
@@ -70,7 +82,7 @@ workflow:
     # a branch pipeline otherwise. An issue-analysis run is an API pipeline
     # and must be created even when that branch has an open MR.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question|implementation plan)$/'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question|implementation plan|plan-drafted)$/'
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
@@ -339,3 +351,22 @@ ai_issue_plan:
   script:
     - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
     - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_plan.py
+
+ai_issue_implement:
+  stage: ai-review
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
+  # A failed implementation must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_IMPLEMENT_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL == "plan-drafted"'
+  script:
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_implement.py
