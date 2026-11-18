@@ -428,3 +428,16 @@ class TestImplementationCockpitIssues(FrappeTestCase):
 		self.assertEqual(ic.issue_stage("Open", [gl("opened", "Testing on Production")]), "Testing")
 		self.assertEqual(ic.issue_stage("Open", [gl("closed")]), "Done")
 		self.assertEqual(ic.issue_stage("Closed", [gl("opened")]), "Done")
+
+	def test_status_opens_one_issue_where_it_was_filed(self):
+		self.assertEqual(ic.resolve_status(issue=self.on_page), self.impl)
+		self.assertEqual(ic.resolve_status(issue=self.foreign), self.other)
+		self.assertIsNone(ic.resolve_status(issue="does not exist"))
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.resolve_status(issue=self.on_page)
+
+	def test_overview_counts_open_reports(self):
+		self.assertEqual(ic.get_issue_counts(self.impl), {"open": 3, "mine": 2})
+		frappe.set_user(USER)
+		self.assertIsNone(ic.get_issue_counts(self.impl))

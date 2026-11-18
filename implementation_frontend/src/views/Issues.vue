@@ -3,13 +3,16 @@
 	     the reports of the place it was opened from; the switcher widens it on purpose. -->
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
 		<div class="mx-auto flex max-w-5xl flex-col gap-4">
+			<div>
+				<h1 class="text-lg font-semibold text-ink-gray-9">{{ heading }}</h1>
+				<p class="mt-0.5 text-sm text-ink-gray-6">{{ __("Each report shows how far it is: reported, in GitLab, in progress, testing, done.") }}</p>
+			</div>
 			<div class="flex flex-wrap items-center gap-3">
 				<TabButtons v-model="scope" :buttons="scopeButtons" />
 				<label class="flex items-center gap-2 text-sm text-ink-gray-7">
 					<input v-model="includeClosed" type="checkbox" class="rounded border-outline-gray-3" />
 					{{ __("Include done") }}
 				</label>
-				<span v-if="contextLabel" class="ml-auto truncate text-xs text-ink-gray-5" :title="contextLabel">{{ contextLabel }}</span>
 			</div>
 
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
@@ -83,9 +86,14 @@ const scope = computed({
 const scopeButtons = computed(() =>
 	available.value.map((s) => ({ label: `${__(SCOPE_LABELS[s])} (${counts.value[s] ?? 0})`, value: s }))
 )
-const contextLabel = computed(() => {
-	if (route.query.ref_doctype && route.query.ref_docname) return `${__(route.query.ref_doctype)} ${route.query.ref_docname}`
-	return readableRoute(route.query.route || "")
+// What the list shows, in words: the place Phriend was opened on, or the wider scope picked.
+const heading = computed(() => {
+	const current = route.query.scope
+	if (current === "record" && route.query.ref_docname)
+		return __("Reports about {0} {1}", [__(route.query.ref_doctype), route.query.ref_docname])
+	if (current === "page" && route.query.route) return __("Reports made on {0}", [readableRoute(route.query.route)])
+	if (current === "mine") return __("Reports you made")
+	return __("All reports of this implementation")
 })
 const emptyText = computed(() =>
 	includeClosed.value ? __("No issues reported here.") : __("No open issues reported here.")

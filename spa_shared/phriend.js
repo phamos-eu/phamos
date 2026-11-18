@@ -79,7 +79,9 @@ export function mountPhriend(router, heading) {
 
 function openStatus(router, ctx) {
 	const query = new URLSearchParams()
-	if (ctx.ref_doctype && ctx.ref_docname) {
+	if (ctx.issue) {
+		query.set("issue", ctx.issue)
+	} else if (ctx.ref_doctype && ctx.ref_docname) {
 		query.set("ref_doctype", ctx.ref_doctype)
 		query.set("ref_docname", ctx.ref_docname)
 	} else if (ctx.route) {

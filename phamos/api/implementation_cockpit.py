@@ -637,6 +637,19 @@ def get_issues(implementation, scope=None, route=None, ref_doctype=None, ref_doc
 
 
 @frappe.whitelist()
+def get_issue_counts(implementation):
+	"""Open reports of the Implementation, all and mine, for the Overview tile (internal only)."""
+	_require_implementation(implementation)
+	if not is_internal_user() or not has_internal_access():
+		return None
+	open_filter = {"custom_implementation": implementation, "status": ["not in", CLOSED_ISSUE_STATUSES]}
+	return {
+		"open": frappe.db.count("Issue", open_filter),
+		"mine": frappe.db.count("Issue", {**open_filter, "phriend_reported_by": frappe.session.user}),
+	}
+
+
+@frappe.whitelist()
 def get_issue(implementation, name):
 	"""One Issue of the Implementation with its report details and GitLab issues."""
 	_require_implementation(implementation)
@@ -658,15 +671,19 @@ def get_issue(implementation, name):
 
 
 @frappe.whitelist()
-def resolve_status(route=None, ref_doctype=None, ref_docname=None):
-	"""The Implementation to open for Phriend's "Status in the Implementation Cockpit" (#1671).
+def resolve_status(route=None, ref_doctype=None, ref_docname=None, issue=None):
+	"""The Implementation to open from Phriend (badge, "See their status", "Follow its status") (#1671).
 
-	The same rule Phriend uses when it files a report (phamos.phriend.api.report_implementation),
-	limited to Implementations the user may open. None: the cockpit opens the last one used.
+	For one Issue: the Implementation it was filed under. For a page or record: the same rule
+	Phriend uses when it files a report (phamos.phriend.api.report_implementation). Limited to
+	Implementations the user may open; None makes the cockpit open the last one used.
 	"""
 	_require_internal()
-	from phamos.phriend.api import report_implementation
+	if issue:
+		implementation = frappe.db.get_value("Issue", issue, "custom_implementation")
+	else:
+		from phamos.phriend.api import report_implementation
 
-	settings = frappe.get_cached_doc("Phriend Settings")
-	implementation = report_implementation(settings, route, ref_doctype, ref_docname)
+		settings = frappe.get_cached_doc("Phriend Settings")
+		implementation = report_implementation(settings, route, ref_doctype, ref_docname)
 	return implementation if implementation in _allowed_implementations() else None

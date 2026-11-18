@@ -8,7 +8,7 @@
 //   issue_url(name)           where "Saved as ISS-…" links to
 //   count_reports()           optional: Promise of the open reports for this page (the badge)
 //   open_reports()            optional: show those reports
-//   open_status(ctx)          optional: where the reports about this place stand (Implementation Cockpit)
+//   open_status(ctx)          optional: where the reports about this place (or ctx.issue) stand, in the Implementation Cockpit
 //   on_route_change(cb)       optional
 //   shortcut                  the user's shortcut ("Mod+P"; "" when off)
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"
@@ -77,7 +77,12 @@ class Phriend {
 		this.ball = new Ball({
 			label: this.label(),
 			on_click: () => this.report(),
-			on_badge_click: () => this.host.open_reports && this.host.open_reports(),
+			// the number on the ball answers "where do the reports here stand?": the Implementation
+			// Cockpit for users who may open it (#1671), else the host's list of those reports
+			on_badge_click: () =>
+				this.host.open_status
+					? this.host.open_status(this.host.page_context() || {})
+					: this.host.open_reports && this.host.open_reports(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
 			close_label: __("Close"),
@@ -201,7 +206,12 @@ class Phriend {
 		this._badge_timer = setTimeout(() => {
 			Promise.resolve(this.host.count_reports())
 				.then((count) =>
-					this.ball.set_badge(count, this.__("{0} open Phriend reports for this page", [count || 0]))
+					this.ball.set_badge(
+						count,
+						this.host.open_status
+							? this.__("{0} open reports here. Click to see where they stand", [count || 0])
+							: this.__("{0} open Phriend reports for this page", [count || 0])
+					)
 				)
 				.catch(() => {});
 		}, 400);

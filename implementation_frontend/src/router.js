@@ -68,12 +68,15 @@ router.beforeEach(async (to) => {
 async function resolveStatus(to) {
 	const query = {}
 	for (const key of ["route", "ref_doctype", "ref_docname"]) if (to.query[key]) query[key] = to.query[key]
+	const issue = to.query.issue || null
 	let implementation = null
 	try {
-		implementation = await call(`${spaConfig.api}.resolve_status`, query)
+		implementation = await call(`${spaConfig.api}.resolve_status`, { ...query, issue })
 	} catch (e) {
 		implementation = null
 	}
+	// one report ("Follow its status"): straight to it, when it belongs to an implementation
+	if (issue && implementation) return { name: "IssueDetail", params: { implementation, name: issue }, replace: true }
 	implementation = implementation || defaultImplementation()
 	if (!implementation) return { name: "Home", replace: true }
 	return { name: "Issues", params: { implementation }, query, replace: true }
