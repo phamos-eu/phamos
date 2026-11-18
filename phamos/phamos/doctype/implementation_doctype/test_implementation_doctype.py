@@ -23,6 +23,12 @@ class TestImplementationDoctype(FrappeTestCase):
 		entry = make_entry("Route Planner Review", showcase=1, showcase_reviewed_by="Guest")
 		self.assertEqual(entry.showcase_reviewed_by, frappe.session.user)
 
+	def test_reviewer_cannot_be_overwritten_later(self):
+		entry = make_entry("Route Planner Keep", showcase=1)
+		entry.showcase_reviewed_by = "Guest"  # as an API write would
+		entry.save()
+		self.assertEqual(entry.showcase_reviewed_by, frappe.session.user)
+
 	def test_changed_content_withdraws_the_showcase(self):
 		entry = make_entry("Route Planner Content", showcase=1, description="Plans tours")
 		entry.description = "Plans tours for Customer X with their prices"

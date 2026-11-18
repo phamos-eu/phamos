@@ -39,13 +39,16 @@ class ImplementationDoctype(Document):
 		content_changed = (before.description or "") != (self.description or "") or [
 			(row.image, row.caption) for row in before.screenshots
 		] != [(row.image, row.caption) for row in self.screenshots]
-		if content_changed:
-			self.showcase = 0
-			self.showcase_reviewed_by = None
-			frappe.msgprint(
-				_("The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again."),
-				indicator="orange",
-			)
+		if not content_changed:
+			# read_only holds only in the form: keep the recorded reviewer against API writes
+			self.showcase_reviewed_by = before.showcase_reviewed_by
+			return
+		self.showcase = 0
+		self.showcase_reviewed_by = None
+		frappe.msgprint(
+			_("The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again."),
+			indicator="orange",
+		)
 
 	@property
 	def used_in_implementations(self):

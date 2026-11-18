@@ -25,7 +25,8 @@
    "in_list_view": 1,
    "label": "Doctype Name",
    "reqd": 1,
-   "description": "Name of the doctype, report, print format or script as it is called in the system, e.g. \"Delivery Trip\"."
+   "description": "Name of the doctype, report, print format or script as it is called in the system, e.g. \"Delivery Trip\".",
+   "set_only_once": 1
   },
   {
    "fieldname": "app",
@@ -33,7 +34,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "App",
-   "description": "The app or repository it lives in, e.g. \"phamos\" or a customer app."
+   "description": "The app or repository it lives in, e.g. \"phamos\" or a customer app.",
+   "set_only_once": 1
   },
   {
    "fieldname": "kind",
