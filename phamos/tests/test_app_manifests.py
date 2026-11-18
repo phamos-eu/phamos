@@ -30,6 +30,7 @@ FRONTENDS = {
 	"project_management_frontend": "/project-management-cockpit",
 	"software_development_frontend": "/software-development-cockpit",
 	"general_management_frontend": "/general-management-cockpit",
+	"team_frontend": "/team-cockpit",
 	"personal_frontend": "/personal-cockpit",
 	"scan_frontend": "/scan",
 	"implementation_frontend": "/implementation-cockpit",

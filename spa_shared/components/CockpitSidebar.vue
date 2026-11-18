@@ -10,9 +10,22 @@
 			class="flex h-12 flex-shrink-0 items-center border-b border-outline-gray-2 px-3"
 			:class="collapsed ? 'justify-center' : 'justify-between'"
 		>
-			<span v-if="!collapsed" class="truncate text-sm font-semibold text-ink-gray-9">
-				{{ label }}
-			</span>
+			<template v-if="!collapsed">
+				<!-- The cockpit's name opens the way to the user's other cockpits (#1955). -->
+				<Dropdown v-if="menu.length" :options="menu" placement="left">
+					<button
+						type="button"
+						class="-ml-1 flex max-w-[9.5rem] items-center gap-1 rounded px-1 py-1 text-sm font-semibold text-ink-gray-9 hover:bg-surface-gray-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+						:title="__('Switch cockpit')"
+					>
+						<span class="truncate">{{ label }}</span>
+						<FeatherIcon name="chevron-down" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
+					</button>
+				</Dropdown>
+				<span v-else class="truncate text-sm font-semibold text-ink-gray-9">
+					{{ label }}
+				</span>
+			</template>
 			<button
 				type="button"
 				class="rounded p-1.5 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
@@ -87,19 +100,39 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
-import { openDesk } from "@spa/utils/appWindow.js"
+import { Dropdown } from "frappe-ui"
+import { openCockpit, openDesk } from "@spa/utils/appWindow.js"
+import { otherCockpits } from "@spa/utils/cockpitSwitcher.js"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	label: { type: String, required: true },
 	storageKey: { type: String, required: true },
 	items: { type: Array, default: () => [] },
+	// Menu groups a cockpit adds above the other cockpits ({ group, items: [{ label, onClick }] }),
+	// e.g. the Team Cockpit's other teams.
+	menuGroups: { type: Array, default: () => [] },
 })
 
 const route = useRoute()
 const collapsed = ref(false)
+// Read once the page is mounted: in dev the boot arrives after the modules load.
+const cockpits = ref([])
+const menu = computed(() => {
+	const groups = props.menuGroups.filter((group) => group.items?.length)
+	if (cockpits.value.length) {
+		groups.push({
+			group: __("Cockpits"),
+			items: cockpits.value.map((cockpit) => ({
+				label: __(cockpit.title),
+				onClick: () => openCockpit(cockpit.route),
+			})),
+		})
+	}
+	return groups
+})
 const openGroups = ref({})
 
 function isActive(item) {
@@ -152,6 +185,7 @@ function expand() {
 }
 
 onMounted(() => {
+	cockpits.value = otherCockpits(window.frappe?.boot?.cockpits, window.location.pathname)
 	try {
 		collapsed.value = localStorage.getItem(props.storageKey) === "1"
 	} catch (e) {

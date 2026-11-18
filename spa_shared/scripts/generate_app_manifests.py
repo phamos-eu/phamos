@@ -90,6 +90,14 @@ APPS = [
 		"symbol": "compass",
 	},
 	{
+		"slug": "team",
+		"name": "Team Cockpit",
+		"description": "Your team's issues, tasks and checklists",
+		"route": "/team-cockpit",
+		"color": "#1d4ed8",
+		"symbol": "flag",
+	},
+	{
 		"slug": "implementation",
 		"name": "Implementation Cockpit",
 		"description": "Status, roadmap, issues and budget of an implementation with phamos",

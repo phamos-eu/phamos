@@ -5,6 +5,7 @@
 `phamos General Management` (and System Manager) gets in, and that role alone is enough."""
 
 import frappe
+from frappe.desk.search import search_widget
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, today
 
@@ -102,7 +103,7 @@ class TestGeneralManagementAccess(FrappeTestCase):
 			frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_department")
 			for prefix, _color in COCKPITS.values()
 			# cockpits without a department of their own
-			if prefix not in ("general_management", "personal", "implementation")
+			if prefix not in ("general_management", "personal", "team", "implementation")
 		}
 		departments = [
 			name
@@ -165,6 +166,29 @@ class TestGeneralManagementAccess(FrappeTestCase):
 		)
 		self.assertEqual(task["department"], self.department)
 		self.assertIn(task["name"], [t["name"] for t in gm.get_tasks()])
+
+	def test_checklist_reference_search_runs_as_the_dialog_calls_it(self):
+		# The "Linked record" field searches through frappe's search_widget, which passes the
+		# arguments by position; frappe's sanitiser has to see the real function to find
+		# `searchfield` among them (#1956).
+		frappe.set_user("Administrator")
+		task = frappe.get_doc(
+			{"doctype": "Task", "subject": "_Test searchable company target", "department": self.department}
+		).insert()
+
+		frappe.set_user(_make_user(MANAGER, [setup.GENERAL_MANAGEMENT_ROLE]))
+		rows = search_widget(
+			"Task",
+			"searchable company",
+			query="phamos.api.general_management_spa.checklist_reference_query",
+			page_length=20,
+		)
+		self.assertIn(task.name, {row[0] for row in rows})
+
+	def test_checklist_reference_search_needs_the_role(self):
+		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
+		with self.assertRaises(frappe.PermissionError):
+			gm.checklist_reference_query("Task", "target", "name", 0, 20, {})
 
 
 class TestGeneralManagementRole(FrappeTestCase):

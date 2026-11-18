@@ -11,6 +11,7 @@ const COCKPIT_ROUTES = {
 	accounting_open_cockpit: "/accounting-cockpit",
 	software_development_open_cockpit: "/software-development-cockpit",
 	general_management_open_cockpit: "/general-management-cockpit",
+	team_open_cockpit: "/team-cockpit",
 	implementation_open_cockpit: "/implementation-cockpit",
 };
 

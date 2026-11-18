@@ -15,7 +15,7 @@ from frappe.translate import (
 from frappe.utils import cint, get_system_timezone
 
 from phamos.api.cockpit_preferences import get_preferences
-from phamos.cockpits.settings import NEUTRAL_THEME_COLOR, cockpit_window
+from phamos.cockpits.settings import COCKPITS, NEUTRAL_THEME_COLOR, cockpit_window
 from phamos.phriend.boot import phriend_boot
 
 
@@ -57,8 +57,35 @@ def get_spa_boot(default_route):
 			"preferences": get_preferences(),
 			# The cockpit's window colour and edge glow from Cockpit Settings (#1933).
 			"cockpit_window": cockpit_window(default_route),
+			# The cockpits this user may open, for the switcher in the sidebar (#1955).
+			"cockpits": user_cockpits(),
 		}
 	)
+
+
+def user_cockpits():
+	"""The cockpits the session user may open, in the order of the Apps screen.
+
+	Taken from this app's `add_to_apps_screen` tiles and their permission checks, so the switcher
+	offers exactly what the Apps screen offers.
+
+	Returns:
+		list[dict]: route and title of each cockpit.
+	"""
+	cockpits = []
+	for tile in frappe.get_hooks("add_to_apps_screen", app_name="phamos"):
+		route = tile.get("route")
+		if route not in COCKPITS:
+			continue
+		check = tile.get("has_permission")
+		try:
+			allowed = not check or frappe.get_attr(check)()
+		except Exception:
+			# a broken check must not take every cockpit's page down; that cockpit is just not offered
+			allowed = False
+		if allowed:
+			cockpits.append({"route": route, "title": tile.get("title") or route})
+	return cockpits
 
 
 def theme_color(boot):

@@ -60,6 +60,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.general_management_spa.check_app_permission",
 	},
 	{
+		"name": "team_cockpit",
+		"logo": "/assets/phamos/manifest/team-icon-192.png",
+		"title": "Team Cockpit",
+		"route": "/team-cockpit",
+		"has_permission": "phamos.api.team_cockpit.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -172,6 +179,8 @@ website_route_rules = [
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
+    {"from_route": "/team-cockpit", "to_route": "team_cockpit"},
+    {"from_route": "/team-cockpit/<path:app_path>", "to_route": "team_cockpit"},
     {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
     {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
@@ -272,7 +281,7 @@ after_migrate = [
 	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
+	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751), Team on Issue and Task (#1955)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
