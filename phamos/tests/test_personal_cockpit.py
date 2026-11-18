@@ -68,7 +68,8 @@ class TestPersonalCockpitWiring(FrappeTestCase):
 
 	def test_unknown_scope_is_rejected(self):
 		with self.assertRaises(ValueError):
-			dc.CockpitConfig(label="X", department_field="", project_field="", roles=(), scope="team")
+			# "team" is a real scope since #1955
+			dc.CockpitConfig(label="X", department_field="", project_field="", roles=(), scope="company")
 
 	def test_form_options_have_no_department_default(self):
 		options = pc.get_form_options()

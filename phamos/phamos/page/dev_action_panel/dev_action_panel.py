@@ -9,7 +9,7 @@ from phamos.phamos.timesheet_utils import (
     percent_billable_preset,
 )
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
-from phamos.gitlab_integration.issue_refs import link_gitlab_issues
+from phamos.gitlab_integration.issue_refs import issue_created_during, link_gitlab_issues
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count, Max
 from pypika import Case
@@ -480,6 +480,11 @@ def stop_timer(name, result, percent_billable=None, activity_type=None, manual_e
 
     doc.result = result
     link_gitlab_issues(doc, reference=gitlab_issue_ref, texts=(doc.goal, result))
+    if not doc.gitlab_issue and not doc.gitlab_parent_issue:
+        # Project timer without a ticket: the newest ticket created in this project while it ran,
+        # mine or unassigned.
+        user = frappe.db.get_value("Employee", doc.employee, "user_id") or frappe.session.user
+        link_gitlab_issues(doc, reference=issue_created_during(doc.project, doc.from_time, end_time, user))
     doc.percent_billable = percent_billable_or_preset(percent_billable, doc.project)
     doc.value_add = cstr(value_add)
     if activity_type:
@@ -614,27 +619,17 @@ def get_dev_my_projects():
 def get_dev_all_projects():
     """One project list instead of "My Projects" + "All Projects".
 
-    Every Open project, plus projects assigned to me (open ToDo) in any status, so closing the
-    assignment ToDo (e.g. in the Personal Cockpit) only changes the order. is_assigned=1 for mine.
-    Order: last used first (my latest Timesheet Record), then assigned to me, then by name.
+    Every Open project, plus projects assigned to me in any status. Assigned means an open or
+    closed (done) assignment ToDo, so a project stays mine after the ToDo is ticked off; a
+    cancelled assignment does not count. Order: assigned to me first, then the rest; within
+    each, last used first (my latest Timesheet Record), then by name.
     """
     user = frappe.session.user
 
     Project = frappe.qb.DocType("Project")
     Customer = frappe.qb.DocType("Customer")
-    ToDo = frappe.qb.DocType("ToDo")
 
-    # A subquery, not a join: several open ToDos for one project would duplicate the row.
-    assigned_to_me = (
-        frappe.qb.from_(ToDo)
-        .select(Max(ToDo.reference_name))
-        .where(
-            (ToDo.reference_name == Project.name)
-            & (ToDo.reference_type == "Project")
-            & (ToDo.status == "Open")
-            & (ToDo.allocated_to == user)
-        )
-    )
+    assigned_to_me = _assigned_to_me(Project, user)
     is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0).as_("is_assigned")
 
     query = (
@@ -655,12 +650,94 @@ def get_dev_all_projects():
     projects = _enrich_projects(query.run(as_dict=True), user)
     projects.sort(
         key=lambda p: (
-            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
             -cint(p.get("is_assigned")),
+            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
             (p.get("project_name") or "").lower(),
         )
     )
     return projects
+
+
+def _assigned_to_me(Project, user):
+    """Subquery: the project has an open or closed (done) assignment ToDo for the user.
+    A subquery, not a join: several ToDos for one project would duplicate the row."""
+    ToDo = frappe.qb.DocType("ToDo")
+    return (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
+            (ToDo.reference_name == Project.name)
+            & (ToDo.reference_type == "Project")
+            & (ToDo.status.isin(["Open", "Closed"]))
+            & (ToDo.allocated_to == user)
+        )
+    )
+
+
+def _dev_project_names(user):
+    """Names get_dev_all_projects lists: every Open project plus those assigned to the user."""
+    Project = frappe.qb.DocType("Project")
+    return set(
+        frappe.qb.from_(Project)
+        .select(Project.name)
+        .where((Project.status == "Open") | _assigned_to_me(Project, user).isnotnull())
+        .run(pluck=True)
+    )
+
+
+# The fields the panel itself already shows for each record (get_my_issues /
+# get_dev_all_projects). Filtering is limited to them, so the Filter button cannot be used to
+# probe values of fields the user never sees (a filter on a hidden field tells, record by
+# record, whether its value matches).
+FILTERABLE_FIELDS = {
+    "GitLab Issue": frozenset(
+        {
+            "name", "issue_id", "title", "state", "due_date", "start_date",
+            "assignee", "assignee_email", "gitlab_username",
+            "issue_url", "parent_issue", "gitlab_project", "labels",
+        }
+    ),
+    "Project": frozenset({"name", "project_name", "status", "percent_billable", "customer"}),
+}
+FILTERABLE_DOCTYPES = tuple(FILTERABLE_FIELDS)
+
+
+@frappe.whitelist()
+def get_matching_names(doctype, filters):
+    """Names of the records that match a Frappe filter group, for the panel's Filter button.
+
+    The panel loads its full lists once and only hides rows, so sidebar counts and the running
+    timer stay as they are. It uses get_all (GitLab Issue is readable by System Manager only, like
+    get_my_issues), so it answers only what the panel already shows: panel users (a linked
+    Employee), the panel's records (open GitLab Issues; Open or assigned projects) and the
+    panel's fields (FILTERABLE_FIELDS), never a child table or another doctype.
+    """
+    if doctype not in FILTERABLE_DOCTYPES:
+        frappe.throw(_("Filtering {0} is not supported here.").format(doctype))
+    user = frappe.session.user
+    if not frappe.db.exists("Employee", {"user_id": user}):
+        frappe.throw(_("No Employee record linked to your user account."), frappe.PermissionError)
+    filters = _filter_rows(doctype, filters)
+    if doctype == "GitLab Issue":
+        return frappe.get_all(doctype, filters=[*filters, [doctype, "state", "=", "opened"]], pluck="name")
+    allowed = _dev_project_names(user)
+    return [name for name in frappe.get_all(doctype, filters=filters, pluck="name") if name in allowed]
+
+
+def _filter_rows(doctype, filters):
+    """[doctype, field, condition, value] rows from FilterGroup.get_filters(), on the doctype's
+    own FILTERABLE_FIELDS only; anything else is refused."""
+    rows = frappe.parse_json(filters) if isinstance(filters, str) else filters
+    if not isinstance(rows, list) or not all(isinstance(f, (list, tuple)) and len(f) >= 4 for f in rows):
+        frappe.throw(_("Filters must be a list of [doctype, field, condition, value] rows."))
+    allowed = FILTERABLE_FIELDS[doctype]
+    for row in rows:
+        if row[0] != doctype or row[1] not in allowed:
+            frappe.throw(
+                _("You can filter {0} on these fields only: {1}").format(_(doctype), ", ".join(sorted(allowed))),
+                frappe.PermissionError,
+            )
+    return [list(f[:4]) for f in rows]
 
 
 def _enrich_projects(projects, user):

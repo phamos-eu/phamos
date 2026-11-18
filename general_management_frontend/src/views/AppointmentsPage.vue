@@ -243,9 +243,10 @@ async function load() {
 
 // Invites go out in a background job after the save (decision 10, #1949): the job tells this
 // user when it is done (phamos.events.team_daily_schedule.SYNC_DONE_EVENT). Without a socket,
-// poll a few times while an appointment is still pending.
-const POLL_MS = 3000
-const POLL_TRIES = 10
+// poll while an appointment is still pending: with many attendees Mailcow takes minutes, and the
+// job waits up to about 8 minutes per call (VERIFY_WINDOW in team_daily_schedule.py).
+const POLL_MS = 10000
+const POLL_TRIES = 60
 const realtime = useUserRealtime("mailcow_schedule_synced", load, { debounceMs: 200 })
 let pollTimer = null
 
