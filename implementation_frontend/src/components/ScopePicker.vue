@@ -82,8 +82,10 @@ function pickCustomer(name) {
 }
 
 function pickImplementation(name) {
-	// Stay on the same section when switching.
-	const section = route.name && route.name !== "Home" ? route.name : "Overview"
+	// Stay on the same section when switching; a record of the old implementation goes back to its list.
+	const DETAIL_TO_LIST = { IssueDetail: "Issues" }
+	const current = DETAIL_TO_LIST[route.name] || route.name
+	const section = current && current !== "Home" ? current : "Overview"
 	router.push({ name: section, params: { implementation: name } })
 }
 </script>

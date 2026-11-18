@@ -8,6 +8,7 @@
 //   issue_url(name)           where "Saved as ISS-…" links to
 //   count_reports()           optional: Promise of the open reports for this page (the badge)
 //   open_reports()            optional: show those reports
+//   open_status(ctx)          optional: where the reports about this place stand (Implementation Cockpit)
 //   on_route_change(cb)       optional
 //   shortcut                  the user's shortcut ("Mod+P"; "" when off)
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"

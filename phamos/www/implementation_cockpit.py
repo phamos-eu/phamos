@@ -3,8 +3,8 @@
 
 import frappe
 from frappe import _
-from phamos.www.spa_boot import get_spa_boot
-from phamos.api.implementation_cockpit import check_app_permission
+from phamos.www.spa_boot import get_spa_boot, theme_color
+from phamos.api.implementation_cockpit import check_app_permission, is_internal_user
 
 no_cache = 1
 
@@ -23,7 +23,9 @@ def get_context(context):
 	frappe.db.commit()  # nosemgrep
 	context = frappe._dict()
 	context.csrf_token = csrf_token
-	context.boot = frappe.as_json(get_boot())
+	boot = get_boot()
+	context.boot = frappe.as_json(boot)
+	context.theme_color = theme_color(boot)
 	context.site_name = frappe.local.site
 	return context
 
@@ -36,4 +38,9 @@ def get_context_for_dev():
 
 
 def get_boot():
-	return get_spa_boot("/implementation-cockpit")
+	boot = get_spa_boot("/implementation-cockpit")
+	if not is_internal_user():
+		# Customers don't report through Phriend yet (#1898 scope, #1938); no ball, no app versions.
+		boot.phriend = None
+		boot.versions = {}
+	return boot

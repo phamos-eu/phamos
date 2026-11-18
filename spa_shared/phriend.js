@@ -63,6 +63,8 @@ export function mountPhriend(router, heading) {
 				: `/app/issue/${encodeURIComponent(name)}`,
 		count_reports: () => call(COUNT_METHOD, badgeArgs(current()), window.csrf_token),
 		open_reports: () => window.open(reportsUrl(current()), "_blank", "noopener"),
+		// where the reports about this place stand, for users who may open the Implementation Cockpit (#1671)
+		open_status: boot().phriend.implementation_cockpit ? (ctx) => openStatus(router, ctx) : null,
 		on_route_change: (callback) => router.afterEach(() => callback()),
 		// the user's own shortcut, else the site's (Phriend Settings); "" when off
 		shortcut: boot().phriend.shortcut || "",
@@ -73,6 +75,20 @@ export function mountPhriend(router, heading) {
 	})
 	early.splice(0).forEach((item) => instance.log.record_failed_request(item))
 	instance.mount()
+}
+
+function openStatus(router, ctx) {
+	const query = new URLSearchParams()
+	if (ctx.ref_doctype && ctx.ref_docname) {
+		query.set("ref_doctype", ctx.ref_doctype)
+		query.set("ref_docname", ctx.ref_docname)
+	} else if (ctx.route) {
+		query.set("route", ctx.route)
+	}
+	const url = `/implementation-cockpit/status?${query}`
+	// inside the Implementation Cockpit itself: stay in the window
+	if (router.options.history.base === "/implementation-cockpit") router.push(`/status?${query}`)
+	else window.open(url, "_blank", "noopener")
 }
 
 function reportsUrl(ctx) {

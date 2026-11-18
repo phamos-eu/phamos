@@ -1,13 +1,13 @@
 {
 	"id": "/implementation-cockpit",
 	"name": "Implementation Cockpit",
-	"short_name": "Implementation",
-	"description": "Status, milestones, issues and contacts of your implementation with phamos",
+	"short_name": "Implementation Cockpit",
+	"description": "Status, roadmap, issues and budget of an implementation with phamos",
 	"start_url": "/implementation-cockpit",
 	"scope": "/implementation-cockpit",
 	"display": "standalone",
 	"background_color": "#f8f8f8",
-	"theme_color": "#f8f8f8",
+	"theme_color": "#0f766e",
 	"icons": [
 		{
 			"src": "/assets/phamos/manifest/implementation-icon-192.png",

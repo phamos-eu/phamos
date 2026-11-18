@@ -22,6 +22,7 @@ import { __ } from "@spa/utils/i18n.js"
 import ScopePicker from "./components/ScopePicker.vue"
 import SidebarContact from "./components/SidebarContact.vue"
 import { loadImplementation } from "./implementationStore.js"
+import { scope } from "./scopeStore.js"
 
 const route = useRoute()
 
@@ -37,9 +38,10 @@ const navItems = computed(() =>
 		? [
 				{ name: "Overview", label: __("Overview"), icon: "grid" },
 				{ name: "Milestones", label: __("Milestones"), icon: "flag" },
-				{ name: "Issues", label: __("Issues"), icon: "inbox" },
+				// Reports through Phriend are internal for now; customers follow with #1938.
+				...(scope.isInternal ? [{ name: "Issues", label: __("Issues"), icon: "inbox", match: ["Issues", "IssueDetail"] }] : []),
 				{ name: "Timesheets", label: __("Timesheets"), icon: "clock" },
-				{ name: "SalesOrders", label: __("Sales Orders"), icon: "file-text" },
+				{ name: "Budget", label: __("Budget"), icon: "file-text" },
 				{ name: "Planning", label: __("Planning"), icon: "calendar" },
 				{ name: "Team", label: __("Contact & Team"), icon: "users" },
 				{ name: "Links", label: __("Links"), icon: "link" },
@@ -49,7 +51,7 @@ const navItems = computed(() =>
 
 const pageTitle = computed(() => {
 	const implementation = route.params.implementation
-	const section = navItems.value.find((item) => item.name === route.name)
+	const section = navItems.value.find((item) => (item.match || [item.name]).includes(route.name))
 	if (!implementation) return __("Implementation Cockpit")
 	return section && route.name !== "Overview" ? `${section.label} · ${implementation}` : implementation
 })

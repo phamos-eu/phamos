@@ -627,8 +627,17 @@ class Flow {
 		}
 		if (!box.isConnected) return;
 		const reports = (result && result.reports) || [];
+		// Where the reports about this place stand, in the Implementation Cockpit (#1671)
+		const cockpit = this.phriend.host.open_status
+			? `<button type="button" class="link reported-all" data-reported-cockpit>${escape_html(__("Status in the Implementation Cockpit"))}</button>`
+			: "";
+		const bind_cockpit = () => {
+			const link = box.querySelector("[data-reported-cockpit]");
+			if (link) link.addEventListener("click", () => this.phriend.host.open_status(this.ctx));
+		};
 		if (!reports.length) {
-			box.innerHTML = `<p class="reported-empty">${escape_html(__("No open reports about this page yet."))}</p>`;
+			box.innerHTML = `<p class="reported-empty">${escape_html(__("No open reports about this page yet."))}</p>${cockpit}`;
+			bind_cockpit();
 			return;
 		}
 		// one row per report, in columns that line up across rows: type, title, reporter, age, status
@@ -649,9 +658,10 @@ class Flow {
 				: "";
 		box.innerHTML = `
 			<p class="reported-head">${escape_html(__("Already reported here"))} <span class="reported-count">${escape_html(String(result.count))}</span></p>
-			<ul>${items}</ul>${more}`;
+			<ul>${items}</ul>${more}${cockpit}`;
 		const all = box.querySelector("[data-reported-all]");
 		if (all) all.addEventListener("click", () => this.phriend.host.open_reports());
+		bind_cockpit();
 	}
 
 	// ------------------------------------------------------------- shortcut

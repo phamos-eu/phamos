@@ -21,6 +21,8 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
 from frappe.utils.html_utils import sanitize_html
 
+from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
+
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
 OVERVIEW_FIELDS = (
 	"name",
@@ -57,13 +59,25 @@ def is_internal_user(user=None):
 	return frappe.get_cached_value("User", user or frappe.session.user, "user_type") == "System User"
 
 
+def has_internal_access(user=None):
+	"""phamos staff get in with the cockpit role or as System Manager (#1671, pattern of #1946).
+
+	All internal users with access see everything for now; finer internal roles may follow
+	(GDPR), so the check stays in this one place.
+	"""
+	roles = frappe.get_roles(user or frappe.session.user)
+	return IMPLEMENTATION_ROLE in roles or "System Manager" in roles
+
+
 def _allowed_implementations():
 	"""Names of the Implementations the session user may open in the cockpit."""
 	user = frappe.session.user
 	if user == "Guest":
 		return []
 	if is_internal_user(user):
-		# Respects role and User Permissions like Desk does.
+		if not has_internal_access(user):
+			return []
+		# Respects User Permissions like Desk does.
 		return frappe.get_list("Implementation", pluck="name", order_by="name asc")
 	return _customer_implementations(user)
 
@@ -526,3 +540,133 @@ def get_links(implementation):
 	_require_implementation(implementation)
 	html = frappe.db.get_value("Implementation", implementation, "links") or ""
 	return {"html": sanitize_html(html, linkify=True, always_sanitize=True)}
+
+
+# Issues (#1671, phase A): the reports made through Phriend about an Implementation, with the
+# stage their GitLab issues are in. Internal users only for now; customers follow with #1938.
+
+ISSUE_SCOPES = ("record", "page", "mine", "implementation")
+ISSUE_LIST_FIELDS = (
+	"name",
+	"subject",
+	"status",
+	"priority",
+	"phriend_type",
+	"phriend_reported_by",
+	"phriend_reported_by_name",
+	"phriend_route",
+	"phriend_ref_doctype",
+	"phriend_ref_docname",
+	"opening_date",
+	"modified",
+)
+CLOSED_ISSUE_STATUSES = ("Resolved", "Closed")
+# GitLab labels that move an issue on (phamos label workflow); anything else open counts as "In GitLab".
+TESTING_LABELS = ("testing", "ready for production")
+WORKING_LABELS = ("working", "in progress", "doing")
+STAGES = ("Reported", "In GitLab", "In Progress", "Testing", "Done")
+
+
+def _require_internal():
+	if not is_internal_user() or not has_internal_access():
+		frappe.throw(_("Only phamos staff can see the issues of an implementation for now."), frappe.PermissionError)
+
+
+def _issue_filters(implementation, scope, route=None, ref_doctype=None, ref_docname=None):
+	filters = {"custom_implementation": implementation}
+	if scope == "record":
+		filters.update({"phriend_ref_doctype": ref_doctype or "", "phriend_ref_docname": ref_docname or ""})
+	elif scope == "page":
+		filters["phriend_route"] = (route or "").lstrip("/")[:140]
+	elif scope == "mine":
+		filters["phriend_reported_by"] = frappe.session.user
+	return filters
+
+
+def issue_stage(status, gitlab_issues):
+	"""Where an Issue stands, from its own status and its GitLab issues' state and labels."""
+	if status in CLOSED_ISSUE_STATUSES:
+		return "Done"
+	if not gitlab_issues:
+		return "Reported"
+	open_issues = [g for g in gitlab_issues if g["state"] != "closed"]
+	if not open_issues:
+		return "Done"
+	labels = {label.lower() for g in open_issues for label in g["labels"]}
+	if any(label.startswith(t) for label in labels for t in TESTING_LABELS):
+		return "Testing"
+	if labels & set(WORKING_LABELS):
+		return "In Progress"
+	return "In GitLab"
+
+
+@frappe.whitelist()
+def get_issues(implementation, scope=None, route=None, ref_doctype=None, ref_docname=None, include_closed=0):
+	"""Issues of the Implementation for one scope, narrowest first: this record, this page, mine, all.
+
+	Opened from Phriend the cockpit gets the record or page of the report; without one it shows
+	the user's own reports. `counts` tells the switcher how many each scope has.
+	"""
+	_require_implementation(implementation)
+	_require_internal()
+	from phamos.phriend.gitlab_issues import issue_gitlab_issues
+
+	available = ["mine", "implementation"]
+	if route:
+		available.insert(0, "page")
+	if ref_doctype and ref_docname:
+		available.insert(0, "record")
+	scope = scope if scope in available else available[0]
+
+	status_filter = {} if cint(include_closed) else {"status": ["not in", CLOSED_ISSUE_STATUSES]}
+	counts = {
+		s: frappe.db.count("Issue", {**_issue_filters(implementation, s, route, ref_doctype, ref_docname), **status_filter})
+		for s in available
+	}
+	rows = frappe.get_all(
+		"Issue",
+		filters={**_issue_filters(implementation, scope, route, ref_doctype, ref_docname), **status_filter},
+		fields=ISSUE_LIST_FIELDS,
+		order_by="modified desc",
+		limit_page_length=200,
+	)
+	for row in rows:
+		row["gitlab_issues"] = issue_gitlab_issues(row.name)
+		row["stage"] = issue_stage(row.status, row["gitlab_issues"])
+	return {"scope": scope, "available": available, "counts": counts, "issues": rows, "stages": STAGES}
+
+
+@frappe.whitelist()
+def get_issue(implementation, name):
+	"""One Issue of the Implementation with its report details and GitLab issues."""
+	_require_implementation(implementation)
+	_require_internal()
+	if frappe.db.get_value("Issue", name, "custom_implementation") != implementation:
+		frappe.throw(_("This issue does not belong to the implementation."), frappe.PermissionError)
+	from phamos.phriend.gitlab_issues import issue_gitlab_issues
+
+	row = frappe.db.get_value(
+		"Issue",
+		name,
+		[*ISSUE_LIST_FIELDS, "phriend_comment", "phriend_screenshot", "phriend_page_url", "resolution_details"],
+		as_dict=True,
+	)
+	row["gitlab_issues"] = issue_gitlab_issues(name)
+	row["stage"] = issue_stage(row.status, row["gitlab_issues"])
+	row["stages"] = STAGES
+	return row
+
+
+@frappe.whitelist()
+def resolve_status(route=None, ref_doctype=None, ref_docname=None):
+	"""The Implementation to open for Phriend's "Status in the Implementation Cockpit" (#1671).
+
+	The same rule Phriend uses when it files a report (phamos.phriend.api.report_implementation),
+	limited to Implementations the user may open. None: the cockpit opens the last one used.
+	"""
+	_require_internal()
+	from phamos.phriend.api import report_implementation
+
+	settings = frappe.get_cached_doc("Phriend Settings")
+	implementation = report_implementation(settings, route, ref_doctype, ref_docname)
+	return implementation if implementation in _allowed_implementations() else None

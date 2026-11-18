@@ -324,3 +324,107 @@ class TestImplementationCockpit(FrappeTestCase):
 		self.assertNotIn("<script", html)
 		with self.assertRaises(frappe.PermissionError):
 			ic.get_links(self.hidden)
+
+
+def _issue(name, implementation, reporter="Administrator", route="", ref_doctype=None, ref_docname=None, status="Open"):
+	frappe.get_doc(
+		{
+			"doctype": "Issue",
+			"name": name,
+			"subject": f"[Bug] {name}",
+			"status": status,
+			"custom_implementation": implementation,
+			"phriend_type": "Bug",
+			"phriend_reported_by": reporter,
+			"phriend_route": route,
+			"phriend_ref_doctype": ref_doctype,
+			"phriend_ref_docname": ref_docname,
+			"opening_date": "2026-11-18",
+		}
+	).db_insert()
+	return name
+
+
+class TestImplementationCockpitIssues(FrappeTestCase):
+	"""Phase A (#1671): the internal role, Phriend's implementation rule and the Issues page."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from phamos.setup.implementation_cockpit import after_migrate
+
+		after_migrate()
+		customer = _customer(PREFIX + "Issue Customer")
+		cls.impl = _implementation(PREFIX + "Issue Impl", customer, stakeholder_email=USER)
+		cls.other = _implementation(PREFIX + "Issue Other", customer)
+		cls.page = f"implementation-cockpit/{cls.impl}/timesheets"
+		cls.on_page = _issue(PREFIX + "ISS 1", cls.impl, route=cls.page)
+		cls.on_record = _issue(PREFIX + "ISS 2", cls.impl, ref_doctype="Implementation", ref_docname=cls.impl)
+		cls.by_other = _issue(PREFIX + "ISS 3", cls.impl, reporter="Guest")
+		cls.done = _issue(PREFIX + "ISS 4", cls.impl, status="Closed")
+		cls.foreign = _issue(PREFIX + "ISS 5", cls.other, route=cls.page)
+
+		cls.staff = "ic-staff@example.com"
+		if not frappe.db.exists("User", cls.staff):
+			frappe.get_doc(
+				{"doctype": "User", "email": cls.staff, "first_name": "IC Staff", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_internal_users_need_the_cockpit_role(self):
+		from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
+
+		staff = frappe.get_doc("User", self.staff)
+		staff.remove_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertEqual(ic._allowed_implementations(), [])
+		frappe.set_user("Administrator")
+		staff.add_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertIn(self.impl, ic._allowed_implementations())
+
+	def test_phriend_files_the_report_under_the_page_record_or_system(self):
+		from phamos.phriend.api import report_implementation
+
+		settings = frappe._dict(system_implementation=self.other)
+		route = f"implementation-cockpit/{self.impl.replace(' ', '%20')}/budget"
+		self.assertEqual(report_implementation(settings, route, None, None), self.impl)
+		self.assertEqual(report_implementation(settings, "app/todo", "Implementation", self.impl), self.impl)
+		self.assertEqual(report_implementation(settings, "app/todo", None, None), self.other)
+		# a report from another system says nothing about records here
+		self.assertIsNone(report_implementation(settings, route, None, None, source={"system": "x", "url": "y"}))
+
+	def test_issue_scopes_narrow_to_the_place(self):
+		page = ic.get_issues(self.impl, route=self.page)
+		self.assertEqual(page["scope"], "page")
+		self.assertEqual([i["name"] for i in page["issues"]], [self.on_page])
+		record = ic.get_issues(self.impl, route=self.page, ref_doctype="Implementation", ref_docname=self.impl)
+		self.assertEqual(record["scope"], "record")
+		self.assertEqual([i["name"] for i in record["issues"]], [self.on_record])
+		mine = ic.get_issues(self.impl, scope="mine")
+		self.assertEqual({i["name"] for i in mine["issues"]}, {self.on_page, self.on_record})
+		everything = ic.get_issues(self.impl, scope="implementation", include_closed=1)
+		self.assertEqual({i["name"] for i in everything["issues"]}, {self.on_page, self.on_record, self.by_other, self.done})
+		self.assertNotIn(self.foreign, {i["name"] for i in everything["issues"]})
+		self.assertEqual(everything["counts"]["implementation"], 4)
+
+	def test_issue_of_another_implementation_is_refused(self):
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_issue(self.impl, self.foreign)
+		self.assertEqual(ic.get_issue(self.impl, self.on_page)["stage"], "Reported")
+
+	def test_customers_do_not_see_issues_yet(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_issues(self.impl)
+
+	def test_stage_follows_gitlab(self):
+		gl = lambda state, *labels: {"state": state, "labels": list(labels)}
+		self.assertEqual(ic.issue_stage("Open", []), "Reported")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened")]), "In GitLab")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened", "Working")]), "In Progress")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened", "Testing on Production")]), "Testing")
+		self.assertEqual(ic.issue_stage("Open", [gl("closed")]), "Done")
+		self.assertEqual(ic.issue_stage("Closed", [gl("opened")]), "Done")

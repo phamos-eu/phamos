@@ -108,7 +108,18 @@
   "general_management_spa_section",
   "general_management_department",
   "column_break_general_management_spa",
-  "general_management_timesheet_project"
+  "general_management_timesheet_project",
+  "implementation_spa_tab",
+  "implementation_open_cockpit",
+  "implementation_window_section",
+  "implementation_color",
+  "column_break_implementation_window",
+  "implementation_glow",
+  "implementation_glow_top",
+  "implementation_glow_left",
+  "implementation_glow_bottom",
+  "implementation_glow_right",
+  "implementation_glow_breathing"
  ],
  "fields": [
   {
@@ -765,11 +776,81 @@
    "fieldtype": "Link",
    "label": "General Management Timesheet Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "implementation_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Implementation Cockpit"
+  },
+  {
+   "fieldname": "implementation_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "implementation_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#0f766e",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "implementation_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_implementation_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "implementation_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.implementation_glow && doc.implementation_glow != 'Off'",
+   "fieldname": "implementation_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.implementation_glow && doc.implementation_glow != 'Off'",
+   "fieldname": "implementation_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.implementation_glow && doc.implementation_glow != 'Off'",
+   "fieldname": "implementation_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.implementation_glow && doc.implementation_glow != 'Off'",
+   "fieldname": "implementation_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.implementation_glow && doc.implementation_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "implementation_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 20:00:00.000000",
+ "modified": "2026-11-18 07:41:45.129400",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",
