@@ -1,0 +1,472 @@
+# Copyright (c) 2026, phamos.eu and contributors
+# For license information, please see license.txt
+
+"""Access scope of the Implementation Cockpit API (#1671).
+
+A customer user sees only Implementations where one of their Contacts is a Customer stakeholder
+and that are shown on the customer portal; nothing else is reachable, and internal fields never
+leave the server.
+"""
+
+import unittest.mock
+
+import frappe
+from frappe.tests.utils import FrappeTestCase
+
+from phamos.api import implementation_cockpit as ic
+
+PREFIX = "_Test IC "
+USER = "ic-customer@example.com"
+
+
+def _customer(name):
+	if not frappe.db.exists("Customer", name):
+		frappe.get_doc({"doctype": "Customer", "name": name, "customer_name": name}).db_insert()
+	return name
+
+
+def _implementation(name, customer, show=1, stakeholder_email=None, stakeholder_contact=None, **values):
+	# db_insert skips Implementation.before_save (financial snapshots, chapters), which these
+	# tests do not need.
+	doc = frappe.get_doc(
+		{
+			"doctype": "Implementation",
+			"name": name,
+			"customer": customer,
+			"show_on_customer_portal": show,
+			**values,
+		}
+	)
+	doc.db_insert()
+	if stakeholder_email or stakeholder_contact:
+		row = frappe.get_doc(
+			{
+				"doctype": "Implementation Stakeholder",
+				"parent": name,
+				"parenttype": "Implementation",
+				"parentfield": "stakeholders",
+				"idx": 1,
+				"email": stakeholder_email or "someone-else@example.com",
+				"contact": stakeholder_contact,
+				"stakeholder_organisation": "Customer",
+				"stakeholder_type": "Sponsor",
+			}
+		)
+		row.db_insert()
+	return name
+
+
+def _project(name, implementation, customer):
+	frappe.get_doc(
+		{
+			"doctype": "Project",
+			"name": name,
+			"project_name": name,
+			"custom_implementation": implementation,
+			"customer": customer,
+			"status": "Open",
+		}
+	).db_insert()
+	return name
+
+
+def _timesheet(name, project, customer, start_date, hours, billable, rating=0, activity="Development"):
+	frappe.get_doc(
+		{
+			"doctype": "Timesheet",
+			"name": name,
+			"customer": customer,
+			"parent_project": project,
+			"project_name": project,
+			"start_date": start_date,
+			"end_date": start_date,
+			"employee_name": "IC Tester",
+			"total_hours": hours,
+			"total_billable_hours": billable,
+			"custom_rating": rating,
+			"docstatus": 0,
+		}
+	).db_insert()
+	frappe.get_doc(
+		{
+			"doctype": "Timesheet Detail",
+			"parent": name,
+			"parenttype": "Timesheet",
+			"parentfield": "time_logs",
+			"idx": 1,
+			"activity_type": activity,
+			"description": f"Work on {name}",
+			"hours": hours,
+			"project": project,
+		}
+	).db_insert()
+	return name
+
+
+def _sales_order(name, implementation, customer, qty, delivered, status="To Deliver and Bill", docstatus=1):
+	frappe.get_doc(
+		{
+			"doctype": "Sales Order",
+			"name": name,
+			"customer": customer,
+			"customer_name": customer,
+			"custom_implementation": implementation,
+			"transaction_date": "2026-03-01",
+			"delivery_date": "2026-06-30",
+			"status": status,
+			"total_qty": qty,
+			"docstatus": docstatus,
+		}
+	).db_insert()
+	frappe.get_doc(
+		{
+			"doctype": "Sales Order Item",
+			"parent": name,
+			"parenttype": "Sales Order",
+			"parentfield": "items",
+			"idx": 1,
+			"item_code": "Consulting",
+			"qty": qty,
+			"delivered_qty": delivered,
+		}
+	).db_insert()
+	return name
+
+
+class TestImplementationCockpit(FrappeTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		if not frappe.db.exists("User", USER):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": USER,
+					"first_name": "IC Customer",
+					"user_type": "Website User",
+					"send_welcome_email": 0,
+				}
+			).insert(ignore_permissions=True)
+		contact = frappe.get_doc(
+			{"doctype": "Contact", "first_name": "IC Customer", "user": USER, "email_ids": [{"email_id": USER, "is_primary": 1}]}
+		).insert(ignore_permissions=True)
+		cls.contact = contact.name
+
+		own = _customer(PREFIX + "Own Customer")
+		other = _customer(PREFIX + "Other Customer")
+		cls.by_contact = _implementation(
+			PREFIX + "By Contact",
+			own,
+			stakeholder_contact=contact.name,
+			status="Escalated",
+			forecast="5 ⛈️ - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult",
+			notes="internal note",
+			maturity_level="4 - Go Live Phase. Go Live, first modules in use with real life data",
+		)
+		cls.by_email = _implementation(PREFIX + "By Email", own, stakeholder_email=USER)
+		cls.hidden = _implementation(PREFIX + "Not On Portal", own, show=0, stakeholder_email=USER)
+		cls.foreign = _implementation(PREFIX + "Other Customer", other, stakeholder_email="x@example.com")
+
+		own_project = _project(PREFIX + "Core Project", cls.by_contact, own)
+		other_impl_project = _project(PREFIX + "Webshop Project", cls.by_email, own)
+		foreign_project = _project(PREFIX + "Foreign Project", cls.foreign, other)
+		cls.ts_march = _timesheet(PREFIX + "TS 1", own_project, own, "2026-03-03", 8, 6)
+		cls.ts_may = _timesheet(PREFIX + "TS 2", own_project, own, "2026-05-12", 4, 4)
+		cls.ts_rated = _timesheet(PREFIX + "TS 3", own_project, own, "2026-05-20", 2, 0, rating=3)
+		cls.ts_other_impl = _timesheet(PREFIX + "TS 4", other_impl_project, own, "2026-05-12", 5, 5)
+		cls.ts_foreign = _timesheet(PREFIX + "TS 5", foreign_project, other, "2026-05-12", 7, 7)
+
+		cls.so_open = _sales_order(PREFIX + "SO 1", cls.by_contact, own, 100, 40)
+		cls.so_done = _sales_order(PREFIX + "SO 2", cls.by_contact, own, 20, 20, status="Completed")
+		cls.so_draft = _sales_order(PREFIX + "SO 3", cls.by_contact, own, 50, 0, docstatus=0)
+		cls.so_other = _sales_order(PREFIX + "SO 4", cls.by_email, own, 30, 0)
+		frappe.db.set_value(
+			"Implementation",
+			cls.by_contact,
+			"links",
+			'<p><a href="https://test.example.com">Test system</a><script>alert(1)</script></p>',
+			update_modified=False,
+		)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_customer_sees_only_own_portal_implementations(self):
+		frappe.set_user(USER)
+		names = ic._allowed_implementations()
+		self.assertIn(self.by_contact, names)
+		self.assertIn(self.by_email, names)
+		self.assertNotIn(self.hidden, names)
+		self.assertNotIn(self.foreign, names)
+
+	def test_scope_groups_by_customer_for_a_customer_user(self):
+		frappe.set_user(USER)
+		scope = ic.get_scope()
+		self.assertFalse(scope["is_internal"])
+		self.assertEqual([c["name"] for c in scope["customers"]], [PREFIX + "Own Customer"])
+		self.assertEqual(
+			{i["name"] for i in scope["customers"][0]["implementations"]}, {self.by_contact, self.by_email}
+		)
+
+	def test_customer_cannot_open_another_implementation(self):
+		frappe.set_user(USER)
+		for name in (self.foreign, self.hidden, "does not exist"):
+			with self.subTest(implementation=name), self.assertRaises(frappe.PermissionError):
+				ic.get_overview(name)
+
+	def test_overview_hides_internal_fields(self):
+		frappe.set_user(USER)
+		overview = ic.get_overview(self.by_contact)
+		self.assertNotIn("forecast", overview)
+		self.assertNotIn("notes", overview)
+		self.assertNotIn("Rechnungen", frappe.as_json(overview))
+		self.assertEqual(overview["status"], "Active")  # Escalated is internal
+		self.assertEqual(overview["phase_number"], 4)
+		self.assertEqual(overview["phase"], "Go Live")
+
+	def test_internal_user_sees_all_readable_implementations(self):
+		names = ic._allowed_implementations()  # Administrator
+		for name in (self.by_contact, self.hidden, self.foreign):
+			self.assertIn(name, names)
+		self.assertTrue(ic.get_scope()["is_internal"])
+
+	def test_guest_has_no_access(self):
+		frappe.set_user("Guest")
+		self.assertFalse(ic.check_app_permission())
+
+	def test_phase_label_parsing(self):
+		self.assertEqual(ic._phase_label("6 - Support Phase. System in daily use"), "Support")
+		self.assertEqual(ic._phase_number("2 - Initial Development Phase. Initial development"), 2)
+		self.assertIsNone(ic._phase_label(None))
+		self.assertIsNone(ic._phase_number(""))
+
+	def test_timesheets_are_scoped_to_the_implementation(self):
+		frappe.set_user(USER)
+		result = ic.get_timesheets(self.by_contact, from_date="2026-01-01", to_date="2026-12-31")
+		names = {r["name"] for r in result["timesheets"]}
+		self.assertEqual(names, {self.ts_march, self.ts_may, self.ts_rated})
+		self.assertEqual(result["total"], 3)
+		first = next(r for r in result["timesheets"] if r["name"] == self.ts_march)
+		self.assertEqual(first["activity_type"], "Development")
+		self.assertEqual(first["related_issue"], f"Work on {self.ts_march}")
+
+	def test_timesheets_of_other_customers_are_unreachable(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_timesheets(self.foreign)
+		# A project of another implementation does not widen the scope.
+		result = ic.get_timesheets(self.by_contact, project=PREFIX + "Foreign Project")
+		self.assertEqual(result["total"], 0)
+
+	def test_malicious_parameters_do_not_widen_the_result(self):
+		frappe.set_user(USER)
+		result = ic.get_timesheets(
+			self.by_contact,
+			project="x' OR '1'='1",
+			sort_by="name; DROP TABLE tabTimesheet",
+			page_length="5 OFFSET 0 UNION SELECT 1",
+			start="-3",
+		)
+		self.assertEqual(result["total"], 0)
+		result = ic.get_timesheets(self.by_contact, sort_by="evil", page_length="1")
+		self.assertEqual(len(result["timesheets"]), 1)
+		self.assertEqual(result["total"], 3)
+
+	def test_summary_totals_and_empty_periods(self):
+		frappe.set_user(USER)
+		summary = ic.get_timesheet_summary(self.by_contact, from_date="2026-03-01", to_date="2026-05-31")
+		self.assertEqual(summary["hours"], 14)
+		self.assertEqual(summary["billable_hours"], 10)
+		self.assertEqual(summary["non_billable_hours"], 4)
+		self.assertEqual([str(p["start"]) for p in summary["periods"]], ["2026-03-01", "2026-04-01", "2026-05-01"])
+		self.assertEqual([p["hours"] for p in summary["periods"]], [8, 0, 6])
+		weeks = ic.get_timesheet_summary(self.by_contact, from_date="2026-05-11", to_date="2026-05-24", group_by="week")
+		self.assertEqual([str(p["start"]) for p in weeks["periods"]], ["2026-05-11", "2026-05-18"])
+
+	def test_feedback_is_checked_and_given_once(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_other_impl, 4, "not mine")
+		with self.assertRaises(frappe.ValidationError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_march, 7, "too high")
+		with self.assertRaises(frappe.ValidationError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_rated, 4, "second time")
+
+		ic.set_timesheet_feedback(self.by_contact, self.ts_march, 4, "Please check the hours on 3 March")
+		values = frappe.db.get_value(
+			"Timesheet",
+			self.ts_march,
+			["custom_rating", "customer_comment", "custom_customer_comment_timestamp", "custom_daily_comment_report_sent"],
+			as_dict=True,
+		)
+		self.assertEqual(values.custom_rating, 4)
+		self.assertEqual(values.customer_comment, "Please check the hours on 3 March")
+		self.assertIsNotNone(values.custom_customer_comment_timestamp)
+		self.assertEqual(values.custom_daily_comment_report_sent, 0)
+
+	def test_sales_orders_are_scoped_and_summed(self):
+		frappe.set_user(USER)
+		data = ic.get_sales_orders(self.by_contact)
+		self.assertEqual({o["name"] for o in data["sales_orders"]}, {self.so_open, self.so_done})
+		summary = data["summary"]
+		self.assertEqual(summary["total_so_hrs"], 120)
+		self.assertEqual(summary["delivered_hrs"], 60)
+		self.assertEqual(summary["open_so_count"], 1)
+		self.assertEqual(summary["total_so_count"], 2)
+		self.assertNotIn("grand_total", data["sales_orders"][0])
+		open_order = next(o for o in data["sales_orders"] if o["name"] == self.so_open)
+		self.assertEqual(open_order["remaining_hrs"], 60)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_sales_orders(self.foreign)
+
+	def test_links_are_sanitized(self):
+		frappe.set_user(USER)
+		html = ic.get_links(self.by_contact)["html"]
+		self.assertIn("https://test.example.com", html)
+		self.assertNotIn("<script", html)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_links(self.hidden)
+
+
+	def test_wide_ranges_give_a_bounded_chart(self):
+		summary = ic.get_timesheet_summary(self.by_contact, from_date="1900-01-01", to_date="2999-12-31", group_by="week")
+		self.assertLessEqual(len(summary["periods"]), ic.MAX_PERIODS)
+		self.assertEqual(summary["hours"], 14)
+
+
+def _issue(name, implementation, reporter="Administrator", route="", ref_doctype=None, ref_docname=None, status="Open"):
+	frappe.get_doc(
+		{
+			"doctype": "Issue",
+			"name": name,
+			"subject": f"[Bug] {name}",
+			"status": status,
+			"custom_implementation": implementation,
+			"phriend_type": "Bug",
+			"phriend_reported_by": reporter,
+			"phriend_route": route,
+			"phriend_ref_doctype": ref_doctype,
+			"phriend_ref_docname": ref_docname,
+			"opening_date": "2026-11-18",
+		}
+	).db_insert()
+	return name
+
+
+class TestImplementationCockpitIssues(FrappeTestCase):
+	"""Phase A (#1671): the internal role, Phriend's implementation rule and the Issues page."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from phamos.setup.implementation_cockpit import after_migrate
+
+		after_migrate()
+		# the customer user of the first class is rolled back with it
+		if not frappe.db.exists("User", USER):
+			frappe.get_doc(
+				{"doctype": "User", "email": USER, "first_name": "IC Customer", "user_type": "Website User", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		customer = _customer(PREFIX + "Issue Customer")
+		cls.impl = _implementation(PREFIX + "Issue Impl", customer, stakeholder_email=USER)
+		cls.other = _implementation(PREFIX + "Issue Other", customer)
+		cls.page = f"implementation-cockpit/{cls.impl}/timesheets"
+		cls.on_page = _issue(PREFIX + "ISS 1", cls.impl, route=cls.page)
+		cls.on_record = _issue(PREFIX + "ISS 2", cls.impl, ref_doctype="Implementation", ref_docname=cls.impl)
+		cls.by_other = _issue(PREFIX + "ISS 3", cls.impl, reporter="Guest")
+		cls.done = _issue(PREFIX + "ISS 4", cls.impl, status="Closed")
+		cls.foreign = _issue(PREFIX + "ISS 5", cls.other, route=cls.page)
+
+		cls.staff = "ic-staff@example.com"
+		if not frappe.db.exists("User", cls.staff):
+			frappe.get_doc(
+				{"doctype": "User", "email": cls.staff, "first_name": "IC Staff", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_internal_users_need_the_cockpit_role(self):
+		from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
+
+		staff = frappe.get_doc("User", self.staff)
+		staff.remove_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertEqual(ic._allowed_implementations(), [])
+		frappe.set_user("Administrator")
+		staff.add_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertIn(self.impl, ic._allowed_implementations())
+
+	def test_phriend_files_the_report_under_the_page_record_or_system(self):
+		from phamos.phriend.api import report_implementation
+
+		settings = frappe._dict(system_implementation=self.other)
+		route = f"implementation-cockpit/{self.impl.replace(' ', '%20')}/budget"
+		self.assertEqual(report_implementation(settings, route, None, None), self.impl)
+		self.assertEqual(report_implementation(settings, "app/todo", "Implementation", self.impl), self.impl)
+		self.assertEqual(report_implementation(settings, "app/todo", None, None), self.other)
+		# a report from another system says nothing about records here
+		self.assertIsNone(report_implementation(settings, route, None, None, source={"system": "x", "url": "y"}))
+
+	def test_issue_scopes_narrow_to_the_place(self):
+		page = ic.get_issues(self.impl, route=self.page)
+		self.assertEqual(page["scope"], "page")
+		self.assertEqual([i["name"] for i in page["issues"]], [self.on_page])
+		record = ic.get_issues(self.impl, route=self.page, ref_doctype="Implementation", ref_docname=self.impl)
+		self.assertEqual(record["scope"], "record")
+		self.assertEqual([i["name"] for i in record["issues"]], [self.on_record])
+		mine = ic.get_issues(self.impl, scope="mine")
+		self.assertEqual({i["name"] for i in mine["issues"]}, {self.on_page, self.on_record})
+		everything = ic.get_issues(self.impl, scope="implementation", include_closed=1)
+		self.assertEqual({i["name"] for i in everything["issues"]}, {self.on_page, self.on_record, self.by_other, self.done})
+		self.assertNotIn(self.foreign, {i["name"] for i in everything["issues"]})
+		self.assertEqual(everything["counts"]["implementation"], 4)
+
+	def test_issue_of_another_implementation_is_refused(self):
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_issue(self.impl, self.foreign)
+		self.assertEqual(ic.get_issue(self.impl, self.on_page)["stage"], "Reported")
+
+	def test_customers_do_not_see_issues_yet(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_issues(self.impl)
+
+	def test_stage_follows_gitlab(self):
+		gl = lambda state, *labels: {"state": state, "labels": list(labels)}
+		self.assertEqual(ic.issue_stage("Open", []), "Reported")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened")]), "In GitLab")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened", "Working")]), "In Progress")
+		self.assertEqual(ic.issue_stage("Open", [gl("opened", "Testing on Production")]), "Testing")
+		self.assertEqual(ic.issue_stage("Open", [gl("closed")]), "Done")
+		self.assertEqual(ic.issue_stage("Closed", [gl("opened")]), "Done")
+
+	def test_status_opens_one_issue_where_it_was_filed(self):
+		self.assertEqual(ic.resolve_status(issue=self.on_page), self.impl)
+		self.assertEqual(ic.resolve_status(issue=self.foreign), self.other)
+		self.assertIsNone(ic.resolve_status(issue="does not exist"))
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.resolve_status(issue=self.on_page)
+
+	def test_overview_counts_open_reports(self):
+		self.assertEqual(ic.get_issue_counts(self.impl), {"open": 3, "mine": 2})
+		frappe.set_user(USER)
+		self.assertIsNone(ic.get_issue_counts(self.impl))
+
+
+	def test_issue_reads_follow_desk_permissions(self):
+		from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
+
+		staff = frappe.get_doc("User", self.staff)
+		staff.add_roles(IMPLEMENTATION_ROLE)
+		frappe.set_user(self.staff)
+		self.assertTrue(ic.get_issues(self.impl, scope="implementation")["issues"])
+		# a staff member Desk keeps away from Issues sees none here either
+		with unittest.mock.patch.object(ic, "_allowed_implementations", return_value=[self.impl]), unittest.mock.patch(
+			"frappe.has_permission", return_value=False
+		), unittest.mock.patch("frappe.get_list", return_value=[]):
+			self.assertEqual(ic.get_issues(self.impl, scope="implementation")["issues"], [])
+			with self.assertRaises(frappe.PermissionError):
+				ic.get_issue(self.impl, self.on_page)
