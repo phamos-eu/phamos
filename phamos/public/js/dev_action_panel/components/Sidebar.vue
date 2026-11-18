@@ -95,7 +95,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     <nav class="sb__nav">
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && mineOnly }"
         @click="selectIssueView(true)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -106,7 +106,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       </button>
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': !mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && !mineOnly }"
         @click="selectIssueView(false)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
