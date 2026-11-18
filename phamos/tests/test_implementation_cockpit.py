@@ -354,6 +354,11 @@ class TestImplementationCockpitIssues(FrappeTestCase):
 		from phamos.setup.implementation_cockpit import after_migrate
 
 		after_migrate()
+		# the customer user of the first class is rolled back with it
+		if not frappe.db.exists("User", USER):
+			frappe.get_doc(
+				{"doctype": "User", "email": USER, "first_name": "IC Customer", "user_type": "Website User", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
 		customer = _customer(PREFIX + "Issue Customer")
 		cls.impl = _implementation(PREFIX + "Issue Impl", customer, stakeholder_email=USER)
 		cls.other = _implementation(PREFIX + "Issue Other", customer)
