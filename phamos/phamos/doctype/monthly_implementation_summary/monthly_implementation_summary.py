@@ -1434,7 +1434,11 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 def _restamp_amended_delivery_note(mis, dn):
 	"""Cancelling a Delivery Note cleared its Timesheet stamps (clear_timesheet_stamps_on_delivery_note_cancel);
 	its amendment delivers the same hours again, so stamp the MIS's open Timesheets for it as the MIS does
-	for a new Delivery Note."""
+	for a new Delivery Note.
+
+	Only reached for a MIS in `_mis_after_dn_submit`'s stamp set, i.e. found through the DN's own MIS link
+	(header or line field, both copied on Amend), the same link `_delivery_notes_of_mis` reads.
+	Timesheets already stamped with this DN: it ran before (e.g. a retried hook), don't stamp twice."""
 	if not dn.get("amended_from") or frappe.db.exists("Timesheet", {"custom_delivery_note": dn.name}):
 		return
 	own = next((d for d in _delivery_notes_of_mis(mis.name) if d.delivery_note == dn.name), None)
