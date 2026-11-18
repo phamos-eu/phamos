@@ -97,6 +97,27 @@ frappe.ui.form.on("Implementation", {
                 });
             });
         }
+        // Features configured with the customer in sales live on the Opportunity until the
+        // deal is won; this moves them here with their history (#1968).
+        if (!frm.is_new() && frappe.model.can_write("Implementation Feature")) {
+            frm.add_custom_button(__("Take over Features from Sales"), () => {
+                frappe.call({
+                    method: "phamos.phamos.doctype.implementation_feature.implementation_feature.take_over_from_sales",
+                    args: { implementation: frm.doc.name },
+                    freeze: true,
+                    callback: ({ message }) => {
+                        const moved = message || [];
+                        frappe.show_alert({
+                            message: moved.length
+                                ? __("{0} features taken over from sales", [moved.length])
+                                : __("No features from sales to take over"),
+                            indicator: moved.length ? "green" : "blue",
+                        });
+                        if (moved.length) frm.reload_doc();
+                    },
+                });
+            }, __("Features"));
+        }
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_active_reports_overview");
         frm.trigger("render_gitlab_projects_section");

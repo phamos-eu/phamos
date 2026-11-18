@@ -21,6 +21,7 @@
   "parent_issue",
   "gitlab_project",
   "gitlab_milestone",
+  "implementation_feature",
   "labels",
   "merged_to_production_at",
   "testing_on_production_at",
@@ -129,6 +130,14 @@
    "options": "GitLab Milestones"
   },
   {
+   "fieldname": "implementation_feature",
+   "fieldtype": "Link",
+   "label": "Implementation Feature",
+   "options": "Implementation Feature",
+   "in_standard_filter": 1,
+   "description": "The feature this issue is part of. One issue belongs to one feature; the feature's suggested progress counts it."
+  },
+  {
    "fieldname": "labels",
    "fieldtype": "Data",
    "label": "Labels"
@@ -202,7 +211,7 @@
    "link_fieldname": "gitlab_issue"
   }
  ],
- "modified": "2026-09-29 10:00:00.000000",
+ "modified": "2026-11-18 19:29:51.968093",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Issue",

@@ -2222,3 +2222,31 @@ No e-mail account delivers to Accounting Receipt. Ask your administrator to set 
 Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
 The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
 "The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
+Implementation Feature,Implementierungsfeature
+Implementation Features,Implementierungsfeatures
+Implementation Feature Dependency,Abhängigkeit des Implementierungsfeatures
+Implementation Feature Progress,Fortschritt des Implementierungsfeatures
+Definition of Done,Abnahmekriterien
+Agreed On,Vereinbart am
+Agreed By (Customer),Vereinbart von (Kunde)
+Target Level,Ziel-Level
+Current Level,Aktuelles Level
+Suggested Progress,Vorgeschlagener Fortschritt
+Target and Progress,Ziel und Fortschritt
+Progress History,Fortschrittsverlauf
+Estimated Hours,Geschätzte Stunden
+Responsible,Verantwortlich
+Depends On,Hängt ab von
+In Testing,Im Test
+Take over Features from Sales,Features aus dem Vertrieb übernehmen
+Features,Features
+{0} features taken over from sales,{0} Features aus dem Vertrieb übernommen
+No features from sales to take over,Keine Features aus dem Vertrieb zu übernehmen
+"A feature belongs to an Implementation or, while in sales, to an Opportunity.","Ein Feature gehört zu einer Implementierung oder, solange es im Vertrieb ist, zu einer Opportunity."
+{0} must be between 1 and 6.,{0} muss zwischen 1 und 6 liegen.
+"The current level is above the target level. Raise the target, or set the feature live.",Das aktuelle Level liegt über dem Ziel-Level. Erhöhe das Ziel oder setze das Feature live.
+The target date is before the planned start.,Das Zieldatum liegt vor dem geplanten Start.
+A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhängen.
+Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
+Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
+These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
