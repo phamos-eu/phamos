@@ -421,7 +421,7 @@ function _mis_render_deliveries(frm) {
 		</tr>`;
 	}).join("");
 	field.$wrapper.html(`
-		<table class="table table-bordered" style="margin-bottom:6px;">
+		<div class="table-responsive"><table class="table table-bordered" style="margin-bottom:6px;">
 			<thead><tr>
 				<th>${__("Delivery Note")}</th>
 				<th>${__("Sales Order")}</th>
@@ -432,7 +432,7 @@ function _mis_render_deliveries(frm) {
 				<th>${__("Sales Invoice")}</th>
 			</tr></thead>
 			<tbody>${rows}</tbody>
-		</table>
+		</table></div>
 		<div class="text-muted small">
 			${__("Delivered {0} h of {1} h billable", [_mis_number(data.delivered_hours), _mis_number(data.billable_hours)])}
 			&nbsp;·&nbsp;
