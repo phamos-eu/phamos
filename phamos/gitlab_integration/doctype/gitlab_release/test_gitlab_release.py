@@ -95,6 +95,8 @@ class TestGitLabRelease(FrappeTestCase):
 	def test_one_broken_release_does_not_undo_the_others(self):
 		broken = release_payload("v2.0")
 		del broken["tag_name"]
-		self.sync([release_payload("v1.0"), broken, release_payload("v3.0")])
+		with mock.patch.object(frappe, "log_error") as log_error:
+			self.sync([release_payload("v1.0"), broken, release_payload("v3.0")])
+		log_error.assert_called_once()
 		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v1.0"))
 		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v3.0"))
