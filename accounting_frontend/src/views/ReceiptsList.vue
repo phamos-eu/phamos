@@ -156,8 +156,10 @@ async function fetchEmails() {
 			return
 		}
 		toast({ title: "Fetching e-mails…", icon: "download" })
-		// Without realtime nobody tells us when the job is done: reload once after a while.
-		if (!socket?.connected) fallbackTimer = setTimeout(finishFetch, 20000)
+		// Without realtime, or if an event gets lost, nobody tells us the job is done: give the
+		// button back and reload after a while in any case.
+		clearTimeout(fallbackTimer)
+		fallbackTimer = setTimeout(finishFetch, socket?.connected ? 60000 : 20000)
 	} catch (e) {
 		toast({ title: e?.messages?.[0] || e?.message || "Could not fetch e-mails", icon: "x-circle", iconClasses: "text-ink-red-4" })
 		fetching.value = false

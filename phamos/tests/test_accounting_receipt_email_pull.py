@@ -105,13 +105,13 @@ class TestFetchReceiptEmails(FrappeTestCase):
 		frappe.set_user("Guest")  # the worker starts as the clicking user
 		with (
 			patch(f"{MODULE}.pull_from_email_account") as pull,
-			patch(f"{MODULE}.frappe.db.count", return_value=2) as count,
+			patch(f"{MODULE}.receipts_created", return_value=2) as count,
 			patch(f"{MODULE}.frappe.publish_realtime") as publish,
 		):
 			email_pull.pull_and_notify(self.receipt_account, "someone@example.com", since)
 		pull.assert_called_once_with(self.receipt_account)
 		self.assertEqual(frappe.session.user, "Administrator")  # like the scheduler, not the clicking user
-		self.assertEqual(count.call_args.kwargs["filters"], {"creation": (">=", since)})
+		count.assert_called_once_with(self.receipt_account, since)
 		publish.assert_called_once_with(
 			"receipt_emails_fetched", {"email_account": self.receipt_account, "created": 2}, user="someone@example.com"
 		)
@@ -129,3 +129,41 @@ class TestFetchReceiptEmails(FrappeTestCase):
 		self.assertIn("error", payload)
 		self.assertNotIn("created", payload)
 		self.assertEqual(publish.call_args.kwargs["user"], "someone@example.com")
+
+	def test_count_only_new_receipts_from_this_account(self):
+		since = add_to_date(now_datetime(), seconds=-5)
+		older = add_to_date(since, days=-1)
+		new_here = self.make_receipt()
+		new_other = self.make_receipt()
+		old_reply = self.make_receipt(creation=older)
+		self.make_mail(self.receipt_account, new_here)
+		self.make_mail(self.receipt_account, new_here)  # a second mail on the same receipt
+		self.make_mail(self.issue_account, new_other)
+		self.make_mail(self.receipt_account, old_reply)
+		self.assertEqual(email_pull.receipts_created(self.receipt_account, since), 1)
+		self.assertEqual(email_pull.receipts_created(self.issue_account, since), 1)
+
+	def make_receipt(self, creation=None):
+		doc = frappe.new_doc("Accounting Receipt")
+		doc.name = frappe.generate_hash(length=10)
+		doc.title = "Mail receipt"
+		doc.db_insert()
+		if creation:
+			frappe.db.set_value("Accounting Receipt", doc.name, "creation", creation, update_modified=False)
+		return doc.name
+
+	def make_mail(self, account, receipt):
+		comm = frappe.new_doc("Communication")
+		comm.update(
+			{
+				"communication_type": "Communication",
+				"communication_medium": "Email",
+				"sent_or_received": "Received",
+				"email_account": account,
+				"reference_doctype": "Accounting Receipt",
+				"reference_name": receipt,
+				"subject": "Invoice",
+			}
+		)
+		comm.name = frappe.generate_hash(length=10)
+		comm.db_insert()

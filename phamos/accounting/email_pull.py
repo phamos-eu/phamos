@@ -90,8 +90,8 @@ def fetch_receipt_emails():
 def pull_and_notify(email_account, user, since):
 	"""Background job: pull one account, then tell `user` how many receipts were created.
 
-	The count is every Accounting Receipt created since the click, so a receipt uploaded by
-	hand in the same seconds is counted too. That is close enough for a toast.
+	The count covers only receipts created from this account's mails (see `receipts_created`),
+	so two inboxes don't report each other's receipts.
 
 	The pull runs as Administrator, like the scheduler's: the account may also deliver to other
 	doctypes (Issue, Lead, …), and those documents must not be created in the clicking user's name.
@@ -111,5 +111,28 @@ def pull_and_notify(email_account, user, since):
 		)
 		return
 
-	created = frappe.db.count(DOCTYPE, filters={"creation": (">=", since)})
+	created = receipts_created(email_account, since)
 	frappe.publish_realtime(REALTIME_EVENT, {"email_account": email_account, "created": created}, user=user)
+
+
+def receipts_created(email_account, since):
+	"""Number of Accounting Receipts created since `since` from mails of `email_account`.
+
+	A received mail is a Communication with `email_account` set and the receipt as reference.
+	The receipt itself must also be new: a reply that lands on an older receipt is not counted.
+	"""
+	names = frappe.get_all(
+		"Communication",
+		filters={
+			"email_account": email_account,
+			"sent_or_received": "Received",
+			"reference_doctype": DOCTYPE,
+			"creation": (">=", since),
+		},
+		pluck="reference_name",
+		distinct=True,
+	)
+	names = [n for n in names if n]
+	if not names:
+		return 0
+	return frappe.db.count(DOCTYPE, filters={"name": ("in", names), "creation": (">=", since)})
