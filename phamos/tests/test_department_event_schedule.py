@@ -17,6 +17,19 @@ from phamos.tests.marketing_fixtures import ensure_company
 MAILBOX = "department-events@example.com"
 
 
+class FakeClock:
+	"""Stands in for the `time` module in team_daily_schedule: sleep() moves the clock on at once."""
+
+	def __init__(self):
+		self.now = 0
+
+	def monotonic(self):
+		return self.now
+
+	def sleep(self, seconds):
+		self.now += seconds
+
+
 def ensure_email_account():
 	"""A bare row is enough: the sync only reads email_id, and a real insert would try to log in."""
 	if not frappe.db.exists("Email Account", MAILBOX):
@@ -321,19 +334,83 @@ class TestReadableSyncError(FrappeTestCase):
 			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
 		)
 
-	def _put_that_times_out(self, stored_text, stored_status=200):
+	def _put_that_times_out(self, stored_text, stored_status=200, answers=None):
+		"""A PUT that runs into the read timeout, then GETs that return `answers` in turn (or the
+		stored event every time). Runs on a fake clock, so the wait after the timeout takes no time."""
 		import requests
 		from types import SimpleNamespace
 
 		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		stored = SimpleNamespace(status_code=stored_status, text=stored_text)
+		get = {"side_effect": answers} if answers else {"return_value": stored}
+		self.clock = FakeClock()
 		with (
 			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule, "time", self.clock),
 			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
-			patch.object(
-				team_daily_schedule.requests, "get", return_value=SimpleNamespace(status_code=stored_status, text=stored_text)
-			),
+			patch.object(team_daily_schedule.requests, "get", **get) as self.get,
 		):
 			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
+
+	def test_an_invite_that_arrives_minutes_later_counts_as_sent(self):
+		"""Production: 15 attendees, no answer within 120 s, in the calendar a few minutes later."""
+		from types import SimpleNamespace
+
+		missing = SimpleNamespace(status_code=404, text="")
+		arrived = SimpleNamespace(status_code=200, text="DTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\n")
+		ok, error = self._put_that_times_out("", answers=[missing, missing, missing, arrived])
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+		self.assertEqual(self.get.call_count, 4)
+		self.assertEqual(self.clock.now, 3 * team_daily_schedule.VERIFY_INTERVAL)
+
+	def test_the_wait_after_a_timeout_ends_and_names_it(self):
+		ok, error = self._put_that_times_out("", stored_status=404)
+		self.assertFalse(ok)
+		self.assertIn("still not in", error)
+		self.assertIn("5 minutes later", error)
+		self.assertGreaterEqual(self.clock.now, team_daily_schedule.VERIFY_WINDOW)
+		self.assertLess(self.clock.now, team_daily_schedule.VERIFY_WINDOW + team_daily_schedule.VERIFY_INTERVAL)
+
+	def _delete_that_times_out(self, answers):
+		import requests
+
+		self.clock = FakeClock()
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule, "time", self.clock),
+			patch.object(team_daily_schedule.requests, "delete", side_effect=requests.ReadTimeout("Read timed out")),
+			patch.object(team_daily_schedule.requests, "get", side_effect=answers),
+		):
+			return team_daily_schedule._delete_uid_for_mailbox("uid-1", MAILBOX)
+
+	def test_a_slow_cancel_counts_as_done_once_the_event_is_gone(self):
+		from types import SimpleNamespace
+
+		still_there = SimpleNamespace(status_code=200, text="BEGIN:VEVENT")
+		ok, error = self._delete_that_times_out([still_there, SimpleNamespace(status_code=404, text="")])
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+
+	def test_a_slow_cancel_whose_event_stays_is_an_error(self):
+		from types import SimpleNamespace
+
+		still_there = SimpleNamespace(status_code=200, text="BEGIN:VEVENT")
+		ok, error = self._delete_that_times_out(lambda *args, **kwargs: still_there)
+		self.assertFalse(ok)
+		self.assertIn("was still in", error)
+
+	def test_the_job_has_time_for_every_wait(self):
+		plan = {
+			"removed": [{"uid": "u0", "mailbox": MAILBOX}],
+			"rows": [
+				{"action": "put", "row": "r1", "mailbox": MAILBOX, "old_mailbox": None},
+				{"action": "put", "row": "r2", "mailbox": MAILBOX, "old_mailbox": "old@example.com"},
+			],
+		}
+		self.assertEqual(team_daily_schedule._mailcow_calls(plan), 4)
+		one_call = sum(team_daily_schedule.PUT_TIMEOUT) + team_daily_schedule.VERIFY_WINDOW
+		self.assertGreater(team_daily_schedule.SYNC_JOB_TIMEOUT_PER_ROW, one_call)
 
 	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
 		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
