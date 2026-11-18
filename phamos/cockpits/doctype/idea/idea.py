@@ -20,6 +20,10 @@ from phamos.cockpits.defaults import (
 )
 
 
+# Fields an employee may not set from Desk, with their value on a new idea (#1951).
+DESK_PROTECTED_FIELDS = {"vote_count": 0, "handed_in_on": None, "imported_from": None}
+
+
 def excerpt(html, length=IDEA_SUMMARY_LENGTH):
 	"""Plain text of an HTML body, whitespace collapsed, cut at `length` with an ellipsis."""
 	text = re.sub(r"\s+", " ", strip_html(BLOCK_END.sub(" ", html or ""))).strip()
@@ -56,6 +60,10 @@ class Idea(Document):
 		before = self.get_doc_before_save()
 		if self.user != me or (before and before.user != me):
 			frappe.throw(_("This idea is not yours."), frappe.PermissionError)
+		# Read-only only stops the form, not the REST API: the owner must not set their own vote
+		# count or hand-in time (the vote ranking), nor the import key (Idea Import's dedupe).
+		for field, new_value in DESK_PROTECTED_FIELDS.items():
+			self.set(field, before.get(field) if before else new_value)
 
 	def _validate_vote(self):
 		"""Hand in for vote (#1842): composting withdraws; the hand-in time follows the status."""

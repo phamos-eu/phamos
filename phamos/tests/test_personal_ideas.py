@@ -296,3 +296,18 @@ class TestIdeasInDesk(FrappeTestCase):
 		mine.user = COLLEAGUE
 		with self.assertRaises(frappe.PermissionError):
 			mine.save()
+
+	def test_employee_cannot_set_votes_or_import_key(self):
+		mine = pc.hand_in_idea_for_vote(pc.create_idea("Mine, for vote")["name"])
+
+		doc = frappe.get_doc("Idea", mine["name"])
+		doc.update({"vote_count": 99, "handed_in_on": "2020-01-01 00:00:00", "imported_from": "fake"})
+		doc.save()
+		saved = frappe.db.get_value("Idea", mine["name"], ["vote_count", "handed_in_on", "imported_from"], as_dict=True)
+		self.assertEqual(saved.vote_count, 0)
+		self.assertEqual(str(saved.handed_in_on), str(mine["handed_in_on"]))
+		self.assertFalse(saved.imported_from)
+
+		new = frappe.get_doc({"doctype": "Idea", "title": "New", "vote_count": 5, "imported_from": "fake"}).insert()
+		self.assertEqual(new.vote_count, 0)
+		self.assertFalse(new.imported_from)
