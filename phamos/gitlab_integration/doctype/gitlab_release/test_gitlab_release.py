@@ -91,3 +91,10 @@ class TestGitLabRelease(FrappeTestCase):
 		)
 		# no time tracking in the payload: nothing to overwrite
 		self.assertEqual(gitlab_utils._get_issue_time_fields({"title": "x"}), {})
+
+	def test_one_broken_release_does_not_undo_the_others(self):
+		broken = release_payload("v2.0")
+		del broken["tag_name"]
+		self.sync([release_payload("v1.0"), broken, release_payload("v3.0")])
+		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v1.0"))
+		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v3.0"))

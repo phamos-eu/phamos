@@ -1682,21 +1682,23 @@ def get_releases_for_project(project_id):
 	return releases
 
 
-@frappe.whitelist()
 def sync_gitlab_releases():
 	"""Releases of every GitLab Project that belongs to an Implementation, with their milestones.
 
 	Read-only: nothing is written back to GitLab. Planning happens in Implementation Release (#1986).
+	Not whitelisted on purpose: it runs inside sync_gitlab_data (scheduler or the sync button).
 	"""
 	projects = frappe.get_all(
 		"GitLab Project", filters={"implementation": ["is", "set"]}, fields=["name", "project_id"]
 	)
 	for project in projects:
 		for release in get_releases_for_project(project.project_id):
+			# a savepoint per release: one broken release must not undo the others of this run
+			frappe.db.savepoint("gitlab_release_sync")
 			try:
 				upsert_release(project.name, release)
 			except Exception:
-				frappe.db.rollback()
+				frappe.db.rollback(save_point="gitlab_release_sync")
 				frappe.log_error(frappe.get_traceback(), f"GitLab Release Sync Error - {project.name}")
 	frappe.db.commit()
 	return "Releases synced successfully"
