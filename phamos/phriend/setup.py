@@ -6,9 +6,10 @@
 Called from `after_migrate`. Idempotent.
 
 Placement follows the convention in phamos/cockpits/setup.py: the section "Implementation Specific" at the
-very top of the form. Issue starts with a Section Break (subject_section), which closes the section. The
-section is shown on Issues that Phriend created (phriend_type is set) and on Issues with a GitLab issue
-(gitlab_issue_url, the first one, is set); the Phriend-only fields inside it stay hidden on the others.
+very top of the form. That module creates the section on Issue and its first field, the team (#1955); the
+section shows on every Issue. Phriend's fields follow the team. Each carries its own condition: shown on
+Issues that Phriend created (phriend_type is set) and on Issues with a GitLab issue (gitlab_issue_url, the
+first one, is set); the Phriend-only fields stay hidden on GitLab issues too.
 """
 
 import frappe
@@ -19,16 +20,9 @@ REPORT_DOCTYPE = "Issue"
 IMPLEMENTATION_SECTION = "custom_implementation_specific"
 ONLY_PHRIEND = "eval:doc.phriend_type"
 PHRIEND_OR_GITLAB = "eval:doc.phriend_type || doc.gitlab_issue_url"
+TEAM_FIELD = "custom_team"
 
 _FIELDS = [
-	{
-		"fieldname": IMPLEMENTATION_SECTION,
-		"label": "Implementation Specific",
-		"fieldtype": "Section Break",
-		"insert_after": "",
-		"collapsible": 0,
-		"depends_on": PHRIEND_OR_GITLAB,
-	},
 	{
 		"fieldname": "phriend_reported_by",
 		"label": "Reported By",
@@ -36,7 +30,9 @@ _FIELDS = [
 		"options": "User",
 		"read_only": 1,
 		"in_standard_filter": 1,
-		"insert_after": IMPLEMENTATION_SECTION,
+		"depends_on": PHRIEND_OR_GITLAB,
+		# the section and the team come from phamos/cockpits/setup.py (#1955)
+		"insert_after": TEAM_FIELD,
 	},
 	{
 		"fieldname": "phriend_reported_by_name",
@@ -44,6 +40,7 @@ _FIELDS = [
 		"fieldtype": "Data",
 		"read_only": 1,
 		"fetch_from": "phriend_reported_by.full_name",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_reported_by",
 	},
 	{
@@ -53,6 +50,7 @@ _FIELDS = [
 		"read_only": 1,
 		"in_standard_filter": 1,
 		"description": "Set when the report came from another system (a develop or test system with this one as its target)",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_reported_by_name",
 	},
 	{
@@ -86,13 +84,20 @@ _FIELDS = [
 		"fieldname": "phriend_gitlab_issues",
 		"label": "GitLab Issues",
 		"fieldtype": "HTML",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "gitlab_issue_url",
 	},
-	{"fieldname": "phriend_col", "fieldtype": "Column Break", "insert_after": "phriend_gitlab_issues"},
+	{
+		"fieldname": "phriend_col",
+		"fieldtype": "Column Break",
+		"depends_on": PHRIEND_OR_GITLAB,
+		"insert_after": "phriend_gitlab_issues",
+	},
 	{
 		"fieldname": "phriend_screenshot_preview",
 		"label": "Screenshot Preview",
 		"fieldtype": "HTML",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_col",
 	},
 	{
@@ -187,6 +192,11 @@ def ensure_remote_role():
 
 
 def ensure_issue_fields():
+	# Phriend's fields sit after the section and the team, so those must exist first; on a
+	# migrate this hook runs before the Cockpits one (hooks.after_migrate).
+	from phamos.cockpits import setup as cockpits_setup
+
+	cockpits_setup.ensure_issue_fields()
 	create_custom_fields({REPORT_DOCTYPE: ISSUE_FIELDS}, update=True)
 
 

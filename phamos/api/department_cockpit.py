@@ -40,7 +40,7 @@ from phamos.cockpits.settings import COCKPIT_SETTINGS
 from phamos.phriend.gitlab_issues import issue_gitlab_issues
 from phamos.phriend.report import issue_report
 
-ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
+ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project", "custom_team")
 TASK_EDITABLE_FIELDS = (
 	"subject",
 	"custom_task_owner",
@@ -51,6 +51,7 @@ TASK_EDITABLE_FIELDS = (
 	"exp_end_date",
 	"progress",
 	"project",
+	"custom_team",
 )
 
 TASK_LIST_FIELDS = [
@@ -546,6 +547,7 @@ def _serialize_issue_detail(doc):
 		"issue_type": doc.issue_type,
 		"project": doc.project,
 		"department": getattr(doc, "custom_department", None),
+		"custom_team": doc.get("custom_team") or None,
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
 		"raised_by": doc.raised_by,
@@ -608,6 +610,9 @@ def get_form_options(config: CockpitConfig):
 			options["shortlist_users"] = teams.team_users(teams.require_active_team())
 		else:
 			options["shortlist_users"] = _role_shortlist_users(config)
+			# the teams the user may put a record into (#1955); in the Team Cockpit the record's
+			# team is the cockpit's, so there is nothing to pick
+			options["teams"] = teams.available_teams()
 		options.update(_task_form_options())
 		return options
 
@@ -625,6 +630,7 @@ def get_form_options(config: CockpitConfig):
 	options[config.project_field] = _get_project(config)
 	options["shortlist_users"] = _role_shortlist_users(config)
 	options.update(_task_form_options())
+	options["teams"] = teams.available_teams()
 	return options
 
 
@@ -778,6 +784,9 @@ def update_issue(config: CockpitConfig, name, **fields):
 	if "project" in updates and updates["project"]:
 		validate_project(config, updates["project"])
 
+	if "custom_team" in updates:
+		updates["custom_team"] = _validate_team_change(config, doc, updates["custom_team"])
+
 	assert_fields_unlocked("Issue", doc.name, list(updates))
 
 	for key, value in updates.items():
@@ -890,6 +899,7 @@ def _serialize_task_detail(doc):
 		"priority": doc.priority,
 		"project": doc.project,
 		"department": doc.department,
+		"custom_team": doc.get("custom_team") or None,
 		"issue": issue_name,
 		"exp_start_date": doc.exp_start_date,
 		"exp_end_date": doc.exp_end_date,
@@ -1505,6 +1515,9 @@ def update_task(config: CockpitConfig, name, **fields):
 	if "custom_task_owner" in updates:
 		updates["custom_task_owner"] = _validate_task_owner(updates["custom_task_owner"])
 
+	if "custom_team" in updates:
+		updates["custom_team"] = _validate_team_change(config, doc, updates["custom_team"])
+
 	if "progress" in updates and updates["progress"] is not None:
 		updates["progress"] = frappe.utils.flt(updates["progress"])
 
@@ -1518,6 +1531,25 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	doc.save()
 	return get_task(config, name)
+
+
+def _validate_team_change(config: CockpitConfig, doc, team):
+	"""Return the team to store on an Issue or Task, or None to clear it (#1955).
+
+	A member puts a record into their own team, or takes it out of their own team. A record of
+	another team stays where it is. General Management and System Manager may set any team.
+	In the Team Cockpit the record belongs to the cockpit's team, so its team is not changed there.
+	"""
+	team = (team or "").strip() or None
+	if team == (doc.get("custom_team") or None):
+		return team
+	if config.is_team:
+		frappe.throw(_("Change the team of a record in another cockpit."))
+	allowed = set(teams.available_teams())
+	current = doc.get("custom_team")
+	if (team and team not in allowed) or (current and current not in allowed):
+		frappe.throw(_("You can only move records into or out of your own team."), frappe.PermissionError)
+	return team
 
 
 def _validate_task_owner(user):
