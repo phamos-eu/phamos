@@ -180,6 +180,10 @@ class TestBackgroundSync(EventScheduleCase):
 		self.assertTrue(kwargs["enqueue_after_commit"])
 		# minutes of waiting must not hold up the short queue's quick jobs (review of !1231)
 		self.assertEqual(kwargs["queue"], "long")
+		# and the job may run long enough for every call it makes to wait out a slow Mailcow
+		calls = team_daily_schedule._mailcow_calls(kwargs["plan"])
+		self.assertGreaterEqual(calls, 1)
+		self.assertGreaterEqual(kwargs["timeout"], team_daily_schedule.SYNC_JOB_TIMEOUT_PER_CALL * calls)
 		self.enqueue.reset_mock()
 		with patch.object(frappe, "publish_realtime") as publish, patch.object(frappe.db, "commit"):
 			team_daily_schedule.run_sync_plan_in_background(kwargs["doctype"], kwargs["name"], kwargs["plan"], kwargs["user"])
