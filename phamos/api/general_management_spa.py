@@ -516,9 +516,15 @@ def _split_emails(value):
 
 
 def _sync_error_line(text):
-	"""Last line of a stored sync error (often a traceback), short enough for the cockpit."""
+	"""One line of a stored sync error, short enough for the cockpit. A traceback's last line is
+	the exception; any other message (e.g. "Mailcow PUT failed (503): <html>…") starts with the
+	part that matters and may end in a server's HTML."""
 	lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-	return lines[-1][:300] if lines else ""
+	if not lines:
+		return ""
+	# "…" marks a traceback whose start was cut (team_daily_schedule._truncate_error keeps the end).
+	is_traceback = lines[0].startswith(("Traceback (most recent call last)", "…"))
+	return (lines[-1] if is_traceback else lines[0])[:300]
 
 
 def _serialize_appointment(row):

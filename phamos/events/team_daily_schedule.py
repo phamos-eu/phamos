@@ -126,8 +126,16 @@ def _row_uid(row_name: str) -> str:
 
 
 def _truncate_error(error_text: str, limit: int = 1400) -> str:
+    """Fit an error into mailcow_last_error. Keeps the END: for a traceback that is the exception
+    line, which the cockpit shows (general_management_spa._sync_error_line). Keeping the start cut
+    long tracebacks mid-frame and showed a 'File "env/lib/..."' fragment instead (#1949)."""
     txt = (error_text or "").strip()
-    return txt[:limit]
+    return txt if len(txt) <= limit else "…" + txt[-(limit - 1):]
+
+
+def _request_error_message(action: str, error: Exception) -> str:
+    """A network failure towards Mailcow (no connection, SSL, timeout) as one readable line."""
+    return f"Mailcow {action} failed, server not reachable: {type(error).__name__}: {error}"[:500]
 
 
 def _update_row_sync_fields(row_name: str, values: dict):
@@ -374,13 +382,16 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.put(
-        url,
-        data=ics.encode("utf-8"),
-        headers={"Content-Type": "text/calendar"},
-        auth=(mailbox_email, pw),
-        timeout=30,
-    )
+    try:
+        r = requests.put(
+            url,
+            data=ics.encode("utf-8"),
+            headers={"Content-Type": "text/calendar"},
+            auth=(mailbox_email, pw),
+            timeout=30,
+        )
+    except requests.RequestException as e:
+        return False, _request_error_message("PUT", e)
     if r.status_code not in (200, 201, 204):
         return False, f"Mailcow PUT failed ({r.status_code}): {r.text}"
 
@@ -397,7 +408,10 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    try:
+        r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    except requests.RequestException as e:
+        return False, _request_error_message("DELETE", e)
     if r.status_code not in (200, 204, 404):
         return False, f"Mailcow DELETE failed ({r.status_code}): {r.text}"
 
