@@ -4,7 +4,10 @@
 // except the Team Cockpit, where a record's team is the cockpit's own. A record of another team
 // keeps that team as a choice, so the field shows its value instead of an empty select.
 
-/** Whether the page shows the field: only when the user may put records into a team. */
+/**
+ * Whether the page shows the field: only when the user may put records into a team. A user in no
+ * team does not see a record's team either; the field is a tool for members, not information.
+ */
 export function showTeamField(options) {
 	return Array.isArray(options?.teams) && options.teams.length > 0
 }

@@ -1544,7 +1544,7 @@ def _validate_team_change(config: CockpitConfig, doc, team):
 	if team == (doc.get("custom_team") or None):
 		return team
 	if config.is_team:
-		frappe.throw(_("Change the team of a record in another cockpit."))
+		frappe.throw(_("The team is changed outside the Team Cockpit."))
 	allowed = set(teams.available_teams())
 	current = doc.get("custom_team")
 	if (team and team not in allowed) or (current and current not in allowed):

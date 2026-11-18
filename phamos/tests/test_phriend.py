@@ -72,7 +72,8 @@ class TestPhriend(FrappeTestCase):
 		meta = frappe.get_meta("Issue")
 		first = meta.fields[0]
 		self.assertEqual((first.fieldname, first.label), (setup.IMPLEMENTATION_SECTION, "Implementation Specific"))
-		# the section shows on every Issue and starts with the team (#1955); Phriend's fields follow
+		# the section and the team come from phamos/cockpits/setup.py, which setup.ensure_issue_fields
+		# runs first; the section shows on every Issue and starts with the team (#1955); Phriend's fields follow
 		# and carry the condition themselves
 		self.assertFalse(first.depends_on)
 		self.assertEqual(meta.fields[1].fieldname, setup.TEAM_FIELD)

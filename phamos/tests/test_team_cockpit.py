@@ -168,6 +168,7 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"phriend_reported_by",
 			"phriend_reported_by_name",
 			"phriend_source_system",
+			"custom_implementation",
 			"phriend_gitlab_issues",
 			"phriend_col",
 			"phriend_screenshot_preview",

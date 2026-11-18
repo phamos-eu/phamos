@@ -60,6 +60,8 @@ _FIELDS = [
 		"fieldtype": "Link",
 		"options": "Implementation",
 		"in_standard_filter": 1,
+		# hidden on other Issues, as it was while the section carried the condition
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_source_system",
 	},
 	{
