@@ -325,7 +325,7 @@ class TestReadableSyncError(FrappeTestCase):
 		import requests
 		from types import SimpleNamespace
 
-		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
 		with (
 			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
 			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
@@ -336,13 +336,29 @@ class TestReadableSyncError(FrappeTestCase):
 			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
 
 	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
-		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
 		self.assertTrue(ok)
 		self.assertIsNone(error)
 
 	def test_a_slow_answer_with_an_older_version_stored_is_an_error(self):
-		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nSEQUENCE:2\r\nEND:VEVENT\r\n")
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:2\r\nEND:VEVENT\r\n")
 		self.assertFalse(ok)
 		self.assertIn("did not answer within 120 s", error)
+		# same sequence from an earlier attempt (a retry reuses it), but another PUT's stamp
+		ok, _error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T075500Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
+		self.assertFalse(ok)
 		ok, _error = self._put_that_times_out("", stored_status=404)
 		self.assertFalse(ok)
+
+	def test_a_connect_timeout_is_not_reachable_and_asks_nothing(self):
+		import requests
+
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ConnectTimeout("timed out")),
+			patch.object(team_daily_schedule.requests, "get") as get,
+		):
+			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "SEQUENCE:1\r\nDTSTAMP:20261118T080000Z", MAILBOX)
+		self.assertFalse(ok)
+		self.assertIn("server not reachable: ConnectTimeout", error)
+		get.assert_not_called()

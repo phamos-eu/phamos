@@ -141,16 +141,20 @@ SYNC_JOB_TIMEOUT_PER_ROW = 150
 
 
 def _stored_version_matches(url: str, ics: str, auth) -> bool:
-    """After a timed-out PUT: is the event in the calendar with this PUT's SEQUENCE? Then the save
-    went through. Any doubt (no answer, other status, older sequence) counts as not stored."""
-    sequence = re.search(r"^SEQUENCE:\d+", ics, re.MULTILINE)
-    if not sequence:
+    """After a timed-out PUT: does the calendar hold exactly this PUT? SEQUENCE alone is not
+    enough: a retry after a failed send reuses the sequence (mailcow_seq only moves on success),
+    so DTSTAMP, written per PUT to the second, must match too. Any doubt (no answer, other status,
+    other version, a server that rewrote DTSTAMP) counts as not stored, and the next save resends."""
+    marks = [re.search(rf"^{name}:[^\r\n]+", ics, re.MULTILINE) for name in ("SEQUENCE", "DTSTAMP")]
+    if not all(marks):
         return False
     try:
         r = requests.get(url, auth=auth, timeout=30)
     except requests.RequestException:
         return False
-    return r.status_code == 200 and re.search(rf"^{sequence.group(0)}\r?$", r.text or "", re.MULTILINE) is not None
+    if r.status_code != 200:
+        return False
+    return all(re.search(rf"^{re.escape(m.group(0))}\r?$", r.text or "", re.MULTILINE) for m in marks)
 
 
 def _request_error_message(action: str, error: Exception) -> str:
@@ -423,15 +427,16 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
             auth=(mailbox_email, pw),
             timeout=PUT_TIMEOUT,
         )
-    except requests.Timeout as e:
+    except requests.ReadTimeout as e:
+        # A connect timeout never reached the server and falls through to RequestException.
         # SOGo answers only after it has written the event into every attendee's calendar and
         # mailed their invites; with a whole team that can outlast the wait, while the save
         # itself goes through. Ask whether this version arrived before calling it failed (#1949).
         if _stored_version_matches(url, ics, (mailbox_email, pw)):
             return True, None
         return False, (
-            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite is not in "
-            f"{mailbox_email}'s calendar. ({type(e).__name__})"
+            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite could not be found "
+            f"in {mailbox_email}'s calendar. Saving again sends it again. ({type(e).__name__})"
         )
     except requests.RequestException as e:
         return False, _request_error_message("PUT", e)
