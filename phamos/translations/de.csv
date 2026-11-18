@@ -2305,15 +2305,3 @@ Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von 
 Open in Cockpit,Im Cockpit öffnen
 Project Management,Projektmanagement
 Software Development,Softwareentwicklung
-Team Cockpit,Team-Cockpit
-Cockpits,Cockpits
-Switch cockpit,Cockpit wechseln
-Could not switch the team,Das Team konnte nicht gewechselt werden
-You are not a member of any team.,Sie gehören keinem Team an.
-You are not a member of team {0}.,Sie gehören dem Team {0} nicht an.
-This issue does not belong to your team.,Diese Anfrage gehört nicht zu Ihrem Team.
-This task does not belong to your team.,Diese Aufgabe gehört nicht zu Ihrem Team.
-Select an Issue or Task of your team.,Bitte eine Anfrage oder Aufgabe Ihres Teams wählen.
-You do not have permission to access the Team Cockpit,Sie haben keine Berechtigung für das Team-Cockpit
-The team this task belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Aufgabe gehört. Sie erscheint im Team-Cockpit dieses Teams."
-The team this issue belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Anfrage gehört. Sie erscheint im Team-Cockpit dieses Teams."
