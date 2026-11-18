@@ -2194,3 +2194,6 @@ The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
 Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
 Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
 Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
+Open in Cockpit,Im Cockpit öffnen
+Project Management,Projektmanagement
+Software Development,Softwareentwicklung
