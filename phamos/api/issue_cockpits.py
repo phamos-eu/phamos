@@ -24,9 +24,14 @@ def _cockpit_modules():
 	"""(module, route) of every cockpit on the Apps screen with a CockpitConfig, in hooks order."""
 	cockpits = []
 	for app in frappe.get_hooks("add_to_apps_screen", app_name="phamos"):
+		module_name = f"phamos.api.{app['name']}"
 		try:
-			module = frappe.get_module(f"phamos.api.{app['name']}")
-		except ImportError:
+			module = frappe.get_module(module_name)
+		except ModuleNotFoundError as error:
+			# An Apps-screen entry without an API module (none today) is no cockpit; a cockpit
+			# module that fails to import must still raise, not vanish from the menu.
+			if error.name != module_name:
+				raise
 			continue
 		if isinstance(getattr(module, "CONFIG", None), dc.CockpitConfig):
 			cockpits.append((module, app["route"]))

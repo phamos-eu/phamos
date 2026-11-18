@@ -114,3 +114,16 @@ class TestIssueCockpits(FrappeTestCase):
 				ic.get_issue_cockpits(doc.name)
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_broken_cockpit_module_raises_instead_of_vanishing(self):
+		broken = ModuleNotFoundError("No module named 'missing_dependency'", name="missing_dependency")
+		with patch.object(ic.frappe, "get_module", side_effect=broken):
+			with self.assertRaises(ModuleNotFoundError):
+				ic._cockpit_modules()
+
+	def test_apps_screen_entry_without_api_module_is_skipped(self):
+		def get_module(name):
+			raise ModuleNotFoundError(f"No module named '{name}'", name=name)
+
+		with patch.object(ic.frappe, "get_module", side_effect=get_module):
+			self.assertEqual(ic._cockpit_modules(), [])

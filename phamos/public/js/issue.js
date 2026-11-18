@@ -28,6 +28,9 @@ function phamos_add_open_in_cockpit(frm) {
 		callback(r) {
 			if (frm.doc.name !== name) return; // the form moved on while the call ran
 			(r.message || []).forEach((cockpit) => {
+				// Two refreshes of the same Issue can overlap; Frappe dedupes the toolbar entry
+				// but not the mobile menu item, so drop any earlier copy first.
+				frm.remove_custom_button(cockpit.label, __("Open in Cockpit"));
 				frm.add_custom_button(
 					cockpit.label,
 					() => window.open(cockpit.url, "_blank", "noopener"),
