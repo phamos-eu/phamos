@@ -56,9 +56,15 @@
 				>
 					{{ __("The invite was not sent: {0}", [appointment.sync_error]) }}
 				</div>
+				<div
+					v-else-if="sending"
+					class="rounded border border-outline-gray-2 bg-surface-gray-2 px-2.5 py-2 text-xs text-ink-gray-7"
+				>
+					{{ __("The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.") }}
+				</div>
 				<ErrorMessage v-if="error" :message="error" />
 
-				<div v-if="appointment?.name" class="border-t border-outline-gray-2 pt-3">
+				<div v-if="appointment?.name && !sending" class="border-t border-outline-gray-2 pt-3">
 					<Button v-if="!confirmingCancel" theme="red" variant="subtle" @click="confirmingCancel = true">
 						{{ __("Cancel appointment") }}
 					</Button>
@@ -105,6 +111,8 @@ const saving = ref(false)
 const deleting = ref(false)
 const confirmingCancel = ref(false)
 const error = ref("")
+// A background job is sending this appointment's invite: no changes until it is done (#1949).
+const sending = computed(() => Boolean(props.appointment?.sending))
 
 const mailboxOptions = computed(() => [
 	{ label: __("Pick a mailbox…"), value: "" },
@@ -117,7 +125,13 @@ const dialogOptions = computed(() => ({
 	size: "2xl",
 	actions: [
 		{ label: __("Close"), variant: "subtle", onClick: () => emit("update:modelValue", false) },
-		{ label: saving.value ? __("Saving…") : __("Save and send"), variant: "solid", loading: saving.value, onClick: save },
+		{
+			label: saving.value ? __("Saving…") : __("Save and send"),
+			variant: "solid",
+			loading: saving.value,
+			disabled: sending.value,
+			onClick: save,
+		},
 	],
 }))
 
