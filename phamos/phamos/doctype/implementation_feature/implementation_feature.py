@@ -105,7 +105,11 @@ class ImplementationFeature(Document):
 		"""A changed definition of done is no longer what the customer agreed to."""
 		before = self.get_doc_before_save()
 		if before and (before.definition_of_done or "") != (self.definition_of_done or ""):
-			if not (self.dod_agreed_on != before.dod_agreed_on or self.dod_agreed_by != before.dod_agreed_by):
+			# the form sends dates as strings, the stored doc has date objects: compare as text
+			agreement_changed = str(self.dod_agreed_on or "") != str(before.dod_agreed_on or "") or (
+				self.dod_agreed_by or ""
+			) != (before.dod_agreed_by or "")
+			if not agreement_changed:
 				self.dod_agreed_on = None
 				self.dod_agreed_by = None
 
