@@ -90,6 +90,14 @@ APPS = [
 		"symbol": "compass",
 	},
 	{
+		"slug": "team",
+		"name": "Team Cockpit",
+		"description": "Your team's issues, tasks and checklists",
+		"route": "/team-cockpit",
+		"color": "#1d4ed8",
+		"symbol": "flag",
+	},
+	{
 		"slug": "personal",
 		"name": "Personal Cockpit",
 		"description": "Issues, tasks and checklists assigned to me",

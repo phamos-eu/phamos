@@ -102,7 +102,7 @@ class TestGeneralManagementAccess(FrappeTestCase):
 		taken = {
 			frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_department")
 			for prefix, _color in COCKPITS.values()
-			if prefix not in ("general_management", "personal")
+			if prefix not in ("general_management", "personal", "team")
 		}
 		departments = [
 			name
