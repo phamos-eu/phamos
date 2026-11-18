@@ -63,21 +63,35 @@ def _employee_names(names) -> dict:
 	return {r.name: r.employee_name for r in rows}
 
 
+SYNC_ERROR_FIELD = "custom_mailcow_sync_error"
+
+
+def _has_sync_error_field() -> bool:
+	return frappe.get_meta("Event").has_field(SYNC_ERROR_FIELD)
+
+
 def _calendar_states(leave_names: list[str]) -> dict:
 	"""Calendar state per Leave Application, from the Events Phase 2 keeps for them."""
 	if not leave_names:
 		return {}
+	fields = ["name", "reference_docname", "custom_mailcow_synched"]
+	# The error field comes with the Event sync of #1558. A site without it (version-15 got the
+	# leave page in 15.125.0 but not #1558) failed here with "Unknown column"; there no push
+	# records an error, so the state is synced or pending.
+	if _has_sync_error_field():
+		fields.append(SYNC_ERROR_FIELD)
 	rows = frappe.get_all(
 		"Event",
 		filters={"reference_doctype": DOCTYPE, "reference_docname": ["in", leave_names]},
-		fields=["name", "reference_docname", "custom_mailcow_synched", "custom_mailcow_sync_error"],
+		fields=fields,
 		order_by="creation asc",
 	)
 	states = {}
 	for row in rows:
 		if row.reference_docname in states:
 			continue
-		if row.custom_mailcow_sync_error:
+		error = row.get(SYNC_ERROR_FIELD) or ""
+		if error:
 			state = "error"
 		elif row.custom_mailcow_synched:
 			state = "synced"
@@ -86,7 +100,7 @@ def _calendar_states(leave_names: list[str]) -> dict:
 		states[row.reference_docname] = {
 			"event": row.name,
 			"state": state,
-			"error": row.custom_mailcow_sync_error or "",
+			"error": error,
 		}
 	return states
 
