@@ -40,21 +40,22 @@ def ensure_role():
 	).insert(ignore_permissions=True)
 
 
-def ensure_permissions(doctype):
-	"""Give the role GRANTED and not WITHHELD on `doctype` (Custom DocPerm, permlevel 0)."""
-	rule = {"parent": doctype, "role": GENERAL_MANAGEMENT_ROLE, "permlevel": 0, "if_owner": 0}
+def ensure_permissions(doctype, role=GENERAL_MANAGEMENT_ROLE, granted=GRANTED, withheld=WITHHELD):
+	"""Give `role` the `granted` and not the `withheld` rights on `doctype` (Custom DocPerm, permlevel 0).
+
+	Also used for the Implementation Cockpit role (phamos/setup/implementation_cockpit.py).
+	"""
+	rule = {"parent": doctype, "role": role, "permlevel": 0, "if_owner": 0}
 	if not frappe.db.exists("Custom DocPerm", rule):
 		# The first custom rule copies the stock DocPerms into Custom DocPerm.
-		add_permission(doctype, GENERAL_MANAGEMENT_ROLE, permlevel=0, ptype="read")
+		add_permission(doctype, role, permlevel=0, ptype="read")
 
-	current = frappe.db.get_value("Custom DocPerm", rule, [*GRANTED, *WITHHELD], as_dict=True)
-	wanted = {**{ptype: 1 for ptype in GRANTED}, **{ptype: 0 for ptype in WITHHELD}}
+	current = frappe.db.get_value("Custom DocPerm", rule, [*granted, *withheld], as_dict=True)
+	wanted = {**{ptype: 1 for ptype in granted}, **{ptype: 0 for ptype in withheld}}
 	changed = [ptype for ptype, value in wanted.items() if (current.get(ptype) or 0) != value]
 	if not changed:
 		return
 	for ptype in changed:
-		update_permission_property(
-			doctype, GENERAL_MANAGEMENT_ROLE, 0, ptype, wanted[ptype], validate=False
-		)
+		update_permission_property(doctype, role, 0, ptype, wanted[ptype], validate=False)
 	validate_permissions_for_doctype(doctype)
 	frappe.clear_cache(doctype=doctype)

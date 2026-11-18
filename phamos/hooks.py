@@ -73,6 +73,13 @@ add_to_apps_screen = [
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
 	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -174,6 +181,8 @@ website_route_rules = [
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
     {"from_route": "/team-cockpit", "to_route": "team_cockpit"},
     {"from_route": "/team-cockpit/<path:app_path>", "to_route": "team_cockpit"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -279,6 +288,7 @@ after_migrate = [
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
 # Uninstallation

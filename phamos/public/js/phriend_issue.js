@@ -20,6 +20,14 @@ frappe.ui.form.on("Issue", {
 			}
 		}
 
+		// Where this report stands, in the Implementation Cockpit (#1671): only with an implementation
+		// and for users who may open the cockpit (frappe.boot.phriend.implementation_cockpit).
+		if (frm.doc.custom_implementation && frappe.boot.phriend && frappe.boot.phriend.implementation_cockpit) {
+			frm.add_custom_button(__("Status in the Implementation Cockpit"), () =>
+				window.open(`/implementation-cockpit/status?issue=${encodeURIComponent(frm.doc.name)}`, "_blank", "noopener")
+			);
+		}
+
 		const button = frm.add_custom_button(__("Create GitLab Issue"), () => phriend_create_gitlab_issue(frm));
 		if (!frm.doc.gitlab_issue_url) button.addClass("btn-primary");
 		phriend_render_gitlab_issues(frm);

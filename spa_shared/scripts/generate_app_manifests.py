@@ -98,6 +98,14 @@ APPS = [
 		"symbol": "flag",
 	},
 	{
+		"slug": "implementation",
+		"name": "Implementation Cockpit",
+		"description": "Status, roadmap, issues and budget of an implementation with phamos",
+		"route": "/implementation-cockpit",
+		"color": "#0f766e",
+		"symbol": "layers",
+	},
+	{
 		"slug": "personal",
 		"name": "Personal Cockpit",
 		"description": "Issues, tasks and checklists assigned to me",
