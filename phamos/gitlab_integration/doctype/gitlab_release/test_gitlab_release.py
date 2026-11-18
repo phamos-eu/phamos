@@ -48,7 +48,11 @@ class TestGitLabRelease(FrappeTestCase):
 		self.milestone = milestone.name
 
 	def sync(self, releases):
-		with mock.patch.object(gitlab_utils, "get_releases_for_project", return_value=releases):
+		# releases only for this test's project, and no commit: the sync commits, which would
+		# keep test records and touch real projects on the site
+		with mock.patch.object(
+			gitlab_utils, "get_releases_for_project", side_effect=lambda pid: releases if pid == self.project else []
+		), mock.patch.object(frappe.db, "commit"):
 			gitlab_utils.sync_gitlab_releases()
 
 	def test_creates_and_updates_by_tag(self):
@@ -71,7 +75,7 @@ class TestGitLabRelease(FrappeTestCase):
 		calls = []
 		with mock.patch.object(
 			gitlab_utils, "get_releases_for_project", side_effect=lambda pid: calls.append(pid) or []
-		):
+		), mock.patch.object(frappe.db, "commit"):
 			gitlab_utils.sync_gitlab_releases()
 		self.assertIn(self.project, calls)
 		self.assertNotIn(other, calls)
