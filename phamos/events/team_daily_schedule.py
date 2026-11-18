@@ -138,6 +138,19 @@ def _request_error_message(action: str, error: Exception) -> str:
     return f"Mailcow {action} failed, server not reachable: {type(error).__name__}: {error}"[:500]
 
 
+def _http_error_message(action: str, mailbox_email: str, response) -> str:
+    """A refused Mailcow request as one readable line. 401/403 means Mailcow rejected the login:
+    the mailbox address with the password of its Mailcow DAV Password record. Other statuses keep
+    the server's text, without its HTML (nginx sends a whole error page)."""
+    if response.status_code in (401, 403):
+        return (
+            f"Mailcow refused the login of {mailbox_email} ({response.status_code}). "
+            "Check its app password in Mailcow (CalDAV allowed) and in its Mailcow DAV Password record."
+        )
+    text = " ".join(re.sub(r"<[^>]+>", " ", response.text or "").split())[:300]
+    return f"Mailcow {action} failed ({response.status_code})" + (f": {text}" if text else "")
+
+
 def _update_row_sync_fields(row_name: str, values: dict):
     if not row_name:
         return
@@ -393,7 +406,7 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
     except requests.RequestException as e:
         return False, _request_error_message("PUT", e)
     if r.status_code not in (200, 201, 204):
-        return False, f"Mailcow PUT failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("PUT", mailbox_email, r)
 
     return True, None
 
@@ -413,7 +426,7 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
     except requests.RequestException as e:
         return False, _request_error_message("DELETE", e)
     if r.status_code not in (200, 204, 404):
-        return False, f"Mailcow DELETE failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("DELETE", mailbox_email, r)
 
     return True, None
 

@@ -299,3 +299,24 @@ class TestReadableSyncError(FrappeTestCase):
 			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "BEGIN:VCALENDAR", MAILBOX)
 		self.assertFalse(ok)
 		self.assertIn("server not reachable: ConnectionError: Name or service not known", error)
+
+	def test_a_refused_login_names_the_mailbox_and_where_to_fix_it(self):
+		from types import SimpleNamespace
+
+		page = "<html>\n<head><title>401 Authorization Required</title></head>\n<body>nginx</body>\n</html>"
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", return_value=SimpleNamespace(status_code=401, text=page)),
+		):
+			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "BEGIN:VCALENDAR", MAILBOX)
+		self.assertFalse(ok)
+		self.assertTrue(error.startswith(f"Mailcow refused the login of {MAILBOX} (401)."))
+		self.assertNotIn("<", error)
+
+	def test_other_server_errors_keep_their_text_without_html(self):
+		from types import SimpleNamespace
+
+		response = SimpleNamespace(status_code=503, text="<html><body><h1>Service Unavailable</h1></body></html>")
+		self.assertEqual(
+			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
+		)
