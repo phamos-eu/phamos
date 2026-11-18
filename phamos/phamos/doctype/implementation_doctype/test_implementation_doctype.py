@@ -20,11 +20,11 @@ class TestImplementationDoctype(FrappeTestCase):
 		self.assertEqual(make_entry("Pick List Print", app="").name, "Pick List Print")
 
 	def test_whoever_sets_showcase_is_the_reviewer(self):
-		entry = make_entry("Route Planner", showcase=1, showcase_reviewed_by="Guest")
+		entry = make_entry("Route Planner Review", showcase=1, showcase_reviewed_by="Guest")
 		self.assertEqual(entry.showcase_reviewed_by, frappe.session.user)
 
 	def test_changed_content_withdraws_the_showcase(self):
-		entry = make_entry("Route Planner", showcase=1, description="Plans tours")
+		entry = make_entry("Route Planner Content", showcase=1, description="Plans tours")
 		entry.description = "Plans tours for Customer X with their prices"
 		entry.save()
 		self.assertFalse(entry.showcase)
