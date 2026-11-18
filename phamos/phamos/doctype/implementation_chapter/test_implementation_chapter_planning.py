@@ -67,3 +67,8 @@ class TestImplementationChapterPlanning(FrappeTestCase):
 		second.append("features", {"feature": feature.name})
 		second.append("features", {"feature": feature.name})
 		self.assertRaises(frappe.ValidationError, second.save)
+
+	def test_limits_cannot_be_negative(self):
+		implementation = frappe.get_doc("Implementation", self.implementation.name)
+		implementation.max_parallel_chapters = -1
+		self.assertRaises(frappe.ValidationError, implementation.save)

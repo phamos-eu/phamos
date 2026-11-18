@@ -702,7 +702,8 @@
    "fieldname": "max_parallel_chapters",
    "fieldtype": "Int",
    "label": "Max Chapters in Progress",
-   "description": "How many chapters may be In Progress at the same time, as agreed with the customer in a regular session. 0 means no limit. Exceeding it shows a warning; nothing is blocked."
+   "description": "How many chapters may be In Progress at the same time, as agreed with the customer in a regular session. 0 means no limit. Exceeding it shows a warning; nothing is blocked.",
+   "non_negative": 1
   },
   {
    "fieldname": "column_break_wip_limits",
@@ -712,7 +713,8 @@
    "fieldname": "max_parallel_features",
    "fieldtype": "Int",
    "label": "Max Features in Progress",
-   "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit."
+   "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit.",
+   "non_negative": 1
   }
  ],
  "index_web_pages_for_search": 1,
