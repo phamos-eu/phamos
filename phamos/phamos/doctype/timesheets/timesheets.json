@@ -52,10 +52,9 @@
   {
    "fetch_from": "timesheet.custom_delivery_note",
    "fieldname": "delivery_note",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Delivery Note",
-   "options": "Delivery Note",
    "read_only": 1
   },
   {
