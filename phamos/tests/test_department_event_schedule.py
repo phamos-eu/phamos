@@ -266,3 +266,99 @@ class TestMoveCompanyEvents(EventScheduleCase):
 			frappe.db.get_value("Team Daily Schedule", name, ["parenttype", "parent"]), ("Department", self.department)
 		)
 		self.put.assert_not_called()
+
+
+class TestReadableSyncError(FrappeTestCase):
+	"""The cockpit shows one line of mailcow_last_error; it must be the line that names the problem."""
+
+	def test_a_long_traceback_keeps_its_exception_line(self):
+		from phamos.api.general_management_spa import _sync_error_line
+
+		frames = "".join(
+			f'  File "env/lib/python3.11/site-packages/requests/adapters.py", line {n}, in send\n    resp = conn.urlopen()\n'
+			for n in range(40)
+		)
+		traceback = f"Traceback (most recent call last):\n{frames}requests.exceptions.SSLError: certificate verify failed\n"
+		stored = team_daily_schedule._truncate_error(traceback)
+		self.assertLessEqual(len(stored), 1400)
+		self.assertEqual(_sync_error_line(stored), "requests.exceptions.SSLError: certificate verify failed")
+
+	def test_a_server_error_shows_its_status_not_the_end_of_its_html(self):
+		from phamos.api.general_management_spa import _sync_error_line
+
+		message = "Mailcow PUT failed (503): <html>\n<body>Service Unavailable</body>\n</html>"
+		self.assertEqual(_sync_error_line(message), "Mailcow PUT failed (503): <html>")
+
+	def test_an_unreachable_server_is_a_message_not_a_crash(self):
+		import requests
+
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ConnectionError("Name or service not known")),
+		):
+			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "BEGIN:VCALENDAR", MAILBOX)
+		self.assertFalse(ok)
+		self.assertIn("server not reachable: ConnectionError: Name or service not known", error)
+
+	def test_a_refused_login_names_the_mailbox_and_where_to_fix_it(self):
+		from types import SimpleNamespace
+
+		page = "<html>\n<head><title>401 Authorization Required</title></head>\n<body>nginx</body>\n</html>"
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", return_value=SimpleNamespace(status_code=401, text=page)),
+		):
+			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "BEGIN:VCALENDAR", MAILBOX)
+		self.assertFalse(ok)
+		self.assertTrue(error.startswith(f"Mailcow refused the login of {MAILBOX} (401)."))
+		self.assertNotIn("<", error)
+
+	def test_other_server_errors_keep_their_text_without_html(self):
+		from types import SimpleNamespace
+
+		response = SimpleNamespace(status_code=503, text="<html><body><h1>Service Unavailable</h1></body></html>")
+		self.assertEqual(
+			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
+		)
+
+	def _put_that_times_out(self, stored_text, stored_status=200):
+		import requests
+		from types import SimpleNamespace
+
+		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
+			patch.object(
+				team_daily_schedule.requests, "get", return_value=SimpleNamespace(status_code=stored_status, text=stored_text)
+			),
+		):
+			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
+
+	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+
+	def test_a_slow_answer_with_an_older_version_stored_is_an_error(self):
+		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:2\r\nEND:VEVENT\r\n")
+		self.assertFalse(ok)
+		self.assertIn("did not answer within 120 s", error)
+		# same sequence from an earlier attempt (a retry reuses it), but another PUT's stamp
+		ok, _error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T075500Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")
+		self.assertFalse(ok)
+		ok, _error = self._put_that_times_out("", stored_status=404)
+		self.assertFalse(ok)
+
+	def test_a_connect_timeout_is_not_reachable_and_asks_nothing(self):
+		import requests
+
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ConnectTimeout("timed out")),
+			patch.object(team_daily_schedule.requests, "get") as get,
+		):
+			ok, error = team_daily_schedule._put_ics_upsert("uid-1", "SEQUENCE:1\r\nDTSTAMP:20261118T080000Z", MAILBOX)
+		self.assertFalse(ok)
+		self.assertIn("server not reachable: ConnectTimeout", error)
+		get.assert_not_called()

@@ -126,8 +126,53 @@ def _row_uid(row_name: str) -> str:
 
 
 def _truncate_error(error_text: str, limit: int = 1400) -> str:
+    """Fit an error into mailcow_last_error. Keeps the END: for a traceback that is the exception
+    line, which the cockpit shows (general_management_spa._sync_error_line). Keeping the start cut
+    long tracebacks mid-frame and showed a 'File "env/lib/..."' fragment instead (#1949)."""
     txt = (error_text or "").strip()
-    return txt[:limit]
+    return txt if len(txt) <= limit else "…" + txt[-(limit - 1):]
+
+
+# (connect, read) seconds for the invite PUT. The read part is long because SOGo answers only after
+# delivering to every attendee (15 people timed out at 30 s on production, #1949). The sync runs in
+# a background job (SYNC_JOB_TIMEOUT), so nobody waits on it.
+PUT_TIMEOUT = (10, 120)
+SYNC_JOB_TIMEOUT_PER_ROW = 150
+
+
+def _stored_version_matches(url: str, ics: str, auth) -> bool:
+    """After a timed-out PUT: does the calendar hold exactly this PUT? SEQUENCE alone is not
+    enough: a retry after a failed send reuses the sequence (mailcow_seq only moves on success),
+    so DTSTAMP, written per PUT to the second, must match too. Any doubt (no answer, other status,
+    other version, a server that rewrote DTSTAMP) counts as not stored, and the next save resends."""
+    marks = [re.search(rf"^{name}:[^\r\n]+", ics, re.MULTILINE) for name in ("SEQUENCE", "DTSTAMP")]
+    if not all(marks):
+        return False
+    try:
+        r = requests.get(url, auth=auth, timeout=30)
+    except requests.RequestException:
+        return False
+    if r.status_code != 200:
+        return False
+    return all(re.search(rf"^{re.escape(m.group(0))}\r?$", r.text or "", re.MULTILINE) for m in marks)
+
+
+def _request_error_message(action: str, error: Exception) -> str:
+    """A network failure towards Mailcow (no connection, SSL, timeout) as one readable line."""
+    return f"Mailcow {action} failed, server not reachable: {type(error).__name__}: {error}"[:500]
+
+
+def _http_error_message(action: str, mailbox_email: str, response) -> str:
+    """A refused Mailcow request as one readable line. 401/403 means Mailcow rejected the login:
+    the mailbox address with the password of its Mailcow DAV Password record. Other statuses keep
+    the server's text, without its HTML (nginx sends a whole error page)."""
+    if response.status_code in (401, 403):
+        return (
+            f"Mailcow refused the login of {mailbox_email} ({response.status_code}). "
+            "Check its app password in Mailcow (CalDAV allowed) and in its Mailcow DAV Password record."
+        )
+    text = " ".join(re.sub(r"<[^>]+>", " ", response.text or "").split())[:300]
+    return f"Mailcow {action} failed ({response.status_code})" + (f": {text}" if text else "")
 
 
 def _update_row_sync_fields(row_name: str, values: dict):
@@ -339,15 +384,29 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.put(
-        url,
-        data=ics.encode("utf-8"),
-        headers={"Content-Type": "text/calendar"},
-        auth=(mailbox_email, pw),
-        timeout=30,
-    )
+    try:
+        r = requests.put(
+            url,
+            data=ics.encode("utf-8"),
+            headers={"Content-Type": "text/calendar"},
+            auth=(mailbox_email, pw),
+            timeout=PUT_TIMEOUT,
+        )
+    except requests.ReadTimeout as e:
+        # A connect timeout never reached the server and falls through to RequestException.
+        # SOGo answers only after it has written the event into every attendee's calendar and
+        # mailed their invites; with a whole team that can outlast the wait, while the save
+        # itself goes through. Ask whether this version arrived before calling it failed (#1949).
+        if _stored_version_matches(url, ics, (mailbox_email, pw)):
+            return True, None
+        return False, (
+            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite could not be found "
+            f"in {mailbox_email}'s calendar. Saving again sends it again. ({type(e).__name__})"
+        )
+    except requests.RequestException as e:
+        return False, _request_error_message("PUT", e)
     if r.status_code not in (200, 201, 204):
-        return False, f"Mailcow PUT failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("PUT", mailbox_email, r)
 
     return True, None
 
@@ -362,9 +421,12 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
-    r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    try:
+        r = requests.delete(url, auth=(mailbox_email, pw), timeout=15)
+    except requests.RequestException as e:
+        return False, _request_error_message("DELETE", e)
     if r.status_code not in (200, 204, 404):
-        return False, f"Mailcow DELETE failed ({r.status_code}): {r.text}"
+        return False, _http_error_message("DELETE", mailbox_email, r)
 
     return True, None
 
@@ -539,6 +601,9 @@ def sync_events_from_parent(doc, method=None):
     frappe.enqueue(
         "phamos.events.team_daily_schedule.run_sync_plan_in_background",
         queue="short",
+        # each row may wait PUT_TIMEOUT plus the check after a timeout; the short queue's 300 s
+        # default would kill a team-wide save midway
+        timeout=max(300, SYNC_JOB_TIMEOUT_PER_ROW * (len(plan["rows"]) + len(plan["removed"])) + 60),
         enqueue_after_commit=True,
         doctype=doc.doctype,
         name=doc.name,
