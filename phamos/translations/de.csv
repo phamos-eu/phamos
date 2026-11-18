@@ -2152,6 +2152,7 @@ GitLab Issues,GitLab-Issues
 GitLab issues,GitLab-Issues
 Create GitLab Issue,GitLab-Issue anlegen
 Open in GitLab,In GitLab öffnen
+Open {0} in GitLab,{0} in GitLab öffnen
 Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
 GitLab issue not linked,GitLab-Issue nicht verknüpft
