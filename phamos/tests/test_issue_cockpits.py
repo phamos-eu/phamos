@@ -26,18 +26,29 @@ def _department(config):
 	return DEPARTMENTS.get(config.department_field)
 
 
-def _issue(name="ISS-TEST-1957", owner="someone-else@example.com", custom_department=None, project=None):
+def _issue(
+	name="ISS-TEST-1957",
+	owner="someone-else@example.com",
+	custom_department=None,
+	project=None,
+	custom_team=None,
+):
 	return frappe._dict(
 		doctype="Issue",
 		name=name,
 		owner=owner,
 		custom_department=custom_department,
+		custom_team=custom_team,
 		project=project,
 	)
 
 
+def _no_team():
+	frappe.throw("You are not a member of any team.", frappe.PermissionError)
+
+
 class TestIssueCockpits(FrappeTestCase):
-	def _fit(self, doc, assigned=False, project_department=None, can_open=lambda module: True):
+	def _fit(self, doc, assigned=False, project_department=None, can_open=lambda module: True, team=None):
 		modules = ic._cockpit_modules()
 		get_value = frappe.db.get_value
 
@@ -52,6 +63,9 @@ class TestIssueCockpits(FrappeTestCase):
 			patch("phamos.api.department_cockpit._is_assigned", return_value=assigned),
 			patch.object(frappe.db, "get_value", side_effect=project_lookup),
 			patch.object(ic, "_cockpit_modules", return_value=modules),
+			patch("phamos.cockpits.teams.active_team", return_value=team),
+			patch("phamos.cockpits.teams.require_active_team", side_effect=(lambda: team) if team else _no_team),
+			patch("phamos.cockpits.teams.team_projects", return_value=[]),
 		):
 			patches = [
 				patch.object(module, "check_app_permission", return_value=can_open(module))
@@ -137,3 +151,17 @@ class TestIssueCockpits(FrappeTestCase):
 			patch.object(ic.frappe, "get_module", side_effect=get_module),
 		):
 			self.assertEqual(ic._cockpit_modules(), [])
+
+	def test_team_issue_opens_in_team_cockpit_after_personal(self):
+		doc = _issue(custom_team="Team Blue", project="PROJ-1957")
+		fit = self._fit(doc, assigned=True, team="Team Blue", project_department="Accounts")
+		labels = [c["label"] for c in fit]
+		self.assertEqual(labels, ["Personal", "Team", "Accounting"])
+
+	def test_user_in_no_team_gets_no_team_entry_and_no_error(self):
+		# Administrator passes every check_app_permission but may be in no team.
+		doc = _issue(custom_team="Team Blue")
+		self.assertEqual(
+			self._fit(doc, assigned=True),
+			[{"label": "Personal", "url": "/personal-cockpit/issues/list/ISS-TEST-1957"}],
+		)

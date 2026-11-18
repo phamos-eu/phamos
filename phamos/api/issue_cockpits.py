@@ -13,8 +13,9 @@ import frappe
 from frappe import _
 
 from phamos.api import department_cockpit as dc
+from phamos.cockpits import teams
 
-# Best fit first: the Personal Cockpit, then the Issue's own department, then its project's.
+# Best fit first: the Personal Cockpit, then the Issue's own department or team, then its project's.
 RANK_PERSONAL = 0
 RANK_ISSUE_DEPARTMENT = 1
 RANK_PROJECT_DEPARTMENT = 2
@@ -41,9 +42,21 @@ def _cockpit_modules():
 def _rank(config, doc):
 	if config.is_personal:
 		return RANK_PERSONAL
-	if doc.get("custom_department") and doc.custom_department == dc._get_department(config):
-		return RANK_ISSUE_DEPARTMENT
-	return RANK_PROJECT_DEPARTMENT
+	if config.is_team:
+		# The Team Cockpit ranks like a department: the Issue's own team before its project's.
+		own = doc.get("custom_team") and doc.custom_team == teams.active_team()
+	else:
+		own = doc.get("custom_department") and doc.custom_department == dc._get_department(config)
+	return RANK_ISSUE_DEPARTMENT if own else RANK_PROJECT_DEPARTMENT
+
+
+def _in_scope(config, doc):
+	"""dc._issue_in_scope, but a cockpit without context for the user (the Team Cockpit for
+	someone in no team, Administrator included) does not fit instead of failing the request."""
+	try:
+		return dc._issue_in_scope(config, doc)
+	except frappe.PermissionError:
+		return False
 
 
 def _short_label(config):
@@ -56,7 +69,7 @@ def cockpits_for_issue(doc):
 	found = []
 	for position, (module, route) in enumerate(_cockpit_modules()):
 		config = module.CONFIG
-		if not module.check_app_permission() or not dc._issue_in_scope(config, doc):
+		if not module.check_app_permission() or not _in_scope(config, doc):
 			continue
 		found.append(
 			(
