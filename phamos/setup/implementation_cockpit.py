@@ -15,8 +15,8 @@ from phamos.setup.general_management import ensure_permissions as _ensure_permis
 IMPLEMENTATION_ROLE = "phamos Implementation"
 
 # Issue: the cockpit lists the reports of an Implementation and shows their screenshots (private files).
-# Implementation Feature: what is built for an implementation (#1968), shown in the cockpit.
-DOCTYPES = ("Implementation", "Issue", "Implementation Feature")
+# Implementation Feature and the Doctype library: what is built for an implementation (#1968, #1969).
+DOCTYPES = ("Implementation", "Issue", "Implementation Feature", "Implementation Doctype")
 GRANTED = ("read", "report", "print")
 # The cockpit shows Implementations; changes are made in Desk by the people who may make them.
 WITHHELD = ("write", "create", "delete")

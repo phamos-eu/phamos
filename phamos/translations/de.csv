@@ -2250,3 +2250,18 @@ A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhän
 Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
 Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
 These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
+Implementation Doctype,Implementierungs-Doctype
+Implementation Doctype Screenshot,Screenshot des Implementierungs-Doctypes
+Implementation Feature Doctype,Doctype des Implementierungsfeatures
+Doctype Name,Doctype-Name
+Kind,Art
+New DocType,Neuer DocType
+Customization,Anpassung
+Reusable,Wiederverwendbar
+Showcase,Referenz zeigen
+Showcase Reviewed By,Referenz geprüft von
+Screenshots,Screenshots
+Used In,Verwendet in
+Work Done,Erledigte Arbeit
+Doctypes,Doctypes
+Set who reviewed the entry before it can be shown to prospects.,"Gib an, wer den Eintrag geprüft hat, bevor er Interessenten gezeigt werden kann."

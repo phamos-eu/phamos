@@ -1,0 +1,34 @@
+# Copyright (c) 2026, phamos.eu and Contributors
+# See license.txt
+
+import frappe
+from frappe.tests.utils import FrappeTestCase
+
+from phamos.phamos.doctype.implementation_feature.test_implementation_feature import make_feature
+from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
+
+
+def make_entry(doctype_name="Delivery Trip", app="phamos_logistics", **values):
+	return frappe.get_doc(
+		{"doctype": "Implementation Doctype", "doctype_name": doctype_name, "app": app, **values}
+	).insert(ignore_permissions=True)
+
+
+class TestImplementationDoctype(FrappeTestCase):
+	def test_named_by_doctype_and_app(self):
+		self.assertEqual(make_entry().name, "Delivery Trip · phamos_logistics")
+		self.assertEqual(make_entry("Pick List Print", app="").name, "Pick List Print")
+
+	def test_showcase_needs_a_reviewer(self):
+		self.assertRaises(frappe.ValidationError, make_entry, "Route Planner", showcase=1)
+		make_entry("Route Planner", showcase=1, showcase_reviewed_by="Administrator")
+
+	def test_used_in_lists_the_implementations_of_its_features(self):
+		entry = make_entry("Batch Label", app="phamos")
+		self.assertEqual(entry.used_in_implementations, "")
+		implementation = make_implementation()
+		make_feature(
+			implementation.name,
+			doctypes=[{"implementation_doctype": entry.name, "work_done": "Print format with batch and best-before"}],
+		)
+		self.assertEqual(entry.used_in_implementations, implementation.name)
