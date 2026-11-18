@@ -487,7 +487,13 @@ doc_events = {
         "on_update": [
             "phamos.phamos.doctype.timesheet_record.timesheet_record.sync_implementation_time_limit_summary_on_save",
             "phamos.web_profile.mirror.push_to_profiles",
+            # direct edits of agreed plan values wait for the customer's confirmation (#1971)
+            "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
         ],
+    },
+    "Implementation Feature": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",
     },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
     "Employee": {

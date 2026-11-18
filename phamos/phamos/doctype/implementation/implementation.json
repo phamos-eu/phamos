@@ -764,9 +764,19 @@
   {
    "link_doctype": "Implementation Feature",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Change",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Baseline",
+   "link_fieldname": "implementation",
+   "group": "Planning"
   }
  ],
- "modified": "2026-11-18 20:30:00.000000",
+ "modified": "2026-11-18 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

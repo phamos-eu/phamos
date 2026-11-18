@@ -8,11 +8,19 @@ from frappe.model.document import Document
 from frappe.utils import cint, formatdate, getdate
 
 from phamos.phamos.doctype.implementation.implementation import compute_next_review_due
+from phamos.phamos.doctype.implementation_baseline.implementation_baseline import create_baseline
+from phamos.phamos.doctype.implementation_change.implementation_change import (
+	apply_agreed_changes_of_meeting,
+	record_meeting_chapter_changes,
+)
 from phamos.phamos.doctype.implementation_chapter.implementation_chapter import (
 	create_revision_snapshot,
 )
 
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
+# Meeting Type created on migrate (phamos/setup/implementation_cockpit.py): a joint planning session
+# that applies the agreed plan changes and sets a new baseline (#1971).
+PLANNING_MEETING_TYPE = "Planning"
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
 PROPOSED_CONTENT_REQUIRED = (
 	"proposed_chapter_title",
@@ -147,8 +155,18 @@ class StakeholderMeeting(Document):
 		try:
 			self.sync_chapter_reviews_to_chapters()
 			self.advance_implementation_review_cadence()
+			self.record_and_apply_plan_changes()
 		finally:
 			frappe.flags.in_stakeholder_meeting_submit = False
+
+	def record_and_apply_plan_changes(self):
+		"""Plan changes of this meeting (#1971). Every meeting records the chapter content it changed.
+		A Planning meeting also applies the changes both sides agreed for it and sets a new baseline.
+		Cancelling the meeting undoes neither, by design: a correction is a new change."""
+		record_meeting_chapter_changes(self)
+		if self.meeting_type == PLANNING_MEETING_TYPE:
+			apply_agreed_changes_of_meeting(self)
+			create_baseline(self.implementation, stakeholder_meeting=self.name, baseline_date=self.meeting_date)
 
 	def before_cancel(self):
 		"""Cancelling restores what this meeting's submit overwrote, which is only
