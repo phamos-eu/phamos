@@ -21,8 +21,31 @@ class ImplementationDoctype(Document):
 		self.name = f"{name} · {self.app.strip()}" if (self.app or "").strip() else name
 
 	def validate(self):
-		if self.showcase and not self.showcase_reviewed_by:
-			frappe.throw(_("Set who reviewed the entry before it can be shown to prospects."))
+		self.guard_showcase()
+
+	def guard_showcase(self):
+		"""The showcase flag is the confidentiality gate: nothing from a customer may reach prospects.
+
+		Whoever sets the flag is recorded as the reviewer; nobody can name someone else. A later
+		change to the description or the screenshots withdraws the flag until it is reviewed again.
+		"""
+		before = self.get_doc_before_save()
+		if not self.showcase:
+			self.showcase_reviewed_by = None
+			return
+		if not before or not before.showcase:
+			self.showcase_reviewed_by = frappe.session.user
+			return
+		content_changed = (before.description or "") != (self.description or "") or [
+			(row.image, row.caption) for row in before.screenshots
+		] != [(row.image, row.caption) for row in self.screenshots]
+		if content_changed:
+			self.showcase = 0
+			self.showcase_reviewed_by = None
+			frappe.msgprint(
+				_("The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again."),
+				indicator="orange",
+			)
 
 	@property
 	def used_in_implementations(self):
@@ -37,7 +60,8 @@ class ImplementationDoctype(Document):
 		)
 		if not features:
 			return ""
-		implementations = frappe.get_all(
+		# get_list: someone who may read the library but not an implementation does not see its name
+		implementations = frappe.get_list(
 			"Implementation Feature",
 			filters={"name": ["in", features], "implementation": ["is", "set"]},
 			pluck="implementation",

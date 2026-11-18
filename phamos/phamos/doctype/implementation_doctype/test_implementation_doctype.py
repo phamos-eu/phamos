@@ -19,9 +19,16 @@ class TestImplementationDoctype(FrappeTestCase):
 		self.assertEqual(make_entry().name, "Delivery Trip · phamos_logistics")
 		self.assertEqual(make_entry("Pick List Print", app="").name, "Pick List Print")
 
-	def test_showcase_needs_a_reviewer(self):
-		self.assertRaises(frappe.ValidationError, make_entry, "Route Planner", showcase=1)
-		make_entry("Route Planner", showcase=1, showcase_reviewed_by="Administrator")
+	def test_whoever_sets_showcase_is_the_reviewer(self):
+		entry = make_entry("Route Planner", showcase=1, showcase_reviewed_by="Guest")
+		self.assertEqual(entry.showcase_reviewed_by, frappe.session.user)
+
+	def test_changed_content_withdraws_the_showcase(self):
+		entry = make_entry("Route Planner", showcase=1, description="Plans tours")
+		entry.description = "Plans tours for Customer X with their prices"
+		entry.save()
+		self.assertFalse(entry.showcase)
+		self.assertIsNone(entry.showcase_reviewed_by)
 
 	def test_used_in_lists_the_implementations_of_its_features(self):
 		entry = make_entry("Batch Label", app="phamos")

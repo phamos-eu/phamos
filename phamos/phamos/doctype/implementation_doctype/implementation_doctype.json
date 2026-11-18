@@ -67,7 +67,7 @@
    "fieldtype": "Check",
    "in_standard_filter": 1,
    "label": "Showcase",
-   "description": "May be shown to prospects. Only after a review that nothing confidential from a customer is in it."
+   "description": "May be shown to prospects. Set it only after checking that nothing confidential from a customer is in the entry; you are recorded as the reviewer. Changing the description or screenshots withdraws it."
   },
   {
    "fieldname": "showcase_reviewed_by",
@@ -75,8 +75,8 @@
    "label": "Showcase Reviewed By",
    "options": "User",
    "depends_on": "showcase",
-   "mandatory_depends_on": "showcase",
-   "description": "Who checked that the entry and its screenshots contain nothing confidential."
+   "description": "Set automatically to whoever sets Showcase, after checking that the entry and its screenshots contain nothing confidential.",
+   "read_only": 1
   },
   {
    "fieldname": "description_section",

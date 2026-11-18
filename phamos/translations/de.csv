@@ -2263,10 +2263,14 @@ Screenshots,Screenshots
 Used In,Verwendet in
 Work Done,Erledigte Arbeit
 Doctypes,Doctypes
-Set who reviewed the entry before it can be shown to prospects.,"Gib an, wer den Eintrag geprüft hat, bevor er Interessenten gezeigt werden kann."
 Feature {0} does not exist.,Feature {0} existiert nicht.
 Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
 Agreed,Vereinbart
 Planned,Geplant
 In Progress,In Arbeit
 Live,Live
+Report,Bericht
+Print Format,Druckformat
+Script,Skript
+Caption,Bildunterschrift
+"The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again.","Beschreibung oder Screenshots wurden geändert, daher ist der Eintrag keine Referenz mehr. Prüfe ihn und setze „Referenz zeigen“ erneut."
