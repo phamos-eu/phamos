@@ -43,7 +43,10 @@
 				</label>
 				<button type="button" class="btn" @click="toggleOrder">{{ filters.order === "desc" ? "↓ newest" : "↑ oldest" }}</button>
 				<button v-if="hasFilters" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="reset">Reset</button>
-				<button type="button" class="btn ml-auto" @click="pick()">Upload</button>
+				<button type="button" class="btn ml-auto" :disabled="fetching" @click="fetchEmails">
+					{{ fetching ? "Fetching e-mails…" : "Fetch e-mails" }}
+				</button>
+				<button type="button" class="btn" @click="pick()">Upload</button>
 			</div>
 			<div class="min-h-0 flex-1 overflow-y-auto bg-surface-white">
 				<p v-if="truncated" class="border-b border-outline-gray-2 bg-surface-amber-1 px-5 py-2 text-xs text-ink-amber-3">
@@ -62,9 +65,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue"
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { call, debounce } from "frappe-ui"
+import { call, debounce, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import ReceiptDropArea from "../components/ReceiptDropArea.vue"
 import ReceiptRow from "../components/ReceiptRow.vue"
@@ -134,7 +137,56 @@ function open(name) {
 	router.push({ name: "ReceiptDetail", params: { name } })
 }
 
-onMounted(load)
+// "Fetch e-mails" (#1964): pull the receipt inboxes now. The server queues one background job
+// per account and each job sends `receipt_emails_fetched` to this user when it is done.
+const FETCH_EVENT = "receipt_emails_fetched"
+const socket = getCurrentInstance()?.appContext?.config?.globalProperties?.$socket || null
+const fetching = ref(false)
+let pending = 0
+let fallbackTimer = null
+
+async function fetchEmails() {
+	fetching.value = true
+	try {
+		const res = await call("phamos.accounting.email_pull.fetch_receipt_emails")
+		pending = res.queued.length
+		if (!pending) {
+			toast({ title: "E-mails are already being fetched", icon: "clock" })
+			fetching.value = false
+			return
+		}
+		toast({ title: "Fetching e-mails…", icon: "download" })
+		// Without realtime nobody tells us when the job is done: reload once after a while.
+		if (!socket?.connected) fallbackTimer = setTimeout(finishFetch, 20000)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not fetch e-mails", icon: "x-circle", iconClasses: "text-ink-red-4" })
+		fetching.value = false
+	}
+}
+
+function onFetched(data) {
+	if (data.error) toast({ title: data.error, icon: "x-circle", iconClasses: "text-ink-red-4" })
+	else if (data.created) toast({ title: `${data.created} new receipt(s) from e-mail`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+	else toast({ title: "No new e-mails", icon: "check-circle" })
+	pending = Math.max(pending - 1, 0)
+	if (!pending) finishFetch()
+	else load({ quiet: true })
+}
+
+function finishFetch() {
+	clearTimeout(fallbackTimer)
+	fetching.value = false
+	load({ quiet: true })
+}
+
+onMounted(() => {
+	load()
+	socket?.on(FETCH_EVENT, onFetched)
+})
+onBeforeUnmount(() => {
+	socket?.off(FETCH_EVENT, onFetched)
+	clearTimeout(fallbackTimer)
+})
 </script>
 
 <style scoped>
@@ -148,6 +200,6 @@ onMounted(load)
 	@apply h-8 rounded-md border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-9;
 }
 .btn {
-	@apply inline-flex h-8 items-center rounded-md border border-outline-gray-2 px-3 text-sm font-medium text-ink-gray-8 hover:bg-surface-gray-2;
+	@apply inline-flex h-8 items-center rounded-md border border-outline-gray-2 px-3 text-sm font-medium text-ink-gray-8 hover:bg-surface-gray-2 disabled:cursor-wait disabled:opacity-60;
 }
 </style>

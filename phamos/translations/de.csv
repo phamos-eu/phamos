@@ -2212,3 +2212,11 @@ Select an Issue or Task of your team.,Bitte eine Anfrage oder Aufgabe Ihres Team
 You do not have permission to access the Team Cockpit,Sie haben keine Berechtigung für das Team-Cockpit
 The team this task belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Aufgabe gehört. Sie erscheint im Team-Cockpit dieses Teams."
 The team this issue belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Anfrage gehört. Sie erscheint im Team-Cockpit dieses Teams."
+Fetch e-mails,E-Mails abrufen
+Fetching e-mails…,E-Mails werden abgerufen…
+{0} new receipts from e-mail,{0} neue Belege aus E-Mails
+No new e-mails,Keine neuen E-Mails
+E-mails are already being fetched,E-Mails werden bereits abgerufen
+No e-mail account,Kein E-Mail-Konto
+No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
+Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
