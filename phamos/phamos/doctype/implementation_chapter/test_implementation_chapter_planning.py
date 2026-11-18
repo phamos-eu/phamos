@@ -55,3 +55,15 @@ class TestImplementationChapterPlanning(FrappeTestCase):
 		second = make_feature(self.implementation.name, title="Two", status="In Progress")
 		self.assertEqual(second.status, "In Progress")
 		self.assertTrue(any("agreed with the customer" in str(message) for message in frappe.message_log))
+
+	def test_a_chapter_or_feature_is_listed_once(self):
+		first = make_chapter(self.implementation.name, title="Setup")
+		second = make_chapter(self.implementation.name, title="Go Live")
+		second.append("depends_on", {"chapter": first.name})
+		second.append("depends_on", {"chapter": first.name})
+		self.assertRaises(frappe.ValidationError, second.save)
+		second.reload()
+		feature = make_feature(self.implementation.name)
+		second.append("features", {"feature": feature.name})
+		second.append("features", {"feature": feature.name})
+		self.assertRaises(frappe.ValidationError, second.save)

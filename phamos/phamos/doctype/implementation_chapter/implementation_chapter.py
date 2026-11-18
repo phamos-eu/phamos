@@ -86,14 +86,10 @@ class ImplementationChapter(Document):
 		chapters = [row.chapter for row in self.get("depends_on", [])]
 		if self.name in chapters:
 			frappe.throw(frappe._("A chapter cannot depend on itself."))
-		for chapter in chapters:
-			if frappe.db.get_value("Implementation Chapter", chapter, "implementation") != self.implementation:
-				frappe.throw(frappe._("Chapter {0} belongs to another implementation.").format(chapter))
+		_check_links(self, "Implementation Chapter", chapters, frappe._("Chapter"))
 		if not self.is_new() and _dependencies_reach(self.name, chapters):
 			frappe.throw(frappe._("These dependencies form a loop: a chapter would wait for itself."))
-		for row in self.get("features", []):
-			if frappe.db.get_value("Implementation Feature", row.feature, "implementation") != self.implementation:
-				frappe.throw(frappe._("Feature {0} belongs to another implementation.").format(row.feature))
+		_check_links(self, "Implementation Feature", [row.feature for row in self.get("features", [])], frappe._("Feature"))
 
 	def warn_when_over_wip_limit(self):
 		"""Chapters may run in parallel, up to the limit agreed with the customer (#1970).
@@ -364,6 +360,28 @@ def get_chapter_history(chapter):
 		"current_revision": doc.current_revision,
 		"revisions": revisions,
 	}
+
+
+def _check_links(chapter, doctype, names, label):
+	"""Each linked record is listed once, exists, and belongs to the chapter's Implementation.
+
+	One query for all rows; a missing record gets its own message instead of "another implementation".
+	"""
+	seen = set()
+	for name in names:
+		if name in seen:
+			frappe.throw(frappe._("{0} {1} is listed twice.").format(label, name))
+		seen.add(name)
+	if not names:
+		return
+	implementation_of = dict(
+		frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", "implementation"], as_list=True)
+	)
+	for name in names:
+		if name not in implementation_of:
+			frappe.throw(frappe._("{0} {1} does not exist.").format(label, name))
+		if implementation_of[name] != chapter.implementation:
+			frappe.throw(frappe._("{0} {1} belongs to another implementation.").format(label, name))
 
 
 def _dependencies_reach(start_name, chapters):

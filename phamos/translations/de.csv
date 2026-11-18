@@ -2255,7 +2255,6 @@ Agreed WIP Limits,Vereinbarte WIP-Limits
 Max Chapters in Progress,Max. Kapitel in Arbeit
 Max Features in Progress,Max. Features in Arbeit
 A chapter cannot depend on itself.,Ein Kapitel kann nicht von sich selbst abhängen.
-Chapter {0} belongs to another implementation.,Kapitel {0} gehört zu einer anderen Implementierung.
 These dependencies form a loop: a chapter would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Kapitel würde auf sich selbst warten.
 "{0} chapters are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Kapitel in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
 "{0} features are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Features in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
@@ -2268,3 +2267,7 @@ Agreed,Vereinbart
 Planned,Geplant
 In Progress,In Arbeit
 Live,Live
+{0} {1} is listed twice.,{0} {1} ist doppelt aufgeführt.
+{0} {1} does not exist.,{0} {1} existiert nicht.
+{0} {1} belongs to another implementation.,{0} {1} gehört zu einer anderen Implementierung.
+Chapter,Kapitel
