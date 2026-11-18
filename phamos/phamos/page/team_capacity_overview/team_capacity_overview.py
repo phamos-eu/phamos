@@ -1,4 +1,6 @@
 import frappe
+
+from phamos.phamos.team_capacity_utils import get_period_leave_hours
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Sum, Avg, Count
 from pypika import Criterion
@@ -97,55 +99,9 @@ def get_team_capacity(filters=None):
         if row.employee:
             team_employees[row.parent].append(row.employee)
 
-    def get_employee_daily_hours(employee, work_date):
-        """Scheduled hours of the day, from the Weekly Working Hours valid on it (#1983)."""
-        from phamos.phamos.team_capacity_utils import get_employee_daily_hours as daily_hours
-
-        return daily_hours(employee, work_date)
-
     def get_week_leave_hours(employee, week_start, week_end):
-        from datetime import timedelta
-        total = 0.0
-        holiday_dates = set()
-
-        # Holiday hours
-        holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
-        if holiday_list:
-            holidays = frappe.db.get_all(
-                "Holiday",
-                filters={
-                    "parent": holiday_list,
-                    "holiday_date": ["between", [week_start, week_end]]
-                },
-                fields=["holiday_date"]
-            )
-            for h in holidays:
-                holiday_dates.add(h.holiday_date) 
-                total += get_employee_daily_hours(employee, h.holiday_date)
-
-        # Leave Application hours
-        leave_apps = frappe.db.get_all(
-            "Leave Application",
-            filters={
-                "employee": employee,
-                "docstatus": 1,
-                "from_date": ["<=", week_end],
-                "to_date": [">=", week_start],
-            },
-            fields=["from_date", "to_date", "half_day"]
-        )
-        for leave in leave_apps:
-            day = max(leave.from_date, week_start)
-            last_day = min(leave.to_date, week_end)
-            while day <= last_day:
-                if day not in holiday_dates:  # holiday wala din skip karo
-                    hrs = get_employee_daily_hours(employee, day)
-                    if leave.half_day:
-                        hrs = hrs / 2
-                    total += hrs
-                day += timedelta(days=1)
-
-        return total
+        """Holiday and approved leave hours of the week, as the Team uses them (#1983)."""
+        return get_period_leave_hours(employee, week_start, week_end)
 
     def calculate_capacity_from_doctypes(team_name, week_start, week_end, base_capacity):
         employees = team_employees.get(team_name, [])

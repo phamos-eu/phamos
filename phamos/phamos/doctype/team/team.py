@@ -3,7 +3,12 @@ from frappe.model.document import Document
 from frappe.utils import nowdate
 from datetime import date, timedelta
 
-from phamos.phamos.team_capacity_utils import get_employee_daily_hours, get_period_leave_hours
+from phamos.phamos.team_capacity_utils import (
+    LEAVE_FIELDS,
+    get_employee_daily_hours,
+    get_period_leave_hours,
+    leave_day_share,
+)
 
 
 class Team(Document):
@@ -100,10 +105,11 @@ def refresh_team_capacity(doc, today, month_start, month_end, week_start, week_e
             filters={
                 "employee": employee,
                 "docstatus": 1,
+                "status": "Approved",
                 "from_date": ["<=", month_end],
                 "to_date": [">=", month_start],
             },
-            fields=["from_date", "to_date", "leave_type", "half_day"]
+            fields=LEAVE_FIELDS
         )
 
         for leave in leave_apps:
@@ -112,9 +118,7 @@ def refresh_team_capacity(doc, today, month_start, month_end, week_start, week_e
 
             while day <= last_day:
                 if day not in employee_holiday_dates:
-                    hours = get_employee_working_hours(employee, day)
-                    if leave.half_day:
-                        hours = hours / 2
+                    hours = get_employee_working_hours(employee, day) * leave_day_share(leave, day)
 
                     doc.append("team_member_leaves_and_holiday", {
                         "employee": employee,

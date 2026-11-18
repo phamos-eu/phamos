@@ -1,6 +1,8 @@
 import frappe
 from datetime import timedelta
 
+from frappe.utils import getdate
+
 
 def _get_team_capacity_cache():
     """Return request-scoped cache for expensive team capacity lookups."""
@@ -43,6 +45,22 @@ def get_employee_daily_hours(employee, work_date):
     return hours
 
 
+# Approved leave only: HRMS also submits Leave Applications with the status Rejected.
+LEAVE_FIELDS = ["from_date", "to_date", "half_day", "half_day_date", "leave_type"]
+
+
+def leave_day_share(leave, day):
+    """How much of the day a Leave Application takes: 0.5 on its half day, otherwise 1.
+
+    HRMS marks one day of a leave as the half day (half_day_date); a one-day leave with half_day
+    is that day. The other days of a longer leave are whole days.
+    """
+    if not leave.half_day:
+        return 1
+    half_day = leave.half_day_date or (leave.from_date if leave.from_date == leave.to_date else None)
+    return 0.5 if half_day and getdate(half_day) == day else 1
+
+
 def _weekly_working_hours(employee):
     """The employee's submitted Weekly Working Hours: validity and hours per weekday, newest first."""
     if not frappe.db.exists("DocType", "Weekly Working Hours"):
@@ -52,7 +70,8 @@ def _weekly_working_hours(employee):
         "Weekly Working Hours",
         filters={"employee": employee, "docstatus": 1},
         fields=["name", "valid_from", "valid_to"],
-        order_by="valid_from desc",
+        # newest first; on the same start date the later record wins
+        order_by="valid_from desc, creation desc",
     )
     for record in records:
         rows = frappe.get_all(
@@ -103,10 +122,11 @@ def get_period_leave_hours(employee, period_start, period_end):
             filters={
                 "employee": employee,
                 "docstatus": 1,
+                "status": "Approved",
                 "from_date": ["<=", period_end],
                 "to_date": [">=", period_start],
             },
-            fields=["from_date", "to_date", "half_day"]
+            fields=LEAVE_FIELDS
         )
         cache["leave_apps_by_period"][leave_apps_key] = leave_apps
 
@@ -115,10 +135,7 @@ def get_period_leave_hours(employee, period_start, period_end):
         last_day = min(leave.to_date, period_end)
         while day <= last_day:
             if day not in holiday_dates:
-                hrs = get_employee_daily_hours(employee, day)
-                if leave.half_day:
-                    hrs = hrs / 2
-                total += hrs
+                total += get_employee_daily_hours(employee, day) * leave_day_share(leave, day)
             day += timedelta(days=1)
 
     cache["leave_hours_by_period"][leave_hours_key] = total

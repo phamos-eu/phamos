@@ -4,6 +4,7 @@
 """Team capacity (#1983): scheduled hours come from the Weekly Working Hours valid on the day, and
 the weekly team capacity subtracts the leave and holidays of the whole week."""
 
+import unittest
 from datetime import date
 from unittest.mock import patch
 
@@ -50,7 +51,24 @@ class TestDailyHours(FrappeTestCase):
 			# outside every validity: no scheduled hours
 			self.assertEqual(utils.get_employee_daily_hours("EMP-1", date(2027, 1, 4)), 0)
 
-	def test_team_and_overview_use_the_same_lookup(self):
+	def test_overlapping_records_the_newest_wins(self):
+		# _weekly_working_hours returns the records newest first (valid_from desc, creation desc)
+		records = [_record(date(2026, 7, 1), date(2026, 12, 31), 6), _record(date(2026, 1, 1), date(2026, 12, 31), 8)]
+		with patch.object(utils, "_weekly_working_hours", return_value=records):
+			self.assertEqual(utils.get_employee_daily_hours("EMP-4", date(2026, 7, 6)), 6)
+			self.assertEqual(utils.get_employee_daily_hours("EMP-4", date(2026, 6, 1)), 8)
+
+	def test_only_the_half_day_of_a_leave_is_halved(self):
+		leave = frappe._dict(
+			from_date=date(2026, 3, 2), to_date=date(2026, 3, 6), half_day=1, half_day_date=date(2026, 3, 4)
+		)
+		self.assertEqual(utils.leave_day_share(leave, date(2026, 3, 4)), 0.5)
+		self.assertEqual(utils.leave_day_share(leave, date(2026, 3, 2)), 1)
+		one_day = frappe._dict(from_date=date(2026, 3, 9), to_date=date(2026, 3, 9), half_day=1, half_day_date=None)
+		self.assertEqual(utils.leave_day_share(one_day, date(2026, 3, 9)), 0.5)
+		self.assertEqual(utils.leave_day_share(frappe._dict(half_day=0), date(2026, 3, 9)), 1)
+
+	def test_team_uses_the_same_lookup(self):
 		records = [_record(date(2026, 1, 1), date(2026, 12, 31), 7)]
 		with patch.object(utils, "_weekly_working_hours", return_value=records):
 			self.assertEqual(team_module.get_employee_working_hours("EMP-2", date(2026, 3, 3)), 7)
@@ -60,10 +78,49 @@ class TestDailyHours(FrappeTestCase):
 			self.assertEqual(utils._weekly_working_hours("EMP-3"), [])
 
 
+@unittest.skipUnless(frappe.db and frappe.db.exists("DocType", "Weekly Working Hours"), "needs HR Addon")
+class TestWeeklyWorkingHoursRecords(FrappeTestCase):
+	"""Against real records, where HR Addon is installed: drafts and cancelled records don't count."""
+
+	def tearDown(self):
+		_clear_cache()
+		frappe.db.rollback()
+
+	def test_only_the_submitted_record_counts(self):
+		employee = frappe.db.get_value("Employee", {"status": "Active"}, "name")
+		if not employee:
+			self.skipTest("needs an active Employee")
+
+		def record(hours, submit):
+			doc = frappe.get_doc(
+				{
+					"doctype": "Weekly Working Hours",
+					"employee": employee,
+					"valid_from": "2030-01-01",
+					"valid_to": "2030-12-31",
+					"hours": [{"day": "Monday", "hours": hours}],
+				}
+			).insert(ignore_permissions=True)
+			if submit:
+				doc.submit()
+			return doc
+
+		record(5, submit=False)
+		_clear_cache()
+		self.assertEqual(utils.get_employee_daily_hours(employee, date(2030, 1, 7)), 0)
+		record(7, submit=True)
+		_clear_cache()
+		self.assertEqual(utils.get_employee_daily_hours(employee, date(2030, 1, 7)), 7)
+
+
 class TestWeeklyTeamCapacity(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		_clear_cache()
+		self.addCleanup(frappe.db.rollback)
+		self.addCleanup(_clear_cache)
+		if not (frappe.db.get_value("Company", {}, "name") and frappe.db.get_value("Gender", {}, "name")):
+			self.skipTest("needs a Company and a Gender")
 		if frappe.db.exists("Holiday List", HOLIDAY_LIST):
 			frappe.delete_doc("Holiday List", HOLIDAY_LIST, force=True)
 		frappe.get_doc(
@@ -89,15 +146,11 @@ class TestWeeklyTeamCapacity(FrappeTestCase):
 				"team_members": [{"employee": self.employee, "weekly_capacity": 40}],
 			}
 		).insert(ignore_permissions=True)
-		self.records = patch.object(
+		records = patch.object(
 			utils, "_weekly_working_hours", return_value=[_record(date(2026, 1, 1), date(2026, 12, 31), 8)]
 		)
-		self.records.start()
-
-	def tearDown(self):
-		self.records.stop()
-		_clear_cache()
-		frappe.db.rollback()
+		records.start()
+		self.addCleanup(records.stop)
 
 	def _employee(self):
 		if not frappe.db.exists("User", EMPLOYEE_USER):
