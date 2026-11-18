@@ -26,7 +26,7 @@
 							<dt class="text-xs text-ink-gray-5">{{ __("Reported on") }}</dt>
 							<dd class="truncate text-ink-gray-8">
 								<template v-if="issue.phriend_ref_doctype">{{ __(issue.phriend_ref_doctype) }} {{ issue.phriend_ref_docname }}</template>
-								<template v-else>{{ issue.phriend_route || "—" }}</template>
+								<template v-else>{{ readableRoute(issue.phriend_route) || "—" }}</template>
 							</dd>
 						</div>
 					</dl>
@@ -95,6 +95,15 @@ watch(
 
 function openGitLab(url) {
 	window.open(url, "_blank", "noopener")
+}
+
+// Routes are stored as the browser had them ("…/DEMO%20Alpenfrisch/…"); show them readable.
+function readableRoute(value) {
+	try {
+		return decodeURIComponent(value || "")
+	} catch (e) {
+		return value || ""
+	}
 }
 
 function date(value) {

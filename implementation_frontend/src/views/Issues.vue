@@ -29,7 +29,7 @@
 					<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-gray-6">
 						<span>{{ issue.phriend_reported_by_name || "—" }} · {{ date(issue.opening_date) }}</span>
 						<span v-if="issue.phriend_ref_doctype">{{ __(issue.phriend_ref_doctype) }} {{ issue.phriend_ref_docname }}</span>
-						<span v-else-if="issue.phriend_route" class="truncate">{{ issue.phriend_route }}</span>
+						<span v-else-if="issue.phriend_route" class="truncate">{{ readableRoute(issue.phriend_route) }}</span>
 						<a
 							v-for="g in issue.gitlab_issues"
 							:key="g.name"
@@ -85,7 +85,7 @@ const scopeButtons = computed(() =>
 )
 const contextLabel = computed(() => {
 	if (route.query.ref_doctype && route.query.ref_docname) return `${__(route.query.ref_doctype)} ${route.query.ref_docname}`
-	return route.query.route || ""
+	return readableRoute(route.query.route || "")
 })
 const emptyText = computed(() =>
 	includeClosed.value ? __("No issues reported here.") : __("No open issues reported here.")
@@ -116,6 +116,15 @@ async function load() {
 		error.value = e?.messages?.[0] || e?.message || __("Could not load the issues")
 	} finally {
 		loading.value = false
+	}
+}
+
+// Routes are stored as the browser had them ("…/DEMO%20Alpenfrisch/…"); show them readable.
+function readableRoute(value) {
+	try {
+		return decodeURIComponent(value || "")
+	} catch (e) {
+		return value || ""
 	}
 }
 
