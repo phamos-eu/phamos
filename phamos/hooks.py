@@ -483,6 +483,10 @@ doc_events = {
             "phamos.web_profile.mirror.push_to_profiles",
         ]
     },
+    # a published GitLab Release sets the planned Implementation Release to Released (#1986)
+    "GitLab Release": {
+        "on_update": "phamos.phamos.doctype.implementation_release.implementation_release.link_published_release",
+    },
     "Implementation": {
         "on_update": [
             "phamos.phamos.doctype.timesheet_record.timesheet_record.sync_implementation_time_limit_summary_on_save",
@@ -577,6 +581,8 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
+        # Implementation Release: capacity shrinks every day, leave changes (#1986)
+        "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring

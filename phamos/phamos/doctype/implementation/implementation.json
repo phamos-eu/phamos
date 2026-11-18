@@ -111,7 +111,8 @@
   "wip_limits_section",
   "max_parallel_chapters",
   "column_break_wip_limits",
-  "max_parallel_features"
+  "max_parallel_features",
+  "team_capacity_share"
  ],
  "fields": [
   {
@@ -715,6 +716,13 @@
    "label": "Max Features in Progress",
    "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit.",
    "non_negative": 1
+  },
+  {
+   "fieldname": "team_capacity_share",
+   "fieldtype": "Percent",
+   "label": "Team Capacity Share",
+   "non_negative": 1,
+   "description": "The share of the team's capacity agreed for this implementation, because teams work for several customers. Used by the realistic check of releases."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -766,9 +774,13 @@
   {
    "link_doctype": "Implementation Feature",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Release",
+   "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-11-18 20:30:00.000000",
+ "modified": "2026-11-18 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
