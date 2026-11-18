@@ -777,7 +777,8 @@
   },
   {
    "link_doctype": "Implementation Release",
-   "link_fieldname": "implementation"
+   "link_fieldname": "implementation",
+   "group": "Planning"
   }
  ],
  "modified": "2026-11-18 22:00:00.000000",
