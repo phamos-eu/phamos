@@ -24,96 +24,6 @@ function _mis_hint_reload_timesheets(frm) {
 }
 
 
-function _mis_inject_grid_button(grid, css_class, label, should_show_fn, click_fn) {
-	grid.wrapper.find("." + css_class).remove();
-	const $btn = $(`<button class="btn btn-default btn-xs ${css_class}" style="margin-left:6px;">${label}</button>`);
-	$btn.hide();
-
-	// Place below the grid body, next to the "Add Row" button if present
-	const $add_row = grid.wrapper.find(".grid-add-row").first();
-	if ($add_row.length) {
-		$add_row.after($btn);
-	} else {
-		const $footer = grid.wrapper.find(".grid-footer").first();
-		if ($footer.length) {
-			$footer.append($('<span>').append($btn));
-		} else {
-			grid.wrapper.append(
-				$('<div class="mis-grid-btn-area" style="padding:4px 0 2px;">').append($btn)
-			);
-		}
-	}
-
-	function update() {
-		const selected = grid.get_selected_children() || [];
-		$btn.toggle(should_show_fn(selected));
-	}
-
-	grid.wrapper.off("change." + css_class + " click." + css_class);
-	grid.wrapper.on("change." + css_class, ".grid-row-check", update);
-	grid.wrapper.on("click." + css_class, ".check-run-all", function() { setTimeout(update, 50); });
-	$btn.off("click." + css_class).on("click." + css_class, function() {
-		const selected = grid.get_selected_children() || [];
-		click_fn(selected);
-	});
-}
-
-function _mis_setup_dn_table_submit_btn(frm) {
-	const field = frm.fields_dict.mis_delivery_notes;
-	if (!field || !field.grid) return;
-
-	_mis_inject_grid_button(
-		field.grid,
-		"mis-submit-dn-btn",
-		__("Submit Delivery Note(s)"),
-		function(selected) {
-			return !frm.is_new() && !frm.is_dirty() &&
-				selected.some(r => r.delivery_note && r.status === "Draft");
-		},
-		function(selected) {
-			const draft_dns = selected
-				.filter(r => r.delivery_note && r.status === "Draft")
-				.map(r => r.delivery_note);
-			if (!draft_dns.length) {
-				frappe.show_alert({ message: __("No draft Delivery Notes selected."), indicator: "orange" });
-				return;
-			}
-			_mis_submit_dns_from_table(frm, draft_dns);
-		}
-	);
-}
-
-function _mis_setup_si_table_submit_btn(frm) {
-	const field = frm.fields_dict.mis_sales_invoices;
-	if (!field || !field.grid) return;
-
-	_mis_inject_grid_button(
-		field.grid,
-		"mis-submit-si-btn",
-		__("Submit Sales Invoice(s)"),
-		function(selected) {
-			return !frm.is_new() && !frm.is_dirty() &&
-				selected.some(r => r.sales_invoice && r.status === "Draft");
-		},
-		function(selected) {
-			const draft_sis = selected
-				.filter(r => r.sales_invoice && r.status === "Draft")
-				.map(r => r.sales_invoice);
-			if (!draft_sis.length) {
-				frappe.show_alert({ message: __("No draft Sales Invoices selected."), indicator: "orange" });
-				return;
-			}
-			_mis_submit_sis_from_table(frm, draft_sis);
-		}
-	);
-}
-
-function _mis_setup_grid_action_buttons(frm) {
-	if (frm.doc.status === "Closed") return;
-	_mis_setup_dn_table_submit_btn(frm);
-	_mis_setup_si_table_submit_btn(frm);
-}
-
 function _mis_setup_status_buttons(frm) {
 	if (!frm.has_perm("submit")) return;
 	if (frm.doc.status === "Closed") {
@@ -246,82 +156,6 @@ function _mis_run_create_si(frm, delivery_notes, submit_after_create) {
 			});
 		})
 		.then(function() { frm.reload_doc(); });
-}
-
-function _mis_submit_dns_from_table(frm, delivery_notes) {
-	if (!delivery_notes || !delivery_notes.length) return;
-	frappe.confirm(
-		__("{0} Delivery Note(s) will be submitted. Continue?", [delivery_notes.length]),
-		function() {
-			frappe.call({
-				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_delivery_notes_in_mis",
-				args: { docname: frm.doc.name, delivery_notes: delivery_notes },
-				freeze: true,
-				freeze_message: __("Submitting Delivery Note(s)..."),
-				callback: function(r) {
-					if (r.exc) {
-						frappe.msgprint({ title: __("Error"), message: r.exc[0] || __("Failed."), indicator: "red" });
-						return;
-					}
-					const d = r.message || {};
-					if (d.failed_details && d.failed_details.length) {
-						frappe.msgprint({
-							title: __("Some submissions failed"),
-							indicator: "orange",
-							message: d.failed_details
-								.map(item => `${_mis_escape(item.delivery_note || "")} : ${_mis_escape(item.error || "")}` )
-								.join("<br>"),
-						});
-					}
-					frappe.show_alert({
-						message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
-							cint(d.submitted || 0), cint(d.already_submitted || 0), cint(d.failed || 0)
-						]),
-						indicator: cint(d.failed || 0) ? "orange" : "green",
-					});
-					frm.reload_doc();
-				}
-			});
-		}
-	);
-}
-
-function _mis_submit_sis_from_table(frm, sales_invoices) {
-	if (!sales_invoices || !sales_invoices.length) return;
-	frappe.confirm(
-		__("{0} Sales Invoice(s) will be submitted. Continue?", [sales_invoices.length]),
-		function() {
-			frappe.call({
-				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_sales_invoices_in_mis",
-				args: { docname: frm.doc.name, sales_invoices: sales_invoices },
-				freeze: true,
-				freeze_message: __("Submitting Sales Invoice(s)..."),
-				callback: function(r) {
-					if (r.exc) {
-						frappe.msgprint({ title: __("Error"), message: r.exc[0] || __("Failed."), indicator: "red" });
-						return;
-					}
-					const d = r.message || {};
-					if (d.failed_details && d.failed_details.length) {
-						frappe.msgprint({
-							title: __("Some submissions failed"),
-							indicator: "orange",
-							message: d.failed_details
-								.map(item => `${_mis_escape(item.sales_invoice || "")} : ${_mis_escape(item.error || "")}` )
-								.join("<br>"),
-						});
-					}
-					frappe.show_alert({
-						message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
-							cint(d.submitted || 0), cint(d.already_submitted || 0), cint(d.failed || 0)
-						]),
-						indicator: cint(d.failed || 0) ? "orange" : "green",
-					});
-					frm.reload_doc();
-				}
-			});
-		}
-	);
 }
 
 function _mis_build_so_items_map(rows) {
@@ -527,10 +361,97 @@ function _mis_show_create_dn_dialog(frm) {
 	});
 }
 
-function _mis_show_create_si_dialog(frm) {
-	const eligible = (frm.doc.mis_delivery_notes || []).filter(
+// ── Deliveries & Invoices (read-only, #1987) ────────────────────────────────
+// The Delivery Notes and Sales Invoices point at the MIS; the MIS keeps no link to them.
+// The overview is read on every refresh and nothing of it is stored on the MIS.
+
+function _mis_dn_to_bill(frm) {
+	return ((frm.__mis_deliveries && frm.__mis_deliveries.rows) || []).filter(
 		r => r.delivery_note && r.status === "To Bill"
 	);
+}
+
+function _mis_link(doctype, name) {
+	if (!name) return "";
+	const route = frappe.router.slug(doctype);
+	return `<a href="/app/${route}/${encodeURIComponent(name)}">${_mis_escape(name)}</a>`;
+}
+
+function _mis_status_pill(status) {
+	if (!status) return "";
+	const colour = {
+		"Draft": "gray", "To Bill": "orange", "Completed": "green", "Paid": "green",
+		"Cancelled": "red", "Overdue": "red", "Unpaid": "orange", "Closed": "green",
+		"Return Issued": "gray", "Credit Note Issued": "gray", "Return": "gray",
+	}[status] || "blue";
+	return `<span class="indicator-pill ${colour}">${_mis_escape(__(status))}</span>`;
+}
+
+function _mis_render_deliveries(frm) {
+	const field = frm.fields_dict.deliveries_html;
+	if (!field) return;
+	const data = frm.__mis_deliveries;
+	if (!data) {
+		field.$wrapper.html("");
+		return;
+	}
+	if (!data.rows.length) {
+		field.$wrapper.html(`<div class="text-muted small">${__("No Delivery Notes yet.")}</div>`);
+		return;
+	}
+	const rows = data.rows.map(r => {
+		const cancelled = cint(r.docstatus) === 2;
+		const invoices = (r.sales_invoices || [])
+			.map(si => `${_mis_link("Sales Invoice", si.sales_invoice)} ${_mis_status_pill(si.status)}`)
+			.join("<br>") || "—";
+		return `<tr${cancelled ? ' class="text-muted"' : ""}>
+			<td${cancelled ? ' style="text-decoration:line-through;"' : ""}>${_mis_link("Delivery Note", r.delivery_note)}</td>
+			<td>${_mis_link("Sales Order", r.sales_order)}</td>
+			<td>${_mis_escape(r.project || "")}</td>
+			<td class="text-right">${_mis_number(r.hours)}</td>
+			<td>${_mis_status_pill(r.status)}</td>
+			<td class="text-right">${_mis_escape(format_currency(r.grand_total))}</td>
+			<td>${invoices}</td>
+		</tr>`;
+	}).join("");
+	field.$wrapper.html(`
+		<div class="table-responsive"><table class="table table-bordered" style="margin-bottom:6px;">
+			<thead><tr>
+				<th>${__("Delivery Note")}</th>
+				<th>${__("Sales Order")}</th>
+				<th>${__("Project")}</th>
+				<th class="text-right">${__("Hours")}</th>
+				<th>${__("Status")}</th>
+				<th class="text-right">${__("Grand Total")}</th>
+				<th>${__("Sales Invoice")}</th>
+			</tr></thead>
+			<tbody>${rows}</tbody>
+		</table></div>
+		<div class="text-muted small">
+			${__("Delivered {0} h of {1} h billable", [_mis_number(data.delivered_hours), _mis_number(data.billable_hours)])}
+			&nbsp;·&nbsp;
+			${__("Not yet invoiced {0} h", [_mis_number(data.not_invoiced_hours)])}
+		</div>
+	`);
+}
+
+function _mis_load_deliveries(frm) {
+	if (frm.is_new()) {
+		frm.__mis_deliveries = null;
+		_mis_render_deliveries(frm);
+		return Promise.resolve();
+	}
+	return frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_deliveries_overview",
+		args: { docname: frm.doc.name },
+	}).then(r => {
+		frm.__mis_deliveries = r.message || { rows: [] };
+		_mis_render_deliveries(frm);
+	});
+}
+
+function _mis_show_create_si_dialog(frm) {
+	const eligible = _mis_dn_to_bill(frm);
 	if (!eligible.length) {
 		frappe.show_alert({ message: __("No Delivery Notes available for invoicing."), indicator: "orange" });
 		return;
@@ -933,14 +854,13 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 		// field removed — handler kept as no-op for compatibility
 	},
 	refresh: function(frm) {
-		_mis_setup_grid_action_buttons(frm);
+		const deliveries_loaded = _mis_load_deliveries(frm);
 		if (frm.is_new()) {
 			const d = new Date();
 			const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 			const defaults = {
 				year: String(d.getFullYear()),
 				month: months[d.getMonth()],
-				mis_delivery_notes: [],
 				delivery_note_item: [],
 				timesheets_table: [],
 				total_hours: 0,
@@ -960,14 +880,13 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 					_mis_show_create_dn_dialog(frm);
 				}, __("Create"));
 			}
-			const has_billable_dns = not_closed && (frm.doc.mis_delivery_notes || []).some(
-				r => r.delivery_note && r.status === "To Bill"
-			);
-			if (has_billable_dns) {
-				frm.add_custom_button(__("Sales Invoice"), function() {
-					_mis_show_create_si_dialog(frm);
-				}, __("Create"));
-			}
+			deliveries_loaded.then(() => {
+				if (not_closed && _mis_dn_to_bill(frm).length) {
+					frm.add_custom_button(__("Sales Invoice"), function() {
+						_mis_show_create_si_dialog(frm);
+					}, __("Create"));
+				}
+			});
 		}
 		_mis_maybe_open_timesheet_approval_dialog(frm);
 	},
