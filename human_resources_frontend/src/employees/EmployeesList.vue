@@ -22,7 +22,7 @@
 						v-if="data.can_see_sick_days"
 						label="Ø sick days this year"
 						:value="data.sick_types_configured ? formatNumber(averageSickDays) : '—'"
-						:hint="data.sick_types_configured ? 'Approved sick leave, HR Manager only' : 'Choose the sick leave types in phamos Settings'"
+						:hint="data.sick_types_configured ? 'Approved sick leave, HR Manager only' : 'Choose the sick leave types in Cockpit Settings'"
 					/>
 				</Sensitive>
 
@@ -198,7 +198,7 @@
 										<Sensitive v-else class="font-medium text-ink-amber-3">{{ row.pending_count }}</Sensitive>
 									</td>
 									<td v-if="data.can_see_sick_days" :class="[bodyCell, groupCell, 'text-right tabular-nums text-ink-gray-8']">
-										<Empty v-if="!data.sick_types_configured" title="Choose the sick leave types in phamos Settings → Human Resources Cockpit" />
+										<Empty v-if="!data.sick_types_configured" title="Choose the sick leave types in Cockpit Settings → Human Resources Cockpit" />
 										<Empty v-else-if="!row.sick_days" />
 										<Sensitive v-else>{{ formatNumber(row.sick_days) }}</Sensitive>
 									</td>

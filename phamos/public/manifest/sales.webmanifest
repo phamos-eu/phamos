@@ -7,7 +7,7 @@
 	"scope": "/sales-cockpit",
 	"display": "standalone",
 	"background_color": "#f8f8f8",
-	"theme_color": "#f8f8f8",
+	"theme_color": "#c2410c",
 	"icons": [
 		{
 			"src": "/assets/phamos/manifest/sales-icon-192.png",

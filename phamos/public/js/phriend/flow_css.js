@@ -114,6 +114,9 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-sha
 	border: 1px solid var(--ph-border-strong); border-radius: 8px; background: transparent; color: var(--ph-text); cursor: pointer; }
 .tool:hover { background: var(--ph-surface); }
 .tool.on { background: var(--ph-chip); border-color: var(--ph-chip-border); color: var(--ph-chip-text); }
+/* Delete waits for a selected drawing */
+.tool:disabled { opacity: 0.4; cursor: default; }
+.tool:disabled:hover { background: transparent; }
 /* the screenshot area keeps one height whether loading, failed or shown (UX review) */
 .panel { --ph-shot-h: min(52vh, 460px); }
 .annotator.off { opacity: 0.25; pointer-events: none; }

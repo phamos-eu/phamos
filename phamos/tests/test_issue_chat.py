@@ -91,8 +91,13 @@ class TestIssueChat(FrappeTestCase):
 		# Restored in tearDown: adding the Raven index (DDL) commits the open transaction, so the
 		# rollback alone left the site's chat pointed at the test workspace.
 		self._settings = {
-			field: frappe.db.get_single_value("phamos Settings", field)
-			for field in ("enable_issue_chat", "issue_chat_workspace", "personal_ideas_show_author")
+			(doctype, field): frappe.db.get_single_value(doctype, field)
+			for doctype, field in (
+				("phamos Settings", "enable_issue_chat"),
+				("phamos Settings", "issue_chat_workspace"),
+				("Cockpit Settings", "personal_ideas_show_author"),
+				("Cockpit Settings", "sales_department"),
+			)
 		}
 		if not frappe.db.exists("Raven Workspace", WORKSPACE):
 			frappe.get_doc(
@@ -111,13 +116,13 @@ class TestIssueChat(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
 		changed = {
-			field: value
-			for field, value in self._settings.items()
-			if frappe.db.get_single_value("phamos Settings", field) != value
+			key: value
+			for key, value in self._settings.items()
+			if frappe.db.get_single_value(*key) != value
 		}
 		if changed:
-			for field, value in changed.items():
-				frappe.db.set_single_value("phamos Settings", field, value)
+			for (doctype, field), value in changed.items():
+				frappe.db.set_single_value(doctype, field, value)
 			frappe.db.commit()  # nosemgrep: undoing what a DDL statement committed
 
 	def _assign(self, user, doctype="Issue", name=None):
@@ -544,7 +549,7 @@ class TestIssueChat(FrappeTestCase):
 		department = frappe.get_all("Department", pluck="name", limit=1)
 		if not department or not frappe.get_meta("Issue").has_field("custom_department"):
 			return
-		frappe.db.set_single_value("phamos Settings", "sales_department", department[0])
+		frappe.db.set_single_value("Cockpit Settings", "sales_department", department[0])
 		frappe.db.set_value("Issue", self.issue.name, "custom_department", department[0])
 		self.assertEqual(
 			issue_chat.document_link("Issue", self.issue.name),
@@ -674,13 +679,13 @@ class TestIssueChat(FrappeTestCase):
 		self.assertIn(f'href="/personal-cockpit/ideas/vote/{idea["name"]}"', intro.text)
 
 	def test_author_joins_a_colleagues_idea_chat_only_while_authors_are_shown(self):
-		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 1)
+		frappe.db.set_single_value("Cockpit Settings", "personal_ideas_show_author", 1)
 		shown = self._idea()
 		frappe.set_user(LATECOMER)
 		self.assertEqual(_members(pc.ensure_idea_chat(shown["name"])["channel_id"]), {LATECOMER, OWNER})
 
 		frappe.set_user(OWNER)
-		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 0)
+		frappe.db.set_single_value("Cockpit Settings", "personal_ideas_show_author", 0)
 		hidden = self._idea()
 		frappe.set_user(LATECOMER)
 		channel_id = pc.ensure_idea_chat(hidden["name"])["channel_id"]

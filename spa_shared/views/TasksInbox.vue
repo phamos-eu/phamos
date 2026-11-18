@@ -26,7 +26,9 @@
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
 				@created="onTaskCreated"
-			/>
+			>
+				<template #toolbar><slot name="gantt-toolbar" /></template>
+			</TaskGantt>
 		</section>
 
 		<aside
@@ -100,7 +102,7 @@ async function loadOptions() {
 		const needsDepartment = Boolean(spaConfig.departmentField)
 		const dept = needsDepartment ? formOptions.value[spaConfig.departmentField] : ""
 		configError.value =
-			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in phamos Settings.` : ""
+			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in Cockpit Settings.` : ""
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}

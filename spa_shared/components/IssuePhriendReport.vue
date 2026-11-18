@@ -43,6 +43,10 @@
 			{{ __("Reported by {0}", [report.reported_by_name || report.reported_by || "—"]) }}
 			· {{ formatDatetime(report.reported_at) }}
 		</p>
+		<p v-if="report.source_system" class="flex items-center gap-1.5 text-xs text-ink-gray-7">
+			<FeatherIcon name="server" class="h-3.5 w-3.5 flex-shrink-0" />
+			<span class="truncate">{{ __("Reported on {0}", [report.source_system]) }}</span>
+		</p>
 
 		<div class="space-y-0.5">
 			<a

@@ -1119,6 +1119,7 @@ Could not load the project,Das Projekt konnte nicht geladen werden
 Please pick a project.,Bitte wählen Sie ein Projekt.
 This project needs a task.,Für dieses Projekt ist eine Aufgabe erforderlich.
 Minimum expected time is 15 minutes.,Die geplante Zeit beträgt mindestens 15 Minuten.
+Please complete the start time.,Bitte vervollständigen Sie die Startzeit.
 Please describe the goal.,Bitte beschreiben Sie das Ziel.
 Could not start the timer,Der Timer konnte nicht gestartet werden
 Stop timer,Timer stoppen
@@ -1986,6 +1987,9 @@ Improved,Verbessert
 Declined,Gesunken
 Same month a year earlier,Gleicher Monat im Vorjahr
 Lighter bar: the same month a year earlier,Hellerer Balken: gleicher Monat im Vorjahr
+Side by side,Nebeneinander
+Stacked,Gestapelt
+Chart view,Diagrammansicht
 No source,Ohne Quelle
 12-month average,12-Monats-Durchschnitt
 There is no complete month of leads yet.,Es gibt noch keinen vollständigen Monat mit Interessenten.
@@ -2086,6 +2090,7 @@ unknown error,unbekannter Fehler
 with screenshot,mit Screenshot
 {0} open Phriend reports for this page,{0} offene Phriend-Meldungen zu dieser Seite
 Bug,Fehler
+Improvement,Verbesserung
 Question,Frage
 Something is broken,Etwas funktioniert nicht
 It could be better,Es könnte besser sein
@@ -2100,6 +2105,8 @@ Reload,Neu laden
 Next,Weiter
 Black out private data,Private Daten schwärzen
 Redacted,Geschwärzt
+Delete,Löschen
+Del,Entf
 "The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
 not a PNG or JPEG image,kein PNG- oder JPEG-Bild
 larger than {0} MB,größer als {0} MB
@@ -2201,3 +2208,103 @@ Add note,Notiz hinzufügen
 1 note,1 Notiz
 {0} notes,{0} Notizen
 last {0},zuletzt {0}
+Cockpit Settings,Cockpit-Einstellungen
+{0} Department is not configured in Cockpit Settings.,Die Abteilung für {0} ist in den Cockpit-Einstellungen nicht festgelegt.
+Task department must match {0} department in Cockpit Settings.,Die Abteilung der Aufgabe muss der Abteilung für {0} in den Cockpit-Einstellungen entsprechen.
+Colour,Farbe
+Edge Glow,Randleuchten
+Off,Aus
+Always,Immer
+On focus,Beim Wechseln
+Always + on focus,Immer + beim Wechseln
+"Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.","Farbe der Titelleiste und des Randleuchtens im Cockpit-Fenster, damit sich die Cockpits beim Fensterwechsel unterscheiden lassen. Leer: neutrale Titelleiste, kein Leuchten."
+"A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.","Ein sanftes Leuchten in der Cockpit-Farbe an den Fensterrändern. Beim Wechseln: leuchtet auf, wenn Sie zum Fenster wechseln, und verblasst dann."
+Open Cockpit,Cockpit öffnen
+Glow from Top,Leuchten von oben
+Glow from Left,Leuchten von links
+Glow from Bottom,Leuchten von unten
+Glow from Right,Leuchten von rechts
+Breathe like Phriend,Atmen wie Phriend
+"The glow fades in and out ever so slightly, in Phriend's breathing rhythm.","Das Leuchten wird kaum merklich stärker und schwächer, im Atemrhythmus von Phriend."
+Target System,Zielsystem
+Target URL,Ziel-URL
+This System's Name,Name dieses Systems
+Target API Key,API-Schlüssel des Zielsystems
+Target API Secret,API-Geheimnis des Zielsystems
+"Set this on a develop or test system: its Phriend reports become Issues on the target system, not here. Empty: reports stay on this system.","Auf einem Entwicklungs- oder Testsystem setzen: Seine Phriend-Meldungen werden Anfragen auf dem Zielsystem, nicht hier. Leer: Meldungen bleiben auf diesem System."
+"The main system, e.g. https://erp.example.com","Das Hauptsystem, z. B. https://erp.example.com"
+How the target's Issues name this system. Empty: the site name.,So nennen die Anfragen im Zielsystem dieses System. Leer: der Site-Name.
+API key of a user with the role Phriend Remote on the target system,API-Schlüssel eines Benutzers mit der Rolle Phriend Remote im Zielsystem
+Reported On System,Gemeldet auf System
+Reported On System URL,URL des meldenden Systems
+Set when the report came from another system (a develop or test system with this one as its target),"Gesetzt, wenn die Meldung von einem anderen System kam (ein Entwicklungs- oder Testsystem mit diesem als Ziel)"
+"Target URL: only the address of the system, like https://erp.example.com","Ziel-URL: nur die Adresse des Systems, z. B. https://erp.example.com"
+Target URL must start with https://,Die Ziel-URL muss mit https:// beginnen
+The target system sent an unexpected answer,Das Zielsystem hat unerwartet geantwortet
+Phriend is switched off on the target system,Phriend ist im Zielsystem ausgeschaltet
+"Set the target system's URL, API key and API secret in Phriend Settings","Bitte URL, API-Schlüssel und API-Geheimnis des Zielsystems in den Phriend-Einstellungen eintragen"
+The target system {0} can't be reached,Das Zielsystem {0} ist nicht erreichbar
+The target system refused the API key: check the key and secret in Phriend Settings and that the user on the target system has the role {0},Das Zielsystem hat den API-Schlüssel abgelehnt: Bitte Schlüssel und Geheimnis in den Phriend-Einstellungen prüfen und ob der Benutzer im Zielsystem die Rolle {0} hat
+The target system answered with an error ({0}): {1},Das Zielsystem hat mit einem Fehler geantwortet ({0}): {1}
+another system,ein anderes System
+The sending system did not say its address,Das sendende System hat seine Adresse nicht mitgeschickt
+Only for the role {0},Nur für die Rolle {0}
+Reported via Phriend by {0} on {1},Über Phriend gemeldet von {0} auf {1}
+Test Target Connection,Verbindung zum Zielsystem testen
+Asking the target system...,Frage das Zielsystem...
+Target connection works,Verbindung zum Zielsystem funktioniert
+"Reports go to {0}, as {1}.","Meldungen gehen an {0}, als {1}."
+Reported on {0},Gemeldet auf {0}
+The target system redirects to {0}: set that address as the Target URL in Phriend Settings,Das Zielsystem leitet nach {0} weiter: Bitte diese Adresse als Ziel-URL in den Phriend-Einstellungen eintragen
+GitLab Issues,GitLab-Issues
+GitLab issues,GitLab-Issues
+Create GitLab Issue,GitLab-Issue anlegen
+Open in GitLab,In GitLab öffnen
+Open {0} in GitLab,{0} in GitLab öffnen
+Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
+GitLab issue {0} created,GitLab-Issue {0} angelegt
+GitLab issue not linked,GitLab-Issue nicht verknüpft
+"The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.","Das GitLab-Issue wurde angelegt, ist aber nicht mit dieser Anfrage verknüpft. Meist ist sein Projekt noch nicht in ERPNext: Bitte vor dem nächsten „Sync Projects“ in {0} ausführen. Sonst siehe {1}."
+General Management,Geschäftsführung
+General Management Cockpit,Geschäftsführung-Cockpit
+General Management Department,Abteilung Geschäftsführung
+General Management Timesheet Project,Zeiterfassungsprojekt Geschäftsführung
+You do not have permission to access the General Management Cockpit,Sie haben keine Berechtigung für das Geschäftsführung-Cockpit
+Own department,Eigene Abteilung
+All departments,Alle Abteilungen
+Open in {0} Cockpit,Im {0}-Cockpit öffnen
+Dates,Zeitraum
+This task is not in a department with a cockpit.,Diese Aufgabe gehört zu keiner Abteilung mit Cockpit.
+Appointments,Termine
+New appointment,Neuer Termin
+Edit appointment,Termin bearbeiten
+Cancel appointment,Termin absagen
+This cancels the invite for all attendees,Damit wird die Einladung für alle Teilnehmenden abgesagt
+Keep it,Behalten
+Show past,Vergangene anzeigen
+No upcoming appointments,Keine anstehenden Termine
+{0} attendees,{0} Teilnehmende
+Not sent,Nicht gesendet
+Sent from,Gesendet von
+Pick a mailbox…,Postfach wählen…
+Save and send,Speichern und senden
+Attendees,Teilnehmende
+Required,Pflicht
+Nobody yet,Noch niemand
+Drag people here,Personen hierher ziehen
+Search people…,Personen suchen…
+Add everyone in {0},Alle aus {0} hinzufügen
+No people found,Keine Personen gefunden
+Remove {0},{0} entfernen
+Until,Bis
+No department,Keine Abteilung
+Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.
+Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
+Remove everyone in {0},Alle aus {0} entfernen
+The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
+Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
+Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
+Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
+Open in Cockpit,Im Cockpit öffnen
+Project Management,Projektmanagement
+Software Development,Softwareentwicklung

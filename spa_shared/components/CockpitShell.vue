@@ -23,6 +23,33 @@
 		</div>
 		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
+		<!-- The cockpit colour glowing in from the chosen window edges (#1933); never catches clicks. -->
+		<div v-if="glow" aria-hidden="true" class="cockpit-glow" :style="glow.style">
+			<div
+				v-if="glow.steady"
+				class="cockpit-glow__layer cockpit-glow__layer--steady"
+				:class="{ 'is-breathing': glow.breathing }"
+			>
+				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
+				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
+			</div>
+			<div
+				v-if="glow.pulse"
+				class="cockpit-glow__layer cockpit-glow__layer--pulse"
+				:class="{ 'is-on': glow.pulsing.value }"
+			>
+				<span v-for="edge in glow.frame.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
+				<span
+					v-for="corner in glow.frame.corners"
+					:key="corner"
+					:class="`cockpit-glow__corner cockpit-glow__corner--${corner}`"
+				/>
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -32,6 +59,7 @@ import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 import { mountPhriend } from "@spa/phriend.js"
+import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
 
 const props = defineProps({
 	title: { type: String, default: "" },
@@ -41,5 +69,6 @@ const props = defineProps({
 // Phriend, the report-a-problem ball, in every cockpit (#1900). The page title the shell shows
 // becomes part of "Reported on"; on record pages the record itself is named instead.
 const router = useRouter()
+const glow = useCockpitGlow()
 onMounted(() => mountPhriend(router, () => props.title))
 </script>

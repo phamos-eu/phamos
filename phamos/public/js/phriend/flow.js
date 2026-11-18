@@ -27,7 +27,7 @@ const ICON_NO_SHOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none
 // [value stored on the Issue, label, hint]
 const TYPES = [
 	["Bug", "Bug", "Something is broken"],
-	["Idea", "Idea", "It could be better"],
+	["Improvement", "Improvement", "It could be better"], // not "Idea": that reads as a cockpit Idea (#1924)
 	["Question", "Question", "I'm not sure how"],
 	["Other", "Something else", "None of these"],
 ];
@@ -245,7 +245,7 @@ class Flow {
 			e.preventDefault();
 			e.stopPropagation();
 			if (asking) this.restore_footer(); // Escape means "Keep editing" there
-			else this.close();
+			else if (!this.shot_selection_cleared()) this.close(); // a first Escape only drops the selection
 		} else if (!asking && this.step === STEP.shot && this.shot_key(e)) {
 			e.preventDefault();
 		} else if (!asking && this.step === STEP.kind && this.chip_key(e)) {
@@ -261,7 +261,13 @@ class Flow {
 		}
 	}
 
-	// On the screenshot step: Cmd/Ctrl+Z undoes, a letter picks a tool (shown in the tooltips).
+	// True when Escape on the screenshot step dropped a selected drawing
+	shot_selection_cleared() {
+		return this.step === STEP.shot && Boolean(this.annotator) && this.annotator.clear_selection();
+	}
+
+	// On the screenshot step: Cmd/Ctrl+Z undoes, a letter picks a tool (shown in the tooltips),
+	// Delete or Backspace removes the selected drawing, the arrow keys nudge it (Shift: ten times).
 	// Not while typing on the screenshot. True when the key was used.
 	shot_key(e) {
 		const a = this.annotator;
@@ -272,6 +278,8 @@ class Flow {
 			return true;
 		}
 		if (e.ctrlKey || e.metaKey || e.altKey) return false;
+		if (e.key === "Delete" || e.key === "Backspace") return a.delete_selected();
+		if (String(e.key).startsWith("Arrow")) return a.nudge(e.key, e.shiftKey);
 		return a.select_tool_by_key(String(e.key).toLowerCase());
 	}
 

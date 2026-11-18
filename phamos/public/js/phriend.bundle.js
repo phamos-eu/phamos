@@ -126,8 +126,9 @@ const desk = {
 	page_context,
 	load_flow,
 	issue_url: (name) => `/app/issue/${encodeURIComponent(name)}`,
+	// with a target system the reports are Issues there; the ones here would mislead
 	count_reports: () =>
-		frappe.model.can_read(REPORT_DOCTYPE)
+		frappe.model.can_read(REPORT_DOCTYPE) && !(frappe.boot.phriend && frappe.boot.phriend.has_target)
 			? frappe.db.count(REPORT_DOCTYPE, { filters: badge_filters() })
 			: Promise.resolve(0),
 	// in a new tab, like the cockpits, so a report in progress isn't lost
