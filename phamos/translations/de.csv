@@ -2307,3 +2307,11 @@ Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von 
 Open in Cockpit,Im Cockpit öffnen
 Project Management,Projektmanagement
 Software Development,Softwareentwicklung
+Fetch e-mails,E-Mails abrufen
+Fetching e-mails…,E-Mails werden abgerufen…
+{0} new receipts from e-mail,{0} neue Belege aus E-Mails
+No new e-mails,Keine neuen E-Mails
+E-mails are already being fetched,E-Mails werden bereits abgerufen
+No e-mail account,Kein E-Mail-Konto
+No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
+Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
