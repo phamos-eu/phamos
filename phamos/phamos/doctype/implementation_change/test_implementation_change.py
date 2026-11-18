@@ -64,7 +64,8 @@ class TestImplementationChange(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.implementation = make_implementation()
+		# reload: inserting an implementation updates it again in hooks
+		self.implementation = frappe.get_doc("Implementation", make_implementation().name)
 		self.implementation.show_on_customer_portal = 1
 		self.implementation.append(
 			"stakeholders", {"contact": self.contact, "full_name": "IC Customer", "stakeholder_organisation": "Customer"}
