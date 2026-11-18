@@ -203,6 +203,27 @@ class TestPersonalLeave(FrappeTestCase):
 			with self.assertRaises(frappe.PermissionError):
 				personal_leave.withdraw_leave(name)
 
+	def test_the_list_works_on_a_site_without_the_sync_error_field(self):
+		"""version-15 has the leave page but not #1558's Event field; asking for it broke the list."""
+		row = self._apply()
+		real_get_all = frappe.get_all
+		asked = []
+
+		def get_all(doctype, *args, **kwargs):
+			if doctype == "Event":
+				asked.extend(kwargs.get("fields") or [])
+			return real_get_all(doctype, *args, **kwargs)
+
+		with patch.object(personal_leave, "_has_sync_error_field", return_value=False), patch.object(
+			personal_leave.frappe, "get_all", side_effect=get_all
+		):
+			leave = personal_leave.get_my_leave()["leave"]
+		self.assertNotIn(personal_leave.SYNC_ERROR_FIELD, asked)
+		mine = next(r for r in leave if r["name"] == row["name"])
+		# version-15 keeps no leave Events (#1558 is not here), so the state is "none"
+		self.assertIn(mine["calendar"]["state"], ("synced", "pending", "none"))
+		self.assertEqual(mine["calendar"]["error"], "")
+
 	def test_withdraw_deletes_my_open_leave(self):
 		row = self._apply()
 		self.assertEqual(personal_leave.withdraw_leave(row["name"]), {"name": row["name"], "withdrawn": True})
