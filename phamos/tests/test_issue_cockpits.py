@@ -161,7 +161,10 @@ class TestIssueCockpits(FrappeTestCase):
 	def test_user_in_no_team_gets_no_team_entry_and_no_error(self):
 		# Administrator passes every check_app_permission but may be in no team.
 		doc = _issue(custom_team="Team Blue")
+		frappe.local.message_log = []
 		self.assertEqual(
 			self._fit(doc, assigned=True),
 			[{"label": "Personal", "url": "/personal-cockpit/issues/list/ISS-TEST-1957"}],
 		)
+		# No "You are not a member of any team." popup goes back to Desk.
+		self.assertEqual(frappe.local.message_log, [])

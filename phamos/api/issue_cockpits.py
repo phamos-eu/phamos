@@ -51,12 +51,15 @@ def _rank(config, doc):
 
 
 def _in_scope(config, doc):
-	"""dc._issue_in_scope, but a cockpit without context for the user (the Team Cockpit for
-	someone in no team, Administrator included) does not fit instead of failing the request."""
-	try:
-		return dc._issue_in_scope(config, doc)
-	except frappe.PermissionError:
+	"""dc._issue_in_scope, except that the Team Cockpit does not fit a user in no team.
+
+	Administrator passes every check_app_permission but may be in no team; asking first keeps
+	teams.require_active_team from throwing, which would also queue a Desk popup
+	("You are not a member of any team.") through frappe.throw's message log.
+	"""
+	if config.is_team and not teams.active_team():
 		return False
+	return dc._issue_in_scope(config, doc)
 
 
 def _short_label(config):
