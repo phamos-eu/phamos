@@ -2308,3 +2308,5 @@ Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von 
 Open in Cockpit,Im Cockpit öffnen
 Project Management,Projektmanagement
 Software Development,Softwareentwicklung
+The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
+"The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
