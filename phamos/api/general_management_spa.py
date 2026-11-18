@@ -538,6 +538,8 @@ def _serialize_appointment(row):
 			"optional_attendees": _split_emails(row.optional_attendees),
 			"synced": bool(frappe.utils.cint(row.mailcow_synced)),
 			"sync_error": _sync_error_line(row.mailcow_last_error),
+			# a background job is sending the invite now; the dialog doesn't allow changes meanwhile
+			"sending": team_daily_schedule.row_is_being_sent(row),
 		}
 	)
 	return data
@@ -575,6 +577,13 @@ def _department_row(department_doc, name):
 	if not row:
 		frappe.throw(_("Appointment {0} is not in the events of {1}.").format(name, department_doc.name))
 	return row
+
+
+def _check_not_being_sent(row):
+	"""Refuse to change or cancel an appointment whose invite a background job is still sending.
+	A second job would send the same version and could mark the first one failed (#1949)."""
+	if team_daily_schedule.row_is_being_sent(row):
+		frappe.throw(_("The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it."))
 
 
 @frappe.whitelist()
@@ -672,6 +681,7 @@ def save_appointment(appointment):
 	department_doc = frappe.get_doc("Department", _appointments_department())
 	if data.name:
 		row = _department_row(department_doc, data.name)
+		_check_not_being_sent(row)
 		row.update(values)
 	else:
 		row = department_doc.append(EVENT_TABLE, values)
@@ -688,7 +698,7 @@ def save_appointment(appointment):
 def delete_appointment(name):
 	"""Remove a company appointment; the Mailcow sync cancels its invite."""
 	department_doc = frappe.get_doc("Department", _appointments_department())
-	_department_row(department_doc, name)
+	_check_not_being_sent(_department_row(department_doc, name))
 	department_doc.set(EVENT_TABLE, [row for row in department_doc.get(EVENT_TABLE) if row.name != name])
 	_save_department_events(department_doc)
 	return {"deleted": name}

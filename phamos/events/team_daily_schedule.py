@@ -134,19 +134,27 @@ def _truncate_error(error_text: str, limit: int = 1400) -> str:
     return txt if len(txt) <= limit else "…" + txt[-(limit - 1):]
 
 
-# (connect, read) seconds for the invite PUT and DELETE. The read part is long because SOGo answers
-# only after delivering to every attendee (15 people timed out at 30 s on production, #1949).
+# (connect, read) seconds for the invite PUT and DELETE in the background job. The read part is
+# long because SOGo answers only after delivering to every attendee (15 people timed out at 30 s
+# on production, #1949).
 PUT_TIMEOUT = (10, 120)
+# The same calls inside a web request (Desk saves and deletes of a Team or Department): kept well
+# under the web server's request timeout. A slow Mailcow still finishes the send on its own; the
+# row then says "not confirmed yet" instead of holding the request for minutes.
+REQUEST_TIMEOUT = (10, 30)
 # SOGo can take longer still: on production a team-wide invite timed out at 120 s and was in the
-# calendar a few minutes later (#1949). After a read timeout the job keeps looking for the result
-# that long, every VERIFY_INTERVAL seconds, before it calls the send failed; calling it failed
-# too early makes the user save again and every attendee gets the invite twice.
+# calendar a few minutes later (#1949). After a read timeout the background job keeps looking for
+# the result that long, every VERIFY_INTERVAL seconds, before it calls the send failed; calling it
+# failed too early makes the user save again and every attendee gets the invite twice.
 VERIFY_WINDOW = 300
 VERIFY_INTERVAL = 20
 VERIFY_GET_TIMEOUT = (10, 15)
 # Upper bound for one step in the background job: the PUT, then the wait above with its last GET.
 # The sync runs in a background job, so nobody waits on it.
-SYNC_JOB_TIMEOUT_PER_ROW = PUT_TIMEOUT[0] + PUT_TIMEOUT[1] + VERIFY_WINDOW + VERIFY_INTERVAL + sum(VERIFY_GET_TIMEOUT)
+SYNC_JOB_TIMEOUT_PER_CALL = PUT_TIMEOUT[0] + PUT_TIMEOUT[1] + VERIFY_WINDOW + VERIFY_INTERVAL + sum(VERIFY_GET_TIMEOUT)
+# How long a row can stay "being sent" (row_is_being_sent): two calls (a row moved to another
+# mailbox), plus time for the job to start behind others in its queue.
+MAX_ROW_SEND_SECONDS = 2 * SYNC_JOB_TIMEOUT_PER_CALL + 300
 
 
 def _wait_for(check) -> bool:
@@ -439,8 +447,21 @@ def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
     )
 
 
-def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str | None]:
-    """Direct upsert in Mailcow (without If-None-Match: * so updates work)."""
+def _not_found_in_time(what: str, mailbox_email: str, timeout: tuple, wait: bool, error, advice: str = "") -> str:
+    """The message after a read timeout whose result did not show up (see _put_ics_upsert).
+    what: the end of "…, and <what> <mailbox>'s calendar", e.g. "the invite is not in"."""
+    head = f"Mailcow did not answer within {timeout[1]} s, and {what} {mailbox_email}'s calendar"
+    when = f"{VERIFY_WINDOW // 60} minutes later." if wait else "yet. Mailcow may still be working on it."
+    return " ".join(part for part in (f"{head} {when}", advice, f"({type(error).__name__})") if part)
+
+
+def _put_ics_upsert(uid: str, ics: str, mailbox_email: str, wait: bool = False) -> tuple[bool, str | None]:
+    """Direct upsert in Mailcow (without If-None-Match: * so updates work).
+
+    wait: True only in the background job. It allows the long PUT_TIMEOUT and, after a read
+    timeout, waiting up to VERIFY_WINDOW for the invite to show up. Inside a web request
+    (False) the call is short and looks for the invite once.
+    """
     s = settings()
     if not mailbox_email:
         return False, "No mailbox email resolved"
@@ -450,26 +471,33 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
+    timeout = PUT_TIMEOUT if wait else REQUEST_TIMEOUT
     try:
         r = requests.put(
             url,
             data=ics.encode("utf-8"),
             headers={"Content-Type": "text/calendar"},
             auth=(mailbox_email, pw),
-            timeout=PUT_TIMEOUT,
+            timeout=timeout,
         )
     except requests.ReadTimeout as e:
         # A connect timeout never reached the server and falls through to RequestException.
         # SOGo answers only after it has written the event into every attendee's calendar and
         # mailed their invites; with a whole team that can outlast the wait, while the save
-        # itself goes through, sometimes minutes later. Wait for this version to arrive before
-        # calling it failed (#1949).
-        if _wait_for(lambda: _stored_version_matches(url, ics, (mailbox_email, pw))):
+        # itself goes through, sometimes minutes later. Look for this version before calling it
+        # failed: a false failure makes the user save again and mails everyone twice (#1949).
+        def stored():
+            return _stored_version_matches(url, ics, (mailbox_email, pw))
+
+        if _wait_for(stored) if wait else stored():
             return True, None
-        return False, (
-            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the invite was still not in "
-            f"{mailbox_email}'s calendar {VERIFY_WINDOW // 60} minutes later. Look there before saving "
-            f"again: saving again sends the invite again. ({type(e).__name__})"
+        return False, _not_found_in_time(
+            "the invite was still not in" if wait else "the invite is not in",
+            mailbox_email,
+            timeout,
+            wait,
+            e,
+            advice="Look there before saving again: saving again sends the invite again.",
         )
     except requests.RequestException as e:
         return False, _request_error_message("PUT", e)
@@ -479,7 +507,8 @@ def _put_ics_upsert(uid: str, ics: str, mailbox_email: str) -> tuple[bool, str |
     return True, None
 
 
-def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | None]:
+def _delete_uid_for_mailbox(uid: str, mailbox_email: str, wait: bool = False) -> tuple[bool, str | None]:
+    """Cancel the invite in Mailcow. wait: as in _put_ics_upsert (True only in the background job)."""
     if not mailbox_email:
         return False, "No mailbox email resolved"
 
@@ -489,16 +518,18 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
         return False, f"No DAV app password for {mailbox_email}"
 
     url = calendar_item_url(s.base_url, mailbox_email, uid)
+    timeout = PUT_TIMEOUT if wait else REQUEST_TIMEOUT
     try:
-        r = requests.delete(url, auth=(mailbox_email, pw), timeout=PUT_TIMEOUT)
+        r = requests.delete(url, auth=(mailbox_email, pw), timeout=timeout)
     except requests.ReadTimeout as e:
         # Cancelling mails every attendee too, so it is as slow as the invite (see the PUT above).
-        if _wait_for(lambda: _stored_event_gone(url, (mailbox_email, pw))):
+        def gone():
+            return _stored_event_gone(url, (mailbox_email, pw))
+
+        if _wait_for(gone) if wait else gone():
             return True, None
-        return False, (
-            f"Mailcow did not answer within {PUT_TIMEOUT[1]} s, and the event was still in "
-            f"{mailbox_email}'s calendar {VERIFY_WINDOW // 60} minutes later. ({type(e).__name__})"
-        )
+        what = "the event was still in" if wait else "the event is still in"
+        return False, _not_found_in_time(what, mailbox_email, timeout, wait, e)
     except requests.RequestException as e:
         return False, _request_error_message("DELETE", e)
     if r.status_code not in (200, 204, 404):
@@ -507,11 +538,11 @@ def _delete_uid_for_mailbox(uid: str, mailbox_email: str) -> tuple[bool, str | N
     return True, None
 
 
-def _sync_row_to_mailcow(doc, row, mailbox_email: str):
+def _sync_row_to_mailcow(doc, row, mailbox_email: str, wait: bool = False):
     uid = (row.get("mailcow_uid") or "").strip() or _row_uid(row.name)
     seq = int(row.get("mailcow_seq") or 0) + 1
     ics = _build_ics(row, uid, seq, organizer=mailbox_email)
-    ok, error = _put_ics_upsert(uid, ics, mailbox_email=mailbox_email)
+    ok, error = _put_ics_upsert(uid, ics, mailbox_email=mailbox_email, wait=wait)
     if not ok:
         raise frappe.ValidationError(error or "Unknown Mailcow PUT error")
 
@@ -601,11 +632,12 @@ def _sync_plan(doc) -> dict:
     return {"removed": _removed_row_deletes(doc), "rows": steps}
 
 
-def _run_sync_plan(doc, plan: dict):
-    """Talk to Mailcow for a plan from _sync_plan. `doc` is the parent as saved (None: it is gone)."""
+def _run_sync_plan(doc, plan: dict, wait: bool = False):
+    """Talk to Mailcow for a plan from _sync_plan. `doc` is the parent as saved (None: it is gone).
+    wait: True in the background job only (see _put_ics_upsert)."""
     for removed in plan.get("removed") or []:
         try:
-            ok, error = _delete_uid_for_mailbox(removed["uid"], removed["mailbox"])
+            ok, error = _delete_uid_for_mailbox(removed["uid"], removed["mailbox"], wait=wait)
             if not ok:
                 frappe.log_error(error or "Unknown delete error", "Team Daily Schedule Mailcow DELETE")
         except Exception:
@@ -618,7 +650,7 @@ def _run_sync_plan(doc, plan: dict):
             continue  # removed again before a background run; that save cancels it
         try:
             if step["action"] == "delete":
-                ok, error = _delete_uid_for_mailbox(step["uid"], step["mailbox"])
+                ok, error = _delete_uid_for_mailbox(step["uid"], step["mailbox"], wait=wait)
                 if not ok:
                     _mark_row_error(row.name, error or "Unknown delete error", mailbox_email=step["mailbox"])
                 else:
@@ -627,12 +659,12 @@ def _run_sync_plan(doc, plan: dict):
 
             if step.get("old_mailbox"):
                 uid = (row.get("mailcow_uid") or "").strip() or _row_uid(row.name)
-                ok, error = _delete_uid_for_mailbox(uid, step["old_mailbox"])
+                ok, error = _delete_uid_for_mailbox(uid, step["old_mailbox"], wait=wait)
                 if not ok:
                     _mark_row_error(row.name, error or "Unknown mailbox move delete error", mailbox_email=step["old_mailbox"])
                     continue
 
-            _sync_row_to_mailcow(doc, row, mailbox_email=step["mailbox"])
+            _sync_row_to_mailcow(doc, row, mailbox_email=step["mailbox"], wait=wait)
         except Exception:
             _mark_row_error(row.name, frappe.get_traceback(), mailbox_email=step.get("mailbox"))
             frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow Sync")
@@ -646,7 +678,7 @@ def run_sync_plan_in_background(doctype: str, name: str, plan: dict, user: str |
     """
     try:
         doc = frappe.get_doc(doctype, name) if frappe.db.exists(doctype, name) else None
-        _run_sync_plan(doc, plan)
+        _run_sync_plan(doc, plan, wait=True)
     except Exception:
         for step in plan.get("rows") or []:
             _mark_row_error(step["row"], frappe.get_traceback(), mailbox_email=step.get("mailbox"))
@@ -655,6 +687,19 @@ def run_sync_plan_in_background(doctype: str, name: str, plan: dict, user: str |
         frappe.db.commit()  # nosemgrep: the row status must be visible before the page reloads
         if user:
             frappe.publish_realtime(SYNC_DONE_EVENT, {"doctype": doctype, "name": name}, user=user)
+
+
+def row_is_being_sent(row) -> bool:
+    """A background job is still sending this row's invite (#1949): pending (not synced, no error)
+    since less than the longest a job can take for it. A pending row older than that belongs to a
+    job that died, and may be changed again. An incomplete row is never sent: after its cancel
+    (_mark_row_deleted_or_skipped) it looks pending too, but isn't."""
+    if row.get("mailcow_synced") or row.get("mailcow_last_error") or not row.get("mailcow_last_sync_at"):
+        return False
+    if not _row_is_complete(row):
+        return False
+    started = frappe.utils.get_datetime(row.get("mailcow_last_sync_at"))
+    return frappe.utils.time_diff_in_seconds(frappe.utils.now_datetime(), started) < MAX_ROW_SEND_SECONDS
 
 
 def _mailcow_calls(plan: dict) -> int:
@@ -679,15 +724,20 @@ def sync_events_from_parent(doc, method=None):
         return
     if not (plan["removed"] or plan["rows"]):
         return
+    # mailcow_last_sync_at: when the send started, until the job writes when it finished
+    # (row_is_being_sent reads it).
+    started = frappe.utils.now_datetime()
     for step in plan["rows"]:
-        _update_row_sync_fields(step["row"], {"mailcow_synced": 0, "mailcow_last_error": ""})
+        _update_row_sync_fields(
+            step["row"], {"mailcow_synced": 0, "mailcow_last_error": "", "mailcow_last_sync_at": started}
+        )
     frappe.enqueue(
         "phamos.events.team_daily_schedule.run_sync_plan_in_background",
-        queue="short",
-        # each Mailcow call may wait PUT_TIMEOUT plus the wait after a timeout; the short queue's
-        # 300 s default would kill a team-wide save midway. A row moved to another mailbox makes
-        # two calls (cancel in the old one, send from the new one).
-        timeout=SYNC_JOB_TIMEOUT_PER_ROW * _mailcow_calls(plan) + 60,
+        # Each Mailcow call may wait PUT_TIMEOUT plus the wait after a timeout, minutes in all:
+        # the long queue, so the short queue's quick jobs don't wait behind it. A row moved to
+        # another mailbox makes two calls (cancel in the old one, send from the new one).
+        queue="long",
+        timeout=SYNC_JOB_TIMEOUT_PER_CALL * _mailcow_calls(plan) + 60,
         enqueue_after_commit=True,
         doctype=doc.doctype,
         name=doc.name,

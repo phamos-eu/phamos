@@ -123,7 +123,12 @@ class TestDepartmentEventSchedule(EventScheduleCase):
 		department.reload()
 		department.event_schedule = [r for r in department.event_schedule if r.name != row.name]
 		department.save()
-		self.delete.assert_called_once_with(uid, MAILBOX)
+		self.delete.assert_called_once_with(uid, MAILBOX, wait=False)
+
+	def test_a_desk_save_does_not_wait_minutes_for_mailcow(self):
+		"""Desk saves run the sync inside the web request: short calls, no waiting (review of !1231)."""
+		self.save_department_with_event()
+		self.assertFalse(self.put.call_args.kwargs["wait"])
 
 	def test_saving_again_does_not_resend_an_unchanged_event(self):
 		self.save_department_with_event()
@@ -173,6 +178,8 @@ class TestBackgroundSync(EventScheduleCase):
 		self.assertEqual(len(jobs), 1)
 		kwargs = jobs[0].kwargs
 		self.assertTrue(kwargs["enqueue_after_commit"])
+		# minutes of waiting must not hold up the short queue's quick jobs (review of !1231)
+		self.assertEqual(kwargs["queue"], "long")
 		self.enqueue.reset_mock()
 		with patch.object(frappe, "publish_realtime") as publish, patch.object(frappe.db, "commit"):
 			team_daily_schedule.run_sync_plan_in_background(kwargs["doctype"], kwargs["name"], kwargs["plan"], kwargs["user"])
@@ -187,6 +194,7 @@ class TestBackgroundSync(EventScheduleCase):
 
 		self.run_job()
 		self.put.assert_called_once()
+		self.assertTrue(self.put.call_args.kwargs["wait"])
 		self.assertEqual(frappe.db.get_value("Team Daily Schedule", row.name, "mailcow_synced"), 1)
 
 	def test_a_removed_row_is_cancelled_by_the_job(self):
@@ -200,7 +208,7 @@ class TestBackgroundSync(EventScheduleCase):
 		department.save()
 		self.delete.assert_not_called()
 		self.run_job()
-		self.delete.assert_called_once_with(uid, MAILBOX)
+		self.delete.assert_called_once_with(uid, MAILBOX, wait=True)
 
 	def test_a_failed_send_shows_the_error(self):
 		self.put.return_value = (False, "Mailcow PUT failed (503)")
@@ -334,7 +342,7 @@ class TestReadableSyncError(FrappeTestCase):
 			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
 		)
 
-	def _put_that_times_out(self, stored_text, stored_status=200, answers=None):
+	def _put_that_times_out(self, stored_text, stored_status=200, answers=None, wait=True):
 		"""A PUT that runs into the read timeout, then GETs that return `answers` in turn (or the
 		stored event every time). Runs on a fake clock, so the wait after the timeout takes no time."""
 		import requests
@@ -350,7 +358,7 @@ class TestReadableSyncError(FrappeTestCase):
 			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
 			patch.object(team_daily_schedule.requests, "get", **get) as self.get,
 		):
-			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
+			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX, wait=wait)
 
 	def test_an_invite_that_arrives_minutes_later_counts_as_sent(self):
 		"""Production: 15 attendees, no answer within 120 s, in the calendar a few minutes later."""
@@ -372,6 +380,14 @@ class TestReadableSyncError(FrappeTestCase):
 		self.assertGreaterEqual(self.clock.now, team_daily_schedule.VERIFY_WINDOW)
 		self.assertLess(self.clock.now, team_daily_schedule.VERIFY_WINDOW + team_daily_schedule.VERIFY_INTERVAL)
 
+	def test_inside_a_request_a_timeout_looks_once_and_does_not_wait(self):
+		ok, error = self._put_that_times_out("", stored_status=404, wait=False)
+		self.assertFalse(ok)
+		self.assertEqual(self.get.call_count, 1)
+		self.assertEqual(self.clock.now, 0)
+		self.assertIn("did not answer within 30 s", error)
+		self.assertIn("may still be working on it", error)
+
 	def _delete_that_times_out(self, answers):
 		import requests
 
@@ -382,7 +398,7 @@ class TestReadableSyncError(FrappeTestCase):
 			patch.object(team_daily_schedule.requests, "delete", side_effect=requests.ReadTimeout("Read timed out")),
 			patch.object(team_daily_schedule.requests, "get", side_effect=answers),
 		):
-			return team_daily_schedule._delete_uid_for_mailbox("uid-1", MAILBOX)
+			return team_daily_schedule._delete_uid_for_mailbox("uid-1", MAILBOX, wait=True)
 
 	def test_a_slow_cancel_counts_as_done_once_the_event_is_gone(self):
 		from types import SimpleNamespace
@@ -410,7 +426,7 @@ class TestReadableSyncError(FrappeTestCase):
 		}
 		self.assertEqual(team_daily_schedule._mailcow_calls(plan), 4)
 		one_call = sum(team_daily_schedule.PUT_TIMEOUT) + team_daily_schedule.VERIFY_WINDOW
-		self.assertGreater(team_daily_schedule.SYNC_JOB_TIMEOUT_PER_ROW, one_call)
+		self.assertGreater(team_daily_schedule.SYNC_JOB_TIMEOUT_PER_CALL, one_call)
 
 	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
 		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")

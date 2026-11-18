@@ -2220,3 +2220,5 @@ E-mails are already being fetched,E-Mails werden bereits abgerufen
 No e-mail account,Kein E-Mail-Konto
 No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
 Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
+The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
+"The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
