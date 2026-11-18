@@ -151,6 +151,7 @@ doctype_js = {
 }
 
 doctype_list_js = {
+    "Accounting Receipt": "public/js/accounting_receipt_list.js",
     "Event": "public/js/event_list.js",
     "Monthly Implementation Summary": "public/js/monthly_implementation_summary_list.js",
 }
