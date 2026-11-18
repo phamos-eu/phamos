@@ -2239,7 +2239,6 @@ Responsible,Verantwortlich
 Depends On,Hängt ab von
 In Testing,Im Test
 Take over Features from Sales,Features aus dem Vertrieb übernehmen
-Features,Features
 {0} features taken over from sales,{0} Features aus dem Vertrieb übernommen
 No features from sales to take over,Keine Features aus dem Vertrieb zu übernehmen
 "A feature belongs to an Implementation or, while in sales, to an Opportunity.","Ein Feature gehört zu einer Implementierung oder, solange es im Vertrieb ist, zu einer Opportunity."
@@ -2250,3 +2249,9 @@ A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhän
 Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
 Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
 These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
+Feature {0} does not exist.,Feature {0} existiert nicht.
+Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
+Agreed,Vereinbart
+Planned,Geplant
+In Progress,In Arbeit
+Live,Live
