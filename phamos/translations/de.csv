@@ -2271,3 +2271,15 @@ Live,Live
 {0} {1} does not exist.,{0} {1} existiert nicht.
 {0} {1} belongs to another implementation.,{0} {1} gehört zu einer anderen Implementierung.
 Chapter,Kapitel
+GitLab Release,GitLab-Release
+GitLab Release Milestone,GitLab-Release-Meilenstein
+Release Notes,Versionshinweise
+Released At,Veröffentlicht am
+Tag,Tag
+Last Synced,Zuletzt synchronisiert
+Time Estimate (Hours),Zeitschätzung (Stunden)
+Time Spent (Hours),Aufgewendete Zeit (Stunden)
+GitLab's upcoming release: its date lies in the future.,Anstehendes Release in GitLab: Sein Datum liegt in der Zukunft.
+From GitLab's time estimate on the issue. Used by release planning.,Aus der Zeitschätzung des Issues in GitLab. Wird für die Release-Planung verwendet.
+Time logged on the issue in GitLab.,In GitLab auf dem Issue erfasste Zeit.
+Releases synced successfully,Releases erfolgreich synchronisiert
