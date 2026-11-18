@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import Sidebar from "./components/Sidebar.vue";
 import StatsBar from "./components/StatsBar.vue";
-import FilterBar from "./components/FilterBar.vue";
+import FrappeFilter from "./components/FrappeFilter.vue";
 import IssueList from "./components/IssueList.vue";
 import BreakModal from "./components/BreakModal.vue";
 import BreakConfirm from "./components/BreakConfirm.vue";
@@ -23,54 +23,32 @@ const activeSession = ref(null);
 const elapsedSeconds = ref(0);
 const sidebarOpen = ref(true);
 const selectedProject = ref(null);
-const currentView = ref("issues"); // 'issues' | 'timesheets' | 'team' | 'projects'
+const currentView = ref("projects"); // 'issues' | 'timesheets' | 'team' | 'projects'; opens on Projects
 const mineOnly = ref(true); // default: show only current user's issues
 
-// Projects section: one list (last used first, then assigned to me, then the rest)
+// Projects section: one list (assigned to me first, then the rest; last used first within each)
 const allProjects = ref([]);
 const projectsLoading = ref(false);
 const activeProjectSession = ref(null);
 const projectElapsedSeconds = ref(0);
 let projectTimerInterval = null;
 
-// Filter state
-const searchQuery = ref("");
-const dueFilter = ref("all");
-const assigneeFilter = ref([]);
-const labelFilter = ref([]);
-const sortBy = ref("due_date");
-const sortDir = ref("asc");
-const typeFilter = ref("all"); // 'all' | 'parent' | 'child'
+// Names matching the Frappe Filter button (GitLab Issue), or null when no filter is set
+const issueMatches = ref(null);
 
-function clearAllFilters() {
-  searchQuery.value = "";
-  dueFilter.value = "all";
-  assigneeFilter.value = [];
-  labelFilter.value = [];
-  sortBy.value = "due_date";
-  sortDir.value = "asc";
-  typeFilter.value = "all";
-  selectedProject.value = null;
+// A filter (e.g. GitLab Project = X) shows every matching issue, not only mine:
+// the sidebar switches to All Issues, and My Issues narrows it again.
+function onIssueFilter(names) {
+  issueMatches.value = names;
+  if (names) mineOnly.value = false;
 }
-
-// Dynamic filter options derived from the loaded issues
-const assigneeOptions = computed(() => {
-  const set = new Set();
-  issues.value.forEach(i => { if (i.assignee) set.add(i.assignee); });
-  return [...set].sort();
-});
-const labelOptions = computed(() => {
-  const set = new Set();
-  issues.value.forEach(i => {
-    if (i.labels) i.labels.split(",").map(l => l.trim()).filter(Boolean).forEach(l => set.add(l));
-  });
-  return [...set].sort();
-});
+// The Filter button is rebuilt empty when the Issues view opens again, so drop its result.
+watch(currentView, (view) => { if (view !== "issues") issueMatches.value = null; });
 
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
 
-// Projects that have issues in the current scope, in the project list's order (last used first).
+// Projects that have issues in the current scope, in the project list's order.
 const projects = computed(() => {
   const base = mineOnly.value ? issues.value.filter(i => i.is_mine) : issues.value;
   const byProject = {};
@@ -85,8 +63,6 @@ const projects = computed(() => {
 });
 
 const filteredIssues = computed(() => {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
   const activeIssueName = activeSession.value?.gitlab_issue;
   const activeIssue = issues.value.find(i => i.name === activeIssueName);
   let list = issues.value.filter(i => i.name !== activeIssueName);
@@ -94,66 +70,14 @@ const filteredIssues = computed(() => {
   if (mineOnly.value) list = list.filter(i => i.is_mine);
   if (selectedProject.value) list = list.filter(i => i.project === selectedProject.value);
 
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) list = list.filter(i =>
-    i.title?.toLowerCase().includes(q) ||
-    String(i.issue_id).includes(q) ||
-    i.gitlab_project_title?.toLowerCase().includes(q) ||
-    i.assignee?.toLowerCase().includes(q) ||
-    i.labels?.toLowerCase().includes(q)
-  );
-
-  if (typeFilter.value === "parent") list = list.filter(i => i.child_count > 0);
-  if (typeFilter.value === "child") list = list.filter(i => !!i.parent_issue);
-
-  if (assigneeFilter.value.length) list = list.filter(i => assigneeFilter.value.includes(i.assignee));
-  if (labelFilter.value.length) list = list.filter(i =>
-    i.labels && labelFilter.value.some(l => i.labels.split(",").map(s => s.trim()).includes(l))
-  );
-
-  if (dueFilter.value !== "all") {
-    list = list.filter(i => {
-      if (dueFilter.value === "no_due") return !i.due_date;
-      if (!i.due_date) return false;
-      const d = new Date(i.due_date);
-      if (dueFilter.value === "overdue")   return d < today;
-      if (dueFilter.value === "today")     return d.getTime() === today.getTime();
-      if (dueFilter.value === "this_week") return d >= today && d <= weekEnd;
-      return true;
-    });
+  if (issueMatches.value) {
+    const allowed = new Set(issueMatches.value);
+    list = list.filter(i => allowed.has(i.name));
   }
 
-  list = [...list].sort((a, b) => {
-    let va, vb;
-    if (sortBy.value === "due_date") {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      va = new Date(a.due_date).getTime(); vb = new Date(b.due_date).getTime();
-    } else if (sortBy.value === "id") {
-      va = parseInt(a.issue_id) || 0; vb = parseInt(b.issue_id) || 0;
-    } else if (sortBy.value === "project") {
-      va = (a.gitlab_project_title || "").toLowerCase(); vb = (b.gitlab_project_title || "").toLowerCase();
-    } else if (sortBy.value === "title") {
-      va = (a.title || "").toLowerCase(); vb = (b.title || "").toLowerCase();
-    } else if (sortBy.value === "priority") {
-        const getPriority = (labels) => {
-          if (!labels) return 999;
-
-          if (labels.includes("P:1")) return 1;
-          if (labels.includes("P:2")) return 2;
-          if (labels.includes("P:3")) return 3;
-
-          return 999;
-        };
-
-        va = getPriority(a.labels);
-        vb = getPriority(b.labels);
-      }
-    if (va < vb) return sortDir.value === "asc" ? -1 : 1;
-    if (va > vb) return sortDir.value === "asc" ? 1 : -1;
-    return 0;
-  });
+  // Due date first, issues without one last
+  const due = i => (i.due_date ? new Date(i.due_date).getTime() : Infinity);
+  list = [...list].sort((a, b) => due(a) - due(b));
 
   // Re-inject the active issue at the top, bypassing all filters
   if (activeIssue) list = [activeIssue, ...list];
@@ -310,11 +234,10 @@ function showTimeLimitDialog(status, onSubmitted) {
   });
 }
 
-async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime, gitlabIssueRef }) {
+async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime }) {
   if (!activeProjectSession.value) return;
   const args = { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
-  if (gitlabIssueRef) args.gitlab_issue_ref = gitlabIssueRef;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args,
@@ -527,29 +450,16 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 
       <div class="dc-body">
         <template v-if="currentView === 'issues'">
-          <FilterBar
-            v-model:search="searchQuery"
-            v-model:dueFilter="dueFilter"
-            v-model:assigneeFilter="assigneeFilter"
-            v-model:labelFilter="labelFilter"
-            v-model:sortBy="sortBy"
-            v-model:sortDir="sortDir"
-            v-model:projectFilter="selectedProject"
-            v-model:typeFilter="typeFilter"
-            :assignee-options="assigneeOptions"
-            :label-options="labelOptions"
-            :project-options="projects"
-            :result-count="filteredIssues.length"
-            :total-count="issues.length"
-            @clear-all="clearAllFilters"
-          />
+          <div class="dc-filter-row">
+            <FrappeFilter doctype="GitLab Issue" @change="onIssueFilter" />
+            <span class="dc-filter-count">{{ filteredIssues.length }} of {{ issues.length }}</span>
+          </div>
           <div v-if="activeProjectRow" class="dc-running-project">
             <ProjectCard
               :project="activeProjectRow"
               :active-project-session="activeProjectSession"
               :project-elapsed-seconds="projectElapsedSeconds"
               :active-issue-session="activeSession"
-              :issues="issues"
               @pause="onPauseProjectTimer"
               @resume="onResumeProjectTimer"
               @stop="onStopProjectTimer"
@@ -581,7 +491,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <ProjectsView
           v-else-if="currentView === 'projects'"
           :all-projects="allProjects"
-          :issues="issues"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
@@ -649,6 +558,8 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 /* Body */
 .dc-body { flex: 1; min-width: 0; overflow-y: auto; }
 .dc-running-project { padding: 4px 16px 0; }
+.dc-filter-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: var(--card-bg); }
+.dc-filter-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 .dc-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
