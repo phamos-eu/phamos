@@ -18,6 +18,10 @@ DEPARTMENTS = {
 }
 
 
+# One Apps-screen entry, for the module-loading tests.
+APPS = [{"name": "sales_spa", "route": "/sales-cockpit"}]
+
+
 def _department(config):
 	return DEPARTMENTS.get(config.department_field)
 
@@ -117,7 +121,10 @@ class TestIssueCockpits(FrappeTestCase):
 
 	def test_broken_cockpit_module_raises_instead_of_vanishing(self):
 		broken = ModuleNotFoundError("No module named 'missing_dependency'", name="missing_dependency")
-		with patch.object(ic.frappe, "get_module", side_effect=broken):
+		with (
+			patch.object(ic.frappe, "get_hooks", return_value=APPS),
+			patch.object(ic.frappe, "get_module", side_effect=broken),
+		):
 			with self.assertRaises(ModuleNotFoundError):
 				ic._cockpit_modules()
 
@@ -125,5 +132,8 @@ class TestIssueCockpits(FrappeTestCase):
 		def get_module(name):
 			raise ModuleNotFoundError(f"No module named '{name}'", name=name)
 
-		with patch.object(ic.frappe, "get_module", side_effect=get_module):
+		with (
+			patch.object(ic.frappe, "get_hooks", return_value=APPS),
+			patch.object(ic.frappe, "get_module", side_effect=get_module),
+		):
 			self.assertEqual(ic._cockpit_modules(), [])
