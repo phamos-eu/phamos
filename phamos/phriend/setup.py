@@ -54,13 +54,22 @@ _FIELDS = [
 		"insert_after": "phriend_reported_by_name",
 	},
 	{
+		# The Implementation the report is about (#1671): set by Phriend, shown in the Implementation Cockpit.
+		"fieldname": "custom_implementation",
+		"label": "Implementation",
+		"fieldtype": "Link",
+		"options": "Implementation",
+		"in_standard_filter": 1,
+		"insert_after": "phriend_source_system",
+	},
+	{
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
 		"options": "\nBug\nImprovement\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"depends_on": ONLY_PHRIEND,
-		"insert_after": "phriend_source_system",
+		"insert_after": "custom_implementation",
 	},
 	{
 		"fieldname": "phriend_comment",

@@ -1997,6 +1997,8 @@ Reload,Neu laden
 Next,Weiter
 Black out private data,Private Daten schwärzen
 Redacted,Geschwärzt
+Delete,Löschen
+Del,Entf
 "The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
 not a PNG or JPEG image,kein PNG- oder JPEG-Bild
 larger than {0} MB,größer als {0} MB
@@ -2150,6 +2152,7 @@ GitLab Issues,GitLab-Issues
 GitLab issues,GitLab-Issues
 Create GitLab Issue,GitLab-Issue anlegen
 Open in GitLab,In GitLab öffnen
+Open {0} in GitLab,{0} in GitLab öffnen
 Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
 GitLab issue not linked,GitLab-Issue nicht verknüpft
@@ -2194,6 +2197,9 @@ The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
 Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
 Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
 Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
+Open in Cockpit,Im Cockpit öffnen
+Project Management,Projektmanagement
+Software Development,Softwareentwicklung
 Team Cockpit,Team-Cockpit
 Cockpits,Cockpits
 Switch cockpit,Cockpit wechseln
@@ -2208,3 +2214,13 @@ The team this task belongs to. It shows in that team's Team Cockpit.,"Das Team, 
 The team this issue belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Anfrage gehört. Sie erscheint im Team-Cockpit dieses Teams."
 Change the team of a record in another cockpit.,Das Team eines Eintrags wird in einem anderen Cockpit geändert.
 You can only move records into or out of your own team.,Sie können Einträge nur in Ihr eigenes Team aufnehmen oder aus ihm entfernen.
+Fetch e-mails,E-Mails abrufen
+Fetching e-mails…,E-Mails werden abgerufen…
+{0} new receipts from e-mail,{0} neue Belege aus E-Mails
+No new e-mails,Keine neuen E-Mails
+E-mails are already being fetched,E-Mails werden bereits abgerufen
+No e-mail account,Kein E-Mail-Konto
+No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
+Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
+The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
+"The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."

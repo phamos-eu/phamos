@@ -66,10 +66,12 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-sha
 .chip.slim { min-width: 0; padding: 7px 16px; }
 .reported { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ph-border); min-height: 64px; }
 .reported[hidden] { display: none; }
-.reported-head { margin: 0 0 8px; font-size: 13px; color: var(--ph-muted); }
+.reported-head { margin: 0 0 8px; font-size: 13px; color: var(--ph-muted); display: flex; align-items: baseline; gap: 6px; }
 .reported-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--ph-surface);
 	color: var(--ph-text); font-size: 12px; text-align: center; }
-.reported-empty { margin: 0; font-size: 13px; color: var(--ph-muted); }
+.reported-empty { margin: 0; font-size: 13px; color: var(--ph-muted); display: flex; align-items: baseline; gap: 6px; }
+/* "See their status": where the reports here stand, in the Implementation Cockpit (#1671) */
+.reported-cockpit { margin-left: auto; font-size: 13px; font-weight: 500; white-space: nowrap; }
 /* a table in all but name: every row shares the columns (subgrid), so titles and the rest line
    up whatever the type's length */
 .reported ul { list-style: none; margin: 0; padding: 0; display: grid; row-gap: 2px;
@@ -114,6 +116,9 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-sha
 	border: 1px solid var(--ph-border-strong); border-radius: 8px; background: transparent; color: var(--ph-text); cursor: pointer; }
 .tool:hover { background: var(--ph-surface); }
 .tool.on { background: var(--ph-chip); border-color: var(--ph-chip-border); color: var(--ph-chip-text); }
+/* Delete waits for a selected drawing */
+.tool:disabled { opacity: 0.4; cursor: default; }
+.tool:disabled:hover { background: transparent; }
 /* the screenshot area keeps one height whether loading, failed or shown (UX review) */
 .panel { --ph-shot-h: min(52vh, 460px); }
 .annotator.off { opacity: 0.25; pointer-events: none; }

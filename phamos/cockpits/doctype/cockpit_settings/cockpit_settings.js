@@ -12,6 +12,7 @@ const COCKPIT_ROUTES = {
 	software_development_open_cockpit: "/software-development-cockpit",
 	general_management_open_cockpit: "/general-management-cockpit",
 	team_open_cockpit: "/team-cockpit",
+	implementation_open_cockpit: "/implementation-cockpit",
 };
 
 frappe.ui.form.on(
