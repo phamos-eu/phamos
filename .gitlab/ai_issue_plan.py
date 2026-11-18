@@ -11,7 +11,8 @@ The label stays on the issue while the draft is in progress. The first comment
 says what the code shows and asks one question. A later run waits until someone
 replies, then asks the next question or posts a summary. Replying "approved"
 to that summary posts the draft and replaces the label with plan-drafted.
-This does not write code and does not open a merge request.
+This does not write code. The plan-drafted label starts ai_issue_implement,
+which opens one merge request and does not merge it.
 """
 
 import base64
@@ -38,7 +39,7 @@ _ACCEPT = {
 _FOOTER = {
     "question": "Reply on this issue. The question waits for your answer.",
     "summary": "Reply `approved` to accept this draft, or reply with a correction.",
-    "plan": "Draft only. Run phamos-forge on this issue before any code is written.",
+    "plan": "Draft only. The plan-drafted label starts a job that opens one merge request. It does not merge.",
 }
 _ANALYSIS = None
 

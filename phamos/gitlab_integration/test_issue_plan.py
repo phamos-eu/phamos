@@ -295,7 +295,7 @@ class TestIssuePlan(FrappeTestCase):
         self.assertIn("reply=6", posts[0])
         self.assertIn("## Requirements", posts[0])
         self.assertIn("## Implementation plan", posts[0])
-        self.assertIn("phamos-forge", posts[0])
+        self.assertIn("opens one merge request", posts[0])
         self.assertEqual(label_updates, [{
             "add_labels": "plan-drafted",
             "remove_labels": "implementation plan",
