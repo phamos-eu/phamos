@@ -76,9 +76,16 @@ class ImplementationFeature(Document):
 			if row.feature in seen:
 				frappe.throw(_("Feature {0} is listed twice under Depends On.").format(row.feature))
 			seen.add(row.feature)
-			other = frappe.db.get_value("Implementation Feature", row.feature, "implementation")
-			if self.implementation and other != self.implementation:
+			other = frappe.db.get_value(
+				"Implementation Feature", row.feature, ["implementation", "opportunity"], as_dict=True
+			)
+			if not other:
+				frappe.throw(_("Feature {0} does not exist.").format(row.feature))
+			# in sales, dependencies stay within the Opportunity; once taken over, within the Implementation
+			if self.implementation and other.implementation != self.implementation:
 				frappe.throw(_("Feature {0} belongs to another implementation.").format(row.feature))
+			if not self.implementation and other.opportunity != self.opportunity:
+				frappe.throw(_("Feature {0} belongs to another opportunity.").format(row.feature))
 		if not self.is_new() and self._leads_back_here(seen):
 			frappe.throw(_("These dependencies form a loop: a feature would wait for itself."))
 
@@ -147,10 +154,15 @@ def take_over_from_sales(implementation):
 		filters={"opportunity": ["in", opportunities], "implementation": ["is", "not set"]},
 		pluck="name",
 	)
+	# Move them all first, then save each: a feature may depend on another feature of the same
+	# Opportunity, and the dependency check needs both on the Implementation already.
+	customer = frappe.db.get_value("Implementation", implementation, "customer")
 	for name in names:
-		feature = frappe.get_doc("Implementation Feature", name)
-		feature.implementation = implementation
-		feature.save()
+		frappe.db.set_value(
+			"Implementation Feature", name, {"implementation": implementation, "customer": customer}, update_modified=False
+		)
+	for name in names:
+		frappe.get_doc("Implementation Feature", name).save()
 	return names
 
 
@@ -168,9 +180,21 @@ def _won_opportunities(implementation):
 	)
 	if not quotations:
 		return []
-	return frappe.get_all(
+	opportunities = frappe.get_all(
 		"Quotation",
 		filters={"name": ["in", quotations], "opportunity": ["is", "set"]},
 		pluck="opportunity",
 		distinct=True,
 	)
+	# An Opportunity of another customer is not taken over, even if a Quotation points to it.
+	# One that came from a Lead has no customer yet and counts.
+	customer = frappe.db.get_value("Implementation", implementation, "customer")
+	return [
+		name
+		for name in opportunities
+		if not (
+			(party := frappe.db.get_value("Opportunity", name, ["opportunity_from", "party_name"], as_dict=True))
+			and party.opportunity_from == "Customer"
+			and party.party_name != customer
+		)
+	]

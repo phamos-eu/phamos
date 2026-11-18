@@ -1,6 +1,8 @@
 # Copyright (c) 2026, phamos.eu and Contributors
 # See license.txt
 
+import unittest.mock
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -136,7 +138,10 @@ class TestImplementationFeature(FrappeTestCase):
 			}
 		).db_insert()
 
-		in_sales = make_feature(opportunity=opportunity, source="Sales", title="Configured in sales")
+		base = make_feature(opportunity=opportunity, source="Sales", title="Base configured in sales")
+		in_sales = make_feature(
+			opportunity=opportunity, source="Sales", title="Configured in sales", depends_on=[{"feature": base.name}]
+		)
 		self.assertEqual(in_sales.customer, customer)
 		lost = f"_Test IF Lost {frappe.generate_hash(length=6)}"
 		frappe.get_doc(
@@ -144,9 +149,35 @@ class TestImplementationFeature(FrappeTestCase):
 		).db_insert()
 		not_won = make_feature(opportunity=lost, source="Sales", title="Not won")
 
+		# two features of the same Opportunity that depend on each other move together
 		moved = take_over_from_sales(self.implementation.name)
-		self.assertEqual(moved, [in_sales.name])
+		self.assertEqual(set(moved), {in_sales.name, base.name})
 		in_sales.reload()
 		self.assertEqual((in_sales.implementation, in_sales.source), (self.implementation.name, "Sales"))
 		self.assertEqual(take_over_from_sales(self.implementation.name), [])
 		self.assertFalse(frappe.db.get_value("Implementation Feature", not_won.name, "implementation"))
+
+	def test_sales_dependencies_stay_within_the_opportunity(self):
+		one = f"_Test IF Opp A {frappe.generate_hash(length=6)}"
+		two = f"_Test IF Opp B {frappe.generate_hash(length=6)}"
+		for name in (one, two):
+			frappe.get_doc(
+				{"doctype": "Opportunity", "name": name, "opportunity_from": "Customer", "party_name": self.implementation.customer}
+			).db_insert()
+		first = make_feature(opportunity=one, title="In A")
+		self.assertRaises(
+			frappe.ValidationError, make_feature, opportunity=two, title="In B", depends_on=[{"feature": first.name}]
+		)
+
+	def test_opportunity_of_another_customer_is_not_taken_over(self):
+		from phamos.phamos.doctype.implementation_feature.implementation_feature import _won_opportunities
+
+		with unittest.mock.patch("frappe.get_all", side_effect=[["SO"], ["QUO"], ["OPP"]]), unittest.mock.patch(
+			"frappe.db.get_value",
+			side_effect=lambda doctype, name, fields=None, **kw: (
+				frappe._dict(opportunity_from="Customer", party_name="Someone else")
+				if doctype == "Opportunity"
+				else self.implementation.customer
+			),
+		):
+			self.assertEqual(_won_opportunities(self.implementation.name), [])
