@@ -79,6 +79,23 @@ frappe.ui.form.on("Implementation", {
             };
         });
     },
+    // Chapters and features in progress against the limits agreed with the customer (#1970)
+    render_wip_limits: function (frm) {
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation_chapter.implementation_chapter.get_wip_status",
+            args: { implementation: frm.doc.name },
+            callback: ({ message: wip }) => {
+                if (!wip) return;
+                const over = [];
+                if (wip.max_chapters && wip.chapters > wip.max_chapters)
+                    over.push(__("{0} chapters in progress, {1} agreed", [wip.chapters, wip.max_chapters]));
+                if (wip.max_features && wip.features > wip.max_features)
+                    over.push(__("{0} features in progress, {1} agreed", [wip.features, wip.max_features]));
+                if (over.length) frm.dashboard.set_headline_alert(over.join(" · "), "orange");
+            },
+        });
+    },
+
     refresh: function (frm) {
         if (!frm.is_new()) {
             add_row_to_sales_order(frm);
@@ -118,6 +135,7 @@ frappe.ui.form.on("Implementation", {
                 });
             }, __("Features"));
         }
+        if (!frm.is_new()) frm.trigger("render_wip_limits");
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_active_reports_overview");
         frm.trigger("render_gitlab_projects_section");

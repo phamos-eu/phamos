@@ -2250,3 +2250,16 @@ A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhän
 Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
 Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
 These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
+Implementation Chapter Dependency,Abhängigkeit des Implementierungskapitels
+Implementation Chapter Feature,Feature des Implementierungskapitels
+Agreed WIP Limits,Vereinbarte WIP-Limits
+Max Chapters in Progress,Max. Kapitel in Arbeit
+Max Features in Progress,Max. Features in Arbeit
+A chapter cannot depend on itself.,Ein Kapitel kann nicht von sich selbst abhängen.
+Chapter {0} belongs to another implementation.,Kapitel {0} gehört zu einer anderen Implementierung.
+These dependencies form a loop: a chapter would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Kapitel würde auf sich selbst warten.
+"{0} chapters are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Kapitel in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+"{0} features are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Features in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+Over the agreed limit,Über dem vereinbarten Limit
+"{0} chapters in progress, {1} agreed","{0} Kapitel in Arbeit, {1} vereinbart"
+"{0} features in progress, {1} agreed","{0} Features in Arbeit, {1} vereinbart"

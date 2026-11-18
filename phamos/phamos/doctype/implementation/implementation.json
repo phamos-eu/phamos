@@ -107,7 +107,11 @@
   "warning_threshold_percent",
   "hours_used_this_period",
   "remaining_hours",
-  "time_limit_percent_used"
+  "time_limit_percent_used",
+  "wip_limits_section",
+  "max_parallel_chapters",
+  "column_break_wip_limits",
+  "max_parallel_features"
  ],
  "fields": [
   {
@@ -687,6 +691,28 @@
    "fieldtype": "Percent",
    "label": "% of Limit Used",
    "read_only": 1
+  },
+  {
+   "fieldname": "wip_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Agreed WIP Limits",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "max_parallel_chapters",
+   "fieldtype": "Int",
+   "label": "Max Chapters in Progress",
+   "description": "How many chapters may be In Progress at the same time, as agreed with the customer in a regular session. 0 means no limit. Exceeding it shows a warning; nothing is blocked."
+  },
+  {
+   "fieldname": "column_break_wip_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_parallel_features",
+   "fieldtype": "Int",
+   "label": "Max Features in Progress",
+   "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -740,7 +766,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-11-18 19:29:51.968093",
+ "modified": "2026-11-18 20:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
