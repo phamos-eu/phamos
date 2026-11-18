@@ -464,9 +464,9 @@ class TestImplementationCockpitIssues(FrappeTestCase):
 		frappe.set_user(self.staff)
 		self.assertTrue(ic.get_issues(self.impl, scope="implementation")["issues"])
 		# a staff member Desk keeps away from Issues sees none here either
-		with unittest.mock.patch("frappe.has_permission", return_value=False), unittest.mock.patch(
-			"frappe.get_list", return_value=[]
-		):
+		with unittest.mock.patch.object(ic, "_allowed_implementations", return_value=[self.impl]), unittest.mock.patch(
+			"frappe.has_permission", return_value=False
+		), unittest.mock.patch("frappe.get_list", return_value=[]):
 			self.assertEqual(ic.get_issues(self.impl, scope="implementation")["issues"], [])
 			with self.assertRaises(frappe.PermissionError):
 				ic.get_issue(self.impl, self.on_page)
