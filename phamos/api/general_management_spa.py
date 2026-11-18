@@ -250,10 +250,14 @@ def create_checklist(
 
 
 @frappe.whitelist()
-@frappe.validate_and_sanitize_search_inputs
 @_require_access
+@frappe.validate_and_sanitize_search_inputs
 def checklist_reference_query(doctype, txt, searchfield, start, page_len, filters):
-	"""Search General Management-scoped Issue/Task parents for Checklist creation."""
+	"""Search General Management-scoped Issue/Task parents for Checklist creation.
+
+	The access check sits outside frappe's sanitiser: that one finds `searchfield` among the
+	positional arguments by the names of the function it wraps, so it must wrap this one (#1956).
+	"""
 	return dc.checklist_reference_query(CONFIG, doctype, txt, searchfield, start, page_len, filters)
 
 
