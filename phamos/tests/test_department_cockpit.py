@@ -268,8 +268,14 @@ class TestTaskOwner(FrappeTestCase):
 		frappe.clear_cache(doctype="Task")
 		fieldnames = [df.fieldname for df in frappe.get_meta("Task").fields]
 		self.assertEqual(
-			fieldnames[:4],
-			[IMPLEMENTATION_SECTION, "custom_task_owner", "custom_implementation_specific_end", "subject"],
+			fieldnames[:5],
+			[
+				IMPLEMENTATION_SECTION,
+				"custom_task_owner",
+				"custom_team",
+				"custom_implementation_specific_end",
+				"subject",
+			],
 		)
 		owner = frappe.get_meta("Task").get_field("custom_task_owner")
 		self.assertEqual((owner.fieldtype, owner.options, owner.reqd), ("Link", "User", 0))
