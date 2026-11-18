@@ -98,17 +98,10 @@ def get_team_capacity(filters=None):
             team_employees[row.parent].append(row.employee)
 
     def get_employee_daily_hours(employee, work_date):
-        """Return scheduled working hours for an employee on a specific date."""
-        day_name = work_date.strftime("%A")
-        wwh = frappe.db.get_value("Weekly Working Hours", {"employee": employee}, "name")
-        if not wwh:
-            return 0
-        hours = frappe.db.get_value(
-            "Daily Hours Detail",
-            {"parent": wwh, "day": day_name},
-            "hours"
-        )
-        return hours or 0
+        """Scheduled hours of the day, from the Weekly Working Hours valid on it (#1983)."""
+        from phamos.phamos.team_capacity_utils import get_employee_daily_hours as daily_hours
+
+        return daily_hours(employee, work_date)
 
     def get_week_leave_hours(employee, week_start, week_end):
         from datetime import timedelta
