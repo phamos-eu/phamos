@@ -81,3 +81,4 @@ phamos.patches.v1_0.set_cockpit_window_defaults #2026-11-18 glow edges and breat
 phamos.patches.v1_0.link_gitlab_issues_to_issues
 phamos.patches.v1_0.move_company_events_to_department #1949
 phamos.patches.v1_0.mis_links_from_documents
+phamos.patches.v1_0.create_team_assignments #1974

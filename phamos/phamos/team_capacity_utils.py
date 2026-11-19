@@ -61,6 +61,28 @@ def leave_day_share(leave, day):
     return 0.5 if half_day and getdate(half_day) == day else 1
 
 
+def get_employee_weekly_hours(employee, on_date):
+	"""Scheduled hours per week on `on_date`: the hours per weekday of the submitted Weekly Working
+	Hours valid then, summed; without one, the weekly hours of the submitted Employment Contract
+	valid then; otherwise 0 (#1974)."""
+	cache = _get_team_capacity_cache()
+	if employee not in cache["wwh_by_employee"]:
+		cache["wwh_by_employee"][employee] = _weekly_working_hours(employee)
+	for record in cache["wwh_by_employee"][employee]:
+		if record["valid_from"] <= on_date <= (record["valid_to"] or on_date):
+			return sum(record["hours"].values())
+
+	contracts = frappe.get_all(
+		"Employment Contract",
+		filters={"employee": employee, "docstatus": 1, "effective_from": ["<=", on_date]},
+		or_filters=[["valid_until", "is", "not set"], ["valid_until", ">=", on_date]],
+		fields=["weekly_hours"],
+		order_by="effective_from desc",
+		limit_page_length=1,
+	)
+	return (contracts[0].weekly_hours or 0) if contracts else 0
+
+
 def _weekly_working_hours(employee):
     """The employee's submitted Weekly Working Hours: validity and hours per weekday, newest first."""
     if not frappe.db.exists("DocType", "Weekly Working Hours"):

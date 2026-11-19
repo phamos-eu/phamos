@@ -3,14 +3,17 @@
 
 """Who belongs to which Team, and which Team a user's Team Cockpit shows (#1955).
 
-A user belongs to a Team when their Employee is its lead, its co-lead or one of its members. The
+A user belongs to a Team when their Employee has a Team Assignment open today (#1974), or, for a
+team without assignments, is its lead, co-lead or one of its members. The
 Team doctype itself stays System Manager only: the Team Cockpit reads it through this module,
 which decides who may see which team.
 """
 
 import frappe
 from frappe import _
+from frappe.utils import getdate, today
 
+from phamos.phamos.doctype.team_assignment.team_assignment import has_assignments
 from phamos.setup.general_management import GENERAL_MANAGEMENT_ROLE
 
 # These roles steer the whole company, so they may open every team.
@@ -30,12 +33,33 @@ def sees_all_teams(user=None):
 	return bool(set(frappe.get_roles(user)) & set(ALL_TEAMS_ROLES))
 
 
-def member_teams(user=None):
-	"""Names of the teams `user` is lead, co-lead or member of, sorted."""
+def member_teams(user=None, on_date=None):
+	"""Names of the teams `user` is lead, co-lead or member of on `on_date` (default today), sorted.
+
+	From the Team Assignments open that day (#1974). A team without any assignment (not migrated,
+	or created outside Team Assignment) still counts through the Team's own lead, co-lead and member
+	fields.
+	"""
 	user = user or frappe.session.user
 	employee = _employee(user)
 	if not employee:
 		return []
+	on_date = getdate(on_date or today())
+	names = set(
+		frappe.get_all(
+			"Team Assignment",
+			filters={"employee": employee, "from_date": ["<=", on_date]},
+			or_filters=[["until_date", "is", "not set"], ["until_date", ">=", on_date]],
+			pluck="team",
+			limit_page_length=0,
+		)
+	)
+	names.update(team for team in _legacy_member_teams(employee) if not has_assignments(team))
+	return sorted(names)
+
+
+def _legacy_member_teams(employee):
+	"""Teams naming `employee` in their own lead, co-lead or member fields."""
 	names = set(
 		frappe.get_all(
 			"Team",
@@ -52,7 +76,7 @@ def member_teams(user=None):
 			limit_page_length=0,
 		)
 	)
-	return sorted(names)
+	return names
 
 
 def available_teams(user=None):
