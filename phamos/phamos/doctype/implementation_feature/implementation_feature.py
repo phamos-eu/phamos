@@ -35,6 +35,7 @@ class ImplementationFeature(Document):
 		self.validate_dates()
 		self.validate_dependencies()
 		self.reset_agreement_when_dod_changes()
+		self.warn_when_over_wip_limit()
 		self.add_progress_row()
 
 	def validate_origin(self):
@@ -111,6 +112,9 @@ class ImplementationFeature(Document):
 	def reset_agreement_when_dod_changes(self):
 		"""A changed definition of done is no longer what the customer agreed to."""
 		before = self.get_doc_before_save()
+		# an applied Implementation Change (#1971) sets text and agreement together
+		if self.flags.from_implementation_change:
+			return
 		if before and (before.definition_of_done or "") != (self.definition_of_done or ""):
 			# the form sends dates as strings, the stored doc has date objects: compare as text
 			agreement_changed = str(self.dod_agreed_on or "") != str(before.dod_agreed_on or "") or (
@@ -119,6 +123,25 @@ class ImplementationFeature(Document):
 			if not agreement_changed:
 				self.dod_agreed_on = None
 				self.dod_agreed_by = None
+
+	def warn_when_over_wip_limit(self):
+		"""Features in progress up to the limit agreed with the customer (#1970); a warning, never a block."""
+		if self.status != "In Progress" or not self.implementation:
+			return
+		before = self.get_doc_before_save()
+		if before and before.status == "In Progress":
+			return
+		limit = frappe.db.get_value("Implementation", self.implementation, "max_parallel_features") or 0
+		running = frappe.db.count(
+			"Implementation Feature",
+			{"implementation": self.implementation, "status": "In Progress", "name": ["!=", self.name or ""]},
+		) + 1
+		if limit and running > limit:
+			frappe.msgprint(
+				_("{0} features are now in progress, more than the {1} agreed with the customer.").format(running, limit),
+				title=_("Over the agreed limit"),
+				indicator="orange",
+			)
 
 	def add_progress_row(self):
 		"""One row in the history whenever the status or the current level changes."""

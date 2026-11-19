@@ -1,0 +1,191 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 21:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "implementation",
+  "change_type",
+  "status",
+  "column_break_head",
+  "target_doctype",
+  "target_name",
+  "stakeholder_meeting",
+  "section_break_values",
+  "old_values",
+  "column_break_values",
+  "proposed_values",
+  "reason",
+  "section_break_consent",
+  "proposed_by",
+  "agreed_by_phamos",
+  "column_break_consent",
+  "agreed_by_customer",
+  "decided_on",
+  "applied_on",
+  "dispute_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "change_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Change Type",
+   "options": "Dates\nPriority\nTarget level\nRank\nScope add\nScope drop\nScope change\nDefinition of done\nWIP limit\nCapacity share",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Proposed\nAgreed\nRejected\nApplied\nApplied – awaiting customer\nDisputed",
+   "default": "Proposed",
+   "read_only": 1,
+   "description": "Proposed: one side asked. Agreed: both sides agreed, applied at the planning session. Applied – awaiting customer: a PM changed it directly; the customer confirms or disputes it."
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "target_doctype",
+   "fieldtype": "Link",
+   "label": "Target Type",
+   "options": "DocType",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Target",
+   "options": "target_doctype",
+   "read_only": 1,
+   "description": "Empty for a proposed new feature until it is applied."
+  },
+  {
+   "fieldname": "stakeholder_meeting",
+   "fieldtype": "Link",
+   "label": "Stakeholder Meeting",
+   "options": "Stakeholder Meeting",
+   "description": "The planning session that decides on this change. Agreed changes are applied when that meeting is submitted."
+  },
+  {
+   "fieldname": "section_break_values",
+   "fieldtype": "Section Break",
+   "label": "Values"
+  },
+  {
+   "fieldname": "old_values",
+   "fieldtype": "JSON",
+   "label": "Old Values",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_values",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "proposed_values",
+   "fieldtype": "JSON",
+   "label": "New Values",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason"
+  },
+  {
+   "fieldname": "section_break_consent",
+   "fieldtype": "Section Break",
+   "label": "Consent"
+  },
+  {
+   "fieldname": "proposed_by",
+   "fieldtype": "Link",
+   "label": "Proposed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "agreed_by_phamos",
+   "fieldtype": "Link",
+   "label": "Agreed by phamos",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_consent",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "agreed_by_customer",
+   "fieldtype": "Link",
+   "label": "Agreed by Customer",
+   "options": "Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "applied_on",
+   "fieldtype": "Datetime",
+   "label": "Applied On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "dispute_reason",
+   "fieldtype": "Small Text",
+   "label": "Dispute Reason",
+   "read_only": 1,
+   "depends_on": "eval:doc.status=='Disputed'"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 21:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Change",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "CHG-.#####",
+ "title_field": "change_type",
+ "track_changes": 1
+}
