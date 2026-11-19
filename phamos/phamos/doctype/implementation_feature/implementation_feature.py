@@ -162,7 +162,10 @@ def take_over_from_sales(implementation):
 			"Implementation Feature", name, {"implementation": implementation, "customer": customer}, update_modified=False
 		)
 	for name in names:
-		frappe.get_doc("Implementation Feature", name).save()
+		feature = frappe.get_doc("Implementation Feature", name)
+		feature.save()
+		# set_value above bypasses Version tracking, so the move is recorded on the timeline here
+		feature.add_comment("Info", _("Taken over from sales into Implementation {0}").format(implementation))
 	return names
 
 
@@ -186,15 +189,12 @@ def _won_opportunities(implementation):
 		pluck="opportunity",
 		distinct=True,
 	)
-	# An Opportunity of another customer is not taken over, even if a Quotation points to it.
-	# One that came from a Lead has no customer yet and counts.
 	customer = frappe.db.get_value("Implementation", implementation, "customer")
-	return [
-		name
-		for name in opportunities
-		if not (
-			(party := frappe.db.get_value("Opportunity", name, ["opportunity_from", "party_name"], as_dict=True))
-			and party.opportunity_from == "Customer"
-			and party.party_name != customer
-		)
-	]
+	return [name for name in opportunities if not _belongs_to_another_customer(name, customer)]
+
+
+def _belongs_to_another_customer(opportunity, customer):
+	"""An Opportunity of another customer is not taken over, even if a Quotation points to it.
+	One that came from a Lead has no customer yet and counts."""
+	party = frappe.db.get_value("Opportunity", opportunity, ["opportunity_from", "party_name"], as_dict=True)
+	return bool(party and party.opportunity_from == "Customer" and party.party_name != customer)
