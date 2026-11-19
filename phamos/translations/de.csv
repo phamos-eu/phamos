@@ -2286,11 +2286,9 @@ Dispute Reason,Grund des Widerspruchs
 Baseline Date,Datum der Planungsbasis
 Snapshot,Momentaufnahme
 Proposed,Vorgeschlagen
-Applied,Angewendet
 Applied – awaiting customer,Angewendet – wartet auf Kunden
 Disputed,Widersprochen
-Target level,Zielstufe
-Rank,Rang
+Target level,Ziel-Level
 Scope add,Umfang hinzugefügt
 Scope drop,Umfang gestrichen
 Scope change,Umfang geändert
@@ -2318,7 +2316,6 @@ Your side has agreed already. The other side decides now.,Ihre Seite hat bereits
 Say why you dispute the change.,"Sagen Sie, warum Sie der Änderung widersprechen."
 Name the customer contact who decided.,"Nennen Sie den Kundenkontakt, der entschieden hat."
 {0} is not a customer stakeholder of this implementation.,{0} ist kein Kunden-Stakeholder dieser Implementierung.
-Planning,Planung
 Agree,Zustimmen
 Reject change,Änderung ablehnen
 Customer confirmed,Kunde hat bestätigt
@@ -2326,7 +2323,8 @@ Customer disputed,Kunde hat widersprochen
 Customer contact,Kundenkontakt
 Record the customer's confirmation,Bestätigung des Kunden erfassen
 Record the customer's dispute,Widerspruch des Kunden erfassen
-Reject,Ablehnen
 Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
 Choose a Planning meeting that is not yet submitted.,"Wählen Sie ein Planungsmeeting aus, das noch nicht gebucht ist."
 These agreed changes could not be applied and stay Agreed:,Diese vereinbarten Änderungen konnten nicht angewendet werden und bleiben vereinbart:
+Customer agreed,Kunde hat zugestimmt
+Record the customer's agreement,Zustimmung des Kunden erfassen
