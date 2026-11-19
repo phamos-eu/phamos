@@ -40,6 +40,12 @@ def get_week_bounds(for_date):
     return week_start, week_end
 
 def update_all_teams_weekly_holidays():
+    # Lead, co-lead and members follow the Team Assignments open today (#1974); first, so the
+    # capacity below counts today's members.
+    from phamos.phamos.doctype.team_assignment.team_assignment import sync_all_teams
+
+    sync_all_teams()
+
     today = date.today()
 
     # Current month date range

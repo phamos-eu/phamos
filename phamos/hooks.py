@@ -581,8 +581,6 @@ fixtures = [
 scheduler_events = {
     "daily": [
         "phamos.api.send_daily_timesheet_comment_summary",
-        # Team: lead, co-lead and members follow the Team Assignments open today (#1974); before the capacity job
-        "phamos.phamos.doctype.team_assignment.team_assignment.sync_all_teams",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",

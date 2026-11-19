@@ -201,45 +201,83 @@ class TestHelpers(TeamAssignmentTestCase):
 
 
 class TestFromExistingTeams(TeamAssignmentTestCase):
-	def _fill(self, team, lead=None, members=()):
+	def _fill(self, team, created, lead=None, members=()):
 		doc = frappe.get_doc("Team", team)
 		doc.team_lead = lead
 		for employee in members:
 			doc.append("team_members", {"employee": employee})
 		doc.save(ignore_permissions=True)
+		# backdate the Team and its rows, as on a real site where the Team is older
+		frappe.db.set_value("Team", team, "creation", created, update_modified=False)
+		frappe.db.sql("update `tabTeam Members` set creation=%s where parent=%s", (created, team))
 		return doc
 
-	def test_one_assignment_per_member_starting_when_added_or_joined(self):
-		doc = self._fill(TEAM_A, lead=self.anna, members=[self.ben, self.cara])
-		added = getdate(doc.team_members[0].creation)
-		created = ta.assignments_from_team(TEAM_A)["created"]
-		rows = {
-			r.employee: r
-			for r in frappe.get_all("Team Assignment", filters={"name": ["in", created]}, fields=["employee", "role", "from_date", "until_date"])
+	def _rows(self, names):
+		return {
+			(r.employee, r.team): r
+			for r in frappe.get_all(
+				"Team Assignment", filters={"name": ["in", names]}, fields=["employee", "team", "role", "from_date", "until_date"]
+			)
 		}
-		self.assertEqual(rows[self.anna].role, "Lead")
-		self.assertEqual(rows[self.ben].role, "Member")
-		# ben joined the company long before: the date he was added to the table counts
-		self.assertEqual(getdate(rows[self.ben].from_date), added)
-		# cara joined after being put into the table (test data): her joining date counts
-		self.assertEqual(getdate(rows[self.cara].from_date), max(added, date(2026, 6, 1)))
+
+	def test_one_assignment_per_member_from_team_creation_or_joining(self):
+		self._fill(TEAM_A, "2024-03-01", lead=self.anna, members=[self.ben, self.cara])
+		rows = self._rows(ta.assignments_from_team(TEAM_A)["created"])
+		self.assertEqual(rows[(self.anna, TEAM_A)].role, "Lead")
+		self.assertEqual(rows[(self.ben, TEAM_A)].role, "Member")
+		# ben joined the company before the Team existed: the Team's creation counts
+		self.assertEqual(getdate(rows[(self.ben, TEAM_A)].from_date), date(2024, 3, 1))
+		# cara joined later: her joining date counts
+		self.assertEqual(getdate(rows[(self.cara, TEAM_A)].from_date), date(2026, 6, 1))
 		self.assertTrue(all(r.until_date is None for r in rows.values()))
 
-	def test_a_person_in_two_teams_keeps_one(self):
-		self._fill(TEAM_A, members=[self.anna])
-		self._fill(TEAM_B, members=[self.anna, self.ben])
-		ta.assignments_from_team(TEAM_A)
-		result = ta.assignments_from_team(TEAM_B)
+	def test_a_person_in_two_teams_keeps_the_one_with_the_higher_role(self):
+		self._fill(TEAM_A, "2024-01-01", members=[self.anna])
+		self._fill(TEAM_B, "2025-06-01", lead=self.anna, members=[self.ben])
+		result = ta.assignments_from_teams([TEAM_A, TEAM_B])
+		rows = self._rows(result["created"])
+		self.assertIsNone(rows[(self.anna, TEAM_B)].until_date)
+		# team A: ends the day before team B starts, so the history keeps it and nothing overlaps
+		self.assertEqual(getdate(rows[(self.anna, TEAM_A)].until_date), date(2025, 5, 31))
 		self.assertEqual(len(result["ended"]), 1)
-		ended = frappe.get_doc("Team Assignment", result["ended"][0])
-		self.assertEqual(ended.employee, self.anna)
-		self.assertEqual(getdate(ended.until_date), add_days(getdate(today()), -1))
+		self.assertEqual(ta.members_of(TEAM_A, "2025-01-01"), [self.anna])
+		self.assertEqual(ta.members_of(TEAM_B, today()), [self.anna, self.ben])
+
+	def test_no_room_before_the_kept_team_means_no_assignment(self):
+		self._fill(TEAM_A, "2025-06-01", members=[self.anna])
+		self._fill(TEAM_B, "2025-06-01", members=[self.anna])
+		result = ta.assignments_from_teams([TEAM_A, TEAM_B])
+		# same role: the first team by name is kept; the other starts no earlier, so it is skipped
+		self.assertEqual(result["skipped"], [f"{self.anna} in {TEAM_B}"])
 		self.assertEqual(ta.members_of(TEAM_A, today()), [self.anna])
-		self.assertEqual(ta.members_of(TEAM_B, today()), [self.ben])
 
 	def test_a_team_without_assignments_is_left_alone(self):
-		self._fill(TEAM_A, members=[self.anna])
+		self._fill(TEAM_A, "2024-01-01", members=[self.anna])
 		ta.sync_all_teams()
 		self.assertEqual([row.employee for row in frappe.get_doc("Team", TEAM_A).team_members], [self.anna])
 		user = frappe.db.get_value("Employee", self.anna, "user_id")
 		self.assertIn(TEAM_A, teams.member_teams(user))
+
+
+class TestSyncEdges(TeamAssignmentTestCase):
+	def test_deleting_the_last_assignment_empties_the_team(self):
+		only = self.assign(self.anna, TEAM_A, "2026-01-01", role="Lead")
+		only.delete(ignore_permissions=True)
+		team = frappe.get_doc("Team", TEAM_A)
+		self.assertEqual((team.team_lead, team.team_members), (None, []))
+
+	def test_becoming_lead_while_another_lead_is_open_is_refused(self):
+		self.assign(self.anna, TEAM_A, "2026-01-01", role="Lead")
+		member = self.assign(self.ben, TEAM_A, "2026-01-01")
+		member.role = "Lead"
+		with self.assertRaises(frappe.ValidationError):
+			member.save()
+
+	def test_a_failing_team_does_not_block_the_assignment(self):
+		with patch("phamos.phamos.doctype.team.team.Team.validate", side_effect=frappe.ValidationError("broken"), create=True):
+			assignment = self.assign(self.anna, TEAM_A, "2026-01-01")
+		self.assertTrue(frappe.db.exists("Team Assignment", assignment.name))
+		self.assertEqual(frappe.get_doc("Team", TEAM_A).team_members, [])
+		# the daily job catches up once the Team is fine again
+		ta.sync_all_teams()
+		self.assertEqual([row.employee for row in frappe.get_doc("Team", TEAM_A).team_members], [self.anna])

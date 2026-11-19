@@ -25,6 +25,11 @@ CO_LEAD = "Co-Lead"
 MEMBER = "Member"
 # Far future stand-in for an open end, so open and closed periods compare alike.
 OPEN_END = date(9999, 12, 31)
+ROLE_RANK = {LEAD: 0, CO_LEAD: 1, MEMBER: 2}
+
+
+class TeamAssignmentOverlapError(frappe.ValidationError):
+	"""An employee's assignments overlap (one team at a time)."""
 
 
 class TeamAssignment(Document):
@@ -36,17 +41,17 @@ class TeamAssignment(Document):
 	def on_update(self):
 		if self.flags.skip_team_sync:
 			return
-		sync_team(self.team, from_assignment=True)
+		_sync_after_change(self.team)
 		previous = self.get_doc_before_save()
 		if previous and previous.team != self.team:
 			# may have been that team's last assignment: sync it anyway, so the person leaves it
-			sync_team(previous.team, from_assignment=True)
+			_sync_after_change(previous.team)
 
 	def on_trash(self):
 		if self.flags.skip_team_sync:
 			return
 		# Runs before the row is deleted: leave it out of the sync explicitly.
-		sync_team(self.team, exclude=self.name, from_assignment=True)
+		_sync_after_change(self.team, exclude=self.name)
 
 	def validate_dates(self):
 		if self.until_date and getdate(self.until_date) < getdate(self.from_date):
@@ -72,7 +77,8 @@ class TeamAssignment(Document):
 			frappe.throw(
 				_("{0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.").format(
 					self.employee_name or self.employee, row.team, row.name
-				)
+				),
+				exc=TeamAssignmentOverlapError,
 			)
 
 	def validate_one_lead_per_role(self):
@@ -170,69 +176,110 @@ def sync_team(team, on_date=None, exclude=None, from_assignment=False):
 	doc.team_lead = lead
 	doc.co_team_lead = co_lead
 	doc.set("team_members", wanted)
-	doc.flags.from_team_assignment = True
 	doc.save(ignore_permissions=True)
 
 
+def _sync_quietly(team, **kwargs):
+	"""sync_team inside a savepoint. A failing Team (its validation or its on_update hooks, e.g. the
+	Mailcow sync) is rolled back to the savepoint and logged instead of half-saved or raised.
+	Returns True when the Team is in step."""
+	frappe.db.savepoint("team_assignment_sync")
+	try:
+		sync_team(team, **kwargs)
+		return True
+	except Exception:
+		frappe.db.rollback(save_point="team_assignment_sync")
+		frappe.log_error(title=f"Team Assignment: syncing team {team} failed")
+		return False
+
+
+def _sync_after_change(team, exclude=None):
+	"""After an assignment changed: the assignment is saved even if its Team cannot be updated right
+	now; HR gets a notice and the daily job tries again."""
+	if not _sync_quietly(team, exclude=exclude, from_assignment=True):
+		frappe.msgprint(
+			_("The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.").format(team),
+			indicator="orange",
+			alert=True,
+		)
+
+
 def sync_all_teams():
-	"""Daily job: assignments that started or ended overnight reach the Team."""
+	"""Daily, at the start of the Team capacity job: assignments that started or ended overnight
+	reach the Team before its capacity is computed."""
 	for team in frappe.get_all("Team", pluck="name"):
-		try:
-			sync_team(team)
-		except Exception:
-			frappe.log_error(title=f"Team Assignment sync failed for {team}")
+		_sync_quietly(team)
+
+
+def assignments_from_teams(team_names):
+	"""Open assignments for the current lead, co-lead and members of Teams that have none yet.
+
+	Used by the patch and the demo data. Start date: the Team's creation date, or the person's date
+	of joining if later. (Frappe gives every row of the member table the Team's creation date, and
+	Team keeps no change history, so the day someone was added to the table is not known.) A person
+	in a row and a lead field gets the lead role; a person who is both lead and co-lead, the lead
+	role.
+
+	A person in several teams (possible before #1974) keeps one: the team where they have the
+	highest role, then the first by name. Their assignment there is open; the other teams get an
+	assignment that ends the day before the kept one starts, so one team at a time holds and the
+	history still shows them. If that leaves no room (the kept one starts at the person's earliest
+	date), no assignment is created there. Both cases are returned for HR to check.
+
+	Returns {"created": [names], "ended": [names], "skipped": ["employee in team"]}.
+	"""
+	people = {}  # employee -> {team: {"role", "since", "designation"}}
+	for team in team_names:
+		doc = frappe.get_doc("Team", team)
+		created_on = getdate(doc.creation)
+		in_team = {}
+		for row in doc.team_members:
+			if row.employee:
+				in_team.setdefault(row.employee, {"role": MEMBER, "designation": row.designation})
+		for employee, role in ((doc.co_team_lead, CO_LEAD), (doc.team_lead, LEAD)):
+			if employee:
+				in_team.setdefault(employee, {"role": role, "designation": None})["role"] = role
+		for employee, person in in_team.items():
+			joined = frappe.db.get_value("Employee", employee, "date_of_joining")
+			person["since"] = max(created_on, getdate(joined)) if joined else created_on
+			people.setdefault(employee, {})[team] = person
+
+	result = {"created": [], "ended": [], "skipped": []}
+	for employee, by_team in people.items():
+		order = sorted(by_team, key=lambda team: (ROLE_RANK[by_team[team]["role"]], team))
+		kept = order[0]
+		kept_start = by_team[kept]["since"]
+		result["created"].append(_insert_assignment(employee, kept, by_team[kept], by_team[kept]["since"], None))
+		for team in order[1:]:
+			until = add_days(kept_start, -1)
+			start = by_team[team]["since"]
+			if start > until:
+				result["skipped"].append(f"{employee} in {team}")
+				continue
+			name = _insert_assignment(employee, team, by_team[team], start, until)
+			result["created"].append(name)
+			result["ended"].append(name)
+	return result
 
 
 def assignments_from_team(team):
-	"""Open assignments for the current lead, co-lead and members of a Team that has none yet.
+	"""assignments_from_teams for one Team (demo data)."""
+	return assignments_from_teams([team])
 
-	Used by the patch and the demo data. Start date: when the person was added to the member table
-	(the row's creation), or their date of joining if later; lead and co-lead without a row: the
-	Team's creation, or their date of joining if later. A person in a row and a lead field gets the
-	lead role. A person who already has an open assignment in another team (in several teams before
-	#1974) gets this one ended yesterday, so one team at a time holds.
 
-	Returns {"created": [names], "ended": [names ended because of another team]}.
-	"""
-	doc = frappe.get_doc("Team", team)
-	people = {}
-	for row in doc.team_members:
-		if row.employee:
-			people.setdefault(row.employee, {"role": MEMBER, "since": getdate(row.creation), "designation": row.designation})
-	for employee, role in ((doc.co_team_lead, CO_LEAD), (doc.team_lead, LEAD)):
-		if employee:
-			person = people.setdefault(employee, {"role": role, "since": getdate(doc.creation), "designation": None})
-			person["role"] = role
-
-	yesterday = add_days(getdate(today()), -1)
-	result = {"created": [], "ended": []}
-	for employee, person in people.items():
-		joined = frappe.db.get_value("Employee", employee, "date_of_joining")
-		start = max(person["since"], getdate(joined)) if joined else person["since"]
-		until = None
-		if frappe.db.exists("Team Assignment", {"employee": employee}):
-			until = yesterday
-			start = min(start, yesterday)
-		assignment = frappe.get_doc(
-			{
-				"doctype": "Team Assignment",
-				"employee": employee,
-				"team": team,
-				"role": person["role"],
-				"from_date": start,
-				"until_date": until,
-				"designation": person["designation"],
-			}
-		)
-		assignment.flags.skip_team_sync = True
-		try:
-			assignment.insert(ignore_permissions=True)
-		except frappe.ValidationError:
-			# e.g. the other team's assignment starts before this one would end: skip, HR decides
-			frappe.clear_last_message()
-			result["ended"].append(f"{employee} in {team}: not created, overlaps another team")
-			continue
-		result["created"].append(assignment.name)
-		if until:
-			result["ended"].append(assignment.name)
-	return result
+def _insert_assignment(employee, team, person, from_date, until_date):
+	assignment = frappe.get_doc(
+		{
+			"doctype": "Team Assignment",
+			"employee": employee,
+			"team": team,
+			"role": person["role"],
+			"from_date": from_date,
+			"until_date": until_date,
+			"designation": person["designation"],
+		}
+	)
+	# the caller syncs the Teams once at the end
+	assignment.flags.skip_team_sync = True
+	assignment.insert(ignore_permissions=True)
+	return assignment.name

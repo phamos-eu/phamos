@@ -45,6 +45,9 @@ def member_teams(user=None, on_date=None):
 	if not employee:
 		return []
 	on_date = getdate(on_date or today())
+	if not frappe.db.table_exists("Team Assignment"):
+		# code deployed, migrate not run yet
+		return sorted(_legacy_member_teams(employee))
 	names = set(
 		frappe.get_all(
 			"Team Assignment",
