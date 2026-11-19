@@ -72,6 +72,8 @@ class ImplementationChange(Document):
 		before = self.get_doc_before_save()
 		if before and before.status in ("Applied", "Rejected") and self.has_value_changed("proposed_values"):
 			frappe.throw(_("An applied or rejected change cannot be edited. Propose a new change instead."))
+		if self.status in ("Proposed", "Agreed") and self.stakeholder_meeting:
+			check_planning_meeting(self.stakeholder_meeting, self.implementation)
 
 	@property
 	def values(self):
@@ -98,6 +100,20 @@ class ImplementationChange(Document):
 		self.status = "Applied"
 		self.applied_on = now_datetime()
 		self.save(ignore_permissions=True)
+
+
+def check_planning_meeting(meeting, implementation):
+	"""An open change may wait only for a Planning meeting of its implementation that is not yet
+	submitted: only the submit of such a meeting applies it (apply_agreed_changes_of_meeting)."""
+	from phamos.setup.implementation_cockpit import PLANNING_MEETING_TYPE
+
+	values = frappe.db.get_value(
+		"Stakeholder Meeting", meeting, ["implementation", "docstatus", "meeting_type"], as_dict=True
+	)
+	if not values or values.implementation != implementation:
+		frappe.throw(_("The meeting belongs to another implementation."))
+	if values.docstatus != 0 or values.meeting_type != PLANNING_MEETING_TYPE:
+		frappe.throw(_("Choose a Planning meeting that is not yet submitted."))
 
 
 def _set_dod_agreement(feature, contact):
@@ -266,14 +282,33 @@ def _insert_change(implementation, target_doctype, target_name, change_type, old
 
 
 def apply_agreed_changes_of_meeting(meeting):
-	"""Submit of a Planning meeting: apply every Agreed change linked to it, oldest first."""
+	"""Submit of a Planning meeting: apply every Agreed change linked to it, oldest first.
+
+	A change its target no longer accepts (a date before the start, a dropped feature) must not
+	block the meeting: it is rolled back on its own, stays Agreed, and the chair is told which one
+	to propose again or link to the next session.
+	"""
+	failed = []
 	for name in frappe.get_all(
 		"Implementation Change",
 		filters={"stakeholder_meeting": meeting.name, "status": "Agreed"},
 		pluck="name",
 		order_by="creation asc",
 	):
-		frappe.get_doc("Implementation Change", name).apply()
+		frappe.db.savepoint("implementation_change_apply")
+		try:
+			frappe.get_doc("Implementation Change", name).apply()
+		except frappe.ValidationError as error:
+			frappe.db.rollback(save_point="implementation_change_apply")
+			failed.append(f"{name}: {frappe.utils.strip_html(str(error))}")
+	if failed:
+		frappe.msgprint(
+			_("These agreed changes could not be applied and stay Agreed:")
+			+ "<br>"
+			+ "<br>".join(frappe.utils.escape_html(line) for line in failed),
+			indicator="orange",
+		)
+	return failed
 
 
 # API for the cockpit ---------------------------------------------------------------------------
@@ -298,10 +333,8 @@ def propose_change(
 	if not isinstance(values, dict) or not values:
 		frappe.throw(_("Name the values to change."))
 	_validate_proposal(implementation, target_doctype, target_name, change_type, values)
-	if stakeholder_meeting and (
-		frappe.db.get_value("Stakeholder Meeting", stakeholder_meeting, "implementation") != implementation
-	):
-		frappe.throw(_("The meeting belongs to another implementation."))
+	if stakeholder_meeting:
+		check_planning_meeting(stakeholder_meeting, implementation)
 	old_values = {}
 	if target_name:
 		old_values = frappe.db.get_value(target_doctype, target_name, list(values), as_dict=True) or {}
