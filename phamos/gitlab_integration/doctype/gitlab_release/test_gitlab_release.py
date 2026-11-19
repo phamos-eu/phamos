@@ -100,3 +100,26 @@ class TestGitLabRelease(FrappeTestCase):
 		log_error.assert_called_once()
 		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v1.0"))
 		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v3.0"))
+
+	def test_an_unreachable_project_does_not_stop_the_others(self):
+		other = make_project(make_implementation().name)
+
+		def fetch(project_id):
+			if project_id == other:
+				raise frappe.ValidationError("GitLab answered 404")
+			return [release_payload("v1.0")] if project_id == self.project else []
+
+		with mock.patch.object(gitlab_utils, "get_releases_for_project", side_effect=fetch), mock.patch.object(
+			frappe.db, "commit"
+		), mock.patch.object(frappe, "log_error") as log_error:
+			gitlab_utils.sync_gitlab_releases()
+		self.assertTrue(frappe.db.exists("GitLab Release", f"{self.project}-v1.0"))
+		self.assertTrue(any(other in str(call) for call in log_error.call_args_list))
+
+	def test_a_non_200_answer_is_an_error_not_an_empty_list(self):
+		response = mock.Mock(status_code=403)
+		settings = frappe._dict(gitlab_url="https://git.example.com")
+		with mock.patch.object(gitlab_utils.requests, "get", return_value=response), mock.patch.object(
+			frappe, "get_single", return_value=settings
+		), mock.patch.object(gitlab_utils, "get_gitlab_headers", return_value={}):
+			self.assertRaises(frappe.ValidationError, gitlab_utils.get_releases_for_project, "1")
