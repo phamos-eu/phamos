@@ -450,6 +450,40 @@ class TestCompanyAppointments(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on="Weekly", repeat_till="2026-11-01"))
 
+	def test_a_weekly_repeat_starts_on_its_first_ticked_weekday(self):
+		"""2026-12-01 is a Tuesday. With Monday and Thursday ticked, the invite would start on a day
+		the repeat doesn't have; the start moves to Thursday, the end with it."""
+		weekly = {"repeat_this_event": 1, "repeat_on": "Weekly"}
+		saved = gm.save_appointment(self._appointment(**weekly, monday=1, thursday=1))
+		self.assertEqual(str(saved["start"]), "2026-12-03 10:00:00")
+		self.assertEqual(str(saved["end"]), "2026-12-03 11:00:00")
+		self.assertEqual((saved["monday"], saved["thursday"]), (1, 1))
+		# Only earlier weekdays ticked: the first one of the next week.
+		saved = gm.save_appointment(self._appointment(**weekly, monday=1))
+		self.assertEqual(str(saved["start"]), "2026-12-07 10:00:00")
+		# An appointment over midnight keeps its length.
+		saved = gm.save_appointment(self._appointment(**weekly, friday=1, end="2026-12-02 01:00:00"))
+		self.assertEqual((str(saved["start"]), str(saved["end"])), ("2026-12-04 10:00:00", "2026-12-05 01:00:00"))
+
+	def test_a_start_that_fits_its_repeat_stays(self):
+		weekly = {"repeat_this_event": 1, "repeat_on": "Weekly"}
+		for values in (
+			{**weekly, "tuesday": 1, "thursday": 1},  # the start's weekday is ticked
+			weekly,  # no weekday ticked: the repeat runs on the start's weekday
+			{"repeat_this_event": 1, "repeat_on": "Daily", "monday": 1},  # weekdays only count for Weekly
+			{"repeat_this_event": 0, "repeat_on": "Weekly", "monday": 1},  # no repeat
+		):
+			saved = gm.save_appointment(self._appointment(**values))
+			self.assertEqual(str(saved["start"]), "2026-12-01 10:00:00", values)
+			self.assertEqual(str(saved["end"]), "2026-12-01 11:00:00", values)
+
+	def test_repeat_until_cannot_be_before_the_first_ticked_weekday(self):
+		weekly = {"repeat_this_event": 1, "repeat_on": "Weekly", "thursday": 1}
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(**weekly, repeat_till="2026-12-02"))
+		saved = gm.save_appointment(self._appointment(**weekly, repeat_till="2026-12-03"))
+		self.assertEqual(str(saved["start"]), "2026-12-03 10:00:00")
+
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
 		for call in (
