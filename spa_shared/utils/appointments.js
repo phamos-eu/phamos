@@ -44,21 +44,6 @@ export function weeklyDays(appointment) {
 	return start ? [weekdayIndex(start)] : []
 }
 
-/**
- * Where a weekly repeat really starts: the first ticked weekday on or after the start. Null when
- * the start stays (not weekly, no weekday ticked, or the start's own weekday is ticked).
- * save_appointment moves start and end there (_first_weekly_start in
- * phamos/api/general_management_spa.py); the dialog says so before the save.
- */
-export function firstWeeklyStart(appointment) {
-	if (repeatFrequency(appointment) !== "Weekly") return null
-	const start = parseDateTime(appointment.start)
-	const ticked = WEEKDAYS.map((day, i) => (Number(appointment[day]) ? i : -1)).filter((i) => i >= 0)
-	if (!start || !ticked.length) return null
-	const daysAhead = Math.min(...ticked.map((i) => (i - weekdayIndex(start) + 7) % 7))
-	return daysAhead ? addDays(start, daysAhead) : null
-}
-
 function repeatEnd(appointment) {
 	const until = parseDateTime(appointment.repeat_till)
 	if (!until) return null
