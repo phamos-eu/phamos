@@ -53,8 +53,9 @@ class ImplementationRelease(Document):
 		# the releases after this one share what is left of the capacity
 		refresh_release_check(self.implementation, skip=self.name)
 
-	def on_trash(self):
-		frappe.db.after_commit.add(lambda: refresh_release_check(self.implementation))
+	def after_delete(self):
+		# the row is gone now, in the same transaction: the other releases get its capacity back
+		refresh_release_check(self.implementation)
 
 	def validate_links(self):
 		if self.chapter and frappe.db.get_value("Implementation Chapter", self.chapter, "implementation") != self.implementation:
@@ -152,11 +153,15 @@ def feature_efforts(features):
 		if feature.status in DONE_FEATURE_STATUSES:
 			efforts[feature.name] = 0.0
 		elif any(flt(issue.time_estimate_hours) for issue in linked):
-			efforts[feature.name] = sum(
+			# GitLab estimates refine the feature's hours but never make it look smaller than they
+			# do: while only some issues are estimated, what is left of the feature's own hours wins
+			open_estimates = sum(
 				max(flt(issue.time_estimate_hours) - flt(issue.time_spent_hours), 0)
 				for issue in linked
 				if issue.state != "closed"
 			)
+			left_of_hours = flt(feature.estimated_hours) - sum(flt(issue.time_spent_hours) for issue in linked)
+			efforts[feature.name] = max(open_estimates, left_of_hours, 0.0)
 		else:
 			efforts[feature.name] = flt(feature.estimated_hours)
 	return efforts
@@ -329,10 +334,16 @@ def link_published_release(doc, method=None):
 		},
 		pluck="name",
 	):
-		release = frappe.get_doc("Implementation Release", name)
-		release.gitlab_release = doc.name
-		release.status = "Released"
-		release.save(ignore_permissions=True)
+		# a planned release that no longer validates must not stop the GitLab Release from syncing
+		frappe.db.savepoint("implementation_release_link")
+		try:
+			release = frappe.get_doc("Implementation Release", name)
+			release.gitlab_release = doc.name
+			release.status = "Released"
+			release.save(ignore_permissions=True)
+		except Exception:
+			frappe.db.rollback(save_point="implementation_release_link")
+			frappe.log_error(frappe.get_traceback(), f"Implementation Release Link Error - {name}")
 
 
 @frappe.whitelist()
