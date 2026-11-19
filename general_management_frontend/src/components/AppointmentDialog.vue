@@ -40,9 +40,9 @@
 								{{ __(DAY_LABELS[i]) }}
 							</button>
 						</div>
-						<!-- The start is on a weekday that isn't ticked: the save moves it (_first_weekly_start). -->
-						<div v-if="movedStartText" class="text-xs text-ink-amber-3" role="status">
-							{{ __("First appointment: {0}. Start and end move to that day.", [movedStartText]) }}
+						<!-- The start's weekday isn't ticked: the start is an extra first appointment. -->
+						<div v-if="startOutsideDays" class="text-xs text-ink-gray-5" role="status">
+							{{ __("The start is the first appointment. After it, the appointment repeats on the ticked days.") }}
 						</div>
 					</div>
 				</div>
@@ -90,8 +90,7 @@ import { computed, ref, watch } from "vue"
 import { Button, call, Dialog, ErrorMessage, FormControl } from "frappe-ui"
 import AttendeePicker from "@spa/components/AttendeePicker.vue"
 import { normalizeAttendees } from "@spa/utils/attendeePicker.js"
-import { firstWeeklyStart, WEEKDAYS } from "@spa/utils/appointments.js"
-import { formatDate } from "@spa/utils/datetime"
+import { startOutsideWeeklyDays, WEEKDAYS } from "@spa/utils/appointments.js"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
@@ -144,15 +143,7 @@ const dialogOptions = computed(() => ({
 const toInput = (value) => (value ? String(value).replace(" ", "T").slice(0, 16) : "")
 const fromInput = (value) => (value ? `${value.replace("T", " ")}:00`.slice(0, 19) : "")
 
-// Weekly on days that don't include the start's weekday: the day the save moves the start to,
-// as "Mon, 23.11.2026" (the user's date format, as in the list), or "" when the start stays.
-const movedStartText = computed(() => {
-	const first = firstWeeklyStart({ ...form.value, start: fromInput(form.value.start) })
-	if (!first) return ""
-	const pad = (n) => String(n).padStart(2, "0")
-	const date = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(first.getDate())}`
-	return `${__(DAY_LABELS[(first.getDay() + 6) % 7])}, ${formatDate(date)}`
-})
+const startOutsideDays = computed(() => startOutsideWeeklyDays({ ...form.value, start: fromInput(form.value.start) }))
 
 function reset() {
 	const a = props.appointment || {}
