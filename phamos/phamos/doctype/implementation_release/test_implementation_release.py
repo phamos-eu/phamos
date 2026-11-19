@@ -73,7 +73,10 @@ class TestImplementationRelease(FrappeTestCase):
 		gitlab_issue(feature.name, estimate=5, spent=2)
 		gitlab_issue(feature.name, estimate=4, spent=6)  # overspent counts 0, never negative
 		gitlab_issue(feature.name, state="closed", estimate=10)
-		self.assertEqual(feature_efforts(rows)[feature.name], 3.0)
+		# open estimates 3 h, but 12 h - 8 h spent leaves 4 h: partly estimated issues never shrink it
+		self.assertEqual(feature_efforts(rows)[feature.name], 4.0)
+		gitlab_issue(feature.name, estimate=20)
+		self.assertEqual(feature_efforts(rows)[feature.name], 23.0)  # estimates above the hours win
 
 	def test_capacity_with_leave_and_share(self):
 		user = f"rel-{frappe.generate_hash(length=6)}@example.com"
@@ -195,3 +198,41 @@ class TestImplementationRelease(FrappeTestCase):
 		self.assertEqual(
 			get_released_features_awaiting_live(self.implementation), [{"feature": feature.name, "release": release.name}]
 		)
+
+
+	def test_deleting_a_release_frees_capacity_for_the_next(self):
+		a, b = (make_feature(self.implementation, title=t, estimated_hours=h) for t, h in (("A", 8), ("B", 9)))
+		with fixed_capacity({str(getdate(NEAR)): 10, str(getdate(FAR)): 10}):
+			first = make_release(self.implementation, [a.name], NEAR, title="First")
+			second = make_release(self.implementation, [b.name], FAR, title="Second")
+			self.assertEqual(frappe.db.get_value("Implementation Release", second.name, "fit"), "Red")
+			first.delete()
+		self.assertEqual(frappe.db.get_value("Implementation Release", second.name, "fit"), "Amber")
+
+	def test_a_planned_release_that_fails_does_not_stop_the_gitlab_sync(self):
+		project = str(random.randint(10**8, 10**9))
+		frappe.get_doc(
+			{"doctype": "GitLab Project", "project_id": project, "title": "_Test REL", "implementation": self.implementation}
+		).insert(ignore_permissions=True)
+		milestone = frappe.new_doc("GitLab Milestones")
+		milestone.update({"title": "Sprint", "milestone_id": random.randint(10**8, 10**9), "gitlab_project": project})
+		milestone.insert(ignore_permissions=True)
+		with fixed_capacity({str(getdate(NEAR)): 100}):
+			release = make_release(self.implementation, [], NEAR, milestones=[milestone.name])
+		with mock.patch.object(
+			implementation_release.ImplementationRelease, "validate", side_effect=frappe.ValidationError("broken")
+		), mock.patch.object(frappe, "log_error") as log_error:
+			published = frappe.get_doc(
+				{
+					"doctype": "GitLab Release",
+					"gitlab_project": project,
+					"tag_name": "v2.0",
+					"title": "v2.0",
+					"released_at": "2026-11-20 10:00:00",
+					"upcoming": 0,
+					"milestones": [{"gitlab_milestone": milestone.name}],
+				}
+			).insert(ignore_permissions=True)
+		self.assertTrue(frappe.db.exists("GitLab Release", published.name))
+		self.assertEqual(frappe.db.get_value("Implementation Release", release.name, "status"), "Planned")
+		log_error.assert_called_once()
