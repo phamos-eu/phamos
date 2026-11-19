@@ -236,3 +236,60 @@ class TestImplementationRelease(FrappeTestCase):
 		self.assertTrue(frappe.db.exists("GitLab Release", published.name))
 		self.assertEqual(frappe.db.get_value("Implementation Release", release.name, "status"), "Planned")
 		log_error.assert_called_once()
+
+	def test_a_released_release_keeps_its_features(self):
+		feature = make_feature(self.implementation, estimated_hours=1, status="In Testing")
+		with fixed_capacity({str(getdate(NEAR)): 100, str(getdate(FAR)): 100}):
+			old = make_release(self.implementation, [feature.name], NEAR, title="Shipped")
+			frappe.db.set_value("Implementation Release", old.name, "status", "Released")
+			make_release(self.implementation, [feature.name], FAR, title="Again")
+			old.reload()
+			old.features[0].note = "still saveable"
+			old.save()
+
+	def test_a_partial_gitlab_release_does_not_release_the_plan(self):
+		project = str(random.randint(10**8, 10**9))
+		frappe.get_doc(
+			{"doctype": "GitLab Project", "project_id": project, "title": "_Test REL", "implementation": self.implementation}
+		).insert(ignore_permissions=True)
+		one, two = [], []
+		for bucket in (one, two):
+			milestone = frappe.new_doc("GitLab Milestones")
+			milestone.update({"title": "Sprint", "milestone_id": random.randint(10**8, 10**9), "gitlab_project": project})
+			milestone.insert(ignore_permissions=True)
+			bucket.append(milestone.name)
+		with fixed_capacity({str(getdate(NEAR)): 100}):
+			release = make_release(self.implementation, [], NEAR, milestones=one + two)
+		frappe.get_doc(
+			{
+				"doctype": "GitLab Release",
+				"gitlab_project": project,
+				"tag_name": "v0.5",
+				"title": "v0.5",
+				"released_at": "2026-11-20 10:00:00",
+				"upcoming": 0,
+				"milestones": [{"gitlab_milestone": one[0]}],
+			}
+		).insert(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_value("Implementation Release", release.name, "status"), "Planned")
+
+	def test_one_broken_implementation_does_not_stop_the_daily_refresh(self):
+		other = make_implementation().name
+		a = make_feature(self.implementation, estimated_hours=1)
+		b = make_feature(other, estimated_hours=1)
+		with fixed_capacity({str(getdate(NEAR)): 100}):
+			make_release(self.implementation, [a.name], NEAR)
+			make_release(other, [b.name], NEAR)
+		calls = []
+
+		def refresh(implementation, skip=None):
+			calls.append(implementation)
+			if implementation == self.implementation:
+				raise frappe.ValidationError("broken team")
+
+		with mock.patch.object(implementation_release, "refresh_release_check", side_effect=refresh), mock.patch.object(
+			frappe, "log_error"
+		) as log_error:
+			implementation_release.refresh_all_release_checks()
+		self.assertIn(other, calls)
+		log_error.assert_called_once()
