@@ -159,6 +159,31 @@ class TestDepartmentEventSchedule(EventScheduleCase):
 		self.put.assert_not_called()
 
 
+class TestWeeklyStartDay(EventScheduleCase):
+	"""The chosen start is always the first appointment; after it the repeat runs on the ticked
+	weekdays (#1991). 2026-12-03 is a Thursday."""
+
+	def test_a_start_outside_the_weekdays_stays_and_is_an_occurrence(self):
+		department = frappe.get_doc("Department", self.department)
+		department.append(
+			"event_schedule",
+			self.event(
+				start="2026-12-03 10:00:00",
+				end="2026-12-03 11:00:00",
+				repeat_this_event=1,
+				repeat_on="Weekly",
+				monday=1,
+				wednesday=1,
+			),
+		)
+		department.save()
+		row = department.event_schedule[-1]
+		self.assertEqual(str(frappe.db.get_value("Team Daily Schedule", row.name, "start")), "2026-12-03 10:00:00")
+		ics = self.put.call_args.args[1]
+		self.assertIn("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", ics)
+		self.assertRegex(ics, r"(?m)^RDATE;TZID=[^:]+:20261203T100000\r$")
+
+
 class TestBackgroundSync(EventScheduleCase):
 	"""With the background flag (the cockpit's saves, decision 10 in #1949), Mailcow is called by a
 	job after the commit, not in the request."""
