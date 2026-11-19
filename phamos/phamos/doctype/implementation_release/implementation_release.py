@@ -39,8 +39,9 @@ AMBER_BUFFER = 0.2  # amber when less than 20% of the capacity is left
 
 class ImplementationRelease(Document):
 	def validate(self):
+		# the row order is the ranking: keep idx in step when rows were reordered in code
 		for index, row in enumerate(self.features, start=1):
-			row.rank = index
+			row.idx = row.rank = index
 		self.validate_links()
 		self.warn_about_missing_milestones()
 		if self.status in ACTIVE:
