@@ -407,7 +407,10 @@ doc_events = {
     "Delivery Note": {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": [
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.clear_timesheet_stamps_on_delivery_note_cancel",
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        ],
     },
     # Event tickets: Attendee links and payment status (phamos.marketing.billing). Only on_change: it runs
     # once after every save, submit and cancel, and payments reach an invoice through db_set, which runs

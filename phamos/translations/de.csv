@@ -2310,3 +2310,7 @@ Project Management,Projektmanagement
 Software Development,Softwareentwicklung
 The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
 "The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
+Deliveries & Invoices,Lieferungen & Rechnungen
+No Delivery Notes yet.,Noch keine Lieferscheine.
+Delivered {0} h of {1} h billable,Geliefert {0} h von {1} h abrechenbar
+Not yet invoiced {0} h,Noch nicht abgerechnet {0} h
