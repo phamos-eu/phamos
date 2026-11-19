@@ -2304,9 +2304,6 @@ Over the agreed limit,Über dem vereinbarten Limit
 Feature {0} does not exist.,Feature {0} existiert nicht.
 Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
 Agreed,Vereinbart
-Planned,Geplant
-In Progress,In Arbeit
-Live,Live
 {0} {1} is listed twice.,{0} {1} ist doppelt aufgeführt.
 {0} {1} does not exist.,{0} {1} existiert nicht.
 {0} {1} belongs to another implementation.,{0} {1} gehört zu einer anderen Implementierung.
@@ -2315,7 +2312,6 @@ GitLab Release,GitLab-Release
 GitLab Release Milestone,GitLab-Release-Meilenstein
 Release Notes,Versionshinweise
 Released At,Veröffentlicht am
-Tag,Tag
 Last Synced,Zuletzt synchronisiert
 Time Estimate (Hours),Zeitschätzung (Stunden)
 Time Spent (Hours),Aufgewendete Zeit (Stunden)
@@ -2327,10 +2323,7 @@ Implementation Release,Implementierungs-Release
 Implementation Release Feature,Implementierungs-Release Feature
 Implementation Release Milestone,Implementierungs-Release Meilenstein
 Realistic Check,Realitätscheck
-Fit,Passt
-Green,Grün
 Amber,Gelb
-Red,Rot
 Open Effort (Hours),Offener Aufwand (Stunden)
 Available Capacity (Hours),Verfügbare Kapazität (Stunden)
 Contents,Inhalt
@@ -2369,11 +2362,9 @@ Dispute Reason,Grund des Widerspruchs
 Baseline Date,Datum der Planungsbasis
 Snapshot,Momentaufnahme
 Proposed,Vorgeschlagen
-Applied,Angewendet
 Applied – awaiting customer,Angewendet – wartet auf Kunden
 Disputed,Widersprochen
-Target level,Zielstufe
-Rank,Rang
+Target level,Ziel-Level
 Scope add,Umfang hinzugefügt
 Scope drop,Umfang gestrichen
 Scope change,Umfang geändert
@@ -2401,7 +2392,6 @@ Your side has agreed already. The other side decides now.,Ihre Seite hat bereits
 Say why you dispute the change.,"Sagen Sie, warum Sie der Änderung widersprechen."
 Name the customer contact who decided.,"Nennen Sie den Kundenkontakt, der entschieden hat."
 {0} is not a customer stakeholder of this implementation.,{0} ist kein Kunden-Stakeholder dieser Implementierung.
-Planning,Planung
 Agree,Zustimmen
 Reject change,Änderung ablehnen
 Customer confirmed,Kunde hat bestätigt
@@ -2409,7 +2399,6 @@ Customer disputed,Kunde hat widersprochen
 Customer contact,Kundenkontakt
 Record the customer's confirmation,Bestätigung des Kunden erfassen
 Record the customer's dispute,Widerspruch des Kunden erfassen
-Reject,Ablehnen
 Implementation Baseline Release,Planungsbasis Release
 Ranking,Rangfolge
 The release's features in their agreed order.,Die Features des Releases in ihrer vereinbarten Reihenfolge.
@@ -2426,3 +2415,5 @@ Only planned releases can be changed.,Nur geplante Releases können geändert we
 Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
 Choose a Planning meeting that is not yet submitted.,"Wählen Sie ein Planungsmeeting aus, das noch nicht gebucht ist."
 These agreed changes could not be applied and stay Agreed:,Diese vereinbarten Änderungen konnten nicht angewendet werden und bleiben vereinbart:
+Customer agreed,Kunde hat zugestimmt
+Record the customer's agreement,Zustimmung des Kunden erfassen

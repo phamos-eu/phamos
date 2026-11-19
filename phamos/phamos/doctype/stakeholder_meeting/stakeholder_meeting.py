@@ -16,11 +16,11 @@ from phamos.phamos.doctype.implementation_change.implementation_change import (
 from phamos.phamos.doctype.implementation_chapter.implementation_chapter import (
 	create_revision_snapshot,
 )
+# a joint planning session that applies the agreed plan changes and sets a new baseline (#1971)
+from phamos.setup.implementation_cockpit import PLANNING_MEETING_TYPE
 
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
-# Meeting Type created on migrate (phamos/setup/implementation_cockpit.py): a joint planning session
-# that applies the agreed plan changes and sets a new baseline (#1971).
-PLANNING_MEETING_TYPE = "Planning"
+
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
 PROPOSED_CONTENT_REQUIRED = (
 	"proposed_chapter_title",

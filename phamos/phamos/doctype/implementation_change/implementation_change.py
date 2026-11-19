@@ -469,21 +469,36 @@ def _consent_of(side, implementation):
 
 
 def _get_change(name, statuses):
+	"""The change and the caller's side. The side is checked before anything about the change is
+	told: an outsider learns neither whether it exists nor its status."""
+	implementation = frappe.db.get_value("Implementation Change", name, "implementation")
+	if not implementation:
+		frappe.throw(_("You cannot take part in plan changes of this implementation."), frappe.PermissionError)
+	side = _side(implementation)
 	change = frappe.get_doc("Implementation Change", name)
 	if change.status not in statuses:
 		frappe.throw(_("This change is {0} and cannot be changed that way.").format(_(change.status)))
-	return change
+	return change, side
 
 
 @frappe.whitelist()
-def agree_change(name):
+def agree_change(name, contact=None):
 	"""The other side agrees. With both sides agreed the change is applied, unless it waits for
-	its planning session. Returns the new status."""
-	change = _get_change(name, ("Proposed",))
-	side = _side(change.implementation)
-	if (side == "phamos" and change.agreed_by_phamos) or (side == "customer" and change.agreed_by_customer):
-		frappe.throw(_("Your side has agreed already. The other side decides now."))
-	change.update(_consent_of(side, change.implementation))
+	its planning session. Returns the new status.
+
+	A phamos user may record the customer's agreement given elsewhere (a call, a meeting) by
+	naming the customer's Contact, as for confirm_change.
+	"""
+	change, side = _get_change(name, ("Proposed",))
+	if side == "phamos" and contact:
+		if change.agreed_by_customer:
+			frappe.throw(_("The customer has agreed already."))
+		change.agreed_by_customer = _customer_side_contact(change, contact)
+		change.agreed_by_phamos = change.agreed_by_phamos or frappe.session.user
+	else:
+		if (side == "phamos" and change.agreed_by_phamos) or (side == "customer" and change.agreed_by_customer):
+			frappe.throw(_("Your side has agreed already. The other side decides now."))
+		change.update(_consent_of(side, change.implementation))
 	change.status = "Agreed"
 	change.decided_on = now_datetime()
 	change.save(ignore_permissions=True)
@@ -495,8 +510,7 @@ def agree_change(name):
 @frappe.whitelist()
 def reject_change(name, reason=None):
 	"""Either side rejects a proposal; the proposer withdraws it this way too."""
-	change = _get_change(name, ("Proposed", "Agreed"))
-	_side(change.implementation)
+	change = _get_change(name, ("Proposed", "Agreed"))[0]
 	change.status = "Rejected"
 	change.decided_on = now_datetime()
 	if reason:
@@ -512,7 +526,7 @@ def confirm_change(name, contact=None):
 	A phamos user may record a confirmation the customer gave elsewhere (a call, a meeting) by
 	naming the customer's Contact.
 	"""
-	change = _get_change(name, (AWAITING, "Disputed"))
+	change = _get_change(name, (AWAITING, "Disputed"))[0]
 	contact = _customer_side_contact(change, contact)
 	change.agreed_by_customer = contact
 	change.status = "Applied"
@@ -533,7 +547,7 @@ def dispute_change(name, reason, contact=None):
 	"""The customer disputes a direct edit. Nothing is undone; it goes on the next session's agenda."""
 	if not (reason or "").strip():
 		frappe.throw(_("Say why you dispute the change."))
-	change = _get_change(name, (AWAITING,))
+	change = _get_change(name, (AWAITING,))[0]
 	_customer_side_contact(change, contact)
 	change.agreed_by_customer = None
 	change.dispute_reason = reason

@@ -14,6 +14,15 @@ frappe.ui.form.on("Implementation Change", {
 		if (status === "Proposed" && !frm.doc.agreed_by_phamos) {
 			frm.add_custom_button(__("Agree"), () => call("agree_change"));
 		}
+		if (status === "Proposed" && !frm.doc.agreed_by_customer) {
+			frm.add_custom_button(__("Customer agreed"), () =>
+				frappe.prompt(
+					{ fieldname: "contact", fieldtype: "Link", options: "Contact", label: __("Customer contact"), reqd: 1 },
+					(v) => call("agree_change", { contact: v.contact }),
+					__("Record the customer's agreement")
+				)
+			);
+		}
 		if (["Proposed", "Agreed"].includes(status)) {
 			frm.add_custom_button(__("Reject"), () =>
 				frappe.prompt({ fieldname: "reason", fieldtype: "Small Text", label: __("Reason") }, (v) =>

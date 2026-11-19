@@ -346,3 +346,21 @@ class TestImplementationChange(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Implementation Change", name, "status"), "Agreed")
 		self.assertTrue(any(name in str(message) for message in frappe.message_log))
 		self.assertTrue(frappe.db.exists("Implementation Baseline", {"stakeholder_meeting": meeting.name}))
+
+	def test_phamos_records_the_customers_agreement(self):
+		name = propose_change(
+			self.implementation.name, "Implementation Feature", "Priority", {"priority": "High"}, self.feature.name
+		)
+		self.assertRaises(frappe.ValidationError, agree_change, name, contact="Not a stakeholder")
+		self.assertEqual(agree_change(name, contact=self.contact), "Applied")
+		self.assertEqual(frappe.db.get_value("Implementation Change", name, "agreed_by_customer"), self.contact)
+
+	def test_outsiders_learn_nothing_about_a_change(self):
+		name = propose_change(
+			self.implementation.name, "Implementation Feature", "Priority", {"priority": "High"}, self.feature.name
+		)
+		reject_change(name)
+		frappe.set_user(OUTSIDER_USER)
+		# an existing (rejected) change and a missing one give the same answer
+		self.assertRaises(frappe.PermissionError, agree_change, name)
+		self.assertRaises(frappe.PermissionError, agree_change, "CHG-99999")
