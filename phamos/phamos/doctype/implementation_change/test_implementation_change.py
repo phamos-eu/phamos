@@ -295,3 +295,54 @@ class TestImplementationChange(FrappeTestCase):
 		self.assertEqual([row["name"] for row in variance["scope"]["added"]], [new.name])
 		self.assertEqual([row["name"] for row in variance["scope"]["dropped"]], [dropped.name])
 		self.assertNotIn(added.name, [row["name"] for row in variance["scope"]["added"]])
+
+	def planning_meeting(self, meeting_type="Planning"):
+		from phamos.setup.implementation_cockpit import after_migrate
+
+		after_migrate()
+		if not frappe.db.exists("Meeting Type", meeting_type):
+			frappe.get_doc({"doctype": "Meeting Type", "meeting_type_name": meeting_type}).insert()
+		return frappe.get_doc(
+			{
+				"doctype": "Stakeholder Meeting",
+				"implementation": self.implementation.name,
+				"meeting_type": meeting_type,
+				"meeting_date": "2026-12-01",
+				"chair": "Administrator",
+			}
+		).insert()
+
+	def test_only_an_open_planning_meeting_can_carry_a_change(self):
+		review = self.planning_meeting("_Test Review")
+		self.assertRaises(
+			frappe.ValidationError,
+			propose_change,
+			self.implementation.name,
+			"Implementation Feature",
+			"Priority",
+			{"priority": "High"},
+			self.feature.name,
+			stakeholder_meeting=review.name,
+		)
+
+	def test_a_change_the_target_refuses_does_not_block_the_meeting(self):
+		meeting = self.planning_meeting()
+		# a target date before the planned start: the feature refuses it at apply time
+		name = propose_change(
+			self.implementation.name,
+			"Implementation Feature",
+			"Dates",
+			{"target_date": "2026-11-01"},
+			self.feature.name,
+			stakeholder_meeting=meeting.name,
+		)
+		self.as_customer()
+		agree_change(name)
+		frappe.set_user("Administrator")
+		meeting.reload()
+		set_progress(meeting)
+		frappe.message_log = []
+		meeting.submit()
+		self.assertEqual(frappe.db.get_value("Implementation Change", name, "status"), "Agreed")
+		self.assertTrue(any(name in str(message) for message in frappe.message_log))
+		self.assertTrue(frappe.db.exists("Implementation Baseline", {"stakeholder_meeting": meeting.name}))
