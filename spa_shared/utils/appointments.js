@@ -6,6 +6,9 @@
  * - Weekly on the ticked weekdays, or the weekday of the start when none is ticked. The start is
  *   always the first appointment, also on a weekday that isn't ticked (Wolfram, 2026-11-19):
  *   start Thursday, Monday and Wednesday ticked → Thu, Mon, Wed, Mon, …
+ *   The RRULE alone has no such occurrence; the invite adds the start as an RDATE
+ *   (_start_outside_rule in phamos/mailcow_integration/caldav/ics.py, #1991), so the attendees'
+ *   calendars show it too. Change both sides together.
  * - Monthly / Yearly on the start's day; months without that day are skipped (RFC 5545)
  * Kept free of Vue and the DOM so it can be unit-tested.
  */
