@@ -2234,6 +2234,10 @@ The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
 Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
 Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
 "The first appointment would be on {0}, after Repeat until","Der erste Termin wäre am {0} und damit nach „Wiederholen bis“"
+"Row #{0}: the first appointment would be on {1}, after Repeat until","Zeile {0}: Der erste Termin wäre am {1} und damit nach „Wiederholen bis“"
+Weekly repeat,Wöchentliche Wiederholung
+The first appointment is on {0}. Start and end were moved to that day.,Der erste Termin ist am {0}. Start und Ende wurden auf diesen Tag verschoben.
+"Row #{0}: the first appointment is on {1}. Start and end were moved to that day.","Zeile {0}: Der erste Termin ist am {1}. Start und Ende wurden auf diesen Tag verschoben."
 First appointment: {0}. Start and end move to that day.,Erster Termin: {0}. Start und Ende werden auf diesen Tag verschoben.
 Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
 Open in Cockpit,Im Cockpit öffnen

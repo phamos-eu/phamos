@@ -229,6 +229,43 @@ class TestMailcowEventSync(FrappeTestCase):
 		)
 		self.assertEqual(sync_event._event_recurrence_rule(doc), "FREQ=WEEKLY;BYDAY=WE")
 
+	def test_a_weekly_event_moves_to_its_first_ticked_weekday(self):
+		"""2026-12-03 is a Thursday. The invite must not start on a day its BYDAY doesn't have (#1991)."""
+		doc = self._event(
+			starts_on="2026-12-03 10:00:00",
+			ends_on="2026-12-03 11:00:00",
+			repeat_this_event=1,
+			repeat_on="Weekly",
+			monday=1,
+			wednesday=1,
+		)
+		self.assertEqual(
+			[str(v) for v in frappe.db.get_value("Event", doc.name, ["starts_on", "ends_on"])],
+			["2026-12-07 10:00:00", "2026-12-07 11:00:00"],
+		)
+		self.assertRegex(self._body(), r"(?m)^DTSTART[^:]*:20261207T100000")
+		self.assertIn("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", self._body())
+		self.assertIn("The first appointment is on", frappe.message_log[-1]["message"])
+
+	def test_a_weekly_event_that_fits_stays(self):
+		for values in ({"monday": 1, "thursday": 1}, {}):
+			doc = self._event(
+				starts_on="2026-12-03 10:00:00", ends_on="2026-12-03 11:00:00",
+				repeat_this_event=1, repeat_on="Weekly", **values,
+			)
+			self.assertEqual(str(frappe.db.get_value("Event", doc.name, "starts_on")), "2026-12-03 10:00:00", values)
+
+	def test_an_event_without_end_moves_its_start(self):
+		doc = self._event(starts_on="2026-12-03 10:00:00", ends_on=None, repeat_this_event=1, repeat_on="Weekly", friday=1)
+		self.assertEqual(str(frappe.db.get_value("Event", doc.name, "starts_on")), "2026-12-04 10:00:00")
+
+	def test_repeat_until_before_the_first_ticked_weekday_is_refused(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "The first appointment would be on"):
+			self._event(
+				starts_on="2026-12-03 10:00:00", ends_on="2026-12-03 11:00:00",
+				repeat_this_event=1, repeat_on="Weekly", monday=1, repeat_till="2026-12-06",
+			)
+
 	# --- milestone 68, Phase 0: all-day, status, url, method, organizer ---------------------
 
 	def _body(self):

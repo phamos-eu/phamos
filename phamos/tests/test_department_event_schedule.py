@@ -159,6 +159,65 @@ class TestDepartmentEventSchedule(EventScheduleCase):
 		self.put.assert_not_called()
 
 
+class TestWeeklyStartDay(EventScheduleCase):
+	"""A weekly row starts on its first ticked weekday, so the invite has no extra first day (#1991).
+	2026-12-03 is a Thursday."""
+
+	WEEKLY = {"repeat_this_event": 1, "repeat_on": "Weekly"}
+
+	def save_row(self, **values):
+		department = frappe.get_doc("Department", self.department)
+		department.append(
+			"event_schedule",
+			self.event(**{"start": "2026-12-03 10:00:00", "end": "2026-12-03 11:00:00", **values}),
+		)
+		department.save()
+		return department.event_schedule[-1]
+
+	def stored(self, row):
+		start, end = frappe.db.get_value("Team Daily Schedule", row.name, ["start", "end"])
+		return str(start), str(end)
+
+	def test_a_weekly_row_moves_to_its_first_ticked_weekday(self):
+		row = self.save_row(**self.WEEKLY, monday=1, wednesday=1)
+		self.assertEqual(self.stored(row), ("2026-12-07 10:00:00", "2026-12-07 11:00:00"))
+		ics = self.put.call_args.args[1]
+		self.assertRegex(ics, r"(?m)^DTSTART[^:]*:20261207T100000")
+		self.assertIn("BYDAY=MO,WE", ics)
+		self.assertIn("Row #1: the first appointment is on", frappe.message_log[-1]["message"])
+
+	def test_a_row_over_midnight_keeps_its_length(self):
+		row = self.save_row(**self.WEEKLY, friday=1, end="2026-12-04 01:00:00")
+		self.assertEqual(self.stored(row), ("2026-12-04 10:00:00", "2026-12-05 01:00:00"))
+
+	def test_a_row_that_fits_its_repeat_stays(self):
+		for values in (
+			{**self.WEEKLY, "thursday": 1, "monday": 1},  # the start's weekday is ticked
+			self.WEEKLY,  # no weekday ticked: the repeat runs on the start's weekday
+			{"repeat_this_event": 1, "repeat_on": "Daily", "monday": 1},  # weekdays only count for Weekly
+			{"repeat_this_event": 0, "repeat_on": "Weekly", "monday": 1},  # no repeat
+		):
+			row = self.save_row(**values)
+			self.assertEqual(self.stored(row), ("2026-12-03 10:00:00", "2026-12-03 11:00:00"), values)
+
+	def test_repeat_until_before_the_first_ticked_weekday_is_refused(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Row #1: the first appointment would be on"):
+			self.save_row(**self.WEEKLY, monday=1, repeat_till="2026-12-06")
+
+	def test_an_old_row_that_is_not_sent_again_does_not_move(self):
+		"""Moving it would send its invite again on an unrelated save of the Department (#1814)."""
+		row = self.save_row(**self.WEEKLY, thursday=1)
+		# A row saved before this change: Thursday start, only Monday ticked.
+		frappe.db.set_value("Team Daily Schedule", row.name, {"thursday": 0, "monday": 1})
+		self.save_again()
+		self.put.assert_not_called()
+		self.assertEqual(self.stored(row), ("2026-12-03 10:00:00", "2026-12-03 11:00:00"))
+		# Edited, it is sent again, and then it moves.
+		self.save_again({"subject": "All-hands, new room"})
+		self.put.assert_called_once()
+		self.assertEqual(self.stored(row), ("2026-12-07 10:00:00", "2026-12-07 11:00:00"))
+
+
 class TestBackgroundSync(EventScheduleCase):
 	"""With the background flag (the cockpit's saves, decision 10 in #1949), Mailcow is called by a
 	job after the commit, not in the request."""
