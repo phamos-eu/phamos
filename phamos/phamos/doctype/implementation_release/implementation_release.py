@@ -17,7 +17,11 @@ date, so both sides see early what fits:
 
 When GitLab publishes a release with this release's milestones, it is linked and set Released
 (`link_published_release`). Its features are not set Live: the PM confirms each one against
-its definition of done. Triage with consent (re-rank, move, new date) follows with #1971.
+its definition of done.
+
+Triage: PM and customer propose a new order, a move to another release or a new target date
+as an Implementation Change (#1971). `preview_triage` shows the cut line a proposal would give
+before anyone agrees; `apply_ranking` carries out an agreed ranking or move.
 """
 
 from datetime import timedelta
@@ -185,10 +189,12 @@ def team_capacity(implementation, start, end):
 	return round(hours * (flt(share) / 100 if flt(share) else 1), 1)
 
 
-def compute_release_check(implementation, current=None):
+def compute_release_check(implementation, current=None, overrides=None):
 	"""The realistic check of every active release, keyed by release name ("__new__" for an unsaved one).
 
 	`current` is a release being saved: its unsaved rows and date replace the stored ones.
+	`overrides` maps release names to a proposed `target_date` and/or `features` (ranked names),
+	for previewing a triage proposal without saving anything.
 	"""
 	releases = {
 		row.name: frappe._dict(row, features=None)
@@ -215,6 +221,10 @@ def compute_release_check(implementation, current=None):
 	for release in releases.values():
 		if release.features is None:
 			release.features = [row.feature for row in rows if row.parent == release.name]
+
+	for name, override in (overrides or {}).items():
+		if name in releases:
+			releases[name].update({key: value for key, value in override.items() if key in ("target_date", "features")})
 
 	all_features = [name for release in releases.values() for name in release.features]
 	efforts = feature_efforts(
@@ -350,3 +360,94 @@ def get_released_features_awaiting_live(implementation):
 		for row in features
 		if statuses.get(row.feature) not in DONE_FEATURE_STATUSES
 	]
+
+
+# Triage (#1986 part 3, through Implementation Change #1971) ------------------------------------
+
+
+def _ranked(release):
+	return frappe.get_all(
+		"Implementation Release Feature",
+		filters={"parent": release, "parenttype": "Implementation Release"},
+		pluck="feature",
+		order_by="idx asc",
+	)
+
+
+def proposed_ranking(release, values):
+	"""The releases and rankings a Rank proposal leads to: {release: [features in order]}."""
+	if "ranking" in values:
+		current = _ranked(release)
+		# features moved out since the proposal are skipped, new ones keep their place at the end
+		ranking = [name for name in values["ranking"] if name in current]
+		return {release: ranking + [name for name in current if name not in ranking]}
+	feature, to_release = values["feature"], values["to_release"]
+	source = [name for name in _ranked(release) if name != feature]
+	target = [name for name in _ranked(to_release) if name != feature]
+	position = values.get("position")
+	index = max(int(position) - 1, 0) if position else len(target)
+	target.insert(min(index, len(target)), feature)
+	return {release: source, to_release: target}
+
+
+def apply_ranking(release, values):
+	"""Carry out an agreed Rank change; returns the values it replaced."""
+	result = proposed_ranking(release, values)
+	old = {"ranking": _ranked(release)}
+	if "feature" in values:
+		old["to_release_ranking"] = _ranked(values["to_release"])
+	# the source first: a feature may be in one active release only
+	for name in [release] + [other for other in result if other != release]:
+		doc = frappe.get_doc("Implementation Release", name)
+		notes = {row.feature: row.note for row in doc.features}
+		doc.set("features", [{"feature": feature, "note": notes.get(feature)} for feature in result[name]])
+		doc.flags.from_implementation_change = True
+		doc.save(ignore_permissions=True)
+	return old
+
+
+@frappe.whitelist()
+def preview_triage(implementation, release, change_type, proposed_values):
+	"""The realistic check of all active releases as it would be with this proposal, nothing saved.
+
+	For the cockpit: the cut line moves while PM and customer try a ranking, a move or a date.
+	"""
+	from phamos.phamos.doctype.implementation_change.implementation_change import _side, _validate_proposal
+
+	_side(implementation)
+	values = frappe.parse_json(proposed_values) or {}
+	_validate_proposal(implementation, "Implementation Release", release, change_type, values)
+	if change_type == "Rank":
+		overrides = {name: {"features": ranking} for name, ranking in proposed_ranking(release, values).items()}
+	else:
+		overrides = {release: {"target_date": values.get("target_date")}}
+	return compute_release_check(implementation, overrides=overrides)
+
+
+@frappe.whitelist()
+def get_triage(implementation):
+	"""Active releases with their ranked features, the check and the open proposals, for the cockpit."""
+	from phamos.phamos.doctype.implementation_change.implementation_change import _side
+
+	_side(implementation)
+	check = compute_release_check(implementation)
+	releases = frappe.get_all(
+		"Implementation Release",
+		filters={"implementation": implementation, "status": ["in", ACTIVE]},
+		fields=["name", "title", "target_date", "status", "chapter"],
+		order_by="target_date asc, name asc",
+	)
+	for release in releases:
+		release.update(check.get(release.name) or {})
+		release["ranking"] = _ranked(release.name)
+		release["proposals"] = frappe.get_all(
+			"Implementation Change",
+			filters={
+				"target_doctype": "Implementation Release",
+				"target_name": release.name,
+				"status": ["in", ("Proposed", "Agreed")],
+			},
+			fields=["name", "change_type", "status", "proposed_values", "proposed_by", "stakeholder_meeting"],
+			order_by="creation asc",
+		)
+	return releases

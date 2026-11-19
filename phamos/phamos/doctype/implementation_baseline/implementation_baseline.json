@@ -11,7 +11,8 @@
   "is_current",
   "section_break_chapters",
   "chapters",
-  "features"
+  "features",
+  "releases"
  ],
  "fields": [
   {
@@ -69,11 +70,18 @@
    "label": "Features",
    "options": "Implementation Baseline Feature",
    "read_only": 1
+  },
+  {
+   "fieldname": "releases",
+   "fieldtype": "Table",
+   "label": "Releases",
+   "options": "Implementation Baseline Release",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-18 21:30:00.000000",
+ "modified": "2026-11-19 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Baseline",

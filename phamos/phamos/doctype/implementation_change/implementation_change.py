@@ -16,6 +16,10 @@ session. Before that the plan is still being drafted together.
 
 Chapters keep their own lock: their agreed content changes only through a Stakeholder Meeting,
 which records what changed as Applied (`record_meeting_chapter_changes`).
+
+Releases (#1986) are triaged the same way: a new target date ("Dates", `target_date`), a new
+order of their features ("Rank", `ranking`: the feature names in the new order) or a feature
+moved to another release ("Rank", `feature` + `to_release`). Their direct edits are recorded too.
 """
 
 import json
@@ -42,6 +46,9 @@ AGREED_FIELDS = {
 		"max_parallel_chapters": "WIP limit",
 		"max_parallel_features": "WIP limit",
 		"team_capacity_share": "Capacity share",
+	},
+	"Implementation Release": {
+		"target_date": "Dates",
 	},
 	"Implementation Chapter": {
 		"chapter_title": "Scope change",
@@ -86,6 +93,10 @@ class ImplementationChange(Document):
 			feature.flags.from_implementation_change = True
 			feature.insert(ignore_permissions=True)
 			self.target_name = feature.name
+		elif self.target_doctype == "Implementation Release" and self.change_type == "Rank":
+			from phamos.phamos.doctype.implementation_release.implementation_release import apply_ranking
+
+			self.old_values = frappe.as_json(apply_ranking(self.target_name, self.values))
 		else:
 			target = frappe.get_doc(self.target_doctype, self.target_name)
 			# the values as they are now, which may differ from those at the time of the proposal
@@ -188,6 +199,11 @@ def record_direct_edits(doc, method=None):
 		new_values[field] = new
 	if doc.doctype == "Implementation Feature" and before.status != doc.status and doc.status == "Dropped":
 		by_type["Scope drop"] = ({"status": before.status}, {"status": "Dropped"})
+	if doc.doctype == "Implementation Release":
+		old_ranking = [row.feature for row in before.features]
+		new_ranking = [row.feature for row in doc.features]
+		if old_ranking != new_ranking:
+			by_type["Rank"] = ({"ranking": old_ranking}, {"ranking": new_ranking})
 	for change_type, (old_values, new_values) in by_type.items():
 		_insert_change(
 			implementation,
@@ -302,15 +318,12 @@ def propose_change(
 		frappe.db.get_value("Stakeholder Meeting", stakeholder_meeting, "implementation") != implementation
 	):
 		frappe.throw(_("The meeting belongs to another implementation."))
-	old_values = {}
-	if target_name:
-		old_values = frappe.db.get_value(target_doctype, target_name, list(values), as_dict=True) or {}
 	change = _insert_change(
 		implementation,
 		target_doctype,
 		target_name,
 		change_type,
-		old_values,
+		_current_values(target_doctype, target_name, change_type, values),
 		values,
 		status="Proposed",
 		reason=reason,
@@ -318,6 +331,48 @@ def propose_change(
 		**_consent_of(side, implementation),
 	)
 	return change.name
+
+
+def _current_values(target_doctype, target_name, change_type, values):
+	"""What the proposal would replace, kept with it so both sides see old and new."""
+	if not target_name:
+		return {}
+	if target_doctype == "Implementation Release" and change_type == "Rank":
+		return {"ranking": _ranking(target_name)}
+	return frappe.db.get_value(target_doctype, target_name, list(values), as_dict=True) or {}
+
+
+def _ranking(release):
+	return frappe.get_all(
+		"Implementation Release Feature",
+		filters={"parent": release, "parenttype": "Implementation Release"},
+		pluck="feature",
+		order_by="idx asc",
+	)
+
+
+def _validate_release_ranking(implementation, release, values):
+	"""A new order of the same features, or one feature moved to another active release."""
+	current = _ranking(release)
+	if set(values) == {"ranking"}:
+		ranking = values["ranking"]
+		if not isinstance(ranking, list) or sorted(ranking) != sorted(current):
+			frappe.throw(_("A new ranking lists the same features as the release, in the new order."))
+		return
+	if set(values) - {"feature", "to_release", "position"} or not values.get("feature") or not values.get("to_release"):
+		frappe.throw(_("Name the new ranking, or the feature and the release to move it to."))
+	if values["feature"] not in current:
+		frappe.throw(_("Feature {0} is not in this release.").format(values["feature"]))
+	other = frappe.db.get_value(
+		"Implementation Release", values["to_release"], ["implementation", "status"], as_dict=True
+	)
+	if (
+		values["to_release"] == release
+		or not other
+		or other.implementation != implementation
+		or other.status not in ("Planned", "In Progress")
+	):
+		frappe.throw(_("Move the feature to another planned release of this implementation."))
 
 
 def _validate_proposal(implementation, target_doctype, target_name, change_type, values):
@@ -328,9 +383,9 @@ def _validate_proposal(implementation, target_doctype, target_name, change_type,
 				_("A new feature needs a title and may set only: {0}").format(", ".join(NEW_FEATURE_FIELDS))
 			)
 		return
-	if target_doctype not in ("Implementation Feature", "Implementation"):
+	if target_doctype not in ("Implementation Feature", "Implementation", "Implementation Release"):
 		# chapters change through a Stakeholder Meeting only
-		frappe.throw(_("Changes can be proposed for features and the implementation."))
+		frappe.throw(_("Changes can be proposed for features, releases and the implementation."))
 	if not target_name or not frappe.db.exists(target_doctype, target_name):
 		frappe.throw(_("Choose the record to change."))
 	owner = (
@@ -340,6 +395,9 @@ def _validate_proposal(implementation, target_doctype, target_name, change_type,
 	)
 	if owner != implementation:
 		frappe.throw(_("The record belongs to another implementation."))
+	if target_doctype == "Implementation Release" and change_type == "Rank":
+		_validate_release_ranking(implementation, target_name, values)
+		return
 	if change_type == "Scope drop":
 		if target_doctype != "Implementation Feature" or values != {"status": "Dropped"}:
 			frappe.throw(_("Dropping a feature sets its status to Dropped and nothing else."))

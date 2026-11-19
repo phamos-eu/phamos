@@ -16,7 +16,6 @@ IMPLEMENTATION_ROLE = "phamos Implementation"
 
 # Issue: the cockpit lists the reports of an Implementation and shows their screenshots (private files).
 # Implementation Feature: what is built for an implementation (#1968), shown in the cockpit.
-# Implementation Feature: what is built for an implementation (#1968), shown in the cockpit.
 # Implementation Change / Baseline: plan changes and the agreed plan (#1971), shown in the cockpit.
 # Implementation Release: release planning and its realistic check (#1986).
 DOCTYPES = (

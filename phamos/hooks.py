@@ -495,6 +495,9 @@ doc_events = {
             "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
         ],
     },
+    "Implementation Release": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+    },
     "Implementation Feature": {
         "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
         "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",

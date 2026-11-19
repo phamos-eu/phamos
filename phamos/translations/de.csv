@@ -2370,3 +2370,11 @@ Customer contact,Kundenkontakt
 Record the customer's confirmation,Bestätigung des Kunden erfassen
 Record the customer's dispute,Widerspruch des Kunden erfassen
 Reject,Ablehnen
+Implementation Baseline Release,Planungsbasis Release
+Ranking,Rangfolge
+The release's features in their agreed order.,Die Features des Releases in ihrer vereinbarten Reihenfolge.
+"A new ranking lists the same features as the release, in the new order.","Eine neue Rangfolge enthält dieselben Features wie das Release, in der neuen Reihenfolge."
+"Name the new ranking, or the feature and the release to move it to.","Nennen Sie die neue Rangfolge oder das Feature und das Release, in das es verschoben wird."
+Feature {0} is not in this release.,Feature {0} ist nicht in diesem Release.
+Move the feature to another planned release of this implementation.,Verschieben Sie das Feature in ein anderes geplantes Release dieser Implementierung.
+"Changes can be proposed for features, releases and the implementation.","Änderungen können für Features, Releases und die Implementierung vorgeschlagen werden."

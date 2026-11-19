@@ -6,8 +6,11 @@
 A snapshot of the implementation's chapters and features, made when a Stakeholder Meeting of
 type Planning is submitted. One baseline is current per implementation; earlier ones stay for
 history. `get_baseline_variance` compares today's plan with the current baseline and feeds the
-roadmap and the PM triangle (#1694, #1681). Releases join the snapshot with #1986.
+roadmap and the PM triangle (#1694, #1681). Releases (#1986) are in the snapshot with their
+target date and ranked features.
 """
+
+import json
 
 import frappe
 from frappe.model.document import Document
@@ -46,6 +49,14 @@ def create_baseline(implementation, stakeholder_meeting=None, baseline_date=None
 		order_by="planned_start asc, name asc",
 	):
 		baseline.append("features", {"feature": feature.pop("name"), **feature})
+	for release in frappe.get_all(
+		"Implementation Release",
+		filters={"implementation": implementation, "status": ["!=", "Cancelled"]},
+		fields=["name", "title", "status", "target_date"],
+		order_by="target_date asc, name asc",
+	):
+		name = release.pop("name")
+		baseline.append("releases", {"release": name, "ranking": json.dumps(_ranking(name)), **release})
 	frappe.db.set_value(
 		"Implementation Baseline", {"implementation": implementation, "is_current": 1}, "is_current", 0
 	)
@@ -78,6 +89,15 @@ def get_baseline_variance(implementation):
 		)
 	}
 
+	releases_now = {
+		row.name: row
+		for row in frappe.get_all(
+			"Implementation Release",
+			filters={"implementation": implementation},
+			fields=["name", "title", "status", "target_date"],
+		)
+	}
+
 	in_baseline = {row.feature for row in baseline.features}
 	dropped_before = {row.feature for row in baseline.features if row.status == "Dropped"}
 	return {
@@ -92,6 +112,7 @@ def get_baseline_variance(implementation):
 			_row_variance(row.feature, row.title, row, features_now.get(row.feature), "title")
 			for row in baseline.features
 		],
+		"releases": [_release_variance(row, releases_now.get(row.release)) for row in baseline.releases],
 		"scope": {
 			"added": [
 				{"name": name, "title": row.title}
@@ -127,3 +148,29 @@ def _shift(then, now):
 	if not then or not now:
 		return None
 	return date_diff(getdate(now), getdate(then))
+
+
+def _ranking(release):
+	return frappe.get_all(
+		"Implementation Release Feature",
+		filters={"parent": release, "parenttype": "Implementation Release"},
+		pluck="feature",
+		order_by="idx asc",
+	)
+
+
+def _release_variance(then, now):
+	if not now:
+		return {"name": then.release, "title": then.title, "removed": True}
+	ranking_then, ranking_now = json.loads(then.ranking or "[]"), _ranking(now.name)
+	return {
+		"name": now.name,
+		"title": now.title,
+		"target_shift_days": _shift(then.target_date, now.target_date),
+		"status_then": then.status,
+		"status_now": now.status,
+		"features_added": [name for name in ranking_now if name not in ranking_then],
+		"features_removed": [name for name in ranking_then if name not in ranking_now],
+		"reranked": [name for name in ranking_now if name in ranking_then]
+		!= [name for name in ranking_then if name in ranking_now],
+	}
