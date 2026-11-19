@@ -3,7 +3,9 @@
  * calendar show the same days as the attendees' calendars. Mirrors _row_recurrence_rule in
  * phamos/events/team_daily_schedule.py:
  * - Daily, Weekly, Monthly, Yearly, until the end of `repeat_till` (inclusive)
- * - Weekly on the ticked weekdays, or the weekday of the start when none is ticked
+ * - Weekly on the ticked weekdays, or the weekday of the start when none is ticked. The start is
+ *   always the first appointment, also on a weekday that isn't ticked (Wolfram, 2026-11-19):
+ *   start Thursday, Monday and Wednesday ticked → Thu, Mon, Wed, Mon, …
  * - Monthly / Yearly on the start's day; months without that day are skipped (RFC 5545)
  * Kept free of Vue and the DOM so it can be unit-tested.
  */
@@ -42,6 +44,14 @@ export function weeklyDays(appointment) {
 	if (ticked.length) return ticked
 	const start = parseDateTime(appointment.start)
 	return start ? [weekdayIndex(start)] : []
+}
+
+/** A weekly repeat whose start is on a weekday that isn't ticked: the start is an extra first
+ * appointment before the ticked days (the dialog says so). */
+export function startOutsideWeeklyDays(appointment) {
+	if (repeatFrequency(appointment) !== "Weekly") return false
+	const start = parseDateTime(appointment.start)
+	return Boolean(start) && !weeklyDays(appointment).includes(weekdayIndex(start))
 }
 
 function repeatEnd(appointment) {
@@ -90,6 +100,12 @@ function* occurrenceStarts(appointment, fromDate, limitDate) {
 		}
 	} else if (freq === "Weekly") {
 		const days = weeklyDays(appointment)
+		// The start comes first and is earlier than every ticked day after it (those before it
+		// are skipped below), so the order stays right.
+		if (!days.includes(weekdayIndex(start))) {
+			if (!within(start)) return
+			yield start
+		}
 		const weekStart = addDays(start, -weekdayIndex(start))
 		const first = Math.max(0, Math.floor((fromDate ? fromDate - weekStart : 0) / (7 * DAY_MS)) - 1)
 		for (let w = first; w < first + MAX_STEPS; w++) {

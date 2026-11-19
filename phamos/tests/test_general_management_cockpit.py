@@ -475,6 +475,16 @@ class TestCompanyAppointments(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on="Weekly", repeat_till="2026-11-01"))
 
+	def test_a_weekly_start_on_an_unticked_weekday_stays(self):
+		"""The chosen start is the first appointment, also when its weekday isn't ticked; the repeat
+		continues on the ticked days after it (Wolfram, 2026-11-19). 2026-12-01 is a Tuesday."""
+		saved = gm.save_appointment(
+			self._appointment(repeat_this_event=1, repeat_on="Weekly", monday=1, thursday=1, repeat_till="2026-12-01")
+		)
+		self.assertEqual(str(saved["start"]), "2026-12-01 10:00:00")
+		self.assertEqual(str(saved["end"]), "2026-12-01 11:00:00")
+		self.assertEqual((saved["monday"], saved["tuesday"], saved["thursday"]), (1, 0, 1))
+
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
 		for call in (
