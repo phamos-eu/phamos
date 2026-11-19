@@ -717,6 +717,9 @@ user_data_fields = [
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 ]
 
+# Automatically update python controller files with type annotations for this app.
+export_python_type_annotations = True
+
 # Authentication and authorization
 # --------------------------------
 
