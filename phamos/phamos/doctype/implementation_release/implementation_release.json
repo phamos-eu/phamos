@@ -81,7 +81,7 @@
   {
    "fieldname": "fit",
    "fieldtype": "Select",
-   "label": "Fit",
+   "label": "Traffic Light",
    "options": "\nGreen\nAmber\nRed",
    "read_only": 1,
    "description": "Green: everything fits. Amber: everything fits, but with less than 20% buffer. Red: some ranked features do not fit before the target date."

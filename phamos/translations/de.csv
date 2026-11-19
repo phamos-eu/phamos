@@ -2284,10 +2284,7 @@ Implementation Release,Implementierungs-Release
 Implementation Release Feature,Implementierungs-Release Feature
 Implementation Release Milestone,Implementierungs-Release Meilenstein
 Realistic Check,Realitätscheck
-Fit,Passt
-Green,Grün
 Amber,Gelb
-Red,Rot
 Open Effort (Hours),Offener Aufwand (Stunden)
 Available Capacity (Hours),Verfügbare Kapazität (Stunden)
 Contents,Inhalt
@@ -2309,3 +2306,4 @@ Feature {0} is listed twice.,Feature {0} ist doppelt aufgeführt.
 Feature {0} is already planned in release {1}. Move it from there.,Feature {0} ist bereits in Release {1} geplant. Verschieben Sie es von dort.
 These milestones of its features are not in the release: {0},Diese Meilensteine seiner Features fehlen im Release: {0}
 Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
+Traffic Light,Ampel
