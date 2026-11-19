@@ -71,6 +71,11 @@
   "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
+  "wip_limits_section",
+  "max_parallel_chapters",
+  "column_break_wip_limits",
+  "max_parallel_features",
+  "team_capacity_share",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -94,12 +99,7 @@
   "column_break_amyu",
   "gitlab_issues_html",
   "column_break_mdrq",
-  "gitlab_milestones_html",
-  "wip_limits_section",
-  "max_parallel_chapters",
-  "column_break_wip_limits",
-  "max_parallel_features",
-  "team_capacity_share"
+  "gitlab_milestones_html"
  ],
  "fields": [
   {
