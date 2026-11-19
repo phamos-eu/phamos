@@ -396,8 +396,6 @@ doc_events = {
 		"on_trash": "phamos.phamos.hr.leave_calendar.remove_leave_event",
 	},
 	"Event": {
-		# A weekly repeat starts on its first ticked weekday, so the invite has no extra day (#1991).
-		"validate": "phamos.events.weekly_repeat.validate_event",
 		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
 		"on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",

@@ -14,8 +14,7 @@ from frappe import _
 
 from phamos.api import department_cockpit as dc
 from phamos.cockpits.settings import COCKPIT_SETTINGS, COCKPITS, cockpit_window
-from phamos.events import team_daily_schedule, weekly_repeat
-from phamos.events.weekly_repeat import WEEKDAYS
+from phamos.events import team_daily_schedule
 from phamos.setup.general_management import GENERAL_MANAGEMENT_ROLE
 
 ACCESS_ROLES = ("System Manager", GENERAL_MANAGEMENT_ROLE)
@@ -499,6 +498,7 @@ def get_company_task(name):
 # Mailcow invites (phamos.events.team_daily_schedule), whose source link then points to it.
 
 EVENT_TABLE = "event_schedule"
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 REPEAT_OPTIONS = ("", "Daily", "Weekly", "Monthly", "Yearly")
 # The row fields the cockpit may set. Sync fields (mailcow_*) stay with the sync.
 APPOINTMENT_FIELDS = (
@@ -599,10 +599,21 @@ def _check_not_being_sent(row):
 
 
 def _first_weekly_start(data):
-	"""Start and end of a weekly repeat's first appointment, as datetimes: a start on a weekday that
-	isn't ticked moves forward to the first ticked one (weekly_repeat.first_weekly_start, the rule
-	Desk uses too, #1991)."""
-	return weekly_repeat.first_weekly_start(data, data.start, data.end)
+	"""Start and end of a weekly repeat's first appointment, as datetimes.
+
+	A start on a weekday that isn't ticked moves forward to the first ticked one, the end with it.
+	Otherwise the invite would start on a day the repeat doesn't have: calendars show that start as
+	an extra appointment, while the cockpit doesn't (spa_shared/utils/appointments.js mirrors this
+	as firstWeeklyStart). No ticked weekday: the repeat runs on the start's own weekday.
+	"""
+	start = frappe.utils.get_datetime(data.start)
+	end = frappe.utils.get_datetime(data.end)
+	ticked = [index for index, day in enumerate(WEEKDAYS) if frappe.utils.cint(data.get(day))]
+	weekly = frappe.utils.cint(data.repeat_this_event) and data.repeat_on == "Weekly"
+	if not weekly or not ticked:
+		return start, end
+	days_ahead = min((index - start.weekday()) % 7 for index in ticked)
+	return frappe.utils.add_days(start, days_ahead), frappe.utils.add_days(end, days_ahead)
 
 
 @frappe.whitelist()

@@ -16,7 +16,6 @@ from phamos.mailcow_integration.caldav.client import (
     dav_password,
     settings,
 )
-from phamos.events.weekly_repeat import move_to_first_weekly_day
 from phamos.mailcow_integration.caldav.ics import vevent
 
 
@@ -312,21 +311,12 @@ def _collect_attendees_for_row(row, row_number: int) -> tuple[list[str], list[st
 def validate_schedule_rows(doc, method=None):
     """Validate and normalize attendee fields before Team save.
 
-    This gives immediate user feedback for malformed attendee lists. A weekly row whose invite is
-    sent with this save (new, changed, or its last send failed; see _sync_plan) starts on its first
-    ticked weekday (weekly_repeat, #1991). Other rows stay as they are: moving one would send its
-    invite again without anyone editing it (#1814).
+    This gives immediate user feedback for malformed attendee lists.
     """
     if not _has_schedule_table(doc):
         return
 
-    previous_doc = doc.get_doc_before_save()
-    previous_rows_by_name = {
-        row.name: row for row in ((previous_doc.get(SCHEDULE_TABLE_FIELD) or []) if previous_doc else []) if row.name
-    }
     for row_number, row in enumerate(doc.get(SCHEDULE_TABLE_FIELD) or [], start=1):
-        if not (_invite_unchanged(row, previous_rows_by_name.get(row.name)) and row.get("mailcow_synced")):
-            move_to_first_weekly_day(row, "start", "end", row_number=row_number)
         required, optional = _collect_attendees_for_row(row, row_number)
 
         required_csv = ", ".join(required)
