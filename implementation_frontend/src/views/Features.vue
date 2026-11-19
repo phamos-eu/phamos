@@ -18,19 +18,10 @@
 
 			<!-- List -->
 			<template v-else-if="view === 'list' && data">
-				<div class="flex flex-wrap items-center gap-2">
-					<select v-model="filters.status" class="rounded border-outline-gray-2 text-sm">
-						<option value="">{{ __("All statuses") }}</option>
-						<option v-for="s in data.statuses" :key="s" :value="s">{{ __(s) }}</option>
-					</select>
-					<select v-model="filters.module" class="rounded border-outline-gray-2 text-sm">
-						<option value="">{{ __("All modules") }}</option>
-						<option v-for="m in modules" :key="m" :value="m">{{ m }}</option>
-					</select>
-					<select v-model="filters.chapter" class="rounded border-outline-gray-2 text-sm">
-						<option value="">{{ __("All chapters") }}</option>
-						<option v-for="c in chapters" :key="c.name" :value="c.name">{{ c.label }}</option>
-					</select>
+				<div class="flex flex-wrap items-end gap-2">
+					<FormControl v-model="filters.status" type="select" size="sm" :label="__('Status')" class="w-44" :options="statusOptions" />
+					<FormControl v-model="filters.module" type="select" size="sm" :label="__('Module')" class="w-44" :options="moduleOptions" />
+					<FormControl v-model="filters.chapter" type="select" size="sm" :label="__('Chapter')" class="w-52" :options="chapterOptions" />
 				</div>
 				<section class="overflow-x-auto rounded-lg border border-outline-gray-2 bg-surface-white">
 					<table class="w-full text-sm">
@@ -63,7 +54,7 @@
 								<td class="px-3 py-2.5"><span :class="statusClass(f.status)" class="rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span></td>
 								<td class="px-3 py-2.5 text-ink-gray-7">{{ levels(f) }}</td>
 								<td class="px-3 py-2.5 text-right text-ink-gray-7">{{ hours(f.effort_hours) }}</td>
-								<td class="px-3 py-2.5"><ProgressBar :value="f.progress" /></td>
+								<td class="px-3 py-2.5"><ProgressBar class="w-32" :value="f.progress" /></td>
 							</tr>
 							<tr v-if="!filtered.length">
 								<td colspan="8" class="px-4 py-8 text-center text-ink-gray-5">{{ __("No features here yet.") }}</td>
@@ -183,7 +174,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { call, FeatherIcon, TabButtons } from "frappe-ui"
+import { call, FeatherIcon, FormControl, TabButtons } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import MethodNote from "../components/MethodNote.vue"
 import ProgressBar from "../components/ProgressBar.vue"
@@ -279,6 +270,15 @@ const chapters = computed(() => {
 	for (const f of features.value) for (const c of f.chapters) seen.set(c.name, c)
 	return [...seen.values()]
 })
+const statusOptions = computed(() => [
+	{ label: __("All statuses"), value: "" },
+	...(data.value?.statuses || []).map((s) => ({ label: __(s), value: s })),
+])
+const moduleOptions = computed(() => [{ label: __("All modules"), value: "" }, ...modules.value.map((m) => ({ label: m, value: m }))])
+const chapterOptions = computed(() => [
+	{ label: __("All chapters"), value: "" },
+	...chapters.value.map((c) => ({ label: c.label, value: c.name })),
+])
 const filtered = computed(() =>
 	features.value.filter(
 		(f) =>
