@@ -27,7 +27,7 @@
    "fieldname": "tag_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Tag",
+   "label": "Tag Name",
    "read_only": 1
   },
   {
