@@ -150,8 +150,31 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			frappe.clear_cache(doctype=doctype)
 			field = frappe.get_meta(doctype).get_field("custom_team")
 			self.assertEqual((field.fieldtype, field.options, field.reqd), ("Link", "Team", 0), doctype)
-		# on Issue the field must not sit in Phriend's section, which hides on most Issues
-		self.assertEqual(frappe.get_meta("Issue").get_field("custom_team").insert_after, "custom_department")
+
+	def test_team_opens_the_implementation_specific_section_on_every_issue(self):
+		from phamos.phriend import setup as phriend_setup
+
+		phriend_setup.ensure_issue_fields()
+		frappe.clear_cache(doctype="Issue")
+		meta = frappe.get_meta("Issue")
+		section, team, reporter = meta.fields[:3]
+		self.assertEqual(section.fieldname, "custom_implementation_specific")
+		# shown on every Issue, so a team can be set on each of them
+		self.assertFalse(section.depends_on)
+		self.assertEqual(team.fieldname, "custom_team")
+		# Phriend's fields follow and stay hidden on Issues that are no report and have no GitLab issue
+		self.assertEqual(reporter.fieldname, "phriend_reported_by")
+		for fieldname in (
+			"phriend_reported_by",
+			"phriend_reported_by_name",
+			"phriend_source_system",
+			"custom_implementation",
+			"phriend_gitlab_issues",
+			"phriend_col",
+			"phriend_screenshot_preview",
+		):
+			self.assertEqual(meta.get_field(fieldname).depends_on, phriend_setup.PHRIEND_OR_GITLAB, fieldname)
+		self.assertEqual(meta.get_field("phriend_type").depends_on, phriend_setup.ONLY_PHRIEND)
 
 
 class TestTeamCockpitAccess(TeamCockpitTestCase):
@@ -369,3 +392,57 @@ class TestCockpitSwitcher(TeamCockpitTestCase):
 		frappe.set_user("Administrator")
 		routes = {cockpit["route"] for cockpit in spa_boot.user_cockpits()}
 		self.assertEqual(routes, set(COCKPITS))
+
+
+class TestSetTeamFromOtherCockpits(TeamCockpitTestCase):
+	"""Members put records into their own team from the other cockpits (#1955)."""
+
+	def mine(self, doctype, subject, team=None):
+		# created by the member, so it is in their Personal Cockpit
+		frappe.set_user(MEMBER)
+		doc = frappe.get_doc({"doctype": doctype, "subject": subject, "custom_team": team}).insert()
+		return doc.name
+
+	def test_member_puts_an_issue_and_a_task_into_their_team_and_out_again(self):
+		from phamos.api import personal_cockpit as pc
+
+		issue, task = self.mine("Issue", "Mine to share"), self.mine("Task", "Task to share")
+		self.assertEqual(pc.get_form_options()["teams"], [ALPHA])
+
+		self.assertEqual(pc.update_issue(issue, custom_team=ALPHA)["custom_team"], ALPHA)
+		self.assertEqual(pc.update_task(task, custom_team=ALPHA)["custom_team"], ALPHA)
+		# now it is the team's: it shows in the Team Cockpit
+		self.assertIn(issue, {row["name"] for row in tc.get_issues()["items"]})
+
+		self.assertIsNone(pc.update_issue(issue, custom_team="")["custom_team"])
+		# the page sends "" for "—"; None means the field was not sent at all
+		self.assertIsNone(pc.update_task(task, custom_team="")["custom_team"])
+
+	def test_another_team_is_refused_both_ways(self):
+		from phamos.api import personal_cockpit as pc
+
+		issue, theirs = self.mine("Issue", "Not for Beta"), self.mine("Task", "Beta's task", team=BETA)
+		with self.assertRaises(frappe.PermissionError):
+			pc.update_issue(issue, custom_team=BETA)
+		# a record of another team is not taken out of it, nor moved into the own team
+		for value in ("", ALPHA):
+			with self.assertRaises(frappe.PermissionError):
+				pc.update_task(theirs, custom_team=value)
+		self.assertEqual(frappe.db.get_value("Task", theirs, "custom_team"), BETA)
+
+	def test_general_management_sets_any_team(self):
+		from phamos.api import personal_cockpit as pc
+
+		issue = self.mine("Issue", "For any team")
+		frappe.set_user("Administrator")
+		frappe.share.add("Issue", issue, MANAGER, write=1)
+		frappe.get_doc("Issue", issue).db_set("owner", MANAGER)
+		frappe.set_user(MANAGER)
+		self.assertIn(BETA, pc.get_form_options()["teams"])
+		self.assertEqual(pc.update_issue(issue, custom_team=BETA)["custom_team"], BETA)
+
+	def test_not_changed_inside_the_team_cockpit(self):
+		issue = self.mine("Issue", "Stays in Alpha", team=ALPHA)
+		self.assertNotIn("teams", tc.get_form_options())
+		with self.assertRaises(frappe.ValidationError):
+			tc.update_issue(issue, custom_team="")

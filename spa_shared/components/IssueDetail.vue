@@ -144,6 +144,15 @@
 						:disabled="isClosed"
 						:options="projectOptions"
 					/>
+					<FormControl
+						v-if="showTeamField(options)"
+						v-model="autosave.draft.custom_team"
+						label="Team"
+						type="select"
+						size="sm"
+						:disabled="isClosed || teamFieldLocked(options, issue.custom_team)"
+						:options="teamOptions(options, issue.custom_team)"
+					/>
 				</section>
 
 				<section>
@@ -290,6 +299,7 @@ import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
 import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
+import { showTeamField, teamFieldLocked, teamOptions } from "@spa/utils/teamField.js"
 import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -378,6 +388,7 @@ const autosave = useAutosaveDoc({
 		priority: { kind: "select", immediate: true, label: "Priority" },
 		issue_type: { kind: "select", immediate: true, label: "Issue Type" },
 		project: { kind: "select", immediate: true, label: "Project" },
+		custom_team: { kind: "select", immediate: true, label: "Team" },
 	},
 	request: (name, payload, modified) => ({
 		method: `${API.value}.update_issue`,
