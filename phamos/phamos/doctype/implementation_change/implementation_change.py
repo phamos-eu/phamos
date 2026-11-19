@@ -354,12 +354,23 @@ def _ranking(release):
 def _validate_release_ranking(implementation, release, values):
 	"""A new order of the same features, or one feature moved to another active release."""
 	current = _ranking(release)
+	# proposed_values comes from the client: check the shape before using it
 	if set(values) == {"ranking"}:
 		ranking = values["ranking"]
-		if not isinstance(ranking, list) or sorted(ranking) != sorted(current):
+		if (
+			not isinstance(ranking, list)
+			or not all(isinstance(name, str) for name in ranking)
+			or sorted(ranking) != sorted(current)
+		):
 			frappe.throw(_("A new ranking lists the same features as the release, in the new order."))
 		return
-	if set(values) - {"feature", "to_release", "position"} or not values.get("feature") or not values.get("to_release"):
+	position = values.get("position")
+	if (
+		set(values) - {"feature", "to_release", "position"}
+		or not isinstance(values.get("feature"), str)
+		or not isinstance(values.get("to_release"), str)
+		or not (position is None or (isinstance(position, int) and not isinstance(position, bool) and position > 0))
+	):
 		frappe.throw(_("Name the new ranking, or the feature and the release to move it to."))
 	if values["feature"] not in current:
 		frappe.throw(_("Feature {0} is not in this release.").format(values["feature"]))
@@ -395,9 +406,13 @@ def _validate_proposal(implementation, target_doctype, target_name, change_type,
 	)
 	if owner != implementation:
 		frappe.throw(_("The record belongs to another implementation."))
-	if target_doctype == "Implementation Release" and change_type == "Rank":
-		_validate_release_ranking(implementation, target_name, values)
-		return
+	if target_doctype == "Implementation Release":
+		# a released or cancelled release is history: it is not re-planned, and stays out of the cut line
+		if frappe.db.get_value("Implementation Release", target_name, "status") not in ("Planned", "In Progress"):
+			frappe.throw(_("Only planned releases can be changed."))
+		if change_type == "Rank":
+			_validate_release_ranking(implementation, target_name, values)
+			return
 	if change_type == "Scope drop":
 		if target_doctype != "Implementation Feature" or values != {"status": "Dropped"}:
 			frappe.throw(_("Dropping a feature sets its status to Dropped and nothing else."))

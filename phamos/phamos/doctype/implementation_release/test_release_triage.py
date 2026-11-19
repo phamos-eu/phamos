@@ -104,6 +104,17 @@ class TestReleaseTriage(FrappeTestCase):
 			self.assertRaises(
 				frappe.ValidationError, propose_change, self.implementation, "Implementation Release", "Rank", values, self.first
 			)
+		# malformed payloads get a message, not a server error
+		for values in (
+			{"ranking": [1, self.a]},
+			{"feature": [self.a], "to_release": self.second},
+			{"feature": self.a, "to_release": {"name": self.second}},
+			{"feature": self.a, "to_release": self.second, "position": "first"},
+			{"feature": self.a, "to_release": self.second, "position": 0},
+		):
+			self.assertRaises(
+				frappe.ValidationError, propose_change, self.implementation, "Implementation Release", "Rank", values, self.first
+			)
 		other = make_release(make_implementation().name, [], FAR, title="Elsewhere").name
 		self.assertRaises(
 			frappe.ValidationError,
@@ -154,3 +165,17 @@ class TestReleaseTriage(FrappeTestCase):
 		self.assertEqual(variance[self.second]["target_shift_days"], 30)
 		self.assertEqual(variance[self.second]["features_added"], [self.b])
 		self.assertEqual(variance[self.first]["features_removed"], [self.b])
+
+	def test_released_or_cancelled_releases_are_not_replanned(self):
+		for status in ("Released", "Cancelled"):
+			frappe.db.set_value("Implementation Release", self.first, "status", status)
+			for change_type, values in (("Dates", {"target_date": str(getdate(LATER))}), ("Rank", {"ranking": [self.b, self.a]})):
+				self.assertRaises(
+					frappe.ValidationError,
+					propose_change,
+					self.implementation,
+					"Implementation Release",
+					change_type,
+					values,
+					self.first,
+				)
