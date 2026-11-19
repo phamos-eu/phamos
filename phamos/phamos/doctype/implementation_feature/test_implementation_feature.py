@@ -1,8 +1,6 @@
 # Copyright (c) 2026, phamos.eu and Contributors
 # See license.txt
 
-import unittest.mock
-
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -154,6 +152,13 @@ class TestImplementationFeature(FrappeTestCase):
 		self.assertEqual(set(moved), {in_sales.name, base.name})
 		in_sales.reload()
 		self.assertEqual((in_sales.implementation, in_sales.source), (self.implementation.name, "Sales"))
+		# the move is on the feature's timeline
+		self.assertTrue(
+			frappe.db.exists(
+				"Comment",
+				{"reference_doctype": "Implementation Feature", "reference_name": in_sales.name, "comment_type": "Info"},
+			)
+		)
 		self.assertEqual(take_over_from_sales(self.implementation.name), [])
 		self.assertFalse(frappe.db.get_value("Implementation Feature", not_won.name, "implementation"))
 
@@ -170,14 +175,18 @@ class TestImplementationFeature(FrappeTestCase):
 		)
 
 	def test_opportunity_of_another_customer_is_not_taken_over(self):
-		from phamos.phamos.doctype.implementation_feature.implementation_feature import _won_opportunities
+		from phamos.phamos.doctype.implementation_feature.implementation_feature import (
+			_belongs_to_another_customer,
+		)
 
-		with unittest.mock.patch("frappe.get_all", side_effect=[["SO"], ["QUO"], ["OPP"]]), unittest.mock.patch(
-			"frappe.db.get_value",
-			side_effect=lambda doctype, name, fields=None, **kw: (
-				frappe._dict(opportunity_from="Customer", party_name="Someone else")
-				if doctype == "Opportunity"
-				else self.implementation.customer
-			),
-		):
-			self.assertEqual(_won_opportunities(self.implementation.name), [])
+		def opportunity(party_type, party):
+			name = f"_Test IF Opp X {frappe.generate_hash(length=6)}"
+			frappe.get_doc(
+				{"doctype": "Opportunity", "name": name, "opportunity_from": party_type, "party_name": party}
+			).db_insert()
+			return name
+
+		own = self.implementation.customer
+		self.assertTrue(_belongs_to_another_customer(opportunity("Customer", "Someone else"), own))
+		self.assertFalse(_belongs_to_another_customer(opportunity("Customer", own), own))
+		self.assertFalse(_belongs_to_another_customer(opportunity("Lead", "LEAD-0001"), own))
