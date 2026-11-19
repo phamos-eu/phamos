@@ -215,6 +215,7 @@ class TestReleaseTriage(FrappeTestCase):
 			self.implementation,
 		)
 		frappe.db.set_value("Implementation Feature", self.a, "planned_start", "2027-03-01")
+		frappe.local.message_log = []
 		self.assertRaises(
 			frappe.ValidationError,
 			propose_change,
@@ -224,6 +225,9 @@ class TestReleaseTriage(FrappeTestCase):
 			{"target_date": "2027-01-01"},
 			self.a,
 		)
+		# the proposer sees why: the feature's own message reaches the response
+		self.assertEqual(len(frappe.local.message_log), 1)
+		self.assertIn("before the planned start", str(frappe.local.message_log[0]))
 		self.assertFalse(frappe.get_all("Implementation Change", filters={"implementation": self.implementation}))
 
 	def test_a_direct_change_of_a_releases_features_is_a_scope_change(self):

@@ -422,7 +422,8 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 
 	The values go onto an unsaved copy of the target, which runs the field checks and the
 	target's own validate (a date before the start, a negative limit, ...). Nothing is saved; the
-	target's warnings are muted. A release ranking is checked by _validate_release_ranking.
+	copy's warnings are dropped, the refusal reaches the proposer. A release ranking is checked by
+	_validate_release_ranking.
 	"""
 	if target_doctype == "Implementation Release" and change_type == "Rank":
 		return
@@ -435,8 +436,10 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 		)
 	doc.flags.from_implementation_change = True
 	doc._action = "save"  # Frappe's link check reads it; set by save() otherwise
-	muted = frappe.flags.mute_messages
-	frappe.flags.mute_messages = True
+	# Not muted: a muted msgprint raises without logging its text, and the proposer would see no
+	# reason. Instead the copy's warnings are taken out of the log again afterwards.
+	log = frappe.local.message_log
+	before = len(log)
 	try:
 		for field in values:
 			df = doc.meta.get_field(field)
@@ -453,11 +456,13 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 		doc._validate_links()
 		doc.run_method("validate")
 	except frappe.ValidationError:
+		# keep the refusal (the last message), drop the copy's warnings before it
+		del log[before:-1]
 		raise
 	except Exception:
+		del log[before:]
 		frappe.throw(_("These values are not valid for {0}.").format(_(target_doctype)))
-	finally:
-		frappe.flags.mute_messages = muted
+	del log[before:]
 
 
 def _validate_proposal(implementation, target_doctype, target_name, change_type, values):
