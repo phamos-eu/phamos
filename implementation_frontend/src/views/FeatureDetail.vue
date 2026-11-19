@@ -36,7 +36,7 @@
 						</div>
 						<div>
 							<dt class="text-xs text-ink-gray-5">{{ __("Planned") }}</dt>
-							<dd class="text-ink-gray-8">{{ date(feature.planned_start) }} – {{ date(feature.target_date) }}</dd>
+							<dd class="text-ink-gray-8">{{ planned }}</dd>
 						</div>
 						<div>
 							<dt class="text-xs text-ink-gray-5">{{ __("Responsible") }}</dt>
@@ -109,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import dayjs from "dayjs"
 import { call, FeatherIcon } from "frappe-ui"
@@ -140,6 +140,12 @@ watch(
 	},
 	{ immediate: true }
 )
+
+const planned = computed(() => {
+	const f = feature.value
+	if (!f || (!f.planned_start && !f.target_date)) return "—"
+	return `${date(f.planned_start)} – ${date(f.target_date)}`
+})
 
 function date(value) {
 	return value ? dayjs(value).format("D MMM YYYY") : "—"

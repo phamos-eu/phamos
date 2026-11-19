@@ -51,7 +51,7 @@
 								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.module || "—" }}</td>
 								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.chapters.map((c) => c.label).join(", ") || "—" }}</td>
 								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.releases.map((r) => r.label).join(", ") || "—" }}</td>
-								<td class="px-3 py-2.5"><span :class="statusClass(f.status)" class="rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span></td>
+								<td class="px-3 py-2.5"><span :class="statusClass(f.status)" class="whitespace-nowrap rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span></td>
 								<td class="px-3 py-2.5 text-ink-gray-7">{{ levels(f) }}</td>
 								<td class="px-3 py-2.5 text-right text-ink-gray-7">{{ hours(f.effort_hours) }}</td>
 								<td class="px-3 py-2.5"><ProgressBar class="w-32" :value="f.progress" /></td>
@@ -142,7 +142,7 @@
 								<li v-for="f in m.features" :key="f.name" class="border-t border-outline-gray-1 px-3 py-2 pl-6">
 									<div class="flex items-center gap-3">
 										<button type="button" class="flex-1 text-left text-sm text-ink-gray-9 hover:underline" @click="openFeature(f.name)">{{ f.title }}</button>
-										<span :class="statusClass(f.status)" class="rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span>
+										<span :class="statusClass(f.status)" class="whitespace-nowrap rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span>
 										<span class="w-14 text-right text-xs text-ink-gray-5">{{ hours(f.weight_hours) }}</span>
 										<ProgressBar class="w-32" :value="f.progress" />
 									</div>
