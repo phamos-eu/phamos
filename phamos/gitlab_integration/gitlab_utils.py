@@ -1673,7 +1673,10 @@ def get_releases_for_project(project_id):
 			timeout=60,
 		)
 		if response.status_code != 200:
-			break
+			# 403/404/expired token: say so instead of returning a silently partial list
+			raise frappe.ValidationError(
+				f"GitLab answered {response.status_code} for the releases of project {project_id} (page {page})"
+			)
 		data = response.json()
 		if not data:
 			break
@@ -1692,7 +1695,13 @@ def sync_gitlab_releases():
 		"GitLab Project", filters={"implementation": ["is", "set"]}, fields=["name", "project_id"]
 	)
 	for project in projects:
-		for release in get_releases_for_project(project.project_id):
+		# one unreachable project (timeout, 404, expired token) must not stop the others
+		try:
+			releases = get_releases_for_project(project.project_id)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"GitLab Release Sync Error - {project.name}")
+			continue
+		for release in releases:
 			# a savepoint per release: one broken release must not undo the others of this run
 			frappe.db.savepoint("gitlab_release_sync")
 			try:
