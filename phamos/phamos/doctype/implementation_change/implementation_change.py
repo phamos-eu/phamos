@@ -434,6 +434,7 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 			{"doctype": "Implementation Feature", "implementation": implementation, "status": "Agreed", **values}
 		)
 	doc.flags.from_implementation_change = True
+	doc._action = "save"  # Frappe's link check reads it; set by save() otherwise
 	muted = frappe.flags.mute_messages
 	frappe.flags.mute_messages = True
 	try:
