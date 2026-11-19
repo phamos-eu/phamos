@@ -2420,3 +2420,22 @@ Customer agreed,Kunde hat zugestimmt
 Record the customer's agreement,Zustimmung des Kunden erfassen
 Traffic Light,Ampel
 "These values are not valid for {0}.","Diese Werte sind für {0} nicht gültig."
+Implementation Doctype,Implementierungs-Doctype
+Implementation Doctype Screenshot,Screenshot des Implementierungs-Doctypes
+Implementation Feature Doctype,Doctype des Implementierungsfeatures
+Doctype Name,Doctype-Name
+Kind,Art
+New DocType,Neuer DocType
+Customization,Anpassung
+Reusable,Wiederverwendbar
+Showcase,Referenz zeigen
+Showcase Reviewed By,Referenz geprüft von
+Screenshots,Screenshots
+Used In,Verwendet in
+Work Done,Erledigte Arbeit
+Doctypes,Doctypes
+Report,Bericht
+Print Format,Druckformat
+Script,Skript
+Caption,Bildunterschrift
+"The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again.","Beschreibung oder Screenshots wurden geändert, daher ist der Eintrag keine Referenz mehr. Prüfe ihn und setze „Referenz zeigen“ erneut."

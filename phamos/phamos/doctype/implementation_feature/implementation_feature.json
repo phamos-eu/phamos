@@ -31,6 +31,8 @@
   "dod_agreed_by",
   "progress_section",
   "progress",
+  "doctypes_section",
+  "doctypes",
   "description_section",
   "description"
  ],
@@ -212,6 +214,19 @@
    "description": "A row is added whenever the status or the current level changes."
   },
   {
+   "fieldname": "doctypes_section",
+   "fieldtype": "Section Break",
+   "label": "Doctypes",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "doctypes",
+   "fieldtype": "Table",
+   "label": "Doctypes",
+   "options": "Implementation Feature Doctype",
+   "description": "The doctypes, reports, print formats and scripts built or changed for this feature (Implementation Doctype library)."
+  },
+  {
    "fieldname": "description_section",
    "fieldtype": "Section Break",
    "label": "Description"
@@ -224,7 +239,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-18 19:00:00.000000",
+ "modified": "2026-11-18 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Feature",

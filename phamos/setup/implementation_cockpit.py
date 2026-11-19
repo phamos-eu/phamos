@@ -15,13 +15,14 @@ from phamos.setup.general_management import ensure_permissions as _ensure_permis
 IMPLEMENTATION_ROLE = "phamos Implementation"
 
 # Issue: the cockpit lists the reports of an Implementation and shows their screenshots (private files).
-# Implementation Feature: what is built for an implementation (#1968), shown in the cockpit.
+# Implementation Feature and the Doctype library: what is built for an implementation (#1968, #1969).
 # Implementation Change / Baseline: plan changes and the agreed plan (#1971), shown in the cockpit.
 # Implementation Release: release planning and its realistic check (#1986).
 DOCTYPES = (
 	"Implementation",
 	"Issue",
 	"Implementation Feature",
+	"Implementation Doctype",
 	"Implementation Change",
 	"Implementation Baseline",
 	"Implementation Release",
