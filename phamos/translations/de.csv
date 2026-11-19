@@ -2262,7 +2262,161 @@ No e-mail account delivers to Accounting Receipt. Ask your administrator to set 
 Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
 The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
 "The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
+Implementation Feature,Implementierungsfeature
+Implementation Features,Implementierungsfeatures
+Implementation Feature Dependency,Abhängigkeit des Implementierungsfeatures
+Implementation Feature Progress,Fortschritt des Implementierungsfeatures
+Definition of Done,Abnahmekriterien
+Agreed On,Vereinbart am
+Agreed By (Customer),Vereinbart von (Kunde)
+Target Level,Ziel-Level
+Current Level,Aktuelles Level
+Suggested Progress,Vorgeschlagener Fortschritt
+Target and Progress,Ziel und Fortschritt
+Progress History,Fortschrittsverlauf
+Estimated Hours,Geschätzte Stunden
+Responsible,Verantwortlich
+Depends On,Hängt ab von
+In Testing,Im Test
+Take over Features from Sales,Features aus dem Vertrieb übernehmen
+{0} features taken over from sales,{0} Features aus dem Vertrieb übernommen
+No features from sales to take over,Keine Features aus dem Vertrieb zu übernehmen
+"A feature belongs to an Implementation or, while in sales, to an Opportunity.","Ein Feature gehört zu einer Implementierung oder, solange es im Vertrieb ist, zu einer Opportunity."
+{0} must be between 1 and 6.,{0} muss zwischen 1 und 6 liegen.
+"The current level is above the target level. Raise the target, or set the feature live.",Das aktuelle Level liegt über dem Ziel-Level. Erhöhe das Ziel oder setze das Feature live.
+The target date is before the planned start.,Das Zieldatum liegt vor dem geplanten Start.
+A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhängen.
+Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
+Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
+These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
+Implementation Chapter Dependency,Abhängigkeit des Implementierungskapitels
+Implementation Chapter Feature,Feature des Implementierungskapitels
+Agreed WIP Limits,Vereinbarte WIP-Limits
+Max Chapters in Progress,Max. Kapitel in Arbeit
+Max Features in Progress,Max. Features in Arbeit
+A chapter cannot depend on itself.,Ein Kapitel kann nicht von sich selbst abhängen.
+These dependencies form a loop: a chapter would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Kapitel würde auf sich selbst warten.
+"{0} chapters are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Kapitel in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+"{0} features are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Features in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+Over the agreed limit,Über dem vereinbarten Limit
+"{0} chapters in progress, {1} agreed","{0} Kapitel in Arbeit, {1} vereinbart"
+"{0} features in progress, {1} agreed","{0} Features in Arbeit, {1} vereinbart"
+Feature {0} does not exist.,Feature {0} existiert nicht.
+Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
+Agreed,Vereinbart
+{0} {1} is listed twice.,{0} {1} ist doppelt aufgeführt.
+{0} {1} does not exist.,{0} {1} existiert nicht.
+{0} {1} belongs to another implementation.,{0} {1} gehört zu einer anderen Implementierung.
+Chapter,Kapitel
+GitLab Release,GitLab-Release
+GitLab Release Milestone,GitLab-Release-Meilenstein
+Release Notes,Versionshinweise
+Released At,Veröffentlicht am
+Tag Name,Tag-Name
+Last Synced,Zuletzt synchronisiert
+Time Estimate (Hours),Zeitschätzung (Stunden)
+Time Spent (Hours),Aufgewendete Zeit (Stunden)
+GitLab's upcoming release: its date lies in the future.,Anstehendes Release in GitLab: Sein Datum liegt in der Zukunft.
+From GitLab's time estimate on the issue. Used by release planning.,Aus der Zeitschätzung des Issues in GitLab. Wird für die Release-Planung verwendet.
+Time logged on the issue in GitLab.,In GitLab auf dem Issue erfasste Zeit.
+Releases synced successfully,Releases erfolgreich synchronisiert
+Implementation Release,Implementierungs-Release
+Implementation Release Feature,Implementierungs-Release Feature
+Implementation Release Milestone,Implementierungs-Release Meilenstein
+Realistic Check,Realitätscheck
+Amber,Gelb
+Open Effort (Hours),Offener Aufwand (Stunden)
+Available Capacity (Hours),Verfügbare Kapazität (Stunden)
+Contents,Inhalt
+Features (ranked),Features (nach Rang)
+Fits,Passt
+Team Capacity Share,Anteil der Teamkapazität
+Released,Veröffentlicht
+"What this release brings, e.g. ""Warehouse go-live"".","Was dieses Release bringt, z. B. „Go-live Lager“."
+Optional. A chapter can have several releases; a maintenance release stands alone.,Optional. Ein Kapitel kann mehrere Releases haben; ein Wartungsrelease steht für sich.
+Linked automatically when GitLab publishes a release with this release's milestones.,"Wird automatisch verknüpft, sobald GitLab ein Release mit den Meilensteinen dieses Releases veröffentlicht."
+"Green: everything fits. Amber: everything fits, but with less than 20% buffer. Red: some ranked features do not fit before the target date.","Grün: Alles passt. Gelb: Alles passt, aber mit weniger als 20 % Puffer. Rot: Einige Features passen nicht vor das Zieldatum."
+"Team capacity from today to the target date, minus leave and holidays, times the agreed share, minus the effort of earlier releases.","Teamkapazität von heute bis zum Zieldatum, abzüglich Urlaub und Feiertagen, mal dem vereinbarten Anteil, abzüglich des Aufwands früherer Releases."
+The order is the priority. Features below the cut line do not fit before the target date.,Die Reihenfolge ist die Priorität. Features unter der Schnittlinie passen nicht vor das Zieldatum.
+The order of the rows; 1 is the most important.,Die Reihenfolge der Zeilen; 1 ist am wichtigsten.
+"Fits into the team capacity before the target date, counting the features ranked above it and earlier releases.","Passt vor dem Zieldatum in die Teamkapazität, gezählt mit den höher eingestuften Features und früheren Releases."
+"The share of the team's capacity agreed for this implementation, because teams work for several customers. Used by the realistic check of releases.","Der für diese Implementierung vereinbarte Anteil der Teamkapazität, weil Teams für mehrere Kunden arbeiten. Wird für den Realitätscheck der Releases verwendet."
+Chapter {0} belongs to another implementation.,Kapitel {0} gehört zu einer anderen Implementierung.
+Feature {0} is listed twice.,Feature {0} ist doppelt aufgeführt.
+Feature {0} is already planned in release {1}. Move it from there.,Feature {0} ist bereits in Release {1} geplant. Verschieben Sie es von dort.
+These milestones of its features are not in the release: {0},Diese Meilensteine seiner Features fehlen im Release: {0}
+Implementation Change,Planänderung
+Implementation Baseline,Planungsbasis
+Implementation Baseline Chapter,Planungsbasis Kapitel
+Implementation Baseline Feature,Planungsbasis Feature
+Change Type,Änderungsart
+Target Type,Zieltyp
+Old Values,Alte Werte
+New Values,Neue Werte
+Consent,Zustimmung
+Proposed By,Vorgeschlagen von
+Agreed by phamos,Zugestimmt von phamos
+Agreed by Customer,Zugestimmt vom Kunden
+Decided On,Entschieden am
+Applied On,Angewendet am
+Dispute Reason,Grund des Widerspruchs
+Baseline Date,Datum der Planungsbasis
+Snapshot,Momentaufnahme
+Proposed,Vorgeschlagen
+Applied – awaiting customer,Angewendet – wartet auf Kunden
+Disputed,Widersprochen
+Target level,Ziel-Level
+Scope add,Umfang hinzugefügt
+Scope drop,Umfang gestrichen
+Scope change,Umfang geändert
+Definition of done,Definition of Done
+WIP limit,WIP-Limit
+Capacity share,Kapazitätsanteil
+"Proposed: one side asked. Agreed: both sides agreed, applied at the planning session. Applied – awaiting customer: a PM changed it directly; the customer confirms or disputes it.","Vorgeschlagen: Eine Seite hat angefragt. Vereinbart: Beide Seiten haben zugestimmt, wird in der Planungssitzung angewendet. Angewendet – wartet auf Kunden: Ein PM hat es direkt geändert; der Kunde bestätigt oder widerspricht."
+Empty for a proposed new feature until it is applied.,"Leer bei einem vorgeschlagenen neuen Feature, bis es angewendet ist."
+The planning session that decides on this change. Agreed changes are applied when that meeting is submitted.,"Die Planungssitzung, die über diese Änderung entscheidet. Vereinbarte Änderungen werden beim Buchen dieser Sitzung angewendet."
+The plan both sides agreed most recently. Variance on the roadmap and the PM triangle is measured against it.,"Der zuletzt von beiden Seiten vereinbarte Plan. Abweichungen in der Roadmap und im PM-Dreieck werden daran gemessen."
+"Changes can be recorded for features, releases, chapters and implementations only.","Änderungen können nur für Features, Releases, Kapitel und Implementierungen erfasst werden."
+An applied or rejected change cannot be edited. Propose a new change instead.,Eine angewendete oder abgelehnte Änderung kann nicht bearbeitet werden. Schlagen Sie stattdessen eine neue Änderung vor.
+You cannot take part in plan changes of this implementation.,Sie können an Planänderungen dieser Implementierung nicht teilnehmen.
+Agreed in Stakeholder Meeting {0},Vereinbart im Stakeholder-Meeting {0}
+Name the values to change.,Nennen Sie die zu ändernden Werte.
+The meeting belongs to another implementation.,Das Meeting gehört zu einer anderen Implementierung.
+A new feature needs a title and may set only: {0},Ein neues Feature braucht einen Titel und darf nur Folgendes setzen: {0}
+Changes can be proposed for features and the implementation.,Änderungen können für Features und die Implementierung vorgeschlagen werden.
+Choose the record to change.,Wählen Sie den zu ändernden Datensatz.
+The record belongs to another implementation.,Der Datensatz gehört zu einer anderen Implementierung.
+Dropping a feature sets its status to Dropped and nothing else.,Das Streichen eines Features setzt nur seinen Status auf Gestrichen.
+A change of type {0} may set only: {1},Eine Änderung der Art {0} darf nur Folgendes setzen: {1}
+This change is {0} and cannot be changed that way.,Diese Änderung ist {0} und kann so nicht geändert werden.
+Your side has agreed already. The other side decides now.,Ihre Seite hat bereits zugestimmt. Jetzt entscheidet die andere Seite.
+Say why you dispute the change.,"Sagen Sie, warum Sie der Änderung widersprechen."
+Name the customer contact who decided.,"Nennen Sie den Kundenkontakt, der entschieden hat."
+{0} is not a customer stakeholder of this implementation.,{0} ist kein Kunden-Stakeholder dieser Implementierung.
+Agree,Zustimmen
+Reject change,Änderung ablehnen
+Customer confirmed,Kunde hat bestätigt
+Customer disputed,Kunde hat widersprochen
+Customer contact,Kundenkontakt
+Record the customer's confirmation,Bestätigung des Kunden erfassen
+Record the customer's dispute,Widerspruch des Kunden erfassen
+Implementation Baseline Release,Planungsbasis Release
+Ranking,Rangfolge
+The release's features in their agreed order.,Die Features des Releases in ihrer vereinbarten Reihenfolge.
+"A new ranking lists the same features as the release, in the new order.","Eine neue Rangfolge enthält dieselben Features wie das Release, in der neuen Reihenfolge."
+"Name the new ranking, or the feature and the release to move it to.","Nennen Sie die neue Rangfolge oder das Feature und das Release, in das es verschoben wird."
+Feature {0} is not in this release.,Feature {0} ist nicht in diesem Release.
+Move the feature to another planned release of this implementation.,Verschieben Sie das Feature in ein anderes geplantes Release dieser Implementierung.
+"Changes can be proposed for features, releases and the implementation.","Änderungen können für Features, Releases und die Implementierung vorgeschlagen werden."
 Deliveries & Invoices,Lieferungen & Rechnungen
 No Delivery Notes yet.,Noch keine Lieferscheine.
 Delivered {0} h of {1} h billable,Geliefert {0} h von {1} h abrechenbar
 Not yet invoiced {0} h,Noch nicht abgerechnet {0} h
+Only planned releases can be changed.,Nur geplante Releases können geändert werden.
+Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
+Choose a Planning meeting that is not yet submitted.,"Wählen Sie ein Planungsmeeting aus, das noch nicht gebucht ist."
+These agreed changes could not be applied and stay Agreed:,Diese vereinbarten Änderungen konnten nicht angewendet werden und bleiben vereinbart:
+Customer agreed,Kunde hat zugestimmt
+Record the customer's agreement,Zustimmung des Kunden erfassen
+Traffic Light,Ampel
+"These values are not valid for {0}.","Diese Werte sind für {0} nicht gültig."
