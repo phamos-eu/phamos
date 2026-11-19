@@ -2252,7 +2252,4 @@ These dependencies form a loop: a feature would wait for itself.,Diese Abhängig
 Feature {0} does not exist.,Feature {0} existiert nicht.
 Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
 Agreed,Vereinbart
-Planned,Geplant
-In Progress,In Arbeit
-Live,Live
 Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
