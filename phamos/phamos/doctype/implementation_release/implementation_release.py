@@ -67,7 +67,9 @@ class ImplementationRelease(Document):
 				"Implementation Feature", filters={"name": ["in", names or [""]]}, fields=["name", "implementation"], as_list=True
 			)
 		)
-		elsewhere = self._features_in_other_releases(names)
+		# only an active release claims its features; a released one keeps its history even when a
+		# feature that is not Live yet is planned again in a new release
+		elsewhere = self._features_in_other_releases(names) if self.status in ACTIVE else {}
 		for row in self.features:
 			if row.feature in seen:
 				frappe.throw(_("Feature {0} is listed twice.").format(row.feature))
@@ -293,7 +295,13 @@ def refresh_all_release_checks():
 	for implementation in frappe.get_all(
 		"Implementation Release", filters={"status": ["in", ACTIVE]}, pluck="implementation", distinct=True
 	):
-		refresh_release_check(implementation)
+		# one implementation with broken team or holiday data must not leave the others stale
+		frappe.db.savepoint("release_check_refresh")
+		try:
+			refresh_release_check(implementation)
+		except Exception:
+			frappe.db.rollback(save_point="release_check_refresh")
+			frappe.log_error(frappe.get_traceback(), f"Implementation Release Check Error - {implementation}")
 
 
 @frappe.whitelist()
@@ -307,23 +315,32 @@ def get_release_check(implementation):
 
 
 def link_published_release(doc, method=None):
-	"""on_update of GitLab Release: a published release (not upcoming) that ships the milestones of
-	a planned release is linked to it, and the planned release becomes Released. Its features stay
-	as they are until the PM confirms them Live."""
+	"""on_update of GitLab Release: a published release (not upcoming) that ships all the milestones
+	of a planned release is linked to it, and the planned release becomes Released. A release that
+	ships only part of them leaves the planned release as it is. Its features stay as they are until
+	the PM confirms them Live."""
 	if doc.upcoming or not doc.released_at or not doc.milestones:
 		return
 	implementation = frappe.db.get_value("GitLab Project", doc.gitlab_project, "implementation")
 	if not implementation:
 		return
-	parents = frappe.get_all(
+	shipped = {row.gitlab_milestone for row in doc.milestones}
+	planned = {}
+	for row in frappe.get_all(
 		"Implementation Release Milestone",
 		filters={
-			"gitlab_milestone": ["in", [row.gitlab_milestone for row in doc.milestones]],
+			"parent": ["in", frappe.get_all(
+				"Implementation Release Milestone",
+				filters={"gitlab_milestone": ["in", list(shipped)], "parenttype": "Implementation Release"},
+				pluck="parent",
+				distinct=True,
+			) or [""]],
 			"parenttype": "Implementation Release",
 		},
-		pluck="parent",
-		distinct=True,
-	)
+		fields=["parent", "gitlab_milestone"],
+	):
+		planned.setdefault(row.parent, set()).add(row.gitlab_milestone)
+	parents = [name for name, milestones in planned.items() if milestones <= shipped]
 	for name in frappe.get_all(
 		"Implementation Release",
 		filters={
