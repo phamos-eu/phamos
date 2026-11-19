@@ -112,6 +112,9 @@ class ImplementationFeature(Document):
 	def reset_agreement_when_dod_changes(self):
 		"""A changed definition of done is no longer what the customer agreed to."""
 		before = self.get_doc_before_save()
+		# an applied Implementation Change (#1971) sets text and agreement together
+		if self.flags.from_implementation_change:
+			return
 		if before and (before.definition_of_done or "") != (self.definition_of_done or ""):
 			# the form sends dates as strings, the stored doc has date objects: compare as text
 			agreement_changed = str(self.dod_agreed_on or "") != str(before.dod_agreed_on or "") or (

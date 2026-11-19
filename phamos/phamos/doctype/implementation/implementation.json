@@ -776,6 +776,16 @@
    "link_fieldname": "implementation"
   },
   {
+   "link_doctype": "Implementation Change",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Baseline",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
    "link_doctype": "Implementation Release",
    "link_fieldname": "implementation",
    "group": "Planning"
