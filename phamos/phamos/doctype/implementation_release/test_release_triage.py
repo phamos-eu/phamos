@@ -189,3 +189,52 @@ class TestReleaseTriage(FrappeTestCase):
 					values,
 					self.first,
 				)
+
+	def test_values_the_target_refuses_are_refused_at_once(self):
+		frappe.set_user(CUSTOMER_USER)
+		for change_type, values in (
+			("Dates", {"target_date": "not a date"}),
+			("Dates", {"target_date": ["2027-01-01"]}),
+		):
+			self.assertRaises(
+				frappe.ValidationError,
+				propose_change,
+				self.implementation,
+				"Implementation Release",
+				change_type,
+				values,
+				self.first,
+			)
+		self.assertRaises(
+			frappe.ValidationError,
+			propose_change,
+			self.implementation,
+			"Implementation",
+			"WIP limit",
+			{"max_parallel_features": -1},
+			self.implementation,
+		)
+		frappe.db.set_value("Implementation Feature", self.a, "planned_start", "2027-03-01")
+		self.assertRaises(
+			frappe.ValidationError,
+			propose_change,
+			self.implementation,
+			"Implementation Feature",
+			"Dates",
+			{"target_date": "2027-01-01"},
+			self.a,
+		)
+		self.assertFalse(frappe.get_all("Implementation Change", filters={"implementation": self.implementation}))
+
+	def test_a_direct_change_of_a_releases_features_is_a_scope_change(self):
+		create_baseline(self.implementation)
+		release = frappe.get_doc("Implementation Release", self.first)
+		release.remove(release.features[1])
+		release.save()
+		change = frappe.get_all(
+			"Implementation Change",
+			filters={"target_name": self.first},
+			fields=["change_type", "proposed_values"],
+		)
+		self.assertEqual([row.change_type for row in change], ["Scope change"])
+		self.assertEqual(json.loads(change[0].proposed_values), {"features": [self.a]})

@@ -27,7 +27,7 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, today
+from frappe.utils import getdate, now_datetime, today
 
 from phamos.phamos.doctype.implementation_release.implementation_release import ranking_of
 
@@ -220,7 +220,11 @@ def record_direct_edits(doc, method=None):
 	if doc.doctype == "Implementation Release":
 		old_ranking = [row.feature for row in before.features]
 		new_ranking = [row.feature for row in doc.features]
-		if old_ranking != new_ranking:
+		# the same features in another order is a re-rank; features added or taken out change the
+		# release's scope (a move between two releases gives one scope change on each)
+		if sorted(old_ranking) != sorted(new_ranking):
+			by_type["Scope change"] = ({"features": old_ranking}, {"features": new_ranking})
+		elif old_ranking != new_ranking:
 			by_type["Rank"] = ({"ranking": old_ranking}, {"ranking": new_ranking})
 	for change_type, (old_values, new_values) in by_type.items():
 		_insert_change(
@@ -351,6 +355,7 @@ def propose_change(
 	if not isinstance(values, dict) or not values:
 		frappe.throw(_("Name the values to change."))
 	_validate_proposal(implementation, target_doctype, target_name, change_type, values)
+	_check_values_on_a_copy(implementation, target_doctype, target_name, change_type, values)
 	if stakeholder_meeting:
 		check_planning_meeting(stakeholder_meeting, implementation)
 	change = _insert_change(
@@ -410,6 +415,48 @@ def _validate_release_ranking(implementation, release, values):
 		or other.status not in ("Planned", "In Progress")
 	):
 		frappe.throw(_("Move the feature to another planned release of this implementation."))
+
+
+def _check_values_on_a_copy(implementation, target_doctype, target_name, change_type, values):
+	"""Refuse values the target would refuse, to the proposer, before the other side sees them.
+
+	The values go onto an unsaved copy of the target, which runs the field checks and the
+	target's own validate (a date before the start, a negative limit, ...). Nothing is saved; the
+	target's warnings are muted. A release ranking is checked by _validate_release_ranking.
+	"""
+	if target_doctype == "Implementation Release" and change_type == "Rank":
+		return
+	if target_name:
+		doc = frappe.get_doc(target_doctype, target_name)
+		doc.update(values)
+	else:
+		doc = frappe.get_doc(
+			{"doctype": "Implementation Feature", "implementation": implementation, "status": "Agreed", **values}
+		)
+	doc.flags.from_implementation_change = True
+	muted = frappe.flags.mute_messages
+	frappe.flags.mute_messages = True
+	try:
+		for field in values:
+			df = doc.meta.get_field(field)
+			if df and df.fieldtype == "Date" and values[field]:
+				getdate(values[field])
+			elif df and df.fieldtype in ("Int", "Float", "Percent") and values[field] not in (None, ""):
+				if isinstance(values[field], bool) or not isinstance(values[field], (int, float, str)):
+					raise ValueError(field)
+				float(values[field])
+		doc._validate_mandatory()
+		doc._validate_selects()
+		doc._validate_non_negative()
+		doc._validate_length()
+		doc._validate_links()
+		doc.run_method("validate")
+	except frappe.ValidationError:
+		raise
+	except Exception:
+		frappe.throw(_("These values are not valid for {0}.").format(_(target_doctype)))
+	finally:
+		frappe.flags.mute_messages = muted
 
 
 def _validate_proposal(implementation, target_doctype, target_name, change_type, values):

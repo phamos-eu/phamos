@@ -327,18 +327,19 @@ class TestImplementationChange(FrappeTestCase):
 
 	def test_a_change_the_target_refuses_does_not_block_the_meeting(self):
 		meeting = self.planning_meeting()
-		# a target date before the planned start: the feature refuses it at apply time
 		name = propose_change(
 			self.implementation.name,
 			"Implementation Feature",
 			"Dates",
-			{"target_date": "2026-11-01"},
+			{"target_date": "2026-12-15"},
 			self.feature.name,
 			stakeholder_meeting=meeting.name,
 		)
 		self.as_customer()
 		agree_change(name)
 		frappe.set_user("Administrator")
+		# the feature moved on since: the agreed date is now before its start and is refused at apply time
+		frappe.db.set_value("Implementation Feature", self.feature.name, "planned_start", "2026-12-20")
 		meeting.reload()
 		set_progress(meeting)
 		frappe.message_log = []
