@@ -195,7 +195,14 @@ def ensure_task_chat(name):
 @frappe.whitelist(methods=["POST"])
 @_require_access
 def update_issue(
-	name, subject=None, description=None, priority=None, issue_type=None, project=None, modified=None
+	name,
+	subject=None,
+	description=None,
+	priority=None,
+	issue_type=None,
+	project=None,
+	custom_team=None,
+	modified=None,
 ):
 	"""Update whitelisted Issue fields within team scope."""
 	fields = {}
@@ -209,6 +216,8 @@ def update_issue(
 		fields["issue_type"] = issue_type
 	if project is not None:
 		fields["project"] = project
+	if custom_team is not None:
+		fields["custom_team"] = custom_team
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_issue(CONFIG, name, **fields)
@@ -301,6 +310,7 @@ def update_task(
 	progress=None,
 	project=None,
 	custom_task_owner=None,
+	custom_team=None,
 	modified=None,
 ):
 	"""Update whitelisted Task fields within team scope."""
@@ -323,6 +333,8 @@ def update_task(
 		fields["project"] = project
 	if custom_task_owner is not None:
 		fields["custom_task_owner"] = custom_task_owner
+	if custom_team is not None:
+		fields["custom_team"] = custom_team
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)

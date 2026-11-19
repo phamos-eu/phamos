@@ -123,6 +123,15 @@
 					size="sm"
 					:options="projectOptions"
 				/>
+				<FormControl
+					v-if="showTeamField(options)"
+					v-model="autosave.draft.custom_team"
+					label="Team"
+					type="select"
+					size="sm"
+					:disabled="teamFieldLocked(options, task.custom_team)"
+					:options="teamOptions(options, task.custom_team)"
+				/>
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Task Owner</label>
 					<FrappeLink
@@ -236,6 +245,7 @@ import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
 import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
+import { showTeamField, teamFieldLocked, teamOptions } from "@spa/utils/teamField.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -292,6 +302,7 @@ const autosave = useAutosaveDoc({
 		priority: { kind: "select", immediate: true, label: "Priority" },
 		project: { kind: "select", immediate: true, label: "Project" },
 		custom_task_owner: { kind: "select", immediate: true, label: "Task Owner" },
+		custom_team: { kind: "select", immediate: true, label: "Team" },
 		exp_start_date: { kind: "date", immediate: true, label: "Expected start" },
 		exp_end_date: { kind: "date", immediate: true, label: "Expected end" },
 		progress: { kind: "number", toServer: clampProgress, label: "Progress" },

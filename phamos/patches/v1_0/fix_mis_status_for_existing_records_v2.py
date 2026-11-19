@@ -56,7 +56,15 @@ def _restore_legacy_links():
 		if dn and frappe.db.exists("Delivery Note", dn):
 			by_mis.setdefault(link["mis_name"], []).append(link)
 
+	# The Delivery Notes table is gone (#1987): the Delivery Note points at its MIS instead.
+	has_dn_table = frappe.get_meta("Monthly Implementation Summary").has_field("mis_delivery_notes")
 	for mis_name, entries in by_mis.items():
+		if not has_dn_table:
+			for entry in entries:
+				if not frappe.db.get_value("Delivery Note", entry["delivery_note"], "custom_monthly_implementation_summary"):
+					frappe.db.set_value("Delivery Note", entry["delivery_note"], "custom_monthly_implementation_summary",
+						mis_name, update_modified=False)
+			continue
 		docstatus = frappe.db.get_value("Monthly Implementation Summary", mis_name, "docstatus")
 		if docstatus is None:
 			continue
