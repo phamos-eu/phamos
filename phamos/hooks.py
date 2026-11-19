@@ -66,6 +66,13 @@ add_to_apps_screen = [
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
 	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -159,6 +166,8 @@ website_route_rules = [
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -262,6 +271,7 @@ after_migrate = [
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
 # Uninstallation
@@ -451,7 +461,24 @@ doc_events = {
             "phamos.web_profile.mirror.push_to_profiles",
         ]
     },
-    "Implementation": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    # a published GitLab Release sets the planned Implementation Release to Released (#1986)
+    "GitLab Release": {
+        "on_update": "phamos.phamos.doctype.implementation_release.implementation_release.link_published_release",
+    },
+    "Implementation": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # direct edits of agreed plan values wait for the customer's confirmation (#1971)
+            "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        ],
+    },
+    "Implementation Release": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+    },
+    "Implementation Feature": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",
+    },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
     "Employee": {
         "on_update": [
@@ -532,6 +559,8 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
+        # Implementation Release: capacity shrinks every day, leave changes (#1986)
+        "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
@@ -599,6 +628,7 @@ override_doctype_dashboards = {
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
+    "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled

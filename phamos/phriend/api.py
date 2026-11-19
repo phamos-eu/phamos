@@ -7,7 +7,7 @@ import base64
 import binascii
 import json
 import re
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import frappe
 import requests
@@ -117,6 +117,34 @@ def create_report(
 	)
 
 
+IMPLEMENTATION_COCKPIT_ROUTE = "implementation-cockpit/"
+
+
+def report_implementation(settings, route, ref_doctype, ref_docname, source=None):
+	"""The Implementation a report belongs to, so the Implementation Cockpit can show it (#1671).
+
+	In this order: the implementation of the Implementation Cockpit page it was made on; the
+	implementation of the record it was made on; the Implementation of this system (Phriend
+	Settings). A report from another system has neither page nor record here, so it gets none
+	until that system's Implementation is known (#1937, #1953).
+	"""
+	if source:
+		return None
+	route = cstr(route).lstrip("/")
+	if route.startswith(IMPLEMENTATION_COCKPIT_ROUTE):
+		name = unquote(route[len(IMPLEMENTATION_COCKPIT_ROUTE) :].split("/", 1)[0])
+		if name and frappe.db.exists("Implementation", name):
+			return name
+	if ref_doctype and ref_docname:
+		if ref_doctype == "Implementation":
+			return ref_docname
+		if frappe.get_meta(ref_doctype).has_field("custom_implementation"):
+			value = frappe.db.get_value(ref_doctype, ref_docname, "custom_implementation")
+			if value:
+				return value
+	return settings.get("system_implementation") or None
+
+
 def make_report(settings, fields, reporter, reporter_name, reporter_email, source=None):
 	"""The Issue for one report, with its screenshot and ToDo. Returns {"name"}.
 
@@ -170,6 +198,7 @@ def make_report(settings, fields, reporter, reporter_name, reporter_email, sourc
 	issue.phriend_page_url = page_url
 	issue.phriend_ref_doctype = ref_doctype
 	issue.phriend_ref_docname = linked_docname
+	issue.custom_implementation = report_implementation(settings, route, ref_doctype, linked_docname, source)
 	issue.phriend_context = _pretty_json(f["context"])
 	if source:
 		issue.phriend_source_system = source["system"]
