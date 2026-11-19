@@ -2233,8 +2233,7 @@ Remove everyone in {0},Alle aus {0} entfernen
 The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
 Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
 Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
-"The first appointment would be on {0}, after Repeat until","Der erste Termin wäre am {0} und damit nach „Wiederholen bis“"
-First appointment: {0}. Start and end move to that day.,Erster Termin: {0}. Start und Ende werden auf diesen Tag verschoben.
+"The start is the first appointment. After it, the appointment repeats on the ticked days.","Der Start ist der erste Termin. Danach wiederholt sich der Termin an den ausgewählten Tagen."
 Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
 Open in Cockpit,Im Cockpit öffnen
 Project Management,Projektmanagement
