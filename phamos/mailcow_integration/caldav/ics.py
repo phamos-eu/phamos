@@ -31,6 +31,25 @@ def _fmt(dt: datetime) -> str:
     return dt.strftime("%Y%m%dT%H%M%S")
 
 
+ICS_WEEKDAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+
+
+def _start_outside_rule(starts_on, recurrence_rule: str | None) -> bool:
+    """A weekly rule whose BYDAY doesn't have the start's weekday (#1991).
+
+    The chosen start is always the first appointment; after it the repeat runs on the ticked
+    weekdays. RFC 5545 leaves a DTSTART outside its rule undefined (section 3.8.5.3): most clients
+    show it, some (dateutil among them) drop it. An RDATE equal to DTSTART makes it an occurrence
+    for every reader.
+    """
+    if not recurrence_rule or not starts_on:
+        return False
+    parts = dict(part.split("=", 1) for part in recurrence_rule.split(";") if "=" in part)
+    if parts.get("FREQ") != "WEEKLY" or not parts.get("BYDAY"):
+        return False
+    return ICS_WEEKDAYS[get_datetime(starts_on).weekday()] not in parts["BYDAY"].split(",")
+
+
 def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
            description: str = "", location: str = "Online", 
            attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "",
@@ -89,6 +108,9 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
 
     if recurrence_rule:
         ics_lines.append(f"RRULE:{recurrence_rule}")
+        if _start_outside_rule(starts_on, recurrence_rule):
+            # same value and TZID as DTSTART
+            ics_lines.append(f"RDATE;TZID={tz}:{_fmt(starts_on)}")
 
     # Close the event
     ics_lines.extend([
