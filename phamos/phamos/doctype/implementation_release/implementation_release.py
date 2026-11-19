@@ -394,7 +394,8 @@ def get_released_features_awaiting_live(implementation):
 # Triage (#1986 part 3, through Implementation Change #1971) ------------------------------------
 
 
-def _ranked(release):
+def ranking_of(release):
+	"""The feature names of a release in their ranked order; the one place that reads it."""
 	return frappe.get_all(
 		"Implementation Release Feature",
 		filters={"parent": release, "parenttype": "Implementation Release"},
@@ -406,13 +407,13 @@ def _ranked(release):
 def proposed_ranking(release, values):
 	"""The releases and rankings a Rank proposal leads to: {release: [features in order]}."""
 	if "ranking" in values:
-		current = _ranked(release)
+		current = ranking_of(release)
 		# features moved out since the proposal are skipped, new ones keep their place at the end
 		ranking = [name for name in values["ranking"] if name in current]
 		return {release: ranking + [name for name in current if name not in ranking]}
 	feature, to_release = values["feature"], values["to_release"]
-	source = [name for name in _ranked(release) if name != feature]
-	target = [name for name in _ranked(to_release) if name != feature]
+	source = [name for name in ranking_of(release) if name != feature]
+	target = [name for name in ranking_of(to_release) if name != feature]
 	position = values.get("position")
 	index = max(int(position) - 1, 0) if position else len(target)
 	target.insert(min(index, len(target)), feature)
@@ -422,9 +423,9 @@ def proposed_ranking(release, values):
 def apply_ranking(release, values):
 	"""Carry out an agreed Rank change; returns the values it replaced."""
 	result = proposed_ranking(release, values)
-	old = {"ranking": _ranked(release)}
+	old = {"ranking": ranking_of(release)}
 	if "feature" in values:
-		old["to_release_ranking"] = _ranked(values["to_release"])
+		old["to_release_ranking"] = ranking_of(values["to_release"])
 	# the source first: a feature may be in one active release only
 	for name in [release] + [other for other in result if other != release]:
 		doc = frappe.get_doc("Implementation Release", name)
@@ -468,7 +469,7 @@ def get_triage(implementation):
 	)
 	for release in releases:
 		release.update(check.get(release.name) or {})
-		release["ranking"] = _ranked(release.name)
+		release["ranking"] = ranking_of(release.name)
 		release["proposals"] = frappe.get_all(
 			"Implementation Change",
 			filters={

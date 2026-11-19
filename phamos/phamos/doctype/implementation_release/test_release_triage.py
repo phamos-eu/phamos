@@ -81,6 +81,16 @@ class TestReleaseTriage(FrappeTestCase):
 		self.assertEqual(agree_change(name), "Applied")
 		self.assertEqual(ranking(self.first), [self.b, self.a])
 
+	def test_an_agreed_move_leaves_exactly_one_change_record(self):
+		create_baseline(self.implementation)
+		name = self.propose_as_customer(self.first, "Rank", {"feature": self.b, "to_release": self.second})
+		agree_change(name)
+		# both releases were saved by the change itself: no extra "awaiting customer" record
+		self.assertEqual(
+			frappe.get_all("Implementation Change", filters={"implementation": self.implementation}, pluck="name"),
+			[name],
+		)
+
 	def test_moving_a_feature_to_another_release(self):
 		name = self.propose_as_customer(self.first, "Rank", {"feature": self.b, "to_release": self.second, "position": 1})
 		agree_change(name)

@@ -29,6 +29,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, today
 
+from phamos.phamos.doctype.implementation_release.implementation_release import ranking_of
+
 AWAITING = "Applied – awaiting customer"
 
 # Agreed plan values per target doctype: field → change type. Status and current level of a
@@ -75,7 +77,7 @@ NEW_FEATURE_FIELDS = (
 class ImplementationChange(Document):
 	def validate(self):
 		if self.target_doctype not in AGREED_FIELDS:
-			frappe.throw(_("Changes can be recorded for features, chapters and implementations only."))
+			frappe.throw(_("Changes can be recorded for features, releases, chapters and implementations only."))
 		before = self.get_doc_before_save()
 		if before and before.status in ("Applied", "Rejected") and self.has_value_changed("proposed_values"):
 			frappe.throw(_("An applied or rejected change cannot be edited. Propose a new change instead."))
@@ -371,22 +373,13 @@ def _current_values(target_doctype, target_name, change_type, values):
 	if not target_name:
 		return {}
 	if target_doctype == "Implementation Release" and change_type == "Rank":
-		return {"ranking": _ranking(target_name)}
+		return {"ranking": ranking_of(target_name)}
 	return frappe.db.get_value(target_doctype, target_name, list(values), as_dict=True) or {}
-
-
-def _ranking(release):
-	return frappe.get_all(
-		"Implementation Release Feature",
-		filters={"parent": release, "parenttype": "Implementation Release"},
-		pluck="feature",
-		order_by="idx asc",
-	)
 
 
 def _validate_release_ranking(implementation, release, values):
 	"""A new order of the same features, or one feature moved to another active release."""
-	current = _ranking(release)
+	current = ranking_of(release)
 	# proposed_values comes from the client: check the shape before using it
 	if set(values) == {"ranking"}:
 		ranking = values["ranking"]

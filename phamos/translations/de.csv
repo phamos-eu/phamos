@@ -2376,7 +2376,7 @@ Capacity share,Kapazitätsanteil
 Empty for a proposed new feature until it is applied.,"Leer bei einem vorgeschlagenen neuen Feature, bis es angewendet ist."
 The planning session that decides on this change. Agreed changes are applied when that meeting is submitted.,"Die Planungssitzung, die über diese Änderung entscheidet. Vereinbarte Änderungen werden beim Buchen dieser Sitzung angewendet."
 The plan both sides agreed most recently. Variance on the roadmap and the PM triangle is measured against it.,"Der zuletzt von beiden Seiten vereinbarte Plan. Abweichungen in der Roadmap und im PM-Dreieck werden daran gemessen."
-"Changes can be recorded for features, chapters and implementations only.","Änderungen können nur für Features, Kapitel und Implementierungen erfasst werden."
+"Changes can be recorded for features, releases, chapters and implementations only.","Änderungen können nur für Features, Releases, Kapitel und Implementierungen erfasst werden."
 An applied or rejected change cannot be edited. Propose a new change instead.,Eine angewendete oder abgelehnte Änderung kann nicht bearbeitet werden. Schlagen Sie stattdessen eine neue Änderung vor.
 You cannot take part in plan changes of this implementation.,Sie können an Planänderungen dieser Implementierung nicht teilnehmen.
 Agreed in Stakeholder Meeting {0},Vereinbart im Stakeholder-Meeting {0}

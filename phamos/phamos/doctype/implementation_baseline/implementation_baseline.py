@@ -16,6 +16,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import date_diff, getdate, today
 
+from phamos.phamos.doctype.implementation_release.implementation_release import ranking_of
+
 CHAPTER_FIELDS = ("chapter_title", "status", "planned_start", "target_date", "current_level", "target_level")
 FEATURE_FIELDS = ("title", "status", "priority", "planned_start", "target_date", "target_level", "estimated_hours")
 
@@ -56,7 +58,7 @@ def create_baseline(implementation, stakeholder_meeting=None, baseline_date=None
 		order_by="target_date asc, name asc",
 	):
 		name = release.pop("name")
-		baseline.append("releases", {"release": name, "ranking": json.dumps(_ranking(name)), **release})
+		baseline.append("releases", {"release": name, "ranking": json.dumps(ranking_of(name)), **release})
 	frappe.db.set_value(
 		"Implementation Baseline", {"implementation": implementation, "is_current": 1}, "is_current", 0
 	)
@@ -150,19 +152,10 @@ def _shift(then, now):
 	return date_diff(getdate(now), getdate(then))
 
 
-def _ranking(release):
-	return frappe.get_all(
-		"Implementation Release Feature",
-		filters={"parent": release, "parenttype": "Implementation Release"},
-		pluck="feature",
-		order_by="idx asc",
-	)
-
-
 def _release_variance(then, now):
 	if not now:
 		return {"name": then.release, "title": then.title, "removed": True}
-	ranking_then, ranking_now = json.loads(then.ranking or "[]"), _ranking(now.name)
+	ranking_then, ranking_now = json.loads(then.ranking or "[]"), ranking_of(now.name)
 	return {
 		"name": now.name,
 		"title": now.title,
