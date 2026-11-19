@@ -37,6 +37,17 @@ export const SVG = `
 	</g>
 </svg>`;
 
+// The hand that goes with a bubble (#1990): say(html, ms, "<gesture>"). Yellow emoji, default
+// skin tone; the motion names a keyframe below.
+export const GESTURES = {
+	wave: { hand: "👋", motion: "wave" }, // "Click me!" and the first greeting
+	thumbs_up: { hand: "👍", motion: "bounce" }, // report saved
+	fingers_crossed: { hand: "🤞", motion: "sway" }, // sending
+	wait: { hand: "✋", motion: "still" }, // "One moment…"
+	point_up: { hand: "☝️", motion: "up" }, // at the bubble: an unsent or failed report
+	point: { hand: "👉", motion: "point" }, // at Phriend: "Report it?"
+};
+
 // Colours and type for everything inside the Shadow DOM (the flow adds its own rules).
 const BASE_CSS = `
 :host {
@@ -93,7 +104,27 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @media (prefers-reduced-motion: reduce) {
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
+	.hand.show { animation: none !important; }
 }
+/* The hand beside the ball, at the side away from the badge (top right). Near the left edge
+   (flip) it moves to the right side, mirrored, so it stays on screen and still faces Phriend. */
+.hand {
+	position: absolute; left: -16px; top: 20px; font-size: 22px; line-height: 1; pointer-events: none;
+	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+	opacity: 0; transform: scale(0.4); transform-origin: 70% 90%; transition: opacity 0.2s, transform 0.2s;
+}
+.hand.show { opacity: 1; transform: none; }
+.ball.flip .hand { left: auto; right: -10px; scale: -1 1; }
+.hand.show[data-motion="wave"] { animation: hand-wave 0.5s ease-in-out infinite alternate; }
+.hand.show[data-motion="bounce"] { animation: hand-bounce 0.6s ease-out 1; }
+.hand.show[data-motion="sway"] { animation: hand-sway 1.2s ease-in-out infinite alternate; }
+.hand.show[data-motion="up"] { animation: hand-up 1s ease-in-out infinite; }
+.hand.show[data-motion="point"] { animation: hand-point 1s ease-in-out infinite; }
+@keyframes hand-wave { from { transform: rotate(-14deg); } to { transform: rotate(22deg); } }
+@keyframes hand-bounce { 0% { transform: scale(0.4); } 55% { transform: translateY(-5px) scale(1.25); } 100% { transform: none; } }
+@keyframes hand-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+@keyframes hand-up { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes hand-point { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
 .badge {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;
@@ -160,6 +191,7 @@ export class Ball {
 			<div class="ball">
 				<div class="bubble" role="status" aria-live="polite"></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
+				<span class="hand" aria-hidden="true"></span>
 				<span class="pending"></span>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
@@ -170,6 +202,7 @@ export class Ball {
 		this.root = this.shadow.querySelector(".ball");
 		this.hit = this.shadow.querySelector(".hit"); // the ball itself: drag, click, keyboard
 		this.bubble = this.shadow.querySelector(".bubble");
+		this.hand = this.shadow.querySelector(".hand");
 		this.badge = this.shadow.querySelector(".badge");
 		this.keys = this.shadow.querySelector(".keys");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
@@ -341,10 +374,12 @@ export class Ball {
 
 	// html: trusted markup built by Phriend itself (user text is escaped by the caller).
 	// ms = 0 keeps the bubble until the next say() or hide_bubble().
-	say(html, ms = 4000) {
+	// gesture: a key of GESTURES; the hand shows while this bubble shows.
+	say(html, ms = 4000, gesture = null) {
 		clearTimeout(this._bubble_timer);
 		this.bubble.innerHTML = html;
 		this.bubble.classList.add("show");
+		this.set_hand(gesture);
 		// a bubble that stays (failures, "One moment…") can be closed
 		this.bubble.classList.toggle("sticky", !ms);
 		if (ms) {
@@ -364,6 +399,21 @@ export class Ball {
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
 		this.bubble.classList.remove("show");
+		this.set_hand(null);
+	}
+
+	bubble_showing() {
+		return this.bubble.classList.contains("show");
+	}
+
+	set_hand(gesture) {
+		const g = gesture && GESTURES[gesture];
+		this.hand.classList.remove("show");
+		if (!g) return; // keep the emoji while it fades out
+		this.hand.textContent = g.hand;
+		this.hand.dataset.motion = g.motion;
+		void this.hand.offsetWidth; // restart the motion when the same hand comes again
+		this.hand.classList.add("show");
 	}
 
 	// "⌘P" under the ball; "" hides it (shortcut switched off)
