@@ -115,11 +115,15 @@ class Phriend {
 
 	// "Click me!" now and then, to users who never opened Phriend or not for a while (nudge.js).
 	start_nudging() {
-		const check = () => this.maybe_nudge();
-		setTimeout(check, NUDGE_DELAY);
-		setInterval(check, NUDGE_CHECK);
-		document.addEventListener("visibilitychange", () => !document.hidden && setTimeout(check, NUDGE_DELAY));
-		if (this.host.on_route_change) this.host.on_route_change(() => setTimeout(check, NUDGE_DELAY));
+		// one pending check: clicking through pages quickly doesn't pile up timers
+		const later = () => {
+			clearTimeout(this._nudge_timer);
+			this._nudge_timer = setTimeout(() => this.maybe_nudge(), NUDGE_DELAY);
+		};
+		later();
+		setInterval(() => this.maybe_nudge(), NUDGE_CHECK);
+		document.addEventListener("visibilitychange", () => !document.hidden && later());
+		if (this.host.on_route_change) this.host.on_route_change(later);
 	}
 
 	maybe_nudge() {
