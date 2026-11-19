@@ -598,6 +598,24 @@ def _check_not_being_sent(row):
 		frappe.throw(_("The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it."))
 
 
+def _first_weekly_start(data):
+	"""Start and end of a weekly repeat's first appointment, as datetimes.
+
+	A start on a weekday that isn't ticked moves forward to the first ticked one, the end with it.
+	Otherwise the invite would start on a day the repeat doesn't have: calendars show that start as
+	an extra appointment, while the cockpit doesn't (spa_shared/utils/appointments.js mirrors this
+	as firstWeeklyStart). No ticked weekday: the repeat runs on the start's own weekday.
+	"""
+	start = frappe.utils.get_datetime(data.start)
+	end = frappe.utils.get_datetime(data.end)
+	ticked = [index for index, day in enumerate(WEEKDAYS) if frappe.utils.cint(data.get(day))]
+	weekly = frappe.utils.cint(data.repeat_this_event) and data.repeat_on == "Weekly"
+	if not weekly or not ticked:
+		return start, end
+	days_ahead = min((index - start.weekday()) % 7 for index in ticked)
+	return frappe.utils.add_days(start, days_ahead), frappe.utils.add_days(end, days_ahead)
+
+
 @frappe.whitelist()
 @_require_access
 def get_company_appointments():
@@ -656,6 +674,8 @@ def save_appointment(appointment):
 	Args:
 		appointment (dict | str): `name` of the row to update (none: new), the fields in
 			APPOINTMENT_FIELDS, and required_attendees / optional_attendees as lists of emails.
+			A weekly repeat whose start is not on a ticked weekday starts on the first ticked one
+			(_first_weekly_start).
 
 	Returns:
 		dict: the saved appointment, with its sync status after the save.
@@ -676,6 +696,12 @@ def save_appointment(appointment):
 			frappe.throw(_("Choose how often the appointment repeats"))
 		if data.repeat_till and frappe.utils.getdate(data.repeat_till) < frappe.utils.getdate(data.start):
 			frappe.throw(_("Repeat until cannot be before the start"))
+		first_start, first_end = _first_weekly_start(data)
+		if data.repeat_till and frappe.utils.getdate(data.repeat_till) < first_start.date():
+			frappe.throw(
+				_("The first appointment would be on {0}, after Repeat until").format(frappe.utils.formatdate(first_start))
+			)
+		data.start, data.end = first_start, first_end
 	for field in ("required_attendees", "optional_attendees"):
 		value = data.get(field) or []
 		if not isinstance(value, list) or not all(isinstance(email, str) for email in value):

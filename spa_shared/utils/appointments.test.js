@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, weeklyDays } from "./appointments.js"
+import { firstWeeklyStart, listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, weeklyDays } from "./appointments.js"
 
 const day = (iso) => parseDateTime(iso)
 const starts = (list) =>
@@ -62,6 +62,31 @@ describe("appointment occurrences", () => {
 	it("ignores the repeat options when repeat is off or unknown", () => {
 		const a = appt({ repeat_this_event: 0, repeat_on: "Daily" })
 		expect(occurrencesBetween(a, day("2026-11-01"), day("2026-12-31"))).toHaveLength(1)
+	})
+})
+
+describe("first appointment of a weekly repeat", () => {
+	const weekly = (extra = {}) => appt({ repeat_this_event: 1, repeat_on: "Weekly", ...extra })
+
+	it("moves to the first ticked weekday when the start's weekday is not ticked", () => {
+		// the start is a Tuesday
+		expect(starts([{ start: firstWeeklyStart(weekly({ monday: 1, thursday: 1 })) }])).toEqual(["2026-12-03"])
+		expect(starts([{ start: firstWeeklyStart(weekly({ monday: 1 })) }])).toEqual(["2026-12-07"])
+		expect(firstWeeklyStart(weekly({ thursday: 1 })).getHours()).toBe(10)
+	})
+
+	it("stays when the start fits: its weekday ticked, none ticked, not weekly, no repeat", () => {
+		expect(firstWeeklyStart(weekly({ tuesday: 1, thursday: 1 }))).toBeNull()
+		expect(firstWeeklyStart(weekly())).toBeNull()
+		expect(firstWeeklyStart(appt({ repeat_this_event: 1, repeat_on: "Daily", monday: 1 }))).toBeNull()
+		expect(firstWeeklyStart(appt({ repeat_on: "Weekly", monday: 1 }))).toBeNull()
+		expect(firstWeeklyStart(weekly({ start: "", monday: 1 }))).toBeNull()
+	})
+
+	it("is the first occurrence the list and calendar show", () => {
+		const a = weekly({ monday: 1, thursday: 1 })
+		const [first] = occurrencesBetween(a, day("2026-11-01"), day("2026-12-31"))
+		expect(first.start.getTime()).toBe(firstWeeklyStart(a).getTime())
 	})
 })
 
