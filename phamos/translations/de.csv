@@ -2191,6 +2191,43 @@ Remove {0},{0} entfernen
 Until,Bis
 No department,Keine Abteilung
 Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.
+Party Accounts,Personenkonten
+Party Account Settings,Personenkonten-Einstellungen
+Party Account Setting,Personenkonten-Einstellung
+"Per company: under which parent account and with which number range a customer's or supplier's own ledger account is created, by the ""Create Debtor Account"" / ""Create Creditor Account"" buttons or automatically on save. The next free number in the range is assigned.","Je Unternehmen: unter welchem übergeordneten Konto und mit welchem Nummernkreis das eigene Konto eines Kunden oder Lieferanten angelegt wird, über die Schaltflächen ""Debitorenkonto anlegen"" / ""Kreditorenkonto anlegen"" oder automatisch beim Speichern. Vergeben wird die nächste freie Nummer im Nummernkreis."
+Debtor Accounts (Customers),Debitorenkonten (Kunden)
+Creditor Accounts (Suppliers),Kreditorenkonten (Lieferanten)
+Debtor Parent Account,Übergeordnetes Debitorenkonto
+Creditor Parent Account,Übergeordnetes Kreditorenkonto
+"Group account under which a receivable account is created for each customer, e.g. ""Debitoren"". Leave empty if this company does not need these accounts.","Gruppenkonto, unter dem für jeden Kunden ein Debitorenkonto angelegt wird, z. B. ""Debitoren"". Leer lassen, wenn dieses Unternehmen keine Debitorenkonten benötigt."
+"Group account under which a payable account is created for each supplier, e.g. ""Kreditoren"". Leave empty if this company does not need these accounts.","Gruppenkonto, unter dem für jeden Lieferanten ein Kreditorenkonto angelegt wird, z. B. ""Kreditoren"". Leer lassen, wenn dieses Unternehmen keine Kreditorenkonten benötigt."
+Create Automatically and Require,Automatisch anlegen und verpflichtend
+Every save of a customer creates its account for this company if it is missing. A customer cannot be saved without one.,"Beim Speichern eines Kunden wird sein Konto für dieses Unternehmen angelegt, falls es fehlt. Ein Kunde kann nicht ohne Konto gespeichert werden."
+Every save of a supplier creates its account for this company if it is missing. A supplier cannot be saved without one.,"Beim Speichern eines Lieferanten wird sein Konto für dieses Unternehmen angelegt, falls es fehlt. Ein Lieferant kann nicht ohne Konto gespeichert werden."
+First Debtor Number,Erste Debitorennummer
+Last Debtor Number,Letzte Debitorennummer
+First Creditor Number,Erste Kreditorennummer
+Last Creditor Number,Letzte Kreditorennummer
+Create Debtor Account,Debitorenkonto anlegen
+Create Creditor Account,Kreditorenkonto anlegen
+Creating account...,Konto wird angelegt...
+Account {0} created,Konto {0} angelegt
+All configured companies already have an account.,Für alle eingerichteten Unternehmen ist bereits ein Konto vorhanden.
+{0} {1} already has the account {2} for company {3}.,{0} {1} hat bereits das Konto {2} für das Unternehmen {3}.
+Party Type must be Customer or Supplier.,Der Typ muss Kunde oder Lieferant sein.
+Company {0} has no {1}. Please set it in {2}.,Für das Unternehmen {0} ist kein {1} hinterlegt. Bitte in {2} einrichten.
+Missing Configuration,Fehlende Einrichtung
+The number range {0} to {1} of company {2} is used up.,Der Nummernkreis {0} bis {1} des Unternehmens {2} ist ausgeschöpft.
+No Free Account Number,Keine freie Kontonummer
+Row #{0}: Company {1} is configured more than once.,Zeile #{0}: Das Unternehmen {1} ist mehrfach eingerichtet.
+Row #{0}: Please set a debtor or a creditor parent account.,Zeile #{0}: Bitte ein übergeordnetes Debitoren- oder Kreditorenkonto angeben.
+Row #{0}: Account {1} does not belong to company {2}.,Zeile #{0}: Das Konto {1} gehört nicht zum Unternehmen {2}.
+Row #{0}: Account {1} must be a group account.,Zeile #{0}: Das Konto {1} muss ein Gruppenkonto sein.
+Row #{0}: Account {1} must have root type {2}.,Zeile #{0}: Das Konto {1} muss den Stammtyp {2} haben.
+Row #{0}: {1} and {2} are required.,Zeile #{0}: {1} und {2} sind erforderlich.
+Row #{0}: The first number ({1}) must not be greater than the last number ({2}).,Zeile #{0}: Die erste Nummer ({1}) darf nicht größer sein als die letzte Nummer ({2}).
+Row #{0}: The debtor and creditor number ranges overlap.,Zeile #{0}: Die Nummernkreise für Debitoren und Kreditoren überschneiden sich.
+Row #{0}: Account {1} does not exist.,Zeile #{0}: Das Konto {1} existiert nicht.
 Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
 Remove everyone in {0},Alle aus {0} entfernen
 The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
