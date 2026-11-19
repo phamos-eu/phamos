@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 19:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "status",
+  "priority",
+  "column_break_head",
+  "implementation",
+  "opportunity",
+  "customer",
+  "source",
+  "scope_section",
+  "module",
+  "owner_user",
+  "estimated_hours",
+  "column_break_scope",
+  "planned_start",
+  "target_date",
+  "gitlab_milestone",
+  "depends_on",
+  "target_section",
+  "target_level",
+  "current_level",
+  "suggested_progress",
+  "column_break_target",
+  "definition_of_done",
+  "dod_agreed_on",
+  "dod_agreed_by",
+  "progress_section",
+  "progress",
+  "description_section",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "description": "What the customer gets, in a few words, e.g. \"Batch numbers on goods receipt\"."
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Idea\nAgreed\nPlanned\nIn Progress\nIn Testing\nLive\nDropped",
+   "default": "Idea"
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "Low\nMedium\nHigh",
+   "default": "Medium"
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "description": "Empty while the feature is still part of a sales conversation; set when the deal becomes an implementation."
+  },
+  {
+   "fieldname": "opportunity",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Opportunity",
+   "options": "Opportunity",
+   "description": "The sales opportunity where the feature was first discussed with the customer."
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "description": "Taken from the implementation, or from the opportunity while in sales."
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Implementation\nSales",
+   "default": "Implementation",
+   "description": "Where the feature came up: in sales, when the customer configured their system, or later in the implementation."
+  },
+  {
+   "fieldname": "scope_section",
+   "fieldtype": "Section Break",
+   "label": "Scope"
+  },
+  {
+   "fieldname": "module",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Module",
+   "options": "Implementation Module"
+  },
+  {
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "label": "Responsible",
+   "options": "User",
+   "description": "The person at phamos responsible for delivering the feature."
+  },
+  {
+   "fieldname": "estimated_hours",
+   "fieldtype": "Float",
+   "label": "Estimated Hours",
+   "description": "Expected effort in hours. Money stays on quotations and the budget."
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Date",
+   "label": "Planned Start"
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "label": "Target Date"
+  },
+  {
+   "fieldname": "gitlab_milestone",
+   "fieldtype": "Link",
+   "label": "GitLab Milestone",
+   "options": "GitLab Milestones",
+   "description": "Optional: the GitLab milestone the feature's work is planned in."
+  },
+  {
+   "fieldname": "depends_on",
+   "fieldtype": "Table MultiSelect",
+   "label": "Depends On",
+   "options": "Implementation Feature Dependency",
+   "description": "Features of the same implementation that have to be done first."
+  },
+  {
+   "fieldname": "target_section",
+   "fieldtype": "Section Break",
+   "label": "Target and Progress"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "Int",
+   "label": "Target Level",
+   "description": "On the 1–6 scale of Implementation Modules: 1 Inception … 6 Support. The level the feature should reach."
+  },
+  {
+   "fieldname": "current_level",
+   "fieldtype": "Int",
+   "label": "Current Level",
+   "description": "On the 1–6 scale of Implementation Modules: 1 Inception … 6 Support. Set by the PM."
+  },
+  {
+   "fieldname": "suggested_progress",
+   "fieldtype": "Percent",
+   "is_virtual": 1,
+   "label": "Suggested Progress",
+   "read_only": 1,
+   "description": "Closed versus all GitLab issues linked to this feature. A hint for the PM, not the level itself."
+  },
+  {
+   "fieldname": "column_break_target",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "definition_of_done",
+   "fieldtype": "Text",
+   "label": "Definition of Done",
+   "description": "When the feature counts as done, agreed by phamos and the customer. Changing it needs a new agreement."
+  },
+  {
+   "fieldname": "dod_agreed_on",
+   "fieldtype": "Date",
+   "label": "Agreed On",
+   "depends_on": "definition_of_done"
+  },
+  {
+   "fieldname": "dod_agreed_by",
+   "fieldtype": "Link",
+   "label": "Agreed By (Customer)",
+   "options": "Contact",
+   "depends_on": "definition_of_done",
+   "description": "The customer contact who agreed to the definition of done."
+  },
+  {
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break",
+   "label": "Progress History",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "progress",
+   "fieldtype": "Table",
+   "label": "Progress",
+   "options": "Implementation Feature Progress",
+   "description": "A row is added whenever the status or the current level changes."
+  },
+  {
+   "fieldname": "description_section",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-18 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Feature",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "IF-.#####",
+ "naming_rule": "Expression (old style)",
+ "title_field": "title",
+ "show_title_field_in_link": 1,
+ "track_changes": 1,
+ "search_fields": "title,implementation,module"
+}
