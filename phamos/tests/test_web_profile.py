@@ -310,3 +310,33 @@ class TestWebProfile(FrappeTestCase):
 		before = frappe.db.count("Opportunity")
 		self.assertEqual(self._submit(self.person.route, website="http://spam.example")["ok"], True)
 		self.assertEqual(frappe.db.count("Opportunity"), before)
+
+	# --- implementations ---------------------------------------------------------------------------
+
+	def test_named_implementation_shows_the_customer_name_not_its_id(self):
+		# phamos/phamos#1825: the Customer link holds the internal ID ("Knd-00314"); the public page
+		# shows the customer's name. Here the ID stays "WP Test Kunde GmbH", the name differs.
+		frappe.db.set_value("Customer", CUSTOMER, "customer_name", "WP Druck & Service GmbH")
+		implementation = frappe.get_doc({"doctype": "Implementation", "name": "WP-TEST-1825", "customer": CUSTOMER})
+		implementation.insert(ignore_permissions=True)
+		doc = frappe.get_doc({
+			"doctype": "Implementation Web Profile", "implementation": implementation.name, "customer": CUSTOMER,
+			"customer_approved": 1, "customer_approval_date": nowdate(), "published": 1,
+		}).insert(ignore_permissions=True)
+
+		_reset_items()
+		item = find_item("implementations", doc.route, "en")
+		self.assertFalse(item.masked)
+		self.assertEqual(item.title, "WP Druck & Service GmbH")
+		self.assertEqual(item.subtitle, "")  # no title of its own: the name is the title, not repeated
+		self.assertIn("wp druck & service gmbh", item.search)
+
+		doc.append("translations", {"language": "en", "title": "A case study"})
+		doc.save(ignore_permissions=True)
+		_reset_items()
+		item = find_item("implementations", doc.route, "en")
+		self.assertEqual(item.subtitle, "WP Druck & Service GmbH")
+		profile = build_profile(item, "en")
+		self.assertIn("WP Druck & Service GmbH", profile["overview"])
+		self.assertEqual(profile["schema"]["about"]["name"], "WP Druck & Service GmbH")
+		self.assertNotIn(CUSTOMER, item.subtitle + item.search + profile["overview"] + frappe.as_json(profile["schema"]))
