@@ -589,20 +589,29 @@ def load_implementations(lang):
 			fields=["parent", "person", "role", "key_person"], order_by="idx asc"):
 		project_people.setdefault(row.parent, []).append(row)
 	items = []
-	for r in _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
-			"start_date", "industry", "customer_approved", "region"]):
+	records = _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
+		"start_date", "industry", "customer_approved", "region"])
+	# The customer link holds the internal ID ("Knd-00314"); named cases show the customer's name (#1825).
+	# Names are read only for approved cases: anonymous ones must never carry them.
+	approved = [r.customer for r in records if r.customer and r.customer_approved]
+	customer_names = dict(frappe.get_all("Customer", filters={"name": ["in", approved]},
+		fields=["name", "customer_name"], as_list=True)) if approved else {}
+	for r in records:
 		if r.implementation_status == "Cancelled":
 			continue
 		industry_label = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
 		year = getdate(r.start_date).year if r.start_date else None
-		masked = not r.customer_approved
+		customer_name = customer_names.get(r.customer)
+		# No name to show (approved but empty customer_name): stay anonymous rather than fall back to the ID.
+		masked = not r.customer_approved or not customer_name
 		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), _region(r.region)]))
-		title = localized(r, "title", lang) or (descriptor if masked else r.customer)
+		title = localized(r, "title", lang) or (descriptor if masked else customer_name)
 		if masked:
 			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == descriptor else descriptor,
 				masked=True)
 		else:
-			item = _item("implementations", r, lang, title, r.route, subtitle=r.customer, image=r.image)
+			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == customer_name else customer_name,
+				image=r.image)
 		if r.industry in industries:
 			_facet(item, "industry", industries[r.industry][0], industry_label)
 		for module in implementation_modules.get(r.name, []):
@@ -631,7 +640,7 @@ def load_implementations(lang):
 			"year": year,
 			"team": teams.get(r.team),
 			"industry": (industries[r.industry][0], industry_label) if r.industry in industries else None,
-			"customer": None if masked else r.customer,
+			"customer": None if masked else customer_name,
 			# Server-side only (never rendered): lets the customer page find its projects.
 			"_customer": r.customer,
 			# Named cases link to a named customer page, anonymous cases only to an anonymous one.
