@@ -37,6 +37,7 @@ const navItems = computed(() =>
 	route.params.implementation
 		? [
 				{ name: "Overview", label: __("Overview"), icon: "grid" },
+				{ name: "Features", label: __("Features"), icon: "layers", match: ["Features", "FeatureDetail"] },
 				{ name: "Milestones", label: __("Milestones"), icon: "flag" },
 				// Reports through Phriend are internal for now; customers follow with #1938.
 				...(scope.isInternal ? [{ name: "Issues", label: __("Issues"), icon: "inbox", match: ["Issues", "IssueDetail"] }] : []),
