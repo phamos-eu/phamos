@@ -713,3 +713,287 @@ def resolve_status(route=None, ref_doctype=None, ref_docname=None, issue=None):
 		settings = frappe.get_cached_doc("Phriend Settings")
 		implementation = report_implementation(settings, route, ref_doctype, ref_docname)
 	return implementation if implementation in _allowed_implementations() else None
+
+
+# Features (#1972): list, Kanban and WBS of the implementation's features. Customers see them
+# read-only; staff who may write Implementation Feature move cards on the Kanban.
+
+FEATURE_STATUSES = ("Idea", "Agreed", "Planned", "In Progress", "In Testing", "Live", "Dropped")
+FEATURE_LIST_FIELDS = (
+	"name",
+	"title",
+	"status",
+	"priority",
+	"module",
+	"owner_user",
+	"target_level",
+	"current_level",
+	"estimated_hours",
+	"planned_start",
+	"target_date",
+	"gitlab_milestone",
+	"dod_agreed_on",
+)
+GITLAB_ISSUE_FIELDS = (
+	"name",
+	"issue_id",
+	"title",
+	"state",
+	"issue_url",
+	"gitlab_milestone",
+	"implementation_feature",
+	"created_at",
+	"closed_at",
+	"aging_days",
+	"total_touch_time",
+	"time_estimate_hours",
+	"time_spent_hours",
+)
+
+
+def _can_move_features():
+	"""Staff who may change features in Desk move cards; customers only look."""
+	return is_internal_user() and bool(frappe.has_permission("Implementation Feature", "write"))
+
+
+def _feature_rows(implementation):
+	return frappe.get_all(
+		"Implementation Feature",
+		filters={"implementation": implementation},
+		fields=list(FEATURE_LIST_FIELDS),
+		order_by="planned_start asc, creation asc",
+	)
+
+
+def _issues_by_feature(features):
+	issues = {}
+	for issue in frappe.get_all(
+		"GitLab Issue",
+		filters={"implementation_feature": ["in", features or [""]]},
+		fields=list(GITLAB_ISSUE_FIELDS),
+		order_by="created_at asc",
+	):
+		issues.setdefault(issue.implementation_feature, []).append(issue)
+	return issues
+
+
+def _parents_by_feature(child_doctype, parent_doctype, features, label_field):
+	"""{feature: [{name, label}]} for chapters or releases that list the feature."""
+	rows = frappe.get_all(
+		child_doctype,
+		filters={"feature": ["in", features or [""]], "parenttype": parent_doctype},
+		fields=["feature", "parent"],
+	)
+	labels = dict(
+		frappe.get_all(
+			parent_doctype,
+			filters={"name": ["in", list({r.parent for r in rows}) or [""]]},
+			fields=["name", label_field],
+			as_list=True,
+		)
+	)
+	out = {}
+	for row in rows:
+		out.setdefault(row.feature, []).append({"name": row.parent, "label": labels.get(row.parent) or row.parent})
+	return out
+
+
+def _percent(value):
+	"""Half-up, as people read percentages (Python's round() would make 62.5 into 62)."""
+	return int(value + 0.5)
+
+
+def feature_progress(feature, issues):
+	"""Progress of one feature in percent: Live is done; otherwise the closed share of its GitLab
+	issues; otherwise how far its level has come towards the target. Dropped counts nowhere."""
+	if feature.status == "Live":
+		return 100
+	if issues:
+		return _percent(100 * sum(1 for i in issues if i.state == "closed") / len(issues))
+	if cint(feature.target_level):
+		return min(100, _percent(100 * cint(feature.current_level) / cint(feature.target_level)))
+	return 0
+
+
+def feature_weight(feature, issues):
+	"""Hours a feature weighs in the WBS roll-up: its estimate, or its issues' estimates if larger."""
+	return max(flt(feature.estimated_hours), sum(flt(i.time_estimate_hours) for i in issues))
+
+
+def roll_up(items):
+	"""Weighted progress of (progress, weight) pairs; plain average when no item has hours."""
+	items = list(items)
+	if not items:
+		return 0
+	total = sum(weight for _progress, weight in items)
+	if total:
+		return _percent(sum(progress * weight for progress, weight in items) / total)
+	return _percent(sum(progress for progress, _weight in items) / len(items))
+
+
+def _wip(implementation, features):
+	limit = cint(frappe.db.get_value("Implementation", implementation, "max_parallel_features"))
+	running = sum(1 for f in features if f.status == "In Progress")
+	return {"running": running, "limit": limit, "over": bool(limit and running > limit)}
+
+
+@frappe.whitelist()
+def get_features(implementation):
+	"""The implementation's features with effort, progress, chapters, releases and issue figures."""
+	_require_implementation(implementation)
+	from phamos.phamos.doctype.implementation_release.implementation_release import feature_efforts
+
+	features = _feature_rows(implementation)
+	names = [f.name for f in features]
+	issues = _issues_by_feature(names)
+	efforts = feature_efforts(features) if features else {}
+	chapters = _parents_by_feature("Implementation Chapter Feature", "Implementation Chapter", names, "chapter_title")
+	releases = _parents_by_feature("Implementation Release Feature", "Implementation Release", names, "title")
+	owners = {u: frappe.utils.get_fullname(u) for u in {f.owner_user for f in features if f.owner_user}}
+	today_date = getdate(today())
+	rows = []
+	for feature in features:
+		linked = issues.get(feature.name, [])
+		open_issues = [i for i in linked if i.state != "closed"]
+		rows.append(
+			{
+				# the responsible's name only: a staff e-mail address is not needed in the cockpit
+				**{key: value for key, value in feature.items() if key != "owner_user"},
+				"owner_name": owners.get(feature.owner_user),
+				"effort_hours": round(flt(efforts.get(feature.name)), 1),
+				"progress": feature_progress(feature, linked),
+				"chapters": chapters.get(feature.name, []),
+				"releases": releases.get(feature.name, []),
+				"issues_open": len(open_issues),
+				"issues_total": len(linked),
+				# the oldest open issue, in days: what has been waiting longest on this card
+				"oldest_open_days": max(
+					((today_date - getdate(i.created_at)).days for i in open_issues if i.created_at), default=None
+				),
+				"touch_hours": round(sum(flt(i.total_touch_time) for i in linked) / 3600, 1),
+			}
+		)
+	return {
+		"features": rows,
+		"statuses": FEATURE_STATUSES,
+		"wip": _wip(implementation, features),
+		"can_move": _can_move_features(),
+	}
+
+
+@frappe.whitelist()
+def get_feature(implementation, name):
+	"""One feature in full: definition of done, history, doctypes and its GitLab issues."""
+	_require_implementation(implementation)
+	if frappe.db.get_value("Implementation Feature", name, "implementation") != implementation:
+		frappe.throw(_("This feature does not belong to the implementation."), frappe.PermissionError)
+	doc = frappe.get_doc("Implementation Feature", name)
+	issues = _issues_by_feature([name]).get(name, [])
+	library = dict(
+		frappe.get_all(
+			"Implementation Doctype",
+			filters={"name": ["in", [d.implementation_doctype for d in doc.doctypes] or [""]]},
+			fields=["name", "kind"],
+			as_list=True,
+		)
+	)
+	contact = doc.dod_agreed_by and frappe.db.get_value("Contact", doc.dod_agreed_by, "full_name")
+	return {
+		**{field: doc.get(field) for field in FEATURE_LIST_FIELDS if field != "owner_user"},
+		"description": sanitize_html(doc.description or "", always_sanitize=True),
+		"definition_of_done": doc.definition_of_done,
+		"dod_agreed_by_name": contact or doc.dod_agreed_by,
+		"owner_name": doc.owner_user and frappe.utils.get_fullname(doc.owner_user),
+		"progress": feature_progress(doc, issues),
+		"chapters": _parents_by_feature("Implementation Chapter Feature", "Implementation Chapter", [name], "chapter_title").get(name, []),
+		"releases": _parents_by_feature("Implementation Release Feature", "Implementation Release", [name], "title").get(name, []),
+		"history": [
+			{"date": row.date, "status": row.status, "level": row.level, "note": row.note, "by": frappe.utils.get_fullname(row.by) if row.by else None}
+			for row in reversed(doc.progress)
+		],
+		"doctypes": [
+			{"name": row.implementation_doctype, "kind": library.get(row.implementation_doctype), "work_done": row.work_done}
+			for row in doc.doctypes
+		],
+		"touch_hours": round(sum(flt(i.total_touch_time) for i in issues) / 3600, 1),
+		# what the cockpit shows of each issue; GitLab-internal figures stay on the server
+		"issues": [
+			{field: i.get(field) for field in ("name", "issue_id", "title", "state", "issue_url", "time_estimate_hours")}
+			for i in issues
+		],
+		"can_move": _can_move_features(),
+		"statuses": FEATURE_STATUSES,
+	}
+
+
+@frappe.whitelist()
+def set_feature_status(implementation, name, status):
+	"""Move a card on the Kanban. Status is daily work (#1971); a move to Dropped after the
+	baseline is recorded as a scope change for the customer by the feature's own hooks."""
+	_require_implementation(implementation)
+	if not _can_move_features():
+		frappe.throw(_("Only phamos staff can move features."), frappe.PermissionError)
+	if status not in FEATURE_STATUSES:
+		frappe.throw(_("Unknown status {0}.").format(status))
+	if frappe.db.get_value("Implementation Feature", name, "implementation") != implementation:
+		frappe.throw(_("This feature does not belong to the implementation."), frappe.PermissionError)
+	doc = frappe.get_doc("Implementation Feature", name)
+	doc.check_permission("write")
+	doc.status = status
+	doc.save()
+	return {"status": doc.status, "wip": _wip(implementation, _feature_rows(implementation))}
+
+
+@frappe.whitelist()
+def get_wbs(implementation):
+	"""Implementation → Modules → Features → GitLab issues, with progress rolled up by hours."""
+	_require_implementation(implementation)
+	features = [f for f in _feature_rows(implementation) if f.status != "Dropped"]
+	issues = _issues_by_feature([f.name for f in features])
+	milestones = dict(
+		frappe.get_all(
+			"GitLab Milestones",
+			filters={"name": ["in", list({i.gitlab_milestone for rows in issues.values() for i in rows if i.gitlab_milestone}) or [""]]},
+			fields=["name", "title"],
+			as_list=True,
+		)
+	)
+	modules = {}
+	for feature in features:
+		linked = issues.get(feature.name, [])
+		node = {
+			"name": feature.name,
+			"title": feature.title,
+			"status": feature.status,
+			"progress": feature_progress(feature, linked),
+			"weight_hours": round(feature_weight(feature, linked), 1),
+			"issues": [
+				{
+					"name": i.name,
+					"issue_id": i.issue_id,
+					"title": i.title,
+					"state": i.state,
+					"url": i.issue_url,
+					"milestone": milestones.get(i.gitlab_milestone) or i.gitlab_milestone,
+				}
+				for i in linked
+			],
+		}
+		modules.setdefault(feature.module or "", []).append(node)
+	tree = []
+	for module, nodes in sorted(modules.items(), key=lambda item: (item[0] == "", item[0])):
+		tree.append(
+			{
+				"module": module,
+				"progress": roll_up((n["progress"], n["weight_hours"]) for n in nodes),
+				"weight_hours": round(sum(n["weight_hours"] for n in nodes), 1),
+				"features": nodes,
+			}
+		)
+	all_nodes = [n for m in tree for n in m["features"]]
+	return {
+		"progress": roll_up((n["progress"], n["weight_hours"]) for n in all_nodes),
+		"weight_hours": round(sum(n["weight_hours"] for n in all_nodes), 1),
+		"weighted": any(n["weight_hours"] for n in all_nodes),
+		"modules": tree,
+	}

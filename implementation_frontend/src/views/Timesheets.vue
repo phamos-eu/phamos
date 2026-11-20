@@ -1,20 +1,26 @@
 <template>
 	<!-- Timesheets (#1685): what /timesheet shows, for the open implementation only. -->
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-5">
-			<div class="flex flex-wrap items-end gap-3">
-				<FormControl v-model="sheets.filters.from" type="date" size="sm" :label="__('From')" class="w-40" @change="applyFilters" />
-				<FormControl v-model="sheets.filters.to" type="date" size="sm" :label="__('To')" class="w-40" @change="applyFilters" />
+	<!-- Full height, no page scrolling: filters in one header row, figures and chart in a compact
+	     band, and the table scrolls inside its frame with the header and footer in view. -->
+	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
+		<!-- scrolls only when a short screen cannot hold the table's minimum height -->
+		<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+			<div class="flex flex-wrap items-center gap-2">
+				<h1 class="mr-2 text-lg font-semibold text-ink-gray-9">{{ __("Timesheets") }}</h1>
+				<span class="text-xs text-ink-gray-5">{{ __("From") }}</span>
+				<FormControl v-model="sheets.filters.from" type="date" size="sm" class="w-36" :aria-label="__('From')" @change="applyFilters" />
+				<span class="text-xs text-ink-gray-5">{{ __("To") }}</span>
+				<FormControl v-model="sheets.filters.to" type="date" size="sm" class="w-36" :aria-label="__('To')" @change="applyFilters" />
 				<FormControl
 					v-model="sheets.filters.project"
 					type="select"
 					size="sm"
-					:label="__('Project')"
-					class="w-56"
+					:aria-label="__('Project')"
+					class="w-48"
 					:options="projectOptions"
 					@change="applyFilters"
 				/>
-				<Button variant="ghost" @click="resetFilters">{{ __("Reset filters") }}</Button>
+				<Button variant="ghost" size="sm" @click="resetFilters">{{ __("Reset filters") }}</Button>
 				<div class="ml-auto flex items-center gap-2">
 					<TabButtons v-model="group" :buttons="groupButtons" />
 					<Button variant="subtle" :loading="exporting" @click="downloadCsv">
@@ -28,25 +34,30 @@
 				{{ sheets.error }}
 			</div>
 
-			<section class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-				<StatCard :label="__('Hours')" :value="formatHours(summary?.hours)" />
-				<StatCard :label="__('Billable')" :value="formatHours(summary?.billable_hours)" />
-				<StatCard :label="__('Non-billable')" :value="formatHours(summary?.non_billable_hours)" />
-				<StatCard :label="__('Timesheets')" :value="summary ? summary.count : '—'" />
-			</section>
+			<div class="grid gap-2 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+				<KpiStrip
+					grid-class="grid-cols-2 sm:grid-cols-4 xl:grid-cols-2"
+					:items="[
+						{ label: __('Hours'), value: formatHours(summary?.hours) },
+						{ label: __('Billable'), value: formatHours(summary?.billable_hours) },
+						{ label: __('Non-billable'), value: formatHours(summary?.non_billable_hours) },
+						{ label: __('Timesheets'), value: summary ? summary.count : '—' },
+					]"
+				/>
+				<PeriodBars
+					compact
+					:title="__('Hours per {0}', [group === 'week' ? __('week') : __('month')])"
+					:subtitle="sheets.filters.project ? projectLabel(sheets.filters.project) : __('All projects')"
+					:periods="periods"
+					:series="[{ label: __('Hours') }, { label: __('Billable') }]"
+					:format="(value) => formatHours(value)"
+				/>
+			</div>
 
-			<PeriodBars
-				:title="__('Hours per {0}', [group === 'week' ? __('week') : __('month')])"
-				:subtitle="sheets.filters.project ? projectLabel(sheets.filters.project) : __('All projects')"
-				:periods="periods"
-				:series="[{ label: __('Hours') }, { label: __('Billable') }]"
-				:format="(value) => formatHours(value)"
-			/>
-
-			<section class="overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
-				<div class="overflow-x-auto">
+			<section class="flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
+				<div class="min-h-0 flex-1 overflow-auto">
 					<div class="min-w-[960px]">
-						<div :class="[GRID, 'border-b border-outline-gray-2 bg-surface-gray-1 py-2 text-xs font-medium text-ink-gray-5']">
+						<div :class="[GRID, 'sticky top-0 z-10 border-b border-outline-gray-2 bg-surface-gray-1 py-1.5 text-xs font-medium text-ink-gray-5']">
 							<input
 								type="checkbox"
 								class="rounded border-outline-gray-3"
@@ -75,7 +86,7 @@
 						<div
 							v-for="row in sheets.rows"
 							:key="row.name"
-							:class="[GRID, 'border-b border-outline-gray-1 py-2.5 text-sm hover:bg-surface-gray-1']"
+							:class="[GRID, 'border-b border-outline-gray-1 py-1.5 text-sm hover:bg-surface-gray-1']"
 						>
 							<input
 								type="checkbox"
@@ -109,7 +120,7 @@
 					</div>
 				</div>
 
-				<div class="flex flex-wrap items-center gap-3 border-t border-outline-gray-2 px-4 py-2.5 text-xs text-ink-gray-6">
+				<div class="flex flex-wrap items-center gap-3 border-t border-outline-gray-2 px-4 py-1.5 text-xs text-ink-gray-6">
 					<span>{{ __("Showing {0} of {1}", [sheets.rows.length, sheets.total]) }}</span>
 					<div class="flex items-center gap-1">
 						<span>{{ __("Rows") }}</span>
@@ -132,7 +143,7 @@ import { useRoute, useRouter } from "vue-router"
 import dayjs from "dayjs"
 import { TabButtons } from "frappe-ui"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
-import StatCard from "@spa/components/dashboard/StatCard.vue"
+import KpiStrip from "../components/KpiStrip.vue"
 import { __ } from "@spa/utils/i18n.js"
 import FeedbackDialog from "../components/FeedbackDialog.vue"
 import {

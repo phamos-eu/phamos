@@ -1,28 +1,28 @@
 <template>
 	<!-- Issues reported through Phriend about this implementation (#1671). Opened from Phriend it shows
 	     the reports of the place it was opened from; the switcher widens it on purpose. -->
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-5xl flex-col gap-4">
-			<div>
-				<h1 class="text-lg font-semibold text-ink-gray-9">{{ heading }}</h1>
-				<p class="mt-0.5 text-sm text-ink-gray-6">{{ __("Each report shows how far it is: reported, in GitLab, in progress, testing, done.") }}</p>
-			</div>
-			<div class="flex flex-wrap items-center gap-3">
-				<TabButtons v-model="scope" :buttons="scopeButtons" />
-				<label class="flex items-center gap-2 text-sm text-ink-gray-7">
-					<input v-model="includeClosed" type="checkbox" class="rounded border-outline-gray-3" />
-					{{ __("Include done") }}
-				</label>
-			</div>
+	<!-- Full height: the list scrolls inside its frame, a report opens in the side panel beside it. -->
+	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<h1 class="text-lg font-semibold text-ink-gray-9">{{ heading }}</h1>
+			<TabButtons v-model="scope" :buttons="scopeButtons" />
+			<label class="flex items-center gap-2 text-sm text-ink-gray-7">
+				<input v-model="includeClosed" type="checkbox" class="rounded border-outline-gray-3" />
+				{{ __("Include done") }}
+			</label>
+		</div>
+		<p class="text-xs text-ink-gray-5">{{ __("Each report shows how far it is: reported, in GitLab, in progress, testing, done.") }}</p>
 
-			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
+		<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-4">{{ error }}</div>
 
-			<section class="overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
+		<div class="flex min-h-0 flex-1 gap-3">
+			<section class="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-lg border border-outline-gray-2 bg-surface-white">
 				<router-link
 					v-for="issue in issues"
 					:key="issue.name"
 					:to="{ name: 'IssueDetail', params: { implementation, name: issue.name }, query: route.query }"
-					class="flex flex-col gap-1.5 border-b border-outline-gray-1 px-4 py-3 hover:bg-surface-gray-1"
+					class="flex flex-col gap-1 border-b border-outline-gray-1 px-3 py-2 hover:bg-surface-gray-1"
+					:class="name === issue.name ? 'bg-surface-gray-2' : ''"
 				>
 					<div class="flex items-center gap-3">
 						<span class="text-xs font-semibold text-ink-gray-6">{{ issue.name }}</span>
@@ -50,20 +50,26 @@
 				<div v-if="!loading && !issues.length" class="px-4 py-8 text-center text-sm text-ink-gray-5">{{ emptyText }}</div>
 				<div v-if="loading" class="px-4 py-8 text-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 			</section>
+			<IssuePanel v-if="name" :key="name" :implementation="implementation" :name="name" class="w-[min(28rem,45%)] shrink-0" @close="closeIssue" />
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import dayjs from "dayjs"
 import { call, TabButtons } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import IssuePanel from "../components/IssuePanel.vue"
 import StageLine from "../components/StageLine.vue"
 import spaConfig from "../config"
 
-const props = defineProps({ implementation: { type: String, required: true } })
+const props = defineProps({
+	implementation: { type: String, required: true },
+	// set on …/issues/<name> (Phriend links there): the side panel shows that report
+	name: { type: String, default: "" },
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -103,7 +109,10 @@ const emptyText = computed(() =>
 let echoedScope = null
 let requestId = 0
 
-watch(() => [props.implementation, route.query.scope, route.query.route, route.query.ref_docname, includeClosed.value], () => {
+// One source per value: Vue compares each, so opening a report (only the route's `name`
+// changes) doesn't fetch the list again. A getter returning a new array would fire on every
+// route change.
+watch([() => props.implementation, () => route.query.scope, () => route.query.route, () => route.query.ref_docname, includeClosed], () => {
 	if (echoedScope && route.query.scope === echoedScope) {
 		echoedScope = null
 		return
@@ -154,4 +163,15 @@ function readableRoute(value) {
 function date(value) {
 	return value ? dayjs(value).format("D MMM YYYY") : ""
 }
+
+function closeIssue() {
+	router.push({ name: "Issues", params: { implementation: props.implementation }, query: route.query })
+}
+
+// Esc closes the side panel.
+function onKey(event) {
+	if (event.key === "Escape" && props.name) closeIssue()
+}
+onMounted(() => document.addEventListener("keydown", onKey))
+onBeforeUnmount(() => document.removeEventListener("keydown", onKey))
 </script>
