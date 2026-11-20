@@ -8,12 +8,13 @@ Privacy is applied here, once, before anything reaches a template: anonymous alu
 unapproved customers never carry a name, photo or named URL in their item.
 """
 
+import html
 import re
 from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import getdate, strip_html
 
 from phamos.web_profile.events import load_events, month_span
 from phamos.web_profile.i18n import localized
@@ -1092,13 +1093,32 @@ def build_profile(item, lang):
 
 	facts = [f for f in facts if f.get("value") or f.get("links")]
 	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
-		"schema": schema, "key_people": key_people(item, lang),
+		"schema": schema, "key_people": key_people(item, lang), "faqs": faqs(item, lang),
 		"anonymous_note": anonymous.note if anonymous else None,
 		# Events only (phamos.web_profile.events.build); empty for every other section.
 		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None}
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)
+
+
+def faqs(item, lang):
+	"""The page's FAQ rows in ``lang`` ({question, answer}), in table order (phamos/phamos#1823).
+
+	No fallback to another language: a German answer on an English page (and in its English
+	FAQPage schema) would mix languages for search engines. Anonymous pages show their FAQ too;
+	the field description tells editors to name no one there."""
+	doctype = SECTIONS[item.section]["doctype"]
+	if not frappe.get_meta(doctype).has_field("faqs"):  # events (Marketing Content) have no FAQ
+		return []
+	rows = frappe.get_all("Web Profile FAQ", filters={"parenttype": doctype, "parentfield": "faqs",
+		"parent": item.name, "language": lang}, fields=["question", "answer"], order_by="idx asc")
+	return [r for r in rows if (r.question or "").strip() and _has_text(r.answer)]
+
+
+def _has_text(html_value):
+	"""True when the HTML shows any text: an editor's "<p>&nbsp;</p>" or "<p><br></p>" counts as empty."""
+	return bool(html.unescape(strip_html(html_value or "")).replace("\u00a0", " ").strip())
 
 
 def _dedupe(item, profile):
