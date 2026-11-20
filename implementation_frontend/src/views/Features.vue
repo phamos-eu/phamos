@@ -174,7 +174,7 @@
 							</span>
 						</div>
 						<div v-if="!wbs.modules.length" class="py-6 text-center text-sm text-ink-gray-5">{{ __("No features here yet.") }}</div>
-						<div class="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto" :class="selected ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(22rem,1fr))]'">
+						<div class="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto" :class="selected ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]'">
 							<section v-for="m in wbs.modules" :key="m.module" class="rounded-lg border border-outline-gray-2 bg-surface-white">
 								<div class="flex items-center gap-2 border-b border-outline-gray-1 px-3 py-1.5">
 									<span class="flex-1 truncate text-sm font-medium text-ink-gray-8">{{ m.module || __("Without module") }}</span>
