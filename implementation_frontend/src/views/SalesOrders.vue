@@ -3,7 +3,8 @@
 	<!-- Full height, no page scrolling: figures and the ordered-hours bar in one band, the table
 	     scrolls inside its frame with its filters and footer in view. -->
 	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
-		<div class="flex min-h-0 flex-1 flex-col gap-2">
+		<!-- scrolls only when a short screen cannot hold the table's minimum height -->
+		<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
 			<div class="flex flex-wrap items-center gap-2">
 				<h1 class="mr-2 text-lg font-semibold text-ink-gray-9">{{ __("Budget") }}</h1>
 				<FormControl v-model="search" type="text" size="sm" :placeholder="__('Search')" class="w-48" />

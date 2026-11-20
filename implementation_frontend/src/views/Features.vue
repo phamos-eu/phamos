@@ -40,7 +40,12 @@
 		</header>
 		<MethodNote :summary="note.summary" :details="note.details" />
 
-		<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-4">{{ error }}</div>
+		<div v-if="error" class="flex items-center gap-2 rounded-lg border border-outline-gray-2 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-4" role="alert">
+			<span class="flex-1">{{ error }}</span>
+			<button type="button" class="rounded p-0.5 hover:bg-surface-red-2" :aria-label="__('Close')" @click="error = ''">
+				<FeatherIcon name="x" class="h-4 w-4" />
+			</button>
+		</div>
 
 		<div class="flex min-h-0 flex-1 gap-3">
 			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -228,7 +233,7 @@
 			<!-- Feature detail beside the list or board, not on a page of its own -->
 			<FeaturePanel
 				v-if="selected"
-				:key="selected"
+				:key="`${selected}-${refreshKey}`"
 				:implementation="implementation"
 				:feature="selected"
 				class="w-[min(28rem,45%)] shrink-0"
@@ -268,6 +273,8 @@ const openIssues = reactive({})
 const dragged = ref(null)
 const dropTarget = ref(null)
 const byMilestone = ref(false)
+// bumped after a move, so an open side panel reloads its status and history
+const refreshKey = ref(0)
 const rows = []
 
 const selected = computed(() => props.feature || "")
@@ -315,9 +322,9 @@ let requestId = 0
 watch(() => props.implementation, load, { immediate: true })
 watch(view, (value) => value === "wbs" && !wbs.value && loadWbs())
 
-async function load() {
+async function load({ quiet = false } = {}) {
 	const id = ++requestId
-	loading.value = true
+	loading.value = !quiet
 	error.value = ""
 	wbs.value = null
 	try {
@@ -387,8 +394,10 @@ async function drop(status) {
 	const before = feature.status
 	feature.status = status
 	try {
-		const result = await call(`${spaConfig.api}.set_feature_status`, { implementation: props.implementation, name: feature.name, status })
-		data.value.wip = result.wip
+		await call(`${spaConfig.api}.set_feature_status`, { implementation: props.implementation, name: feature.name, status })
+		// progress, the WIP figure and the work breakdown come from the server: fetch them again
+		await load({ quiet: true })
+		refreshKey.value += 1
 	} catch (e) {
 		feature.status = before
 		error.value = e?.messages?.[0] || e?.message || __("Could not move the feature")

@@ -3,7 +3,8 @@
 	<!-- Full height, no page scrolling: filters in one header row, figures and chart in a compact
 	     band, and the table scrolls inside its frame with the header and footer in view. -->
 	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
-		<div class="flex min-h-0 flex-1 flex-col gap-2">
+		<!-- scrolls only when a short screen cannot hold the table's minimum height -->
+		<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
 			<div class="flex flex-wrap items-center gap-2">
 				<h1 class="mr-2 text-lg font-semibold text-ink-gray-9">{{ __("Timesheets") }}</h1>
 				<span class="text-xs text-ink-gray-5">{{ __("From") }}</span>

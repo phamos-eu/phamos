@@ -857,7 +857,8 @@ def get_features(implementation):
 		open_issues = [i for i in linked if i.state != "closed"]
 		rows.append(
 			{
-				**feature,
+				# the responsible's name only: a staff e-mail address is not needed in the cockpit
+				**{key: value for key, value in feature.items() if key != "owner_user"},
 				"owner_name": owners.get(feature.owner_user),
 				"effort_hours": round(flt(efforts.get(feature.name)), 1),
 				"progress": feature_progress(feature, linked),
@@ -898,7 +899,7 @@ def get_feature(implementation, name):
 	)
 	contact = doc.dod_agreed_by and frappe.db.get_value("Contact", doc.dod_agreed_by, "full_name")
 	return {
-		**{field: doc.get(field) for field in FEATURE_LIST_FIELDS},
+		**{field: doc.get(field) for field in FEATURE_LIST_FIELDS if field != "owner_user"},
 		"description": sanitize_html(doc.description or "", always_sanitize=True),
 		"definition_of_done": doc.definition_of_done,
 		"dod_agreed_by_name": contact or doc.dod_agreed_by,
@@ -914,7 +915,12 @@ def get_feature(implementation, name):
 			{"name": row.implementation_doctype, "kind": library.get(row.implementation_doctype), "work_done": row.work_done}
 			for row in doc.doctypes
 		],
-		"issues": issues,
+		"touch_hours": round(sum(flt(i.total_touch_time) for i in issues) / 3600, 1),
+		# what the cockpit shows of each issue; GitLab-internal figures stay on the server
+		"issues": [
+			{field: i.get(field) for field in ("name", "issue_id", "title", "state", "issue_url", "time_estimate_hours")}
+			for i in issues
+		],
 		"can_move": _can_move_features(),
 		"statuses": FEATURE_STATUSES,
 	}

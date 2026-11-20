@@ -32,6 +32,7 @@
 					{{ data.dod_agreed_on ? __("Agreed on {0} with {1}", [date(data.dod_agreed_on), data.dod_agreed_by_name || "—"]) : __("Not agreed yet") }}
 				</p>
 				<MethodNote
+					inline
 					class="mt-1"
 					:summary="__('The definition of done says when the feature counts as finished, in words both sides agreed.')"
 					:details="[
@@ -127,6 +128,7 @@ const facts = computed(() => {
 		{ label: __("Chapter"), value: f.chapters.map((c) => c.label).join(", ") || "—" },
 		{ label: __("Release"), value: f.releases.map((r) => r.label).join(", ") || "—" },
 		{ label: __("Level (current / target)"), value: `${f.current_level || 0} / ${f.target_level || "—"}` },
+		{ label: __("Worked"), value: f.touch_hours ? `${f.touch_hours} h` : "—" },
 		{ label: __("Planned"), value: f.planned_start || f.target_date ? `${date(f.planned_start)} – ${date(f.target_date)}` : "—" },
 	]
 })

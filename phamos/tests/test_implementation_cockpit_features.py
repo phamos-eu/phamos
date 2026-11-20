@@ -69,13 +69,19 @@ class TestCockpitFeatures(FrappeTestCase):
 
 	def test_customers_read_their_features_and_no_one_elses(self):
 		feature = make_feature(self.implementation, title="Batches", module=self.warehouse, estimated_hours=8)
+		gitlab_issue(feature.name)
 		other = make_feature(make_implementation().name, title="Elsewhere")
 		frappe.set_user(CUSTOMER_USER)
 		data = get_features(self.implementation)
 		self.assertEqual([f["name"] for f in data["features"]], [feature.name])
 		self.assertEqual(data["features"][0]["effort_hours"], 8)
 		self.assertFalse(data["can_move"])
-		self.assertEqual(get_feature(self.implementation, feature.name)["title"], "Batches")
+		detail = get_feature(self.implementation, feature.name)
+		self.assertEqual(detail["title"], "Batches")
+		# no staff e-mail address and no GitLab-internal figures for customers
+		self.assertNotIn("owner_user", detail)
+		self.assertNotIn("owner_user", data["features"][0])
+		self.assertNotIn("total_touch_time", detail["issues"][0])
 		self.assertRaises(frappe.PermissionError, get_feature, self.implementation, other.name)
 		frappe.set_user(OUTSIDER_USER)
 		self.assertRaises(frappe.PermissionError, get_features, self.implementation)
