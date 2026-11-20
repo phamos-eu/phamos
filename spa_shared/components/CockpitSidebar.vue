@@ -80,6 +80,19 @@
 				</div>
 			</template>
 			<slot :collapsed="collapsed" :expand="expand" />
+			<!-- Every cockpit is its own desktop app (#1458); this explains how to install it (#1998).
+			     Here rather than in a menu, because cockpits may replace the header and the footer. -->
+			<button
+				v-if="offerInstall"
+				type="button"
+				class="mt-auto flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:class="collapsed ? 'justify-center' : ''"
+				:title="collapsed ? __('Install as app') : undefined"
+				@click="openInstallHint"
+			>
+				<FeatherIcon name="download" class="h-4 w-4 flex-shrink-0" />
+				<span v-if="!collapsed" class="truncate">{{ __("Install as app") }}</span>
+			</button>
 		</nav>
 
 		<!-- Website users have no Desk; their cockpit puts its own footer here (#1671). -->
@@ -104,6 +117,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { Dropdown } from "frappe-ui"
 import { openCockpit, openDesk } from "@spa/utils/appWindow.js"
+import { canOfferInstall, installApp, openInstallHint } from "@spa/installApp.js"
 import { otherCockpits } from "@spa/utils/cockpitSwitcher.js"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -134,6 +148,8 @@ const menu = computed(() => {
 	return groups
 })
 const openGroups = ref({})
+// installApp.installed is reactive, so the entry disappears once the app is installed.
+const offerInstall = computed(() => !installApp.installed && canOfferInstall())
 
 function isActive(item) {
 	return (item.match || [item.name]).includes(route.name)
