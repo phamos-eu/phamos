@@ -11,6 +11,25 @@
 				<FormControl v-model="filters.module" type="select" size="sm" class="w-36" :options="moduleOptions" :aria-label="__('Module')" />
 				<FormControl v-model="filters.chapter" type="select" size="sm" class="w-40" :options="chapterOptions" :aria-label="__('Chapter')" />
 			</div>
+			<div v-if="view === 'kanban' && data" class="flex items-center gap-1.5">
+				<button
+					v-for="side in sideColumns"
+					:key="side.status"
+					type="button"
+					class="rounded-full border px-2 py-0.5 text-xs"
+					:class="[
+						expanded[side.status] ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-6',
+						dropTarget === side.status ? 'ring-2 ring-outline-gray-4' : '',
+					]"
+					:aria-pressed="!!expanded[side.status]"
+					@click="expanded[side.status] = !expanded[side.status]"
+					@dragover.prevent="data.can_move && (dropTarget = side.status)"
+					@dragleave="dropTarget = null"
+					@drop.prevent="drop(side.status)"
+				>
+					{{ __(side.status) }} {{ side.cards.length }}
+				</button>
+			</div>
 			<label v-if="view === 'wbs'" class="flex items-center gap-2 text-sm text-ink-gray-7">
 				<input v-model="byMilestone" type="checkbox" class="rounded border-outline-gray-3" />
 				{{ __("Group issues by GitLab milestone") }}
@@ -27,15 +46,39 @@
 			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 				<div v-if="loading && !data" class="text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 
-				<!-- List: the table scrolls inside its frame, the header stays -->
+				<!-- List: the table scrolls inside its frame, the header stays. With the side panel open
+				     there is less room, so each feature becomes a compact two-line row. -->
+				<section v-else-if="view === 'list' && data && selected" class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-outline-gray-2 bg-surface-white">
+					<div
+						v-for="(f, index) in filtered"
+						:key="f.name"
+						:ref="(el) => (rows[index] = el)"
+						tabindex="0"
+						class="cursor-pointer border-b border-outline-gray-1 px-3 py-1.5 last:border-b-0 hover:bg-surface-gray-1 focus:bg-surface-gray-2 focus:outline-none"
+						:class="selected === f.name ? 'bg-surface-gray-2' : ''"
+						@click="openFeature(f.name)"
+						@keydown.enter.prevent="openFeature(f.name)"
+						@keydown.down.prevent="focusRow(index + 1)"
+						@keydown.up.prevent="focusRow(index - 1)"
+					>
+						<div class="truncate text-sm font-medium text-ink-gray-9" :title="f.title">{{ f.title }}</div>
+						<div class="mt-0.5 flex items-center gap-2 text-xs text-ink-gray-5">
+							<StatusBadge :status="f.status" />
+							<span class="whitespace-nowrap">{{ levels(f) }}</span>
+							<span class="whitespace-nowrap">{{ hours(f.effort_hours) }}</span>
+							<ProgressBar class="ml-auto w-24 !min-w-0" :value="f.progress" />
+						</div>
+					</div>
+					<div v-if="!filtered.length" class="px-3 py-8 text-center text-sm text-ink-gray-5">{{ __("No features here yet.") }}</div>
+				</section>
 				<section v-else-if="view === 'list' && data" class="min-h-0 flex-1 overflow-auto rounded-lg border border-outline-gray-2 bg-surface-white">
 					<table class="w-full text-sm">
 						<thead class="sticky top-0 z-10 border-b border-outline-gray-2 bg-surface-white text-left text-xs text-ink-gray-5">
 							<tr>
 								<th class="px-3 py-1.5 font-medium">{{ __("Feature") }}</th>
 								<th class="px-2 py-1.5 font-medium">{{ __("Module") }}</th>
-								<th v-if="!selected" class="px-2 py-1.5 font-medium">{{ __("Chapter") }}</th>
-								<th v-if="!selected" class="px-2 py-1.5 font-medium">{{ __("Release") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Chapter") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Release") }}</th>
 								<th class="px-2 py-1.5 font-medium">{{ __("Status") }}</th>
 								<th class="px-2 py-1.5 font-medium">{{ __("Level") }}</th>
 								<th class="px-2 py-1.5 text-right font-medium">{{ __("Effort") }}</th>
@@ -49,19 +92,18 @@
 								:ref="(el) => (rows[index] = el)"
 								tabindex="0"
 								class="cursor-pointer border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1 focus:bg-surface-gray-2 focus:outline-none"
-								:class="selected === f.name ? 'bg-surface-gray-2' : ''"
 								@click="openFeature(f.name)"
 								@keydown.enter.prevent="openFeature(f.name)"
 								@keydown.down.prevent="focusRow(index + 1)"
 								@keydown.up.prevent="focusRow(index - 1)"
 							>
-								<td class="px-3 py-1.5">
+								<td class="min-w-[12rem] px-3 py-1.5">
 									<div class="font-medium text-ink-gray-9">{{ f.title }}</div>
 									<div class="text-xs text-ink-gray-5">{{ f.name }}<template v-if="f.owner_name"> · {{ f.owner_name }}</template></div>
 								</td>
 								<td class="px-2 py-1.5 text-ink-gray-7">{{ f.module || "—" }}</td>
-								<td v-if="!selected" class="px-2 py-1.5 text-ink-gray-7">{{ f.chapters.map((c) => c.label).join(", ") || "—" }}</td>
-								<td v-if="!selected" class="px-2 py-1.5 text-ink-gray-7">{{ f.releases.map((r) => r.label).join(", ") || "—" }}</td>
+								<td class="px-2 py-1.5 text-ink-gray-7">{{ f.chapters.map((c) => c.label).join(", ") || "—" }}</td>
+								<td class="px-2 py-1.5 text-ink-gray-7">{{ f.releases.map((r) => r.label).join(", ") || "—" }}</td>
 								<td class="px-2 py-1.5"><StatusBadge :status="f.status" /></td>
 								<td class="whitespace-nowrap px-2 py-1.5 text-ink-gray-7">{{ levels(f) }}</td>
 								<td class="whitespace-nowrap px-2 py-1.5 text-right text-ink-gray-7">{{ hours(f.effort_hours) }}</td>
@@ -75,13 +117,13 @@
 				</section>
 
 				<!-- Kanban: the columns share the width and scroll on their own -->
-				<div v-else-if="view === 'kanban' && data" class="flex min-h-0 flex-1 gap-2 overflow-x-auto">
+				<div v-else-if="view === 'kanban' && data" class="flex min-h-0 flex-1 gap-2">
 					<div
-						v-for="column in columns"
+						v-for="column in visibleColumns"
 						:key="column.status"
 						class="flex min-h-0 flex-col rounded-lg border bg-surface-white"
 						:class="[
-							column.narrow && !expanded[column.status] ? 'w-28 shrink-0' : 'min-w-[11rem] flex-1',
+							'min-w-0 flex-1',
 							column.over ? 'border-outline-amber-2 bg-surface-amber-1' : 'border-outline-gray-2',
 							dropTarget === column.status ? 'ring-2 ring-outline-gray-4' : '',
 						]"
@@ -89,18 +131,13 @@
 						@dragleave="dropTarget = null"
 						@drop.prevent="drop(column.status)"
 					>
-						<button
-							type="button"
-							class="flex items-center justify-between gap-2 border-b border-outline-gray-1 px-2.5 py-1.5 text-left"
-							:class="column.narrow ? 'cursor-pointer' : 'cursor-default'"
-							@click="column.narrow && (expanded[column.status] = !expanded[column.status])"
-						>
-							<span class="truncate text-sm font-medium text-ink-gray-8">{{ __(column.status) }}</span>
+						<div class="flex items-center justify-between gap-2 border-b border-outline-gray-1 px-2.5 py-1.5">
+							<span class="truncate text-sm font-medium text-ink-gray-8" :title="__(column.status)">{{ __(column.status) }}</span>
 							<span class="shrink-0 text-xs" :class="column.over ? 'font-medium text-ink-amber-3' : 'text-ink-gray-5'">
 								{{ column.limit ? `${column.cards.length}/${column.limit}` : column.cards.length }}
 							</span>
-						</button>
-						<div v-if="!column.narrow || expanded[column.status]" class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
+						</div>
+						<div class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
 							<div
 								v-for="f in column.cards"
 								:key="f.name"
@@ -328,14 +365,18 @@ const filtered = computed(() =>
 	)
 )
 
-// Idea and Dropped sit at the edges, collapsed: they are not on the way to live use.
+// Idea and Dropped are not on the way to live use: they sit as chips in the header (still drop
+// targets) and join the board as a column only when opened, so the main columns always fit.
+const SIDE_STATUSES = ["Idea", "Dropped"]
 const columns = computed(() =>
 	(data.value?.statuses || []).map((status) => {
 		const cards = features.value.filter((f) => f.status === status)
 		const limit = status === "In Progress" ? data.value.wip.limit : 0
-		return { status, cards, limit, over: Boolean(limit && cards.length > limit), narrow: ["Idea", "Dropped"].includes(status) }
+		return { status, cards, limit, over: Boolean(limit && cards.length > limit), side: SIDE_STATUSES.includes(status) }
 	})
 )
+const sideColumns = computed(() => columns.value.filter((c) => c.side))
+const visibleColumns = computed(() => columns.value.filter((c) => !c.side || expanded[c.status]))
 
 async function drop(status) {
 	dropTarget.value = null
