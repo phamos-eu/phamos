@@ -6,7 +6,8 @@
 			<li
 				v-for="dep in dependencies"
 				:key="dep.name"
-				class="flex items-center gap-2 rounded-md bg-surface-gray-2 px-2 py-1.5 text-sm"
+				class="flex items-center gap-2 rounded-md border bg-surface-gray-2 px-2 py-1.5 text-sm"
+				:class="isConflict(dep) ? 'border-outline-red-3' : 'border-transparent'"
 			>
 				<span
 					class="h-2 w-2 flex-shrink-0 rounded-full bg-surface-gray-5"
@@ -31,6 +32,26 @@
 				>
 					<FeatherIcon name="x" class="h-3.5 w-3.5" />
 				</button>
+			</li>
+		</ul>
+
+		<!-- Date conflicts (#2002): shown only, no date changes by itself. -->
+		<ul v-if="conflicts.length" class="mb-2 space-y-1">
+			<li
+				v-for="dep in conflicts"
+				:key="dep.name"
+				class="flex items-start gap-1.5 text-xs text-ink-red-4"
+			>
+				<FeatherIcon name="alert-triangle" class="mt-px h-3.5 w-3.5 flex-shrink-0" />
+				<span>
+					{{
+						__("Starts {0}, but {1} ends {2}", [
+							formatDate(task.exp_start_date),
+							dep.subject || dep.name,
+							formatDate(taskEndDay(dep)),
+						])
+					}}
+				</span>
 			</li>
 		</ul>
 
@@ -99,6 +120,7 @@
 import { computed, ref, watch } from "vue"
 import { call, debounce, FeatherIcon, toast } from "frappe-ui"
 import { formatDate } from "@spa/utils/datetime.js"
+import { startsBeforePredecessorEnds, taskEndDay } from "@spa/utils/dependencyConflict.js"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -123,6 +145,13 @@ let searchSeq = 0
 let closeTimer = null
 
 const dependencies = computed(() => props.task.dependencies || [])
+
+/** Readable predecessors that end after this task starts (#2002). */
+function isConflict(dep) {
+	return Boolean(dep.readable) && startsBeforePredecessorEnds(dep, props.task)
+}
+
+const conflicts = computed(() => dependencies.value.filter(isConflict))
 
 async function search() {
 	const seq = ++searchSeq

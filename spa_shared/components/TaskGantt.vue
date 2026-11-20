@@ -322,6 +322,7 @@ import { formatDateIso } from "../utils/ganttTimelineFormat"
 import { buildBarColorCss, parseDependsOn, taskColorClass } from "../utils/ganttColors"
 import { addArrowHitAreas, restyleDependencyArrows } from "../utils/ganttDependencyArrows"
 import { handlePoint, linkTargetId } from "../utils/ganttDependencyDrag"
+import { startsBeforePredecessorEnds } from "../utils/dependencyConflict"
 import { __ } from "@spa/utils/i18n.js"
 import { updateGanttTodayStrip } from "../utils/ganttTodayStrip"
 import { updateGanttSelectedRow } from "../utils/ganttSelectedRow"
@@ -687,6 +688,16 @@ function removeArrow() {
 	emit("dependency-remove", { name: popover.to, depends_on: popover.from })
 }
 
+/** Red arrows (#2002): the successor starts before its predecessor ends. Show only, no date change. */
+function markConflictArrows() {
+	const svg = ganttHost.value
+	if (!svg) return
+	for (const link of svg.querySelectorAll(".dep-link")) {
+		const conflict = startsBeforePredecessorEnds(rowMeta(link.dataset.from), rowMeta(link.dataset.to))
+		link.classList.toggle("dep-link--conflict", conflict)
+	}
+}
+
 function markActiveArrow() {
 	const svg = ganttHost.value
 	if (!svg) return
@@ -885,6 +896,7 @@ function applyGanttFrame() {
 	updateBarStateClasses()
 	restyleDependencyArrows(gantt)
 	addArrowHitAreas(gantt)
+	markConflictArrows()
 	// The bars moved or were redrawn: a dot or popover from before would point at nothing.
 	if (!drag.value) handle.value = null
 	arrowPopover.value = null
@@ -1204,18 +1216,34 @@ onUnmounted(() => {
 	stroke-width: 2px;
 }
 
-/* Clickable arrows: a wide invisible stroke on top of each arrow. */
-:deep(.dep-hit) {
+/* Clickable arrows: a wide invisible stroke on top of each arrow. The selectors repeat
+   ".hr-gantt-wrap .gantt g.arrow" to outrank the global arrow style, which sets every
+   arrow path to a 1.2px stroke and left the hit area as thin as the line (#1999). */
+:deep(.hr-gantt-wrap .gantt g.arrow path.dep-hit) {
 	fill: none;
 	stroke: transparent;
-	stroke-width: 12px;
+	/* 10px either side of the line. */
+	stroke-width: 20px;
+	stroke-linecap: round;
 	pointer-events: stroke;
 	cursor: pointer;
 }
 
-:deep(.dep-link:hover path:first-child),
-:deep(.dep-link--active path:first-child) {
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link:hover path:first-child),
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--active path:first-child) {
 	stroke: var(--ink-gray-9);
+	stroke-width: 2.4px;
+}
+
+/* Successor starts before its predecessor ends (#2002). */
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict path:first-child) {
+	stroke: var(--ink-red-3);
+	stroke-width: 1.8px;
+}
+
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict:hover path:first-child),
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict.dep-link--active path:first-child) {
+	stroke: var(--ink-red-4);
 	stroke-width: 2.4px;
 }
 
