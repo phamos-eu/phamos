@@ -291,6 +291,33 @@ class TestCompanyTasks(FrappeTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			gm.get_company_task(self.other_task)
 
+	def test_dependencies_in_the_task_panel(self):
+		# #2000: the side panel lists, adds and removes predecessors.
+		first = self._task("GM first", self.own)
+		gm.add_task_dependency(self.own_task, first)
+
+		deps = gm.get_task(self.own_task)["dependencies"]
+		self.assertEqual([d["name"] for d in deps], [first])
+		self.assertEqual(deps[0]["subject"], "_Test company GM first")
+		self.assertTrue(deps[0]["readable"])
+
+		detail = gm.remove_task_dependency(self.own_task, first)
+		self.assertEqual(detail["dependencies"], [])
+		self.assertEqual(frappe.get_doc("Task", self.own_task).depends_on, [])
+		# Removing it again changes nothing.
+		self.assertEqual(gm.remove_task_dependency(self.own_task, first)["dependencies"], [])
+
+	def test_dependency_search_stays_in_the_cockpit(self):
+		first = self._task("GM first", self.own)
+		found = [t["name"] for t in gm.search_dependency_candidates(self.own_task, "_Test company")]
+		self.assertIn(first, found)
+		self.assertNotIn(self.own_task, found)
+		self.assertNotIn(self.sales_task, found)
+
+		gm.add_task_dependency(self.own_task, first)
+		found = [t["name"] for t in gm.search_dependency_candidates(self.own_task, "_Test company")]
+		self.assertNotIn(first, found)
+
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
 		with self.assertRaises(frappe.PermissionError):

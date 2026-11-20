@@ -2519,3 +2519,15 @@ Later,Später
 Don't show again,Nicht mehr anzeigen
 Install as app,Als App installieren
 this cockpit,dieses Cockpit
+Depends on,Hängt ab von
+no access,kein Zugriff
+ends {0},endet {0}
+Remove dependency on {0},Abhängigkeit von {0} entfernen
+Remove dependency,Abhängigkeit entfernen
+Add a task that must finish first…,"Aufgabe hinzufügen, die vorher fertig sein muss …"
+Searching…,Suche …
+No matching task,Keine passende Aufgabe
+Dependency linked,Abhängigkeit verknüpft
+Could not link tasks,Aufgaben konnten nicht verknüpft werden
+Dependency removed,Abhängigkeit entfernt
+Could not remove the dependency,Die Abhängigkeit konnte nicht entfernt werden

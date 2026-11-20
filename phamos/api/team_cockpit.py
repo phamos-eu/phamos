@@ -410,3 +410,17 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+@_require_access
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
