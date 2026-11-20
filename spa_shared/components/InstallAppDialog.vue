@@ -114,8 +114,12 @@ async function loadManifest() {
 	try {
 		const manifest = await (await fetch(href, { credentials: "same-origin" })).json()
 		if (manifest.name) appName.value = manifest.name
-		// Relative paths in a manifest resolve against the manifest's URL, not the page's.
-		if (manifest.id) key.value = storageKey(new URL(manifest.id, href).pathname)
+		// As the manifest spec says: `id` resolves against the origin of start_url, while icon paths
+		// resolve against the manifest's own URL (not the page's).
+		if (manifest.id) {
+			const origin = new URL(manifest.start_url || "/", href).origin
+			key.value = storageKey(new URL(manifest.id, origin).pathname)
+		}
 		const best = (manifest.icons || []).find((i) => i.sizes === "192x192" && i.purpose !== "maskable")
 		const src = (best || manifest.icons?.[0])?.src
 		icon.value = src ? new URL(src, href).href : ""
