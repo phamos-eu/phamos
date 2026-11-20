@@ -110,6 +110,25 @@
 	</section>
 	{%- endfor %}
 
+	{#- FAQ (phamos/phamos#1823): questions of the page language only, all collapsed. Native
+	    <details> works without JavaScript and keeps the answers in the HTML for search and AI
+	    answer engines; the same rows go into the FAQPage JSON-LD (profile.py). Look of the
+	    "Section with Collapsible Content" web block: thin lines, "+" turning into "−". -#}
+	{%- if profile.faqs %}
+	<section class="wp-faq" aria-labelledby="wp-faq-title">
+		<h2 id="wp-faq-title">{{ _("Frequently asked questions") }}</h2>
+		{%- for faq in profile.faqs %}
+		<details class="wp-faq-item">
+			<summary><span class="wp-faq-question">{{ faq.question | e }}</span>
+				<svg class="wp-faq-icon" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path class="wp-faq-v" d="M8 4v8"/><path d="M4 8h8"/></svg>
+			</summary>
+			{#- Text Editor HTML, sanitised by Frappe on save and written by website editors. -#}
+			<div class="wp-body wp-faq-answer">{{ faq.answer }}</div>
+		</details>
+		{%- endfor %}
+	</section>
+	{%- endif %}
+
 	</div>
 	</div>
 	{%- if profile.ticket %}{{ ticket_dialog_markup(item, profile.ticket, lang) }}{% endif %}
