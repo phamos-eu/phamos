@@ -109,7 +109,10 @@ const emptyText = computed(() =>
 let echoedScope = null
 let requestId = 0
 
-watch(() => [props.implementation, route.query.scope, route.query.route, route.query.ref_docname, includeClosed.value], () => {
+// One source per value: Vue compares each, so opening a report (only the route's `name`
+// changes) doesn't fetch the list again. A getter returning a new array would fire on every
+// route change.
+watch([() => props.implementation, () => route.query.scope, () => route.query.route, () => route.query.ref_docname, includeClosed], () => {
 	if (echoedScope && route.query.scope === echoedScope) {
 		echoedScope = null
 		return
