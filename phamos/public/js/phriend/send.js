@@ -28,7 +28,7 @@ export class Sender {
 		this.sending = report;
 		ball.set_pending(true);
 		ball.set_busy(true);
-		ball.say(escape_html(__("Sending…")), 0);
+		ball.say(escape_html(__("Sending…")), 0, "fingers_crossed");
 		try {
 			const args = report.args_value || (report.args_value = await report.args());
 			const result = await call(METHOD, args, host.csrf_token());
@@ -46,7 +46,8 @@ export class Sender {
 					: "";
 			ball.say(
 				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>${follow}`,
-				follow ? 12000 : 8000
+				follow ? 12000 : 8000,
+				"thumbs_up"
 			);
 			if (follow) this.phriend.bind_bubble_link("[data-follow]", () => host.open_status({ issue: result.name }));
 			this.phriend.refresh_badge();
@@ -102,7 +103,7 @@ export class Sender {
 			forbidden: `${escape_html(__("You're not allowed to send Phriend reports."))} ${escape_html(error.message || "")} ${link("data-discard-report", __("Discard"))}`,
 			server: `${escape_html(__("Sending didn't work:"))} ${escape_html(String(error.message || __("unknown error")).replace(/[.\s]+$/, ""))}. ${kept} ${again} · ${edit}`,
 		}[error.kind];
-		const bubble = ball.say(text, 0);
+		const bubble = ball.say(text, 0, "point_up");
 		const on = (selector, callback) => {
 			const el = bubble.querySelector(selector);
 			if (el) el.addEventListener("click", callback);
