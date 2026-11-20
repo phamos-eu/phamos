@@ -17,11 +17,15 @@
 
 import { Ball } from "./ball";
 import { ErrorLog } from "./errors";
+import * as nudge from "./nudge";
 import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
 
 export { DRAFT_KEY };
 const GREETED_KEY = "phriend:greeted";
+const NUDGE_DELAY = 4000; // after the page (or the tab) shows
+const NUDGE_CHECK = 30 * 60 * 1000; // Desk tabs stay open all day
+const NUDGE_MS = 8000;
 
 export function create_phriend(host) {
 	return new Phriend(host);
@@ -96,14 +100,46 @@ class Phriend {
 			this.ball.set_pending(true);
 			this.ball.say(
 				`${escape_html(__("You have a report that wasn't sent."))} <button type="button" class="link" data-open>${escape_html(__("Open it"))}</button>`,
-				10000
+				10000,
+				"point_up"
 			);
 			this.bind_bubble_link("[data-open]", () => this.report(this.saved_draft()));
 		} else if (!storage_get(GREETED_KEY)) {
-			this.ball.say(escape_html(__("Hi, I'm Phriend! Click me when something looks wrong.")), 6000);
+			this.ball.say(escape_html(__("Hi, I'm Phriend! Click me when something looks wrong.")), NUDGE_MS, "wave");
 			storage_set(GREETED_KEY, "1");
+			nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())); // the first nudge
 		}
 		this.refresh_badge();
+		this.start_nudging();
+	}
+
+	// "Click me!" now and then, to users who never opened Phriend or not for a while (nudge.js).
+	start_nudging() {
+		// one pending check: clicking through pages quickly doesn't pile up timers
+		const later = () => {
+			clearTimeout(this._nudge_timer);
+			this._nudge_timer = setTimeout(() => this.maybe_nudge(), NUDGE_DELAY);
+		};
+		later();
+		setInterval(() => this.maybe_nudge(), NUDGE_CHECK);
+		document.addEventListener("visibilitychange", () => !document.hidden && later());
+		if (this.host.on_route_change) this.host.on_route_change(later);
+	}
+
+	maybe_nudge() {
+		// never in the way: not over another bubble, an open flow or a report still to send
+		if (!this.ball || this.open || document.hidden || this.ball.bubble_showing()) return;
+		if ((this.sender && this.sender.busy()) || this.saved_draft()) return;
+		const state = nudge.read(this.host.user);
+		const now = Date.now();
+		if (!nudge.is_due(state, now)) return;
+		this.ball.say(
+			`<button type="button" class="link" data-nudge>${escape_html(this.__("Click me!"))}</button>`,
+			NUDGE_MS,
+			"wave"
+		);
+		this.bind_bubble_link("[data-nudge]", () => this.report());
+		nudge.write(nudge.after_nudge(state, now));
 	}
 
 	bind_bubble_link(selector, callback) {
@@ -157,7 +193,7 @@ class Phriend {
 		if (this.open || !this.ball) return;
 		const sender = this.sender;
 		if (sender && sender.sending) {
-			this.ball.say(escape_html(this.__("Still sending your last report…")), 3000);
+			this.ball.say(escape_html(this.__("Still sending your last report…")), 3000, "fingers_crossed");
 			return;
 		}
 		if (sender && sender.failed && !draft) {
@@ -166,9 +202,11 @@ class Phriend {
 			draft = { ...failed.draft, canvas: failed.canvas, from_failed: true };
 		}
 		this.open = true;
+		// opened: no "Click me!" for the next 10 to 20 days
+		nudge.write(nudge.after_click(nudge.read(this.host.user), Date.now()));
 		this.ball.hop();
 		const ctx = this.context(); // before anything changes on the page
-		const slow = setTimeout(() => this.ball.say(escape_html(this.__("One moment…")), 0), 150);
+		const slow = setTimeout(() => this.ball.say(escape_html(this.__("One moment…")), 0, "wait"), 150);
 		let flow;
 		try {
 			flow = await this.load_flow();
@@ -195,7 +233,8 @@ class Phriend {
 		if (this.sender && this.sender.busy()) return; // keep "Sending…" / "Try again" in the bubble
 		this.ball.say(
 			`${escape_html(this.__("Whoops, that call failed."))} <button type="button" class="link" data-report>${escape_html(this.__("Report it?"))}</button>`,
-			6000
+			6000,
+			"point"
 		);
 		this.bind_bubble_link("[data-report]", () => this.report());
 	}
