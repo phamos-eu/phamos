@@ -592,15 +592,18 @@ def load_implementations(lang):
 	records = _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
 		"start_date", "industry", "customer_approved", "region"])
 	# The customer link holds the internal ID ("Knd-00314"); named cases show the customer's name (#1825).
-	customer_names = dict(frappe.get_all("Customer", filters={"name": ["in", [r.customer for r in records if r.customer] or [""]]},
-		fields=["name", "customer_name"], as_list=True))
+	# Names are read only for approved cases: anonymous ones must never carry them.
+	approved = [r.customer for r in records if r.customer and r.customer_approved]
+	customer_names = dict(frappe.get_all("Customer", filters={"name": ["in", approved]},
+		fields=["name", "customer_name"], as_list=True)) if approved else {}
 	for r in records:
 		if r.implementation_status == "Cancelled":
 			continue
 		industry_label = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
 		year = getdate(r.start_date).year if r.start_date else None
-		masked = not r.customer_approved
-		customer_name = customer_names.get(r.customer) or r.customer
+		customer_name = customer_names.get(r.customer)
+		# No name to show (approved but empty customer_name): stay anonymous rather than fall back to the ID.
+		masked = not r.customer_approved or not customer_name
 		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), _region(r.region)]))
 		title = localized(r, "title", lang) or (descriptor if masked else customer_name)
 		if masked:

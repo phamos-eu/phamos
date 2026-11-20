@@ -340,3 +340,12 @@ class TestWebProfile(FrappeTestCase):
 		self.assertIn("WP Druck & Service GmbH", profile["overview"])
 		self.assertEqual(profile["schema"]["about"]["name"], "WP Druck & Service GmbH")
 		self.assertNotIn(CUSTOMER, item.subtitle + item.search + profile["overview"] + frappe.as_json(profile["schema"]))
+
+		# No customer name to show (it is mandatory, but set by hand here): the case stays anonymous
+		# instead of falling back to the ID.
+		frappe.db.set_value("Customer", CUSTOMER, "customer_name", "")
+		_reset_items()
+		item = find_item("implementations", doc.route, "en")
+		self.assertTrue(item.masked)
+		self.assertNotIn(CUSTOMER, item.title + item.subtitle + item.search)
+		self.assertIsNone(item.data["customer"])
