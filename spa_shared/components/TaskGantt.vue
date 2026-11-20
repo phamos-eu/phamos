@@ -116,7 +116,7 @@
 
 			<div
 				class="hr-gantt-right flex min-w-0 flex-1 flex-col"
-				:class="{ 'hr-gantt--link-mode': linkMode }"
+				:class="{ 'hr-gantt--linking': drag }"
 			>
 				<div
 					class="hr-gantt-timeline-controls flex flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 bg-surface-gray-1 px-3 dark:bg-surface-gray-2"
@@ -146,20 +146,6 @@
 					>
 						{{ selectionRangeLabel }}
 					</span>
-					<Button
-						type="button"
-						size="sm"
-						:variant="linkMode ? 'solid' : 'outline'"
-						:theme="linkMode ? 'blue' : 'gray'"
-						:title="
-							linkMode
-								? 'Click predecessor, then successor (Esc to cancel)'
-								: 'Link tasks'
-						"
-						@click="toggleLinkMode"
-					>
-						Link
-					</Button>
 					<!-- Extra controls of the hosting view, e.g. "Own / All departments" (#1948). -->
 					<slot name="toolbar" />
 					<label class="ml-auto flex items-center gap-2 text-[11px] text-ink-gray-5">
@@ -248,7 +234,7 @@
 					class="hr-gantt-body min-h-0 flex-1 overflow-auto bg-surface-white dark:bg-surface-gray-1"
 					@scroll="onBodyScroll"
 				>
-					<div class="hr-gantt-body-inner relative" :style="bodyInnerStyle">
+					<div ref="bodyInner" class="hr-gantt-body-inner relative" :style="bodyInnerStyle">
 						<div
 							v-if="!ganttTasks.length"
 							class="absolute inset-0 z-[3] flex items-center justify-center text-xs text-ink-gray-5"
@@ -256,6 +242,56 @@
 							Set expected dates to show tasks on the timeline
 						</div>
 						<div ref="ganttHost" class="hr-gantt-wrap" />
+
+						<!-- Drag-to-link (#2001): a dot after the hovered bar; drag it onto the task that follows. -->
+						<svg v-if="drag" class="hr-gantt-link-line" aria-hidden="true">
+							<line :x1="drag.x0" :y1="drag.y0" :x2="drag.x" :y2="drag.y" />
+						</svg>
+						<button
+							v-if="handle"
+							type="button"
+							class="hr-gantt-link-handle"
+							:class="{ 'hr-gantt-link-handle--active': drag }"
+							:style="{ left: `${handle.x}px`, top: `${handle.y}px` }"
+							:title="__('Drag onto the task that follows')"
+							:aria-label="__('Drag onto the task that follows')"
+							@pointerdown="onHandlePointerDown"
+							@pointermove="onHandlePointerMove"
+							@pointerup="onHandlePointerUp"
+							@pointercancel="endDrag"
+							@mouseenter="keepHandle"
+							@mouseleave="hideHandleSoon"
+						/>
+
+						<!-- Click on an arrow (#2001): who waits for whom, and remove. -->
+						<div
+							v-if="arrowPopover"
+							ref="popoverEl"
+							role="dialog"
+							:aria-label="__('Dependency')"
+							class="hr-gantt-dep-popover absolute z-[6] w-64 rounded-lg border border-outline-gray-2 bg-surface-white p-3 shadow-lg dark:bg-surface-gray-2"
+							:style="{ left: `${arrowPopover.x}px`, top: `${arrowPopover.y}px` }"
+						>
+							<div class="flex items-center gap-2 text-sm font-semibold text-ink-gray-9">
+								<span class="h-2 w-2 flex-shrink-0 rounded-full bg-surface-gray-5" />
+								<span class="min-w-0 truncate">{{ taskTitle(arrowPopover.from) }}</span>
+							</div>
+							<div class="my-1 pl-4 text-xs text-ink-gray-5">{{ __("must finish before") }}</div>
+							<div class="flex items-center gap-2 text-sm font-semibold text-ink-gray-9">
+								<span class="h-2 w-2 flex-shrink-0 rounded-full bg-surface-gray-5" />
+								<span class="min-w-0 truncate">{{ taskTitle(arrowPopover.to) }}</span>
+							</div>
+							<Button
+								ref="popoverRemove"
+								class="mt-3 w-full"
+								size="sm"
+								variant="outline"
+								theme="red"
+								@click="removeArrow"
+							>
+								{{ __("Remove dependency") }}
+							</Button>
+						</div>
 					</div>
 				</div>
 				<div
@@ -284,7 +320,9 @@ import {
 } from "../utils/ganttTimeline"
 import { formatDateIso } from "../utils/ganttTimelineFormat"
 import { buildBarColorCss, parseDependsOn, taskColorClass } from "../utils/ganttColors"
-import { restyleDependencyArrows } from "../utils/ganttDependencyArrows"
+import { addArrowHitAreas, restyleDependencyArrows } from "../utils/ganttDependencyArrows"
+import { handlePoint, linkTargetId } from "../utils/ganttDependencyDrag"
+import { __ } from "@spa/utils/i18n.js"
 import { updateGanttTodayStrip } from "../utils/ganttTodayStrip"
 import { updateGanttSelectedRow } from "../utils/ganttSelectedRow"
 import { ganttBuildAction } from "../utils/ganttBuildAction"
@@ -305,6 +343,7 @@ const emit = defineEmits([
 	"select",
 	"date-change",
 	"dependency-change",
+	"dependency-remove",
 	"created",
 	"update:search",
 	"update:includeCompleted",
@@ -341,8 +380,16 @@ const frameStart = ref("")
 const frameEnd = ref("")
 const newTaskSubject = ref("")
 const newTaskDialogOpen = ref(false)
-const linkMode = ref(false)
-const linkFrom = ref(null)
+/** Drag-to-link (#2001): the dot shown after a hovered bar, {id, x, y} in body-inner pixels. */
+const handle = ref(null)
+/** While dragging: {from, x0, y0, x, y, target}. */
+const drag = ref(null)
+/** The arrow clicked: {from, to, x, y}. */
+const arrowPopover = ref(null)
+const bodyInner = ref(null)
+const popoverEl = ref(null)
+const popoverRemove = ref(null)
+let hideHandleTimer = null
 
 const selecting = ref(false)
 const selectionStartCol = ref(null)
@@ -479,20 +526,183 @@ function onHostMouseDown(e) {
 	if (wrapper && isLocked(wrapper.getAttribute("data-id"))) e.stopPropagation()
 }
 
-function toggleLinkMode() {
-	linkMode.value = !linkMode.value
-	if (!linkMode.value) {
-		linkFrom.value = null
+const dependsOnMap = computed(() =>
+	Object.fromEntries(ganttTasks.value.map((t) => [t.id, t.dependencies || []]))
+)
+const linkRows = { isLocked, dependsOn: (id) => dependsOnMap.value[id] || [] }
+
+function taskTitle(id) {
+	return rowMeta(id).subject || id
+}
+
+function innerRect() {
+	return bodyInner.value?.getBoundingClientRect() || null
+}
+
+function barOf(id) {
+	return gantt?.bars?.find((bar) => bar.task.id === id) || null
+}
+
+// --- Drag-to-link (#2001) --------------------------------------------------------------------
+
+function onHostMouseOver(e) {
+	if (drag.value) return
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (!wrapper) return
+	const id = wrapper.getAttribute("data-id")
+	if (isLocked(id)) return
+	showHandle(id)
+}
+
+function onHostMouseOut(e) {
+	if (drag.value) return
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (!wrapper || wrapper.contains(e.relatedTarget)) return
+	hideHandleSoon()
+}
+
+function showHandle(id) {
+	clearTimeout(hideHandleTimer)
+	const bar = barOf(id)?.$bar
+	const origin = innerRect()
+	if (!bar || !origin) return
+	handle.value = { id, ...handlePoint(bar.getBoundingClientRect(), origin) }
+}
+
+function keepHandle() {
+	clearTimeout(hideHandleTimer)
+}
+
+function hideHandleSoon() {
+	if (drag.value) return
+	clearTimeout(hideHandleTimer)
+	hideHandleTimer = setTimeout(() => {
+		if (!drag.value) handle.value = null
+	}, 300)
+}
+
+function onHandlePointerDown(e) {
+	if (e.button !== 0 || !handle.value) return
+	e.preventDefault()
+	e.stopPropagation()
+	closeArrowPopover()
+	e.currentTarget?.setPointerCapture?.(e.pointerId)
+	const { id, x, y } = handle.value
+	drag.value = { from: id, x0: x, y0: y, x, y, target: null }
+	updateBarStateClasses()
+}
+
+/** Scroll the chart while the pointer is near its edge, so far-away bars can be reached. */
+function autoScroll(e) {
+	const body = bodyScroll.value
+	if (!body) return
+	const rect = body.getBoundingClientRect()
+	const edge = 32
+	const step = 14
+	if (e.clientY < rect.top + edge) body.scrollTop -= step
+	else if (e.clientY > rect.bottom - edge) body.scrollTop += step
+	if (e.clientX < rect.left + edge) body.scrollLeft -= step
+	else if (e.clientX > rect.right - edge) body.scrollLeft += step
+}
+
+function onHandlePointerMove(e) {
+	if (!drag.value) return
+	autoScroll(e)
+	const origin = innerRect()
+	if (!origin) return
+	drag.value.x = e.clientX - origin.left
+	drag.value.y = e.clientY - origin.top
+	const wrapper = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".bar-wrapper")
+	const target = linkTargetId(drag.value.from, wrapper?.getAttribute("data-id") || null, linkRows)
+	if (target !== drag.value.target) {
+		drag.value.target = target
 		updateBarStateClasses()
 	}
 }
 
-function onKeyDown(e) {
-	if (e.key === "Escape" && linkMode.value) {
-		linkMode.value = false
-		linkFrom.value = null
-		updateBarStateClasses()
+function onHandlePointerUp() {
+	if (!drag.value) return
+	const { from, target } = drag.value
+	endDrag()
+	if (target) emit("dependency-change", { name: target, depends_on: from })
+}
+
+function endDrag() {
+	drag.value = null
+	handle.value = null
+	updateBarStateClasses()
+}
+
+// --- Arrow popover (#2001) -------------------------------------------------------------------
+
+function onHostClick(e) {
+	const link = e.target?.closest?.(".dep-link")
+	if (!link) return
+	e.stopPropagation()
+	const origin = innerRect()
+	if (!origin) return
+	arrowPopover.value = {
+		from: link.dataset.from,
+		to: link.dataset.to,
+		...popoverPoint(e.clientX - origin.left, e.clientY - origin.top),
 	}
+	markActiveArrow()
+	nextTick(() => {
+		const el = popoverRemove.value?.$el || popoverRemove.value
+		el?.focus?.()
+	})
+}
+
+const POPOVER_WIDTH = 256
+const POPOVER_HEIGHT = 130
+
+/** Below and right of the click, flipped left or up where it would leave the visible chart. */
+function popoverPoint(x, y) {
+	const body = bodyScroll.value
+	const right = body ? body.scrollLeft + body.clientWidth : Infinity
+	const bottom = body ? body.scrollTop + body.clientHeight : Infinity
+	return {
+		x: x + 8 + POPOVER_WIDTH > right ? Math.max(0, x - 8 - POPOVER_WIDTH) : x + 8,
+		y: y + 8 + POPOVER_HEIGHT > bottom ? Math.max(0, y - 8 - POPOVER_HEIGHT) : y + 8,
+	}
+}
+
+function closeArrowPopover() {
+	if (!arrowPopover.value) return
+	arrowPopover.value = null
+	markActiveArrow()
+}
+
+function onDocumentPointerDown(e) {
+	if (!arrowPopover.value) return
+	if (popoverEl.value?.contains(e.target)) return
+	if (e.target?.closest?.(".dep-link")) return
+	closeArrowPopover()
+}
+
+function removeArrow() {
+	const popover = arrowPopover.value
+	if (!popover) return
+	closeArrowPopover()
+	emit("dependency-remove", { name: popover.to, depends_on: popover.from })
+}
+
+function markActiveArrow() {
+	const svg = ganttHost.value
+	if (!svg) return
+	const active = arrowPopover.value
+	for (const link of svg.querySelectorAll(".dep-link")) {
+		link.classList.toggle(
+			"dep-link--active",
+			Boolean(active && link.dataset.from === active.from && link.dataset.to === active.to)
+		)
+	}
+}
+
+function onKeyDown(e) {
+	if (e.key !== "Escape") return
+	if (drag.value) endDrag()
+	else closeArrowPopover()
 }
 
 function focusNewTaskInput() {
@@ -564,7 +774,7 @@ function colFromClientX(clientX) {
 }
 
 function onHeaderPointerDown(e) {
-	if (linkMode.value || e.button !== 0) return
+	if (e.button !== 0) return
 	selecting.value = true
 	selectionDragActive.value = false
 	pointerStartX.value = e.clientX
@@ -674,25 +884,11 @@ function applyGanttFrame() {
 	fixSvgHeight()
 	updateBarStateClasses()
 	restyleDependencyArrows(gantt)
+	addArrowHitAreas(gantt)
+	// The bars moved or were redrawn: a dot or popover from before would point at nothing.
+	if (!drag.value) handle.value = null
+	arrowPopover.value = null
 	updateTodayStripOverlay()
-}
-
-function handleLinkClick(taskId) {
-	if (isLocked(taskId)) return
-	if (!linkFrom.value) {
-		linkFrom.value = taskId
-		updateBarStateClasses()
-		return
-	}
-	if (linkFrom.value === taskId) {
-		linkFrom.value = null
-		updateBarStateClasses()
-		return
-	}
-	emit("dependency-change", { name: taskId, depends_on: linkFrom.value })
-	linkMode.value = false
-	linkFrom.value = null
-	updateBarStateClasses()
 }
 
 function buildGantt() {
@@ -715,13 +911,7 @@ function buildGantt() {
 			header_height: 0,
 			date_format: "YYYY-MM-DD",
 			language: "en",
-			on_click: (task) => {
-				if (linkMode.value) {
-					handleLinkClick(task.id)
-					return
-				}
-				emit("select", task.id)
-			},
+			on_click: (task) => emit("select", task.id),
 			on_date_change: (task, start, end) => {
 				// A locked bar only moves along with a predecessor it depends on: redraw, don't save.
 				if (isLocked(task.id)) {
@@ -782,9 +972,9 @@ function updateBarStateClasses() {
 	if (!gantt?.bars) return
 	for (const bar of gantt.bars) {
 		const selected = bar.task.id === props.selectedName
-		const linkSource = bar.task.id === linkFrom.value
 		bar.group.classList.toggle("bar-selected", selected)
-		bar.group.classList.toggle("link-from", linkSource)
+		bar.group.classList.toggle("link-source", bar.task.id === drag.value?.from)
+		bar.group.classList.toggle("link-target", bar.task.id === drag.value?.target)
 	}
 	updateGanttSelectedRow(gantt, props.selectedName)
 }
@@ -904,12 +1094,15 @@ watch(
 
 watch(todayStrip, () => updateTodayStripOverlay())
 
-watch(linkFrom, () => updateBarStateClasses())
 
 onMounted(() => {
 	initFrame()
 	document.addEventListener("keydown", onKeyDown)
+	document.addEventListener("pointerdown", onDocumentPointerDown, true)
 	ganttHost.value?.addEventListener("mousedown", onHostMouseDown, true)
+	ganttHost.value?.addEventListener("mouseover", onHostMouseOver)
+	ganttHost.value?.addEventListener("mouseout", onHostMouseOut)
+	ganttHost.value?.addEventListener("click", onHostClick, true)
 	ganttTasksSignature = tasksSignature(ganttTasks.value)
 	buildGantt()
 	bodyScroll.value?.addEventListener("wheel", onWheel, { passive: false })
@@ -941,8 +1134,13 @@ onUnmounted(() => {
 	bodyResizeObserver = null
 	listFooterResizeObserver?.disconnect()
 	listFooterResizeObserver = null
+	clearTimeout(hideHandleTimer)
 	document.removeEventListener("keydown", onKeyDown)
+	document.removeEventListener("pointerdown", onDocumentPointerDown, true)
 	ganttHost.value?.removeEventListener("mousedown", onHostMouseDown, true)
+	ganttHost.value?.removeEventListener("mouseover", onHostMouseOver)
+	ganttHost.value?.removeEventListener("mouseout", onHostMouseOut)
+	ganttHost.value?.removeEventListener("click", onHostClick, true)
 	bodyScroll.value?.removeEventListener("wheel", onWheel)
 	document.getElementById(BAR_COLOR_STYLE_ID)?.remove()
 	destroyGantt()
@@ -960,10 +1158,65 @@ onUnmounted(() => {
 	filter: brightness(1.08);
 }
 
-:deep(.link-from .bar) {
+:deep(.link-source .bar),
+:deep(.link-target .bar) {
+	stroke: var(--ink-blue-3);
+	stroke-width: 2.5px;
+}
+
+:deep(.link-source .bar) {
+	stroke-dasharray: 4 2;
+}
+
+/* Drag-to-link (#2001) */
+.hr-gantt-link-handle {
+	position: absolute;
+	z-index: 5;
+	width: 12px;
+	height: 12px;
+	margin: -6px 0 0 -6px;
+	border: 2px solid var(--ink-blue-3);
+	border-radius: 9999px;
+	background: var(--surface-white);
+	cursor: crosshair;
+	touch-action: none;
+}
+
+.hr-gantt-link-handle:hover,
+.hr-gantt-link-handle--active,
+.hr-gantt-link-handle:focus-visible {
+	background: var(--ink-blue-3);
+	outline: none;
+}
+
+.hr-gantt-link-line {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.hr-gantt-link-line line {
 	stroke: var(--ink-blue-3);
 	stroke-width: 2px;
-	stroke-dasharray: 4 2;
+}
+
+/* Clickable arrows: a wide invisible stroke on top of each arrow. */
+:deep(.dep-hit) {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 12px;
+	pointer-events: stroke;
+	cursor: pointer;
+}
+
+:deep(.dep-link:hover path:first-child),
+:deep(.dep-link--active path:first-child) {
+	stroke: var(--ink-gray-9);
+	stroke-width: 2.4px;
 }
 
 :deep(.hr-gantt-wrap .gantt .bar-label) {
@@ -979,8 +1232,9 @@ onUnmounted(() => {
 	display: none;
 }
 
-.hr-gantt--link-mode .hr-gantt-body {
+.hr-gantt--linking .hr-gantt-body {
 	cursor: crosshair;
+	user-select: none;
 }
 
 /* Read-only rows of the company view (#1948): no resize or progress handles. */
