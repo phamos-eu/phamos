@@ -302,6 +302,51 @@ class TestDevActionPanelIssueList(_DapTestCase):
 		)
 		self.assertEqual(names, [opened])
 
+	def _family(self):
+		parent = self._issue("DAP Family parent")
+		children = [self._issue("DAP Family child", parent=parent) for _ in range(2)]
+		standalone = self._issue("DAP Family standalone")
+		return parent, children, standalone
+
+	def _matching(self, *rows):
+		# Narrowed to this test's issues; the site may hold other open issues.
+		return set(
+			self._as_user(
+				dap.get_matching_names,
+				"GitLab Issue",
+				[["GitLab Issue", "title", "like", "DAP Family%"], *[["GitLab Issue", *r] for r in rows]],
+			)
+		)
+
+	def test_gitlab_parent_issue_filter_lists_the_parent_and_its_children(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", parent]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", standalone]), {standalone})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "in", f"{parent},{standalone}"]), {parent, *children, standalone}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "!=", parent]), {standalone})
+
+	def test_gitlab_child_issue_filter_lists_child_issues_only(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "set"]), set(children))
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "not set"]), {parent, standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", children[0]]), {children[0]})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", parent]), set())
+		# Both together: the children of one parent.
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "=", parent], ["gitlab_child_issue", "is", "set"]), set(children)
+		)
+
+	def test_gitlab_family_filters_refuse_conditions_they_cannot_answer(self):
+		self.assertRaises(
+			frappe.ValidationError,
+			self._as_user,
+			dap.get_matching_names,
+			"GitLab Issue",
+			[["GitLab Issue", "gitlab_parent_issue", ">", "x"]],
+		)
+
 	def test_running_issue_assigned_to_someone_else_is_marked_running(self):
 		running = self._issue("Running, not assigned to me")
 		record = frappe.get_doc(
