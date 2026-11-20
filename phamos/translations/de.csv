@@ -2572,3 +2572,6 @@ Dependency linked,Abhängigkeit verknüpft
 Could not link tasks,Aufgaben konnten nicht verknüpft werden
 Dependency removed,Abhängigkeit entfernt
 Could not remove the dependency,Die Abhängigkeit konnte nicht entfernt werden
+Drag onto the task that follows,Auf die nachfolgende Aufgabe ziehen
+Dependency,Abhängigkeit
+must finish before,muss fertig sein vor
