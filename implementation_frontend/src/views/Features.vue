@@ -1,186 +1,222 @@
 <template>
 	<!-- What phamos builds for this implementation (#1972): the features as a list, a Kanban with the
-	     agreed WIP limit, and the work breakdown structure. Customers look; phamos staff move cards. -->
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-6xl flex-col gap-4">
-			<div class="flex flex-wrap items-end justify-between gap-3">
-				<div>
-					<h1 class="text-lg font-semibold text-ink-gray-9">{{ __("Features") }}</h1>
-					<p class="mt-0.5 text-sm text-ink-gray-6">{{ __("What we build for you, how far each part is, and what it takes.") }}</p>
-				</div>
-				<TabButtons v-model="view" :buttons="viewButtons" />
+	     agreed WIP limit, and the work breakdown. Full height, no page scrolling: only a list or a
+	     column scrolls inside itself, and a feature opens in a side panel next to it. -->
+	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<h1 class="text-lg font-semibold text-ink-gray-9">{{ __("Features") }}</h1>
+			<TabButtons v-model="view" :buttons="viewButtons" />
+			<div v-if="view === 'list' && data" class="flex flex-wrap items-center gap-2">
+				<FormControl v-model="filters.status" type="select" size="sm" class="w-36" :options="statusOptions" :aria-label="__('Status')" />
+				<FormControl v-model="filters.module" type="select" size="sm" class="w-36" :options="moduleOptions" :aria-label="__('Module')" />
+				<FormControl v-model="filters.chapter" type="select" size="sm" class="w-40" :options="chapterOptions" :aria-label="__('Chapter')" />
 			</div>
+			<label v-if="view === 'wbs'" class="flex items-center gap-2 text-sm text-ink-gray-7">
+				<input v-model="byMilestone" type="checkbox" class="rounded border-outline-gray-3" />
+				{{ __("Group issues by GitLab milestone") }}
+			</label>
+			<span v-if="data?.wip.limit" class="ml-auto text-xs" :class="data.wip.over ? 'font-medium text-ink-amber-3' : 'text-ink-gray-5'">
+				{{ __("In progress: {0} of {1} agreed", [data.wip.running, data.wip.limit]) }}
+			</span>
+		</header>
+		<MethodNote :summary="note.summary" :details="note.details" />
 
-			<MethodNote :summary="note.summary" :details="note.details" />
+		<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-4">{{ error }}</div>
 
-			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
-			<div v-else-if="loading && !data" class="text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
+		<div class="flex min-h-0 flex-1 gap-3">
+			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+				<div v-if="loading && !data" class="text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 
-			<!-- List -->
-			<template v-else-if="view === 'list' && data">
-				<div class="flex flex-wrap items-end gap-2">
-					<FormControl v-model="filters.status" type="select" size="sm" :label="__('Status')" class="w-44" :options="statusOptions" />
-					<FormControl v-model="filters.module" type="select" size="sm" :label="__('Module')" class="w-44" :options="moduleOptions" />
-					<FormControl v-model="filters.chapter" type="select" size="sm" :label="__('Chapter')" class="w-52" :options="chapterOptions" />
-				</div>
-				<section class="overflow-x-auto rounded-lg border border-outline-gray-2 bg-surface-white">
+				<!-- List: the table scrolls inside its frame, the header stays -->
+				<section v-else-if="view === 'list' && data" class="min-h-0 flex-1 overflow-auto rounded-lg border border-outline-gray-2 bg-surface-white">
 					<table class="w-full text-sm">
-						<thead class="border-b border-outline-gray-2 text-left text-xs text-ink-gray-5">
+						<thead class="sticky top-0 z-10 border-b border-outline-gray-2 bg-surface-white text-left text-xs text-ink-gray-5">
 							<tr>
-								<th class="px-4 py-2 font-medium">{{ __("Feature") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Module") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Chapter") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Release") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Status") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Level") }}</th>
-								<th class="px-3 py-2 text-right font-medium">{{ __("Effort") }}</th>
-								<th class="px-3 py-2 font-medium">{{ __("Progress") }}</th>
+								<th class="px-3 py-1.5 font-medium">{{ __("Feature") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Module") }}</th>
+								<th v-if="!selected" class="px-2 py-1.5 font-medium">{{ __("Chapter") }}</th>
+								<th v-if="!selected" class="px-2 py-1.5 font-medium">{{ __("Release") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Status") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Level") }}</th>
+								<th class="px-2 py-1.5 text-right font-medium">{{ __("Effort") }}</th>
+								<th class="px-2 py-1.5 font-medium">{{ __("Progress") }}</th>
 							</tr>
 						</thead>
 						<tbody>
 							<tr
-								v-for="f in filtered"
+								v-for="(f, index) in filtered"
 								:key="f.name"
-								class="cursor-pointer border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1"
+								:ref="(el) => (rows[index] = el)"
+								tabindex="0"
+								class="cursor-pointer border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1 focus:bg-surface-gray-2 focus:outline-none"
+								:class="selected === f.name ? 'bg-surface-gray-2' : ''"
 								@click="openFeature(f.name)"
+								@keydown.enter.prevent="openFeature(f.name)"
+								@keydown.down.prevent="focusRow(index + 1)"
+								@keydown.up.prevent="focusRow(index - 1)"
 							>
-								<td class="px-4 py-2.5">
+								<td class="px-3 py-1.5">
 									<div class="font-medium text-ink-gray-9">{{ f.title }}</div>
 									<div class="text-xs text-ink-gray-5">{{ f.name }}<template v-if="f.owner_name"> · {{ f.owner_name }}</template></div>
 								</td>
-								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.module || "—" }}</td>
-								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.chapters.map((c) => c.label).join(", ") || "—" }}</td>
-								<td class="px-3 py-2.5 text-ink-gray-7">{{ f.releases.map((r) => r.label).join(", ") || "—" }}</td>
-								<td class="px-3 py-2.5"><span :class="statusClass(f.status)" class="whitespace-nowrap rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span></td>
-								<td class="px-3 py-2.5 text-ink-gray-7">{{ levels(f) }}</td>
-								<td class="px-3 py-2.5 text-right text-ink-gray-7">{{ hours(f.effort_hours) }}</td>
-								<td class="px-3 py-2.5"><ProgressBar class="w-32" :value="f.progress" /></td>
+								<td class="px-2 py-1.5 text-ink-gray-7">{{ f.module || "—" }}</td>
+								<td v-if="!selected" class="px-2 py-1.5 text-ink-gray-7">{{ f.chapters.map((c) => c.label).join(", ") || "—" }}</td>
+								<td v-if="!selected" class="px-2 py-1.5 text-ink-gray-7">{{ f.releases.map((r) => r.label).join(", ") || "—" }}</td>
+								<td class="px-2 py-1.5"><StatusBadge :status="f.status" /></td>
+								<td class="whitespace-nowrap px-2 py-1.5 text-ink-gray-7">{{ levels(f) }}</td>
+								<td class="whitespace-nowrap px-2 py-1.5 text-right text-ink-gray-7">{{ hours(f.effort_hours) }}</td>
+								<td class="px-2 py-1.5"><ProgressBar class="w-28" :value="f.progress" /></td>
 							</tr>
 							<tr v-if="!filtered.length">
-								<td colspan="8" class="px-4 py-8 text-center text-ink-gray-5">{{ __("No features here yet.") }}</td>
+								<td colspan="8" class="px-3 py-8 text-center text-ink-gray-5">{{ __("No features here yet.") }}</td>
 							</tr>
 						</tbody>
 					</table>
 				</section>
-			</template>
 
-			<!-- Kanban -->
-			<template v-else-if="view === 'kanban' && data">
-				<div class="flex gap-3 overflow-x-auto pb-2">
+				<!-- Kanban: the columns share the width and scroll on their own -->
+				<div v-else-if="view === 'kanban' && data" class="flex min-h-0 flex-1 gap-2 overflow-x-auto">
 					<div
 						v-for="column in columns"
 						:key="column.status"
-						class="flex shrink-0 flex-col rounded-lg border bg-surface-white"
-						:class="[column.narrow && !expanded[column.status] ? 'w-40' : 'w-64', column.over ? 'border-outline-amber-2 bg-surface-amber-1' : 'border-outline-gray-2', dropTarget === column.status ? 'ring-2 ring-outline-gray-4' : '']"
+						class="flex min-h-0 flex-col rounded-lg border bg-surface-white"
+						:class="[
+							column.narrow && !expanded[column.status] ? 'w-28 shrink-0' : 'min-w-[11rem] flex-1',
+							column.over ? 'border-outline-amber-2 bg-surface-amber-1' : 'border-outline-gray-2',
+							dropTarget === column.status ? 'ring-2 ring-outline-gray-4' : '',
+						]"
 						@dragover.prevent="data.can_move && (dropTarget = column.status)"
 						@dragleave="dropTarget = null"
 						@drop.prevent="drop(column.status)"
 					>
-						<div class="flex items-center justify-between border-b border-outline-gray-1 px-3 py-2">
-							<button type="button" class="text-left text-sm font-medium text-ink-gray-8" @click="column.narrow && (expanded[column.status] = !expanded[column.status])">
-								{{ __(column.status) }} <span class="text-ink-gray-5">{{ column.cards.length }}</span>
-							</button>
-							<span v-if="column.limit" class="text-xs" :class="column.over ? 'font-medium text-ink-amber-3' : 'text-ink-gray-5'">
-								{{ __("{0} of {1} agreed", [column.cards.length, column.limit]) }}
+						<button
+							type="button"
+							class="flex items-center justify-between gap-2 border-b border-outline-gray-1 px-2.5 py-1.5 text-left"
+							:class="column.narrow ? 'cursor-pointer' : 'cursor-default'"
+							@click="column.narrow && (expanded[column.status] = !expanded[column.status])"
+						>
+							<span class="truncate text-sm font-medium text-ink-gray-8">{{ __(column.status) }}</span>
+							<span class="shrink-0 text-xs" :class="column.over ? 'font-medium text-ink-amber-3' : 'text-ink-gray-5'">
+								{{ column.limit ? `${column.cards.length}/${column.limit}` : column.cards.length }}
 							</span>
-						</div>
-						<div v-if="!column.narrow || expanded[column.status]" class="flex min-h-[4rem] flex-col gap-2 p-2">
+						</button>
+						<div v-if="!column.narrow || expanded[column.status]" class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
 							<div
 								v-for="f in column.cards"
 								:key="f.name"
 								:draggable="data.can_move"
-								class="rounded-md border border-outline-gray-2 bg-surface-white p-2.5 text-sm shadow-sm"
-								:class="data.can_move ? 'cursor-grab' : 'cursor-pointer'"
+								tabindex="0"
+								class="rounded-md border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-outline-gray-4"
+								:class="[data.can_move ? 'cursor-grab' : 'cursor-pointer', selected === f.name ? 'ring-2 ring-outline-gray-4' : '']"
 								@dragstart="dragged = f"
 								@dragend="dragged = null"
 								@click="openFeature(f.name)"
+								@keydown.enter.prevent="openFeature(f.name)"
 							>
-								<div class="font-medium text-ink-gray-9">{{ f.title }}</div>
-								<div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-gray-6">
-									<span v-if="f.module">{{ f.module }}</span>
+								<div class="line-clamp-2 font-medium leading-snug text-ink-gray-9">{{ f.title }}</div>
+								<div class="mt-0.5 flex flex-wrap gap-x-2 text-xs text-ink-gray-5">
 									<span>{{ hours(f.effort_hours) }}</span>
-									<span v-if="f.issues_total">{{ __("{0} of {1} issues open", [f.issues_open, f.issues_total]) }}</span>
-									<span v-if="f.oldest_open_days !== null">{{ __("waiting {0} days", [f.oldest_open_days]) }}</span>
-									<span v-if="f.touch_hours">{{ __("{0} h worked", [f.touch_hours]) }}</span>
+									<span v-if="f.issues_total">{{ __("{0}/{1} open", [f.issues_open, f.issues_total]) }}</span>
+									<span v-if="f.oldest_open_days !== null">{{ __("{0} d waiting", [f.oldest_open_days]) }}</span>
 								</div>
-								<ProgressBar class="mt-2" :value="f.progress" />
+								<ProgressBar class="mt-1" :value="f.progress" />
 							</div>
 						</div>
 					</div>
 				</div>
-				<p v-if="data.wip.over" class="text-sm text-ink-amber-3">
-					{{ __("{0} features are in progress, {1} were agreed. Finish one before starting the next.", [data.wip.running, data.wip.limit]) }}
-				</p>
-			</template>
 
-			<!-- WBS -->
-			<template v-else-if="view === 'wbs'">
-				<div v-if="!wbs" class="text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
-				<section v-else class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
-					<div class="flex flex-wrap items-center justify-between gap-3">
-						<div class="flex items-center gap-3">
+				<!-- Work breakdown: modules side by side when there is room; issues fold out per feature -->
+				<template v-else-if="view === 'wbs'">
+					<div v-if="!wbs" class="text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
+					<div v-else class="flex min-h-0 flex-1 flex-col gap-2">
+						<div class="flex flex-wrap items-center gap-3 rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2">
 							<span class="text-sm font-semibold text-ink-gray-9">{{ implementation }}</span>
-							<ProgressBar class="w-40" :value="wbs.progress" />
+							<ProgressBar class="w-48" :value="wbs.progress" />
+							<span class="text-xs text-ink-gray-5">
+								{{ wbs.weighted ? __("Weighted by estimated hours ({0} h in total).", [wbs.weight_hours]) : __("No hours estimated yet, so every feature counts the same.") }}
+							</span>
 						</div>
-						<label class="flex items-center gap-2 text-sm text-ink-gray-7">
-							<input v-model="byMilestone" type="checkbox" class="rounded border-outline-gray-3" />
-							{{ __("Group issues by GitLab milestone") }}
-						</label>
+						<div v-if="!wbs.modules.length" class="py-6 text-center text-sm text-ink-gray-5">{{ __("No features here yet.") }}</div>
+						<div class="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto" :class="selected ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(22rem,1fr))]'">
+							<section v-for="m in wbs.modules" :key="m.module" class="rounded-lg border border-outline-gray-2 bg-surface-white">
+								<div class="flex items-center gap-2 border-b border-outline-gray-1 px-3 py-1.5">
+									<span class="flex-1 truncate text-sm font-medium text-ink-gray-8">{{ m.module || __("Without module") }}</span>
+									<span class="text-xs text-ink-gray-5">{{ hours(m.weight_hours) }}</span>
+									<ProgressBar class="w-28" :value="m.progress" />
+								</div>
+								<ul>
+									<li v-for="f in m.features" :key="f.name" class="border-b border-outline-gray-1 px-3 py-1 last:border-b-0">
+										<div class="flex items-center gap-2">
+											<button
+												v-if="f.issues.length"
+												type="button"
+												class="text-ink-gray-5 hover:text-ink-gray-9"
+												:aria-expanded="!!openIssues[f.name]"
+												:aria-label="__('Show issues')"
+												@click="openIssues[f.name] = !openIssues[f.name]"
+											>
+												<FeatherIcon :name="openIssues[f.name] ? 'chevron-down' : 'chevron-right'" class="h-3.5 w-3.5" />
+											</button>
+											<span v-else class="w-3.5" />
+											<button type="button" class="min-w-0 flex-1 truncate text-left text-sm text-ink-gray-9 hover:underline" @click="openFeature(f.name)">{{ f.title }}</button>
+											<span v-if="f.issues.length" class="text-xs text-ink-gray-5">{{ f.issues.length }}</span>
+											<span class="w-12 text-right text-xs text-ink-gray-5">{{ hours(f.weight_hours) }}</span>
+											<ProgressBar class="w-24" :value="f.progress" />
+										</div>
+										<div v-if="openIssues[f.name]" class="pb-1 pl-6">
+											<div v-for="group in issueGroups(f.issues)" :key="group.label">
+												<div v-if="byMilestone" class="mt-1 text-xs font-medium text-ink-gray-5">{{ group.label }}</div>
+												<a
+													v-for="i in group.issues"
+													:key="i.name"
+													:href="i.url"
+													target="_blank"
+													rel="noopener noreferrer"
+													class="flex items-center gap-2 py-0.5 text-xs text-ink-gray-7 hover:text-ink-gray-9"
+												>
+													<FeatherIcon :name="i.state === 'closed' ? 'check-circle' : 'circle'" class="h-3 w-3 shrink-0" />
+													<span class="truncate">#{{ i.issue_id }} {{ i.title }}</span>
+													<FeatherIcon name="external-link" class="h-3 w-3 shrink-0" />
+												</a>
+											</div>
+										</div>
+									</li>
+								</ul>
+							</section>
+						</div>
 					</div>
-					<p class="mt-1 text-xs text-ink-gray-5">
-						{{ wbs.weighted ? __("Weighted by estimated hours ({0} h in total).", [wbs.weight_hours]) : __("No hours estimated yet, so every feature counts the same.") }}
-					</p>
-					<div v-if="!wbs.modules.length" class="py-6 text-center text-sm text-ink-gray-5">{{ __("No features here yet.") }}</div>
-					<ul class="mt-3 flex flex-col gap-3">
-						<li v-for="m in wbs.modules" :key="m.module" class="rounded-md border border-outline-gray-1">
-							<div class="flex items-center gap-3 bg-surface-gray-1 px-3 py-2">
-								<span class="flex-1 text-sm font-medium text-ink-gray-8">{{ m.module || __("Without module") }}</span>
-								<span class="text-xs text-ink-gray-5">{{ hours(m.weight_hours) }}</span>
-								<ProgressBar class="w-32" :value="m.progress" />
-							</div>
-							<ul class="flex flex-col">
-								<li v-for="f in m.features" :key="f.name" class="border-t border-outline-gray-1 px-3 py-2 pl-6">
-									<div class="flex items-center gap-3">
-										<button type="button" class="flex-1 text-left text-sm text-ink-gray-9 hover:underline" @click="openFeature(f.name)">{{ f.title }}</button>
-										<span :class="statusClass(f.status)" class="whitespace-nowrap rounded px-1.5 py-0.5 text-xs">{{ __(f.status) }}</span>
-										<span class="w-14 text-right text-xs text-ink-gray-5">{{ hours(f.weight_hours) }}</span>
-										<ProgressBar class="w-32" :value="f.progress" />
-									</div>
-									<div v-for="group in issueGroups(f.issues)" :key="group.label" class="mt-1 pl-4">
-										<div v-if="byMilestone" class="text-xs font-medium text-ink-gray-5">{{ group.label }}</div>
-										<a
-											v-for="i in group.issues"
-											:key="i.name"
-											:href="i.url"
-											target="_blank"
-											rel="noopener noreferrer"
-											class="flex items-center gap-2 py-0.5 text-xs text-ink-gray-7 hover:text-ink-gray-9"
-										>
-											<FeatherIcon :name="i.state === 'closed' ? 'check-circle' : 'circle'" class="h-3 w-3" />
-											<span class="truncate">#{{ i.issue_id }} {{ i.title }}</span>
-											<FeatherIcon name="external-link" class="h-3 w-3 shrink-0" />
-										</a>
-									</div>
-								</li>
-							</ul>
-						</li>
-					</ul>
-				</section>
-			</template>
+				</template>
+			</div>
+
+			<!-- Feature detail beside the list or board, not on a page of its own -->
+			<FeaturePanel
+				v-if="selected"
+				:key="selected"
+				:implementation="implementation"
+				:feature="selected"
+				class="w-[min(28rem,45%)] shrink-0"
+				@close="closeFeature"
+			/>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, FeatherIcon, FormControl, TabButtons } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import FeaturePanel from "../components/FeaturePanel.vue"
 import MethodNote from "../components/MethodNote.vue"
 import ProgressBar from "../components/ProgressBar.vue"
+import StatusBadge from "../components/StatusBadge.vue"
 import spaConfig from "../config"
 
-const props = defineProps({ implementation: { type: String, required: true } })
+const props = defineProps({
+	implementation: { type: String, required: true },
+	// set on …/features/<feature>: the side panel shows that feature
+	feature: { type: String, default: "" },
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -191,11 +227,15 @@ const loading = ref(false)
 const error = ref("")
 const filters = reactive({ status: "", module: "", chapter: "" })
 const expanded = reactive({})
+const openIssues = reactive({})
 const dragged = ref(null)
 const dropTarget = ref(null)
 const byMilestone = ref(false)
+const rows = []
 
-// The view is part of the URL, so a link can open the Kanban or the WBS directly.
+const selected = computed(() => props.feature || "")
+
+// The view is part of the URL, so a link can open the Kanban or the work breakdown directly.
 const view = computed({
 	get: () => (["list", "kanban", "wbs"].includes(route.query.view) ? route.query.view : "list"),
 	set: (value) => router.replace({ query: { ...route.query, view: value } }),
@@ -315,8 +355,23 @@ async function drop(status) {
 }
 
 function openFeature(name) {
-	router.push({ name: "FeatureDetail", params: { implementation: props.implementation, feature: name }, query: { view: view.value } })
+	router.push({ name: "FeatureDetail", params: { implementation: props.implementation, feature: name }, query: route.query })
 }
+
+function closeFeature() {
+	router.push({ name: "Features", params: { implementation: props.implementation }, query: route.query })
+}
+
+function focusRow(index) {
+	rows[Math.max(0, Math.min(index, filtered.value.length - 1))]?.focus()
+}
+
+// Esc closes the side panel; an open "Learn more" popover closes first (MethodNote).
+function onKey(event) {
+	if (event.key === "Escape" && selected.value && !document.querySelector("[role=dialog]")) closeFeature()
+}
+onMounted(() => document.addEventListener("keydown", onKey, true))
+onBeforeUnmount(() => document.removeEventListener("keydown", onKey, true))
 
 function issueGroups(issues) {
 	if (!byMilestone.value) return [{ label: "", issues }]
@@ -336,14 +391,5 @@ function levels(f) {
 
 function hours(value) {
 	return value ? `${value} h` : "—"
-}
-
-function statusClass(status) {
-	return {
-		Live: "bg-surface-green-2 text-ink-green-4",
-		"In Testing": "bg-surface-blue-2 text-ink-blue-3",
-		"In Progress": "bg-surface-blue-1 text-ink-blue-3",
-		Dropped: "bg-surface-gray-2 text-ink-gray-5 line-through",
-	}[status] || "bg-surface-gray-2 text-ink-gray-7"
 }
 </script>

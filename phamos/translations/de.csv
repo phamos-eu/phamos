@@ -2448,10 +2448,6 @@ All chapters,Alle Kapitel
 Effort,Aufwand
 No features here yet.,Hier gibt es noch keine Features.
 {0} of {1} agreed,{0} von {1} vereinbart
-{0} of {1} issues open,{0} von {1} Issues offen
-waiting {0} days,wartet seit {0} Tagen
-{0} h worked,{0} h gearbeitet
-"{0} features are in progress, {1} were agreed. Finish one before starting the next.","{0} Features sind in Arbeit, vereinbart waren {1}. Schließen Sie eines ab, bevor das nächste beginnt."
 Group issues by GitLab milestone,Issues nach GitLab-Meilenstein gruppieren
 Weighted by estimated hours ({0} h in total).,Gewichtet nach geschätzten Stunden ({0} h insgesamt).
 "No hours estimated yet, so every feature counts the same.","Noch keine Stunden geschätzt, daher zählt jedes Feature gleich."
@@ -2474,7 +2470,6 @@ Could not load the work breakdown,Der Projektstrukturplan konnte nicht geladen w
 Drop {0}? After the baseline the customer confirms this as a scope change.,{0} streichen? Nach der Planungsbasis bestätigt der Kunde das als Umfangsänderung.
 Could not move the feature,Das Feature konnte nicht verschoben werden
 Without milestone,Ohne Meilenstein
-Back to the features,Zurück zu den Features
 Level (current / target),Stufe (aktuell / Ziel)
 Not written yet.,Noch nicht geschrieben.
 Agreed on {0} with {1},Vereinbart am {0} mit {1}
@@ -2484,7 +2479,6 @@ Not agreed yet,Noch nicht vereinbart
 "When the text changes, the agreement starts again: the customer confirms the new version.","Ändert sich der Text, beginnt die Vereinbarung neu: Der Kunde bestätigt die neue Fassung."
 In GitLab,In GitLab
 No GitLab issues linked yet.,Noch keine GitLab-Issues verknüpft.
-{0} h estimated,{0} h geschätzt
 What we build,Was wir bauen
 level {0},Stufe {0}
 Could not load the feature,Das Feature konnte nicht geladen werden
@@ -2493,3 +2487,8 @@ Milestones,Meilensteine
 Contact & Team,Kontakt & Team
 Only phamos staff can move features.,Nur phamos-Mitarbeitende können Features verschieben.
 This feature does not belong to the implementation.,Dieses Feature gehört nicht zu der Implementierung.
+In progress: {0} of {1} agreed,In Arbeit: {0} von {1} vereinbart
+{0}/{1} open,{0}/{1} offen
+{0} d waiting,wartet {0} T
+Show issues,Issues zeigen
+Close (Esc),Schließen (Esc)

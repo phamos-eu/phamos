@@ -11,7 +11,6 @@ import Issues from "./views/Issues.vue"
 import IssueDetail from "./views/IssueDetail.vue"
 import Links from "./views/Links.vue"
 import Features from "./views/Features.vue"
-import FeatureDetail from "./views/FeatureDetail.vue"
 import NoImplementation from "./views/NoImplementation.vue"
 
 // Every page belongs to one implementation, so it is part of the URL: links into the cockpit
@@ -40,7 +39,8 @@ const router = createRouter({
 		{ path: "/:implementation/links", name: "Links", component: Links, props: true },
 		// Features as list, Kanban and work breakdown (#1972)
 		{ path: "/:implementation/features", name: "Features", component: Features, props: true },
-		{ path: "/:implementation/features/:feature", name: "FeatureDetail", component: FeatureDetail, props: true },
+		// a feature opens in the side panel of the Features page, so the list or board stays in view
+		{ path: "/:implementation/features/:feature", name: "FeatureDetail", component: Features, props: true },
 		...sections.map((s) => ({
 			path: `/:implementation/${s.path}`,
 			name: s.name,
