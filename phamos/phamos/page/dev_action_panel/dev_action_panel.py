@@ -6,7 +6,7 @@ from phamos.phamos.timesheet_utils import (
     billable_seconds_term,
     billing_context,
     percent_billable_or_preset,
-    percent_billable_preset,
+    project_percent_billable_preset,
 )
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from phamos.gitlab_integration.issue_refs import issue_created_during, link_gitlab_issues
@@ -607,6 +607,7 @@ def get_dev_my_projects():
             Project.status,
             Project.percent_billable,
             Project.customer,
+            Project.custom_is_internal_project,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
         )
         .distinct()
@@ -642,6 +643,7 @@ def get_dev_all_projects():
             Project.status,
             Project.percent_billable,
             Project.customer,
+            Project.custom_is_internal_project,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
         )
@@ -865,7 +867,7 @@ def _enrich_projects(projects, user):
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
         p["last_used"] = ts.get("last_used")
-        p["percent_billable"] = percent_billable_preset(p.get("percent_billable"))
+        p["percent_billable"] = project_percent_billable_preset(p)
 
     return projects
 

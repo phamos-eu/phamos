@@ -101,9 +101,55 @@ class TestDevActionPanelBilling(_DapTestCase):
 			{self.billable: "75", self.internal: "75", self.no_implementation: "0"},
 		)
 
-	def test_new_project_and_timesheet_record_default_to_zero_percent_billable(self):
-		self.assertEqual(frappe.new_doc("Project").percent_billable, "0")
+	def test_new_project_leaves_percent_billable_to_the_rule(self):
+		# Empty on a new project, so the customer / internal rule decides (#1896).
+		self.assertFalse(frappe.new_doc("Project").percent_billable)
 		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
+
+	def _customer(self):
+		name = "DAP Billing Customer"
+		if not frappe.db.exists("Customer", name):
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": name,
+					"customer_type": "Company",
+					"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}) or "All Customer Groups",
+					"territory": frappe.db.get_value("Territory", {"is_group": 0}) or "All Territories",
+				}
+			).insert(ignore_permissions=True)
+		return name
+
+	def test_customer_project_without_percent_billable_presets_100_internal_0(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		customer_project = self._project("DAP Customer", percent_billable="", customer=customer)
+		internal = self._project("DAP Own", percent_billable="", customer=customer, custom_is_internal_project=1)
+		no_customer = self._project("DAP Own", percent_billable="")
+		self.assertEqual(billing_context(customer_project), {"percent_billable": "100"})
+		self.assertEqual(billing_context(internal), {"percent_billable": "0"})
+		self.assertEqual(billing_context(no_customer), {"percent_billable": "0"})
+		for project in (customer_project, internal, no_customer):
+			self._assign(project)
+		rows = {p["name"]: p["percent_billable"] for p in self._as_user(dap.get_dev_all_projects)}
+		self.assertEqual(
+			(rows[customer_project], rows[internal], rows[no_customer]), ("100", "0", "0")
+		)
+
+	def test_project_value_wins_over_the_customer_rule(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		zero = self._project("DAP Customer", percent_billable="0", customer=customer)
+		half = self._project("DAP Own", percent_billable="50", custom_is_internal_project=1)
+		self.assertEqual(billing_context(zero), {"percent_billable": "0"})
+		self.assertEqual(billing_context(half), {"percent_billable": "50"})
+
+	def test_customer_project_timer_starts_at_100(self):
+		project = self._project("DAP Customer", percent_billable="", customer=self._customer())
+		started = self._as_user(dap.start_project_timer, project, 3600, "Customer work")
+		self.assertEqual(frappe.db.get_value("Timesheet Record", started["name"], "percent_billable"), "100")
 
 	def test_project_without_percent_billable_presets_zero_everywhere(self):
 		from phamos.api import personal_timer
