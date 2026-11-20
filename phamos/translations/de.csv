@@ -2190,7 +2190,7 @@ No people found,Keine Personen gefunden
 Remove {0},{0} entfernen
 Until,Bis
 No department,Keine Abteilung
-Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.
+Pick a mailbox with a Mailcow calendar to send the invite.,"Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden."
 Party Accounts,Personenkonten
 Party Account Settings,Personenkonten-Einstellungen
 Party Account Setting,Personenkonten-Einstellung
@@ -2231,7 +2231,7 @@ Row #{0}: Account {1} does not exist.,Zeile #{0}: Das Konto {1} existiert nicht.
 Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
 Remove everyone in {0},Alle aus {0} entfernen
 The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
-Choose how often the appointment repeats,Bitte wählen, wie oft sich der Termin wiederholt
+Choose how often the appointment repeats,"Bitte wählen, wie oft sich der Termin wiederholt"
 Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
 "The start is the first appointment. After it, the appointment repeats on the ticked days.","Der Start ist der erste Termin. Danach wiederholt sich der Termin an den ausgewählten Tagen."
 Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
@@ -2260,7 +2260,7 @@ E-mails are already being fetched,E-Mails werden bereits abgerufen
 No e-mail account,Kein E-Mail-Konto
 No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
 Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
-The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern.
+The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,"Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern."
 "The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
 Implementation Feature,Implementierungsfeature
 Implementation Features,Implementierungsfeatures
@@ -2501,3 +2501,20 @@ Answer,Antwort
 "Answer the question in the first sentence; details after it.","Beantworten Sie die Frage im ersten Satz; Einzelheiten danach."
 "Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.","Fragen und Antworten unten auf der Seite, zugeklappt. Eine Seite zeigt nur die Zeilen in ihrer eigenen Sprache; ohne Zeilen keine FAQ. Auch auf anonymen Seiten sichtbar: Nennen Sie niemanden, der nicht namentlich veröffentlicht ist."
 "One question and answer of a Web Profile page in one language (phamos/phamos#1823).","Eine Frage mit Antwort einer Web-Profil-Seite in einer Sprache (phamos/phamos#1823)."
+Use {0} as an app,{0} als App nutzen
+"Install it once and it opens in its own window, from the Dock or taskbar, without searching for a browser tab.","Einmal installiert, öffnet es sich in einem eigenen Fenster, aus dem Dock oder der Taskleiste, ohne Suche nach einem Browser-Tab."
+Your browser can do it with one click.,Ihr Browser erledigt das mit einem Klick.
+"Click the install icon at the right end of the address bar, or open the ⋮ menu.","Klicken Sie auf das Installations-Symbol rechts in der Adressleiste oder öffnen Sie das ⋮-Menü."
+"Choose “Cast, save and share” → “Install page as app”.","Wählen Sie „Streamen, speichern und teilen“ → „Seite als App installieren“."
+"Click the install icon at the right end of the address bar, or open the … menu.","Klicken Sie auf das Installations-Symbol rechts in der Adressleiste oder öffnen Sie das …-Menü."
+Choose “Apps” → “Install this site as an app”.,Wählen Sie „Apps“ → „Diese Website als App installieren“.
+Choose File → Add to Dock in the menu bar.,Wählen Sie in der Menüleiste Ablage → Zum Dock hinzufügen.
+Confirm with “Add”.,Bestätigen Sie mit „Hinzufügen“.
+"Firefox can't install web apps. Open the cockpit in Chrome, Edge or Safari to install it.","Firefox kann keine Web-Apps installieren. Öffnen Sie das Cockpit in Chrome, Edge oder Safari, um es zu installieren."
+Look for “Install” or “Add to Dock” in your browser's menu.,Suchen Sie im Menü Ihres Browsers nach „Installieren“ oder „Zum Dock hinzufügen“.
+"If the entry is missing, the app may already be installed: look for it in your apps.","Fehlt der Eintrag, ist die App vielleicht schon installiert: Schauen Sie in Ihren Apps nach."
+Install,Installieren
+Later,Später
+Don't show again,Nicht mehr anzeigen
+Install as app,Als App installieren
+this cockpit,dieses Cockpit

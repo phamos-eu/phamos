@@ -23,6 +23,8 @@
 		</div>
 		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
+		<!-- How to install this cockpit as a desktop app, on the first visits (#1998). -->
+		<InstallAppDialog />
 		<!-- The cockpit colour glowing in from the chosen window edges (#1933); never catches clicks. -->
 		<div v-if="glow" aria-hidden="true" class="cockpit-glow" :style="glow.style">
 			<div
@@ -58,6 +60,7 @@ import { onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
+import InstallAppDialog from "@spa/components/InstallAppDialog.vue"
 import { mountPhriend } from "@spa/phriend.js"
 import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
 
