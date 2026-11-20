@@ -10,6 +10,7 @@ import CalendarView from "./components/CalendarView.vue";
 import TimesheetList from "./components/TimesheetList.vue";
 import ProjectsView from "./components/ProjectsView.vue";
 import ProjectCard from "./components/ProjectCard.vue";
+import SessionStopModal from "./components/SessionStopModal.vue";
 import { ratingArgs } from "./timesheetRating.js";
 
 const issues = ref([]);
@@ -95,6 +96,17 @@ const activeProjectRow = computed(() => {
 function openRunningSession() {
   if (activeProjectSession.value) currentView.value = "projects";
   else if (activeSession.value) currentView.value = "issues";
+}
+
+// Sidebar session widget: pause / resume / stop the running timesheet from any view.
+// The project session wins when both exist, same as the widget shows.
+const showSessionStop = ref(false);
+function onSidebarPause() { return activeProjectSession.value ? onPauseProjectTimer() : onPause(); }
+function onSidebarResume() { return activeProjectSession.value ? onResumeProjectTimer() : onResume(); }
+async function onSidebarStopConfirm(payload) {
+  showSessionStop.value = false;
+  if (activeProjectSession.value) await onStopProjectTimer(payload);
+  else if (activeSession.value) await onStop(payload);
 }
 
 // Timer
@@ -410,6 +422,13 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
     @skip="onBreakSkip"
     @close="onBreakModalClose"
   />
+  <SessionStopModal
+    v-if="showSessionStop && (activeProjectSession || activeSession)"
+    :session="activeProjectSession || activeSession"
+    :is-project="!!activeProjectSession"
+    @confirm="onSidebarStopConfirm"
+    @cancel="showSessionStop = false"
+  />
 
   <div class="dc-root">
     <!-- Top bar: hamburger + title -->
@@ -445,6 +464,9 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @sync="onSync"
           @navigate-projects="currentView = 'projects'"
           @open-session="openRunningSession"
+          @pause-session="onSidebarPause"
+          @resume-session="onSidebarResume"
+          @stop-session="showSessionStop = true"
         />
       </aside>
 

@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("Customer", {
     refresh(frm) {
+        phamos.party_account.setup_button(frm); // "Create Debtor Account" (#1529)
         render_gitlab_groups_section(frm);
         render_gitlab_projects_section(frm);
         render_gitlab_issues_section(frm);

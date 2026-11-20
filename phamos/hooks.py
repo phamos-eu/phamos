@@ -144,7 +144,9 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
-    "Customer": "public/js/customer.js",
+    # party_account.js before customer.js / supplier.js: they call phamos.party_account (#1529)
+    "Customer": ["public/js/party_account.js", "public/js/customer.js"],
+    "Supplier": ["public/js/party_account.js", "public/js/supplier.js"],
     "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 
@@ -481,16 +483,31 @@ doc_events = {
         "before_validate": "phamos.marketing.crm.lead_set_direction",
     },
     "Customer": {
+        # Debtor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
         "on_update": [
             "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer",
             "phamos.web_profile.mirror.push_to_profiles",
         ]
     },
+    # a published GitLab Release sets the planned Implementation Release to Released (#1986)
+    "GitLab Release": {
+        "on_update": "phamos.phamos.doctype.implementation_release.implementation_release.link_published_release",
+    },
     "Implementation": {
         "on_update": [
             "phamos.phamos.doctype.timesheet_record.timesheet_record.sync_implementation_time_limit_summary_on_save",
             "phamos.web_profile.mirror.push_to_profiles",
+            # direct edits of agreed plan values wait for the customer's confirmation (#1971)
+            "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
         ],
+    },
+    "Implementation Release": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+    },
+    "Implementation Feature": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",
     },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
     "Employee": {
@@ -501,7 +518,11 @@ doc_events = {
         ]
     },
     "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Supplier": {
+        # Creditor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
+        "on_update": "phamos.web_profile.mirror.push_to_profiles",
+    },
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Department": {
@@ -580,6 +601,8 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
+        # Implementation Release: capacity shrinks every day, leave changes (#1986)
+        "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
@@ -647,6 +670,7 @@ override_doctype_dashboards = {
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
+    "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled

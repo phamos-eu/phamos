@@ -215,7 +215,7 @@ jobs:
         done
 
         echo "Running Accounting Cockpit (statistics, receivables) tests..."
-        for module in test_accounting_stats test_accounting_receivables; do
+        for module in test_accounting_stats test_accounting_receivables test_party_account test_party_account_settings; do
           bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
         done
 

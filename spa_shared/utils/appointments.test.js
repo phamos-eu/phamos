@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, weeklyDays } from "./appointments.js"
+import { listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, startOutsideWeeklyDays, weeklyDays } from "./appointments.js"
 
 const day = (iso) => parseDateTime(iso)
 const starts = (list) =>
@@ -62,6 +62,41 @@ describe("appointment occurrences", () => {
 	it("ignores the repeat options when repeat is off or unknown", () => {
 		const a = appt({ repeat_this_event: 0, repeat_on: "Daily" })
 		expect(occurrencesBetween(a, day("2026-11-01"), day("2026-12-31"))).toHaveLength(1)
+	})
+})
+
+describe("weekly repeat whose start is not on a ticked weekday", () => {
+	// the start, 2026-12-01, is a Tuesday
+	const weekly = (extra = {}) => appt({ repeat_this_event: 1, repeat_on: "Weekly", ...extra })
+
+	it("starts on the chosen day, then continues on the ticked weekdays", () => {
+		const a = weekly({ monday: 1, thursday: 1, repeat_till: "2026-12-10" })
+		expect(starts(occurrencesBetween(a, day("2026-11-01"), day("2026-12-31")))).toEqual([
+			"2026-12-01",
+			"2026-12-03",
+			"2026-12-07",
+			"2026-12-10",
+		])
+		expect(startOutsideWeeklyDays(a)).toBe(true)
+	})
+
+	it("is the next appointment until it has passed", () => {
+		const a = weekly({ monday: 1 })
+		expect(starts([nextOccurrence(a, day("2026-11-30 12:00:00"))])).toEqual(["2026-12-01"])
+		expect(starts([nextOccurrence(a, day("2026-12-01 12:00:00"))])).toEqual(["2026-12-07"])
+	})
+
+	it("adds nothing when the start's weekday is ticked, none is ticked, or the repeat is not weekly", () => {
+		expect(startOutsideWeeklyDays(weekly({ tuesday: 1, thursday: 1 }))).toBe(false)
+		expect(startOutsideWeeklyDays(weekly())).toBe(false)
+		expect(startOutsideWeeklyDays(appt({ repeat_this_event: 1, repeat_on: "Daily", monday: 1 }))).toBe(false)
+		expect(startOutsideWeeklyDays(appt({ repeat_on: "Weekly", monday: 1 }))).toBe(false)
+		const ticked = weekly({ tuesday: 1, thursday: 1, repeat_till: "2026-12-08" })
+		expect(starts(occurrencesBetween(ticked, day("2026-11-01"), day("2026-12-31")))).toEqual([
+			"2026-12-01",
+			"2026-12-03",
+			"2026-12-08",
+		])
 	})
 })
 

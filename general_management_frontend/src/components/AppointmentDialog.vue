@@ -40,6 +40,10 @@
 								{{ __(DAY_LABELS[i]) }}
 							</button>
 						</div>
+						<!-- The start's weekday isn't ticked: the start is an extra first appointment. -->
+						<div v-if="startOutsideDays" class="text-xs text-ink-gray-5" role="status">
+							{{ __("The start is the first appointment. After it, the appointment repeats on the ticked days.") }}
+						</div>
 					</div>
 				</div>
 
@@ -86,7 +90,7 @@ import { computed, ref, watch } from "vue"
 import { Button, call, Dialog, ErrorMessage, FormControl } from "frappe-ui"
 import AttendeePicker from "@spa/components/AttendeePicker.vue"
 import { normalizeAttendees } from "@spa/utils/attendeePicker.js"
-import { WEEKDAYS } from "@spa/utils/appointments.js"
+import { startOutsideWeeklyDays, WEEKDAYS } from "@spa/utils/appointments.js"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
@@ -138,6 +142,8 @@ const dialogOptions = computed(() => ({
 /** "2026-12-01 10:00:00" <-> "2026-12-01T10:00" for datetime-local inputs. */
 const toInput = (value) => (value ? String(value).replace(" ", "T").slice(0, 16) : "")
 const fromInput = (value) => (value ? `${value.replace("T", " ")}:00`.slice(0, 19) : "")
+
+const startOutsideDays = computed(() => startOutsideWeeklyDays({ ...form.value, start: fromInput(form.value.start) }))
 
 function reset() {
 	const a = props.appointment || {}
