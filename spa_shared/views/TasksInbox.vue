@@ -25,6 +25,7 @@
 				@select="openTask"
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
+				@dependency-remove="onGanttDependencyRemove"
 				@created="onTaskCreated"
 			>
 				<template #toolbar><slot name="gantt-toolbar" /></template>
@@ -61,6 +62,7 @@ import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import spaConfig from "@/config"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { __ } from "@spa/utils/i18n.js"
 
 const API = spaConfig.api
 
@@ -156,19 +158,33 @@ async function onGanttDateChange({ name, exp_start_date, exp_end_date }) {
 	}
 }
 
-async function onGanttDependencyChange({ name, depends_on }) {
+// Drag-to-link and the arrow popover on the Gantt (#2001); the panel's "Depends on" uses the same calls.
+async function saveGanttDependency(method, { name, depends_on }, done, failed) {
 	try {
-		const updated = await call(`${API}.add_task_dependency`, { name, depends_on })
+		const updated = await call(`${API}.${method}`, { name, depends_on })
 		await loadTasks()
 		if (selectedName.value === name) selectedTask.value = updated
-		toast({ title: "Dependency linked", icon: "check-circle", iconClasses: "text-ink-green-4" })
+		toast({ title: done, icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
 		toast({
-			title: e?.messages?.[0] || e?.message || "Could not link tasks",
+			title: e?.messages?.[0] || e?.message || failed,
 			icon: "x-circle",
 			iconClasses: "text-ink-red-4",
 		})
 	}
+}
+
+function onGanttDependencyChange(link) {
+	return saveGanttDependency("add_task_dependency", link, __("Dependency linked"), __("Could not link tasks"))
+}
+
+function onGanttDependencyRemove(link) {
+	return saveGanttDependency(
+		"remove_task_dependency",
+		link,
+		__("Dependency removed"),
+		__("Could not remove the dependency")
+	)
 }
 
 async function onTaskCreated(name) {
