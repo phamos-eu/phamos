@@ -390,6 +390,20 @@ def add_task_dependency(name, depends_on):
 	return dc.add_task_dependency(CONFIG, name, depends_on)
 
 
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+@_require_access
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
+
+
 # --- Company view: "All departments" on the Tasks Gantt (#1948) ---------------------------------
 
 # Cap per department, like department_cockpit.get_tasks.
