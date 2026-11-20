@@ -319,7 +319,7 @@ const NOTES = {
 const note = computed(() => NOTES[view.value])
 
 let requestId = 0
-watch(() => props.implementation, load, { immediate: true })
+watch(() => props.implementation, () => load(), { immediate: true })
 watch(view, (value) => value === "wbs" && !wbs.value && loadWbs())
 
 async function load({ quiet = false } = {}) {
