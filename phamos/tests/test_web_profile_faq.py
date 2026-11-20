@@ -85,10 +85,11 @@ class TestWebProfileFaq(FrappeTestCase):
 		self.assertIsNone(faq_schema(faqs))
 
 	def test_rows_without_answer_text_are_left_out(self):
-		frappe.db.set_value("Web Profile FAQ", {"parent": self.industry.name, "question": "What does it cost?"},
-			"answer", "<p><br></p>")
-		faqs = self._profile("industries", self.industry.route, "en")["faqs"]
-		self.assertEqual([f.question for f in faqs], ["How long does it take?"])
+		for empty in ("<p><br></p>", "<p>&nbsp;</p>", "<p>\u00a0 </p>"):
+			frappe.db.set_value("Web Profile FAQ", {"parent": self.industry.name, "question": "What does it cost?"},
+				"answer", empty)
+			faqs = self._profile("industries", self.industry.route, "en")["faqs"]
+			self.assertEqual([f.question for f in faqs], ["How long does it take?"], empty)
 
 	def test_faq_schema_has_every_question_and_answer(self):
 		schema = faq_schema(self._profile("industries", self.industry.route, "en")["faqs"])

@@ -8,6 +8,7 @@ Privacy is applied here, once, before anything reaches a template: anonymous alu
 unapproved customers never carry a name, photo or named URL in their item.
 """
 
+import html
 import re
 from datetime import date
 
@@ -1112,7 +1113,12 @@ def faqs(item, lang):
 		return []
 	rows = frappe.get_all("Web Profile FAQ", filters={"parenttype": doctype, "parentfield": "faqs",
 		"parent": item.name, "language": lang}, fields=["question", "answer"], order_by="idx asc")
-	return [r for r in rows if (r.question or "").strip() and strip_html(r.answer or "").strip()]
+	return [r for r in rows if (r.question or "").strip() and _has_text(r.answer)]
+
+
+def _has_text(html_value):
+	"""True when the HTML shows any text: an editor's "<p>&nbsp;</p>" or "<p><br></p>" counts as empty."""
+	return bool(html.unescape(strip_html(html_value or "")).replace("\u00a0", " ").strip())
 
 
 def _dedupe(item, profile):
