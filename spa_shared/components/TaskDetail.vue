@@ -180,6 +180,8 @@
 				<ErrorMessage :message="fieldError" />
 			</section>
 
+			<TaskDependencies :task="task" :api="API" @updated="(t) => emit('updated', t)" />
+
 			<section v-if="task.issue">
 				<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 					From Issue
@@ -247,6 +249,7 @@ import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
 import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
 import { showTeamField, teamFieldLocked, teamOptions } from "@spa/utils/teamField.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import TaskDependencies from "@spa/components/TaskDependencies.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import spaConfig from "@/config"
