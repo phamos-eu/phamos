@@ -2493,3 +2493,11 @@ In progress: {0} of {1} agreed,In Arbeit: {0} von {1} vereinbart
 Show issues,Issues zeigen
 Close (Esc),Schließen (Esc)
 Worked,Gearbeitet
+Frequently asked questions,Häufige Fragen
+FAQ,FAQ
+Web Profile FAQ,Web-Profil-FAQ
+Answer,Antwort
+"As a visitor would ask it, in this language.","So, wie Besucherinnen und Besucher sie stellen würden, in dieser Sprache."
+"Answer the question in the first sentence; details after it.","Beantworten Sie die Frage im ersten Satz; Einzelheiten danach."
+"Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.","Fragen und Antworten unten auf der Seite, zugeklappt. Eine Seite zeigt nur die Zeilen in ihrer eigenen Sprache; ohne Zeilen keine FAQ. Auch auf anonymen Seiten sichtbar: Nennen Sie niemanden, der nicht namentlich veröffentlicht ist."
+"One question and answer of a Web Profile page in one language (phamos/phamos#1823).","Eine Frage mit Antwort einer Web-Profil-Seite in einer Sprache (phamos/phamos#1823)."
