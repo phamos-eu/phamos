@@ -83,9 +83,12 @@ export function writeState(storage, key, state) {
  * @param {boolean} env.installed the page runs in the installed app window
  * @param {number} env.width the window's inner width
  * @param {{shown: number, dismissed: boolean}} env.state from readState()
+ * @param {string} [env.family] from browserFamily(); Firefox can't install web apps, so it gets no
+ *   popup by itself (the sidebar's "Install as app" still explains it)
  */
-export function shouldShowHint({ installed, width, state }) {
+export function shouldShowHint({ installed, width, state, family }) {
 	if (installed) return false
+	if (family === "firefox") return false
 	if (width < MIN_WIDTH) return false
 	if (state.dismissed) return false
 	return state.shown < MAX_SHOWS

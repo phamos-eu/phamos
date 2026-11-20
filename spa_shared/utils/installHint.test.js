@@ -52,6 +52,11 @@ describe("install hint: when it shows", () => {
 		expect(shouldShowHint({ installed: false, width: 390, state: fresh })).toBe(false)
 	})
 
+	it("doesn't open by itself in Firefox, which can't install web apps", () => {
+		expect(shouldShowHint({ installed: false, width: 1440, state: fresh, family: "firefox" })).toBe(false)
+		expect(shouldShowHint({ installed: false, width: 1440, state: fresh, family: "safari" })).toBe(true)
+	})
+
 	it("stays away after “Don't show again” and after the last “Later”", () => {
 		expect(shouldShowHint({ installed: false, width: 1440, state: { shown: 1, dismissed: true } })).toBe(false)
 		expect(shouldShowHint({ installed: false, width: 1440, state: { shown: MAX_SHOWS - 1, dismissed: false } })).toBe(true)

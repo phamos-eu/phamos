@@ -114,9 +114,11 @@ async function loadManifest() {
 	try {
 		const manifest = await (await fetch(href, { credentials: "same-origin" })).json()
 		if (manifest.name) appName.value = manifest.name
-		if (manifest.id) key.value = storageKey(manifest.id)
+		// Relative paths in a manifest resolve against the manifest's URL, not the page's.
+		if (manifest.id) key.value = storageKey(new URL(manifest.id, href).pathname)
 		const best = (manifest.icons || []).find((i) => i.sizes === "192x192" && i.purpose !== "maskable")
-		icon.value = (best || manifest.icons?.[0])?.src || ""
+		const src = (best || manifest.icons?.[0])?.src
+		icon.value = src ? new URL(src, href).href : ""
 	} catch (e) {
 		/* the hint still works with the page title */
 	}
@@ -130,9 +132,11 @@ watch(
 onMounted(async () => {
 	await loadManifest()
 	const state = readState(storage(), key.value)
-	if (!shouldShowHint({ installed: !canOfferInstall(), width: window.innerWidth, state })) return
+	if (!shouldShowHint({ installed: !canOfferInstall(), width: window.innerWidth, state, family })) return
 	timer = setTimeout(() => {
-		if (installApp.open) return
+		// Once per page load at most, even if the shell were ever mounted again.
+		if (installApp.open || installApp.autoShown) return
+		installApp.autoShown = true
 		automatic.value = true
 		installApp.open = true
 		writeState(storage(), key.value, { ...state, shown: state.shown + 1 })

@@ -17,6 +17,8 @@ export const installApp = reactive({
 	installed: false,
 	/** The dialog is open. */
 	open: false,
+	/** The dialog already opened by itself during this page load. */
+	autoShown: false,
 })
 
 if (typeof window !== "undefined") {
