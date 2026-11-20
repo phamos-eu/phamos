@@ -303,6 +303,18 @@ def add_task_dependency(name, depends_on):
 	return dc.add_task_dependency(CONFIG, name, depends_on)
 
 
+@frappe.whitelist(methods=["POST"])
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
+
+
 def _require_implementation_read():
 	frappe.has_permission("Implementation", "read", throw=True)
 
