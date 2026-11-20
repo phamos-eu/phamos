@@ -197,14 +197,14 @@
    "label": "Profile Image"
   },
   {
-   "description": "Every consent is stored with its date. Without publication consent an external person cannot be published.",
+   "description": "Every consent is stored with its date. Without publication consent an external person cannot be published, nor an employee unless by HR.",
    "fieldname": "consent_section",
    "fieldtype": "Section Break",
    "label": "Consent"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.party_type && doc.party_type!='Employee'",
+   "depends_on": "party_type",
    "fieldname": "publication_consent",
    "fieldtype": "Check",
    "label": "Consents to Public Profile"
@@ -340,7 +340,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-11-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Person Web Profile",
