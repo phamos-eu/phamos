@@ -1,44 +1,49 @@
 <template>
 	<!-- Sales Orders: the /timesheet "Sales Orders" tab for the open implementation (hours only). -->
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-5">
+	<!-- Full height, no page scrolling: figures and the ordered-hours bar in one band, the table
+	     scrolls inside its frame with its filters and footer in view. -->
+	<div class="flex h-full min-h-0 flex-col gap-2 bg-surface-gray-1 p-4">
+		<div class="flex min-h-0 flex-1 flex-col gap-2">
+			<div class="flex flex-wrap items-center gap-2">
+				<h1 class="mr-2 text-lg font-semibold text-ink-gray-9">{{ __("Budget") }}</h1>
+				<FormControl v-model="search" type="text" size="sm" :placeholder="__('Search')" class="w-48" />
+				<FormControl v-model="status" type="select" size="sm" class="w-44" :options="statusOptions" :aria-label="__('Status')" />
+				<Button v-if="search || status" variant="ghost" size="sm" @click="clearFilters">{{ __("Reset filters") }}</Button>
+			</div>
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
 				{{ error }}
 			</div>
 
-			<section class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-				<StatCard
-					:label="__('Ordered')"
-					:value="hours(summary?.total_so_hrs)"
-					:hint="summary ? __('{0} sales orders, {1} open', [summary.total_so_count, summary.open_so_count]) : ''"
-				/>
-				<StatCard :label="__('Delivered')" :value="hours(summary?.delivered_hrs)" :hint="__('on delivery notes')" />
-				<StatCard :label="__('Booked, not yet delivered')" :value="hours(summary?.timesheet_hrs)" :hint="__('billable timesheet hours')" />
-				<StatCard :label="__('Remaining')" :value="hours(summary?.remaining_hrs)" :hint="__('ordered minus delivered and booked')" />
-			</section>
+			<KpiStrip
+				:items="[
+					{
+						label: __('Ordered'),
+						value: hours(summary?.total_so_hrs),
+						hint: summary ? __('{0} sales orders, {1} open', [summary.total_so_count, summary.open_so_count]) : '',
+					},
+					{ label: __('Delivered'), value: hours(summary?.delivered_hrs), hint: __('on delivery notes') },
+					{ label: __('Booked, not yet delivered'), value: hours(summary?.timesheet_hrs), hint: __('billable timesheet hours') },
+					{ label: __('Remaining'), value: hours(summary?.remaining_hrs), hint: __('ordered minus delivered and booked') },
+				]"
+			/>
 
-			<section v-if="summary && summary.total_so_hrs > 0" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
-				<div class="text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Ordered hours") }}</div>
-				<div class="mt-3 flex h-3 overflow-hidden rounded-full bg-surface-gray-2" role="img" :aria-label="barLabel">
+			<section v-if="summary && summary.total_so_hrs > 0" class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2">
+				<div class="text-xs text-ink-gray-5">{{ __("Ordered hours") }}</div>
+				<div class="flex h-2.5 min-w-[12rem] flex-1 overflow-hidden rounded-full bg-surface-gray-2" role="img" :aria-label="barLabel">
 					<div :style="{ width: share(summary.delivered_hrs), background: 'var(--ink-blue-3)' }" />
 					<div :style="{ width: share(summary.timesheet_hrs), background: 'var(--ink-amber-3)' }" />
 				</div>
-				<div class="mt-2 flex flex-wrap gap-4 text-xs text-ink-gray-6">
+				<div class="flex flex-wrap gap-3 text-xs text-ink-gray-6">
 					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background: var(--ink-blue-3)" />{{ __("Delivered") }}</span>
 					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background: var(--ink-amber-3)" />{{ __("Booked, not yet delivered") }}</span>
 					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-surface-gray-3" />{{ __("Remaining") }}</span>
 				</div>
 			</section>
 
-			<section class="overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
-				<div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-2 px-4 py-2.5">
-					<FormControl v-model="search" type="text" size="sm" :placeholder="__('Search')" class="w-56" />
-					<FormControl v-model="status" type="select" size="sm" class="w-48" :options="statusOptions" />
-					<Button v-if="search || status" variant="ghost" size="sm" @click="clearFilters">{{ __("Reset filters") }}</Button>
-				</div>
-				<div class="overflow-x-auto">
+			<section class="flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
+				<div class="min-h-0 flex-1 overflow-auto">
 					<div class="min-w-[880px]">
-						<div :class="[GRID, 'border-b border-outline-gray-2 bg-surface-gray-1 py-2 text-xs font-medium text-ink-gray-5']">
+						<div :class="[GRID, 'sticky top-0 z-10 border-b border-outline-gray-2 bg-surface-gray-1 py-1.5 text-xs font-medium text-ink-gray-5']">
 							<button
 								v-for="col in COLUMNS"
 								:key="col.key"
@@ -54,7 +59,7 @@
 						<div
 							v-for="so in visible"
 							:key="so.name"
-							:class="[GRID, 'border-b border-outline-gray-1 py-2.5 text-sm hover:bg-surface-gray-1']"
+							:class="[GRID, 'border-b border-outline-gray-1 py-1.5 text-sm hover:bg-surface-gray-1']"
 						>
 							<span class="truncate text-xs font-semibold text-ink-gray-6">{{ so.name }}</span>
 							<span class="tabular-nums text-ink-gray-7">{{ date(so.transaction_date) }}</span>
@@ -80,7 +85,7 @@
 						<div v-if="loading" class="px-4 py-8 text-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 					</div>
 				</div>
-				<div class="flex items-center gap-3 border-t border-outline-gray-2 px-4 py-2.5 text-xs text-ink-gray-6">
+				<div class="flex items-center gap-3 border-t border-outline-gray-2 px-4 py-1.5 text-xs text-ink-gray-6">
 					<span>{{ __("Showing {0} of {1}", [visible.length, filtered.length]) }}</span>
 					<Button v-if="visible.length < filtered.length" class="ml-auto" size="sm" @click="limit += PAGE">{{ __("Load more") }}</Button>
 				</div>
@@ -93,7 +98,7 @@
 import { computed, ref, watch } from "vue"
 import dayjs from "dayjs"
 import { call } from "frappe-ui"
-import StatCard from "@spa/components/dashboard/StatCard.vue"
+import KpiStrip from "../components/KpiStrip.vue"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "../config"
 

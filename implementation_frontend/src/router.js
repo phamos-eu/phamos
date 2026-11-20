@@ -8,7 +8,6 @@ import ComingSoon from "./views/ComingSoon.vue"
 import Timesheets from "./views/Timesheets.vue"
 import SalesOrders from "./views/SalesOrders.vue"
 import Issues from "./views/Issues.vue"
-import IssueDetail from "./views/IssueDetail.vue"
 import Links from "./views/Links.vue"
 import Features from "./views/Features.vue"
 import NoImplementation from "./views/NoImplementation.vue"
@@ -32,7 +31,7 @@ const router = createRouter({
 		{ path: "/:implementation/timesheets", name: "Timesheets", component: Timesheets, props: true },
 		// Reports made through Phriend (#1671). IssueDetail with `name` is what Phriend knows as an Issue page.
 		{ path: "/:implementation/issues", name: "Issues", component: Issues, props: true },
-		{ path: "/:implementation/issues/:name", name: "IssueDetail", component: IssueDetail, props: true },
+		{ path: "/:implementation/issues/:name", name: "IssueDetail", component: Issues, props: true },
 		// Budget (was "Sales Orders"): the ordered budget and its Sales Orders; forecast follows (#1681).
 		{ path: "/:implementation/budget", name: "Budget", component: SalesOrders, props: true },
 		{ path: "/:implementation/sales-orders", redirect: (to) => ({ name: "Budget", params: to.params }) },
