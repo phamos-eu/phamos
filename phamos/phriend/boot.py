@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import cint
 
+from phamos.phriend.quiet import state as quiet_state
 from phamos.phriend.shortcut import site_shortcut, user_shortcut
 
 
@@ -27,6 +28,7 @@ def phriend_boot():
 	if not is_for_user():
 		return None
 	settings = frappe.get_cached_doc("Phriend Settings")
+	on = features(settings)
 	# the user's own shortcut ("" when switched off) and the site's, for "Back to the default";
 	# has_target: reports go to another system, so there are none here to count
 	return {
@@ -36,12 +38,16 @@ def phriend_boot():
 		"has_target": 1 if settings.target_url else 0,
 		# "Status in the Implementation Cockpit" in the report flow (#1671)
 		"implementation_cockpit": 1 if _may_open_implementation_cockpit() else 0,
-		"features": features(settings),
+		"features": on,
+		# leave me in peace (#2010): the user's quiet time and warning mute, while the feature is on
+		"quiet": quiet_state() if on["quiet_mode"] else None,
+		# the menu links to Phriend Settings for those who may change them
+		"can_configure": 1 if frappe.has_permission("Phriend Settings", "write") else 0,
 	}
 
 
 # Phriend Settings → Features: one switch per feature (#2008); the companion slices add theirs.
-FEATURE_FIELDS = ("reactions",)
+FEATURE_FIELDS = ("reactions", "quiet_mode")
 
 
 def features(settings):
