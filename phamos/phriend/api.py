@@ -13,9 +13,10 @@ import frappe
 import requests
 from frappe import _
 from frappe.desk.form.assign_to import add as assign_to
-from frappe.utils import cstr, escape_html, get_url, pretty_date, to_markdown
+from frappe.utils import cint, cstr, escape_html, get_url, pretty_date, to_markdown
 from frappe.utils.password import get_decrypted_password
 
+from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend.boot import is_for_user
 from phamos.phriend.gitlab_issues import link_created
@@ -273,6 +274,28 @@ def set_my_shortcut(shortcut=None):
 	else:
 		frappe.defaults.set_user_default(phriend_shortcut.USER_DEFAULT, phriend_shortcut.normalize(value))
 	return phriend_shortcut.user_shortcut()
+
+
+def _check_quiet_allowed():
+	settings = _check_allowed()
+	if not cint(settings.get("quiet_mode")):
+		frappe.throw(_("Leave me in peace is switched off in Phriend Settings"), frappe.PermissionError)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_my_quiet(until=None, minutes=None):
+	"""Leave me in peace (#2010) for the current user: minutes (counted on the server), or until
+	"forever", a time in epoch ms (at most the rest of today), or empty to call Phriend back.
+	Returns the user's quiet state."""
+	_check_quiet_allowed()
+	return phriend_quiet.set_quiet(until, minutes)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_my_warning_mute(minutes=0):
+	"""Mute Phriend's red warnings for 30, 60 or 90 minutes (#2010); 0 to hear them again."""
+	_check_quiet_allowed()
+	return phriend_quiet.set_warning_mute(minutes)
 
 
 def _open_report_filters(route, ref_doctype, ref_docname):

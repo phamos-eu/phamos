@@ -10,6 +10,13 @@ describe("GESTURES (#1990, #2009)", () => {
 			"thumbs_down", "thanks", "praise", "high_five", "clap", "heart", "star", "alert"])
 			expect(GESTURES[name], name).toBeTruthy()
 	})
+	it("attaches each emoji on its own side, never mirrored (PM, 2026-11-21)", () => {
+		for (const [name, g] of Object.entries(GESTURES)) expect([undefined, "left", "right"], name).toContain(g.side)
+		expect(GESTURES.muscle.side).toBe("left")
+		expect(GESTURES.clap.side).toBe("left")
+		expect(GESTURES.point.side).toBe("right")
+		expect(ball_source).not.toMatch(/\.hand[^{]*\{[^}]*scale:\s*-1/)
+	})
 	it("gives every gesture an emoji and a motion that has its keyframe", () => {
 		for (const [name, g] of Object.entries(GESTURES)) {
 			expect(g.hand, name).toMatch(/\p{Extended_Pictographic}/u)
