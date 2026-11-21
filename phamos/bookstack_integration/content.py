@@ -21,11 +21,11 @@ from frappe.utils.html_utils import sanitize_html
 
 DOCS_ROUTE = "/de/doku"
 
-# Removed together with their content. bleach would turn them into visible text instead.
 # Attributes that make the browser fetch something; checked against the BookStack host.
 _URL_ATTRS = ("src", "poster", "background", "href", "xlink:href", "data")
 _MEDIA_TAGS = ("img", "video", "audio", "source")
 
+# Removed together with their content. bleach would turn them into visible text instead.
 _DROP_TAGS = (
 	"script", "style", "link", "meta", "iframe", "frame", "object", "embed", "noscript",
 	"form", "input", "button", "select", "textarea", "template", "base", "html", "head", "body",
