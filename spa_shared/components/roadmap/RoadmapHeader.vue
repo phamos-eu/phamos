@@ -42,15 +42,17 @@ function quarterRow(withYear) {
 	}))
 }
 
+// Month names through Intl in the user's language. The timeline's own `label` comes from dayjs,
+// whose German locale loads only after the first render, so the header would stay English.
 function monthRow(short) {
-	const fmt = short ? new Intl.DateTimeFormat(userLocale(), { month: "short" }) : null
-	return props.timeline.months.map((m) => ({
-		key: m.key,
-		left: m.left,
-		width: m.width,
-		label: short ? fmt.format(toDay(m.startIso)) : m.label,
-		title: m.label,
-	}))
+	const locale = userLocale()
+	const longFmt = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" })
+	const shortFmt = new Intl.DateTimeFormat(locale, { month: "short" })
+	return props.timeline.months.map((m) => {
+		const day = toDay(m.startIso)
+		const long = longFmt.format(day)
+		return { key: m.key, left: m.left, width: m.width, label: short ? shortFmt.format(day) : long, title: long }
+	})
 }
 
 const headerRows = computed(() => {
