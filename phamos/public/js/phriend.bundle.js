@@ -172,6 +172,8 @@ const desk = {
 	quiet: (frappe.boot.phriend && frappe.boot.phriend.quiet) || null,
 	can_configure: !!(frappe.boot.phriend && frappe.boot.phriend.can_configure),
 	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
+	// one voice (#2011)
+	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
 };
 
 frappe.provide("phriend");

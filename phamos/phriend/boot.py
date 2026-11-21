@@ -6,6 +6,7 @@ from frappe.utils import cint
 
 from phamos.phriend.quiet import state as quiet_state
 from phamos.phriend.shortcut import site_shortcut, user_shortcut
+from phamos.phriend.voice import state as voice_state
 
 
 def is_for_user():
@@ -43,11 +44,13 @@ def phriend_boot():
 		"quiet": quiet_state() if on["quiet_mode"] else None,
 		# the menu links to Phriend Settings for those who may change them
 		"can_configure": 1 if frappe.has_permission("Phriend Settings", "write") else 0,
+		# one voice (#2011): today's unprompted bubbles, while the feature is on
+		"voice": voice_state(settings) if on["one_voice"] else None,
 	}
 
 
 # Phriend Settings → Features: one switch per feature (#2008); the companion slices add theirs.
-FEATURE_FIELDS = ("reactions", "quiet_mode")
+FEATURE_FIELDS = ("reactions", "quiet_mode", "one_voice")
 
 
 def features(settings):
