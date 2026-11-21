@@ -122,14 +122,15 @@ function onUp(event) {
    title and logo read the same on every color. */
 .area {
 	--area-h: 265;
-	background: hsl(var(--area-h) 75% 50% / 0.3);
+	/* Fill in the frame's own color (PM, 2026-11-22), see-through so the map shows. */
+	background: hsl(var(--area-h) 70% 42% / 0.32);
 	border: 2.5px solid hsl(var(--area-h) 70% 42% / 0.9);
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 1px 4px rgba(0, 0, 0, 0.35);
 	color: #fff;
 	gap: 3px;
 }
 .area--active {
-	background: hsl(var(--area-h) 75% 50% / 0.42);
+	background: hsl(var(--area-h) 70% 42% / 0.45);
 	border-color: hsl(var(--area-h) 70% 35%);
 }
 .area--editing {
