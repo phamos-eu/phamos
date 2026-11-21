@@ -17,6 +17,7 @@ import TasksHome from "./views/TasksHome.vue"
 import TodosPlan from "./views/TodosPlan.vue"
 import spaConfig from "./config"
 import TodosFocus from "./views/TodosFocus.vue"
+import ChipSpace from "./views/ChipSpace.vue"
 import { ensureFocusLoaded } from "./focusStore.js"
 
 const router = createSpaRouter({
@@ -46,6 +47,8 @@ const router = createSpaRouter({
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },
+		// Chip Space (#2053): full screen, without the cockpit shell (App.vue reads meta.standalone).
+		{ path: "/space", name: "Space", component: ChipSpace, meta: { standalone: true } },
 	],
 })
 

@@ -1,5 +1,10 @@
 <template>
-	<CockpitShell :title="pageTitle">
+	<!-- Chip Space (#2053) and other standalone pages: full screen, no sidebar or top bar. -->
+	<div v-if="route.meta.standalone" class="h-full min-h-0">
+		<router-view />
+		<Toasts />
+	</div>
+	<CockpitShell v-else :title="pageTitle">
 		<template #sidebar>
 			<div class="relative flex h-full">
 				<div
@@ -33,6 +38,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
+import { Toasts } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
@@ -179,6 +185,8 @@ const BASE_ITEMS = [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
 	},
+	// Chip Space (#2053): opens full screen.
+	{ name: "Space", label: "Space", icon: "grid", match: ["Space"] },
 	{
 		name: "ChecklistsHome",
 		label: "Checklists",
@@ -222,6 +230,7 @@ const PAGE_TITLES = {
 	ChecklistsHome: ["My Checklists", "Dashboard"],
 	Checklists: ["My Checklists", "List"],
 	ChecklistDetail: ["My Checklists", "List"],
+	Space: ["Space"],
 }
 const pageTitle = computed(
 	() => (PAGE_TITLES[route.name] || ["Personal Cockpit"]).map((part) => __(part)).join(" · ")
