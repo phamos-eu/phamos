@@ -1052,10 +1052,17 @@ def sync_gitlab_data():
     Full sync in order: projects → milestones → issues.
     This is what the Dev Action Panel sync button calls.
     """
-    sync_projects_only()
-    sync_gitlab_milestones()
-    sync_all_issues()
-    sync_gitlab_releases()
+    try:
+        sync_projects_only()
+        sync_gitlab_milestones()
+        sync_all_issues()
+        sync_gitlab_releases()
+    except Exception:
+        # a warning on the Phriend of the warning role (#2012); the job still fails as before
+        from phamos.phriend import events as phriend_events
+
+        phriend_events.gitlab_sync_failed()
+        raise
     return "Sync complete"
 
 

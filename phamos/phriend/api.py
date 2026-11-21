@@ -16,6 +16,7 @@ from frappe.desk.form.assign_to import add as assign_to
 from frappe.utils import cint, cstr, escape_html, get_url, pretty_date, to_markdown
 from frappe.utils.password import get_decrypted_password
 
+from phamos.phriend import events as phriend_events
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend import voice as phriend_voice
@@ -289,14 +290,18 @@ def set_my_quiet(until=None, minutes=None):
 	"forever", a time in epoch ms (at most the rest of today), or empty to call Phriend back.
 	Returns the user's quiet state."""
 	_check_quiet_allowed()
-	return phriend_quiet.set_quiet(until, minutes)
+	state = phriend_quiet.set_quiet(until, minutes)
+	phriend_events.send_quiet_state(state)  # the user's other tabs (#2012)
+	return state
 
 
 @frappe.whitelist(methods=["POST"])
 def set_my_warning_mute(minutes=0):
 	"""Mute Phriend's red warnings for 30, 60 or 90 minutes (#2010); 0 to hear them again."""
 	_check_quiet_allowed()
-	return phriend_quiet.set_warning_mute(minutes)
+	state = phriend_quiet.set_warning_mute(minutes)
+	phriend_events.send_quiet_state(state)  # the user's other tabs (#2012)
+	return state
 
 
 @frappe.whitelist(methods=["POST"])
@@ -307,6 +312,17 @@ def claim_my_bubble(day=None):
 	if not cint(settings.get("one_voice")):
 		frappe.throw(_("One voice is switched off in Phriend Settings"), frappe.PermissionError)
 	return phriend_voice.claim(settings, day)
+
+
+@frappe.whitelist(methods=["POST"])
+def send_test_event(kind=None):
+	"""Debug (phriend.emit, #2012): a sample event of `kind` to the current user's own Phriend.
+	For those who may change Phriend Settings, while events are on."""
+	settings = _check_allowed()
+	frappe.has_permission("Phriend Settings", "write", throw=True)
+	if not cint(settings.get("events")):
+		frappe.throw(_("Events are switched off in Phriend Settings"), frappe.PermissionError)
+	return phriend_events.test_event(cstr(kind))
 
 
 def _open_report_filters(route, ref_doctype, ref_docname):
@@ -621,6 +637,8 @@ def create_gitlab_issue(issue, labels=None, title=None):
 			f'<a href="{escape_html(web_url)}" target="_blank">{escape_html(reference)}</a>'
 		),
 	)
+	# tell the reporter's Phriend (#2012)
+	phriend_events.gitlab_issue_created(doc, web_url, reference)
 	# no record: the GitLab Project is not synced to ERPNext yet, or linking failed (both logged)
 	return {"web_url": web_url, "iid": created.get("iid"), "reference": reference, "gitlab_issue": record}
 

@@ -50,7 +50,7 @@ def phriend_boot():
 
 
 # Phriend Settings → Features: one switch per feature (#2008); the companion slices add theirs.
-FEATURE_FIELDS = ("reactions", "quiet_mode", "one_voice")
+FEATURE_FIELDS = ("reactions", "quiet_mode", "one_voice", "events")
 
 
 def features(settings):

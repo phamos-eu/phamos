@@ -2616,3 +2616,17 @@ Bubbles per Day,Sprechblasen pro Tag
 One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Warnings Go To,Warnungen gehen an
+Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
+Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
+Warn: GitLab Sync Failed,Warnen: GitLab-Abgleich fehlgeschlagen
+"Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.","Phriend erfährt, was passiert: Ihre Meldung wurde ein GitLab-Issue, jemand hat für Ihre Idee gestimmt, ein KI-Agent-Lauf ist fehlgeschlagen, Beleg-E-Mails konnten nicht gelesen werden, der GitLab-Abgleich ist fehlgeschlagen."
+"Who gets warnings about the whole system, such as a failed GitLab sync.","Wer Warnungen zum ganzen System bekommt, zum Beispiel einen fehlgeschlagenen GitLab-Abgleich."
+Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.,Angehakt: eine rote ‼️-Warnung. Nicht angehakt: eine Notiz hinter dem blauen Punkt.
+Your report is now a GitLab issue: {0},Ihre Meldung ist jetzt ein GitLab-Issue: {0}
+Someone voted for your idea: {0},Jemand hat für Ihre Idee gestimmt: {0}
+The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht abschließen.
+The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
+Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
+Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
