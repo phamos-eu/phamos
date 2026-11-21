@@ -50,3 +50,38 @@ export function nextListIndex(current, count, direction) {
 	if (current < 0) return direction > 0 ? 0 : count - 1
 	return Math.min(count - 1, Math.max(0, current + direction))
 }
+
+// Ctrl/Cmd+S: "save" in Frappe Desk, here the primary action of the open dialog (#2032).
+export function isSaveKey(event) {
+	return Boolean(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && String(event.key).toLowerCase() === "s"
+}
+
+// The frappe-ui dialog on top: Headless UI appends each new one to the body, so the last wins.
+// Only frappe-ui (Headless UI) dialogs: full-page surfaces with role="dialog", like the idea
+// writing mode, are not confirm dialogs.
+const FRAPPE_DIALOG = '[role="dialog"][id^="headlessui-dialog-"]'
+export function topDialog(root = typeof document !== "undefined" ? document : null) {
+	const dialogs = root?.querySelectorAll?.(FRAPPE_DIALOG)
+	return dialogs?.length ? dialogs[dialogs.length - 1] : null
+}
+
+// frappe-ui solid buttons are the only ones with white text; red ones are destructive.
+function isSolid(button) {
+	return button.classList.contains("text-ink-white") && !button.classList.contains("bg-surface-red-5")
+}
+
+// What Ctrl/Cmd+S runs in a dialog: a button to click, a form to submit, or null.
+// - a button marked data-primary-action wins;
+// - otherwise the one solid, non-red button;
+// - a dialog without such a button submits its one form.
+// A disabled (or loading) button and an ambiguous choice run nothing, so nothing is guessed
+// and nothing is submitted twice. A disabled solid button also blocks the form fallback.
+export function dialogPrimaryAction(dialog) {
+	if (!dialog) return null
+	const marked = dialog.querySelector("[data-primary-action]")
+	if (marked) return marked.disabled ? null : marked
+	const solid = [...dialog.querySelectorAll("button")].filter(isSolid)
+	if (solid.length) return solid.length === 1 && !solid[0].disabled ? solid[0] : null
+	const forms = dialog.querySelectorAll("form")
+	return forms.length === 1 ? forms[0] : null
+}

@@ -56,13 +56,14 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue"
+import { onBeforeUnmount, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 import InstallAppDialog from "@spa/components/InstallAppDialog.vue"
 import { mountPhriend } from "@spa/phriend.js"
 import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
+import { dialogPrimaryAction, isSaveKey, topDialog } from "@spa/utils/shortcuts.js"
 
 const props = defineProps({
 	title: { type: String, default: "" },
@@ -74,4 +75,19 @@ const props = defineProps({
 const router = useRouter()
 const glow = useCockpitGlow()
 onMounted(() => mountPhriend(router, () => props.title))
+
+// Ctrl/Cmd+S runs the open dialog's primary action, as in Frappe Desk (#2032). Captured, so a
+// field or editor inside the dialog cannot swallow it; the browser's "Save page" never opens.
+function onSaveKey(event) {
+	if (!isSaveKey(event)) return
+	const dialog = topDialog()
+	if (!dialog) return
+	event.preventDefault()
+	if (event.repeat || event.isComposing) return
+	const action = dialogPrimaryAction(dialog)
+	if (action?.tagName === "FORM") action.requestSubmit()
+	else action?.click()
+}
+onMounted(() => document.addEventListener("keydown", onSaveKey, true))
+onBeforeUnmount(() => document.removeEventListener("keydown", onSaveKey, true))
 </script>
