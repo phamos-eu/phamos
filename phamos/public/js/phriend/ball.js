@@ -135,7 +135,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 /* The phriend's menu (#2010): right-click, long press or the context-menu key. Where the
    bubble would be; the bubble steps aside while it is open. */
 .menu {
-	position: absolute; bottom: calc(100% + 8px); right: 0; min-width: 220px; max-width: 280px; padding: 6px;
+	position: absolute; z-index: 3; bottom: calc(100% + 8px); right: 0; min-width: 220px; max-width: 280px; padding: 6px;
 	border-radius: 12px; background: var(--ph-bg); color: var(--ph-text); border: 1px solid var(--ph-border);
 	box-shadow: var(--ph-shadow); font-size: 13px; line-height: 1.35; cursor: auto;
 }
@@ -203,17 +203,18 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	background: #e8a23a; box-shadow: 0 0 0 2px var(--ph-bg); display: none; }
 .ball.has-pending .pending { display: block; }
 /* One voice (#2011): something waits for the user. Click: the oldest one, in a bubble. */
-.waiting { position: absolute; left: 24px; top: -5px; min-width: 14px; height: 14px; padding: 0 3px; border: 0;
+.waiting { position: absolute; left: 30px; top: -5px; min-width: 14px; height: 14px; padding: 0 3px; border: 0;
 	border-radius: 7px; background: #2f6fdb; color: #fff; font: 600 9px/14px var(--ph-font); text-align: center;
 	cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg); }
 .waiting:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 2px; }
 .ball.resting .waiting { opacity: 0.7; }
 /* The bubble: its outline (box and tail as one shape) is an SVG path drawn to its size
    (bubble.js), so border and shadow run round the tail too. Each one lands a little off (--jx,
-   --jy, --jr: the jitter), tilting round its tail. Beside Phriend's head rather than high above
-   it (PM, 2026-11-21): its lower edge level with the top of the sphere, its tail leaning in. */
+   --jy, --jr: the jitter), tilting round its tail. Half up, half to the side (PM, 2026-11-21):
+   the tail's tip just over Phriend's scalp, above the eyes, leaning in; always in front of
+   Phriend, never behind it. */
 .bubble {
-	position: absolute; bottom: 62px; right: 44px; width: max-content; max-width: 260px;
+	position: absolute; z-index: 3; bottom: 76px; right: 36px; width: max-content; max-width: 260px;
 	padding: 8px 12px; color: var(--ph-text); font-size: 13px; line-height: 1.4;
 	--jx: 0px; --jy: 0px; --jr: 0deg; transform-origin: calc(100% - 22px) calc(100% + 8px);
 	opacity: 0; transform: translate(var(--jx), calc(var(--jy) + 6px)) rotate(var(--jr));
@@ -229,7 +230,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .bubble-close { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px;
 	background: transparent; color: var(--ph-muted); font: inherit; font-size: 15px; line-height: 20px; cursor: pointer; }
 .bubble-close:hover { color: var(--ph-text); background: var(--ph-surface); }
-.ball.flip .bubble { right: auto; left: 44px; transform-origin: 22px calc(100% + 8px); }
+.ball.flip .bubble { right: auto; left: 36px; transform-origin: 22px calc(100% + 8px); }
 /* 4 / 21 = 19.05 %, 9 / 21 = 42.86 %, 16 / 21 = 76.19 % */
 @keyframes breathe {
 	0% { transform: scale(1, 1); animation-timing-function: ease-in-out; }
