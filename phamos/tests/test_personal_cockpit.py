@@ -1,8 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Personal Cockpit (#1540): the cockpit engine scoped to the session user, and the
-retirement of I Own My Work and the cockpit Raven chat (#1456)."""
+"""Personal Cockpit (#1540): the cockpit engine scoped to the session user, and a guard that the
+retired apps (#1456, #2030) leave no code behind."""
 
 from pathlib import Path
 from unittest.mock import patch
@@ -10,7 +10,6 @@ from unittest.mock import patch
 import frappe
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.tests.utils import FrappeTestCase
-from frappe.website.path_resolver import resolve_redirect
 
 from phamos.api import department_cockpit as dc
 from phamos.api import human_resources_spa
@@ -83,40 +82,14 @@ class TestPersonalCockpitWiring(FrappeTestCase):
 
 	def test_apps_screen_shows_personal_cockpit_only(self):
 		apps = {app["name"]: app for app in frappe.get_hooks("add_to_apps_screen", app_name="phamos")}
-		self.assertNotIn("i_own_my_work", apps)
 		self.assertEqual(apps["personal_cockpit"]["route"], "/personal-cockpit")
-
-	def test_old_routes_redirect_permanently(self):
-		cases = {
-			"i-own-my-work": "/personal-cockpit",
-			"i-own-my-work/issue/ISS-1": "/personal-cockpit/issues/list/ISS-1",
-			"i-own-my-work/issues/ISS-1": "/personal-cockpit/issues/list/ISS-1",
-			"i-own-my-work/checklists/CHK-1": "/personal-cockpit/checklists/CHK-1",
-			"i_own_my_work": "/personal-cockpit",
-		}
-		for old, new in cases.items():
-			with self.subTest(path=old):
-				frappe.cache.hdel("website_redirects", old)
-				with self.assertRaises(frappe.Redirect) as ctx:
-					resolve_redirect(old)
-				self.assertEqual(frappe.flags.redirect_location, new)
-				self.assertEqual(ctx.exception.http_status_code, 301)
-
-	def test_lookalike_route_is_not_redirected(self):
-		frappe.cache.hdel("website_redirects", "i-own-my-work-archive")
-		self.assertIsNone(resolve_redirect("i-own-my-work-archive"))
 
 	def test_no_code_refers_to_the_retired_apps(self):
 		app_dir = Path(frappe.get_app_path("phamos"))
 		needles = ("i_own_my_work", "i-own-my-work", "I Own My Work", "issue_raven")
-		allowed = {
-			app_dir / "hooks.py",  # redirects from the old routes
-			app_dir / "patches" / "v1_0" / "retire_i_own_my_work_default_app.py",
-			app_dir / "patches.txt",
-		}
 		offenders = []
 		for path in app_dir.rglob("*"):
-			if path.suffix not in (".py", ".json", ".csv", ".txt") or path in allowed:
+			if path.suffix not in (".py", ".json", ".csv", ".txt"):
 				continue
 			if "tests" in path.parts or "node_modules" in path.parts or "public" in path.parts:
 				continue
