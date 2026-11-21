@@ -474,3 +474,17 @@ class OphiceAreaTestCase(FrappeTestCase):
 		ophice.delete_area(name)
 		self.assertFalse(frappe.db.exists("Ophice Area", name))
 
+
+	def test_every_area_gets_its_own_color(self):
+		hues = []
+		for i in range(5):
+			name = ophice.save_area(f"Room {i}", f"https://meet.jit.si/ColorRoom{i}", i * 3, 0, 2, 2)
+			hue = frappe.db.get_value("Ophice Area", name, "color_hue")
+			self.assertTrue(0 <= hue < 360)
+			for other in hues:
+				self.assertGreaterEqual(min(abs(hue - other), 360 - abs(hue - other)), ophice.AREA_HUE_GAP)
+			hues.append(hue)
+		# Editing keeps the color.
+		first = frappe.get_all("Ophice Area", filters={"title": "Room 1"}, fields=["name", "color_hue"])[0]
+		ophice.save_area("Room 1b", "https://meet.jit.si/ColorRoom1", 3, 0, 2, 2, name=first.name)
+		self.assertEqual(frappe.db.get_value("Ophice Area", first.name, "color_hue"), first.color_hue)

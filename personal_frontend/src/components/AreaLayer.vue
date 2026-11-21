@@ -9,7 +9,7 @@
 			:key="area.name"
 			class="area absolute flex flex-col items-center justify-center overflow-hidden rounded-md"
 			:class="{ 'area--active': area.name === activeName, 'area--editing': editing }"
-			:style="rectStyle(area)"
+			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265 }"
 			:title="area.title"
 			data-testid="meeting-area"
 		>
@@ -116,18 +116,21 @@ function onUp(event) {
 </script>
 
 <style scoped>
-/* Clearly visible on any map (PM: "a little more solid"): a solid violet tint, a firm edge with
-   a light inner line, and the white Jitsi watermark with a dark halo. */
+/* Clearly visible on any map (PM: "a little more solid"), each area in its own random color
+   (--area-h, a hue; PM 2026-11-22): a solid tint, a firm edge with a light inner line, and
+   the white Jitsi watermark with a dark halo. Saturation and lightness stay fixed so the
+   title and logo read the same on every color. */
 .area {
-	background: rgba(124, 58, 237, 0.3);
-	border: 2.5px solid rgba(109, 40, 217, 0.9);
+	--area-h: 265;
+	background: hsl(var(--area-h) 75% 50% / 0.3);
+	border: 2.5px solid hsl(var(--area-h) 70% 42% / 0.9);
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 1px 4px rgba(0, 0, 0, 0.35);
 	color: #fff;
 	gap: 3px;
 }
 .area--active {
-	background: rgba(124, 58, 237, 0.42);
-	border-color: rgb(91, 33, 182);
+	background: hsl(var(--area-h) 75% 50% / 0.42);
+	border-color: hsl(var(--area-h) 70% 35%);
 }
 .area--editing {
 	border-style: dashed;
@@ -141,7 +144,7 @@ function onUp(event) {
 	max-width: 110px;
 	max-height: 50%;
 	opacity: 0.9;
-	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 6px rgba(76, 29, 149, 0.8));
+	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 6px hsl(var(--area-h) 70% 25% / 0.8));
 	user-select: none;
 }
 .area__logo-text {
@@ -154,7 +157,7 @@ function onUp(event) {
 	max-width: 95%;
 	padding: 1px 6px;
 	border-radius: 4px;
-	background: rgba(46, 16, 101, 0.85);
+	background: hsl(var(--area-h) 65% 22% / 0.85);
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1.4;

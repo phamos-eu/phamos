@@ -15,7 +15,8 @@
   "height",
   "section_jitsi",
   "jitsi_domain",
-  "jitsi_room"
+  "jitsi_room",
+  "color_hue"
  ],
  "fields": [
   {
@@ -81,11 +82,18 @@
    "fieldtype": "Data",
    "label": "Jitsi Room",
    "read_only": 1
+  },
+  {
+   "description": "The area's color on the grid: a hue 0-359, picked at random when the area is made, apart from the other areas' hues.",
+   "fieldname": "color_hue",
+   "fieldtype": "Int",
+   "label": "Color Hue",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-21 22:00:00.000000",
+ "modified": "2026-11-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

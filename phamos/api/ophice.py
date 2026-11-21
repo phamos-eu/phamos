@@ -85,6 +85,8 @@ JITSI_DEFAULT_DOMAIN = "meet.jit.si"
 AREA_DOCTYPE = "Ophice Area"
 EVENT_AREAS = "ophice_areas"
 MAX_AREAS = 50
+# Every area gets its own random color (PM, 2026-11-22): a hue, at least this far from the others.
+AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
 
 
@@ -888,12 +890,27 @@ def _parse_meeting_url(url):
 
 
 def _areas():
-	return frappe.get_all(
+	areas = frappe.get_all(
 		AREA_DOCTYPE,
-		fields=["name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room"],
+		fields=["name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room", "color_hue"],
 		order_by="creation asc",
 		limit=MAX_AREAS,
 	)
+	# An area without a stored color (made before colors existed) gets a steady one from its
+	# name: this runs on reads, which Frappe does not commit, so nothing random here.
+	for area in areas:
+		if area.color_hue is None or area.color_hue == "":
+			area.color_hue = int(hashlib.md5(area.name.encode()).hexdigest(), 16) % 360
+	return areas
+
+
+def _random_hue(taken):
+	"""A random hue at least AREA_HUE_GAP degrees from every taken one (if there is still room)."""
+	taken = [int(h) % 360 for h in taken]
+	free = [
+		h for h in range(360) if all(min(abs(h - t), 360 - abs(h - t)) >= AREA_HUE_GAP for t in taken)
+	]
+	return random.choice(free or range(360))
 
 
 def _clean_rect(x, y, width, height):
@@ -949,6 +966,7 @@ def save_area(title, meeting_url, x, y, width, height, name=None):
 	else:
 		if frappe.db.count(AREA_DOCTYPE) >= MAX_AREAS:
 			frappe.throw(_("Ophice has room for at most {0} meeting areas.").format(MAX_AREAS))
+		values["color_hue"] = _random_hue([a.color_hue for a in _areas()])
 		doc = frappe.get_doc({"doctype": AREA_DOCTYPE, **values}).insert(ignore_permissions=True)
 	_publish(EVENT_AREAS, {"areas": _areas()})
 	return doc.name
