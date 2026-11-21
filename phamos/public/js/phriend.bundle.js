@@ -168,6 +168,12 @@ const desk = {
 	user: frappe.session.user,
 	// Phriend Settings → Features (#2009)
 	features: (frappe.boot.phriend && frappe.boot.phriend.features) || {},
+	// leave me in peace (#2010)
+	quiet: (frappe.boot.phriend && frappe.boot.phriend.quiet) || null,
+	can_configure: !!(frappe.boot.phriend && frappe.boot.phriend.can_configure),
+	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
+	// one voice (#2011)
+	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
 };
 
 frappe.provide("phriend");
