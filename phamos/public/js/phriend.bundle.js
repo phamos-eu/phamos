@@ -174,6 +174,8 @@ const desk = {
 	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
 	// one voice (#2011)
 	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
+	// events (#2012): the user's own realtime room
+	on_event: (cb) => frappe.realtime && frappe.realtime.on("phriend_event", cb),
 };
 
 frappe.provide("phriend");

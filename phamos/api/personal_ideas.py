@@ -508,6 +508,10 @@ def vote_idea(name):
 	else:
 		frappe.get_doc({"doctype": VOTE_DOCTYPE, "idea": doc.name, "user": me}).insert(ignore_permissions=True)
 		voted = True
+		# a ❤️ on the idea owner's Phriend (#2012); who voted stays as private as the vote list
+		from phamos.phriend import events as phriend_events
+
+		phriend_events.idea_voted(doc.user, doc.title)
 	count = frappe.db.count(VOTE_DOCTYPE, {"idea": doc.name})
 	# Not `modified`: a vote must not trip the owner's autosave lock.
 	frappe.db.set_value(DOCTYPE, doc.name, "vote_count", count, update_modified=False)
