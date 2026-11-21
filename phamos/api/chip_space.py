@@ -476,6 +476,9 @@ def open_encounter(with_user):
 			doc.insert(ignore_permissions=True)
 		except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
 			frappe.db.rollback(save_point="chip_space_encounter")
+			# Frappe msgprints "Pair Key must be unique" before raising: drop it, or the page
+			# shows an error although the chat opens fine.
+			frappe.clear_last_message()
 			name = _open_encounter_name(pair_key, for_update=True)
 			if not name:
 				frappe.throw(_("The chat is just being opened. Please try again."))

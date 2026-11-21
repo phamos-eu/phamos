@@ -194,11 +194,14 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		"""The page that loses the race to insert takes the winner's encounter (Pair Key unique)."""
 		first = self._open(self.A, self.B)
 		real = chip_space._open_encounter_name
+		frappe.local.message_log = []
 		# B's request did not see A's row yet when it looked, so it tries to insert too.
 		with patch.object(chip_space, "_open_encounter_name", side_effect=[None, real(chip_space._pair_key(self.A, self.B))]):
 			second = self._open(self.B, self.A)
 		self.assertEqual(second["encounter"], first["encounter"])
 		self.assertEqual(frappe.db.count("Chip Space Encounter", {"pair_key": chip_space._pair_key(self.A, self.B)}), 1)
+		# No "Pair Key must be unique" left for the page to show.
+		self.assertFalse(any("must be unique" in str(m) for m in frappe.local.message_log))
 		# The users and the first encounter of this test survived: only the failed insert was undone.
 		self.assertTrue(frappe.db.exists("User", self.A))
 
