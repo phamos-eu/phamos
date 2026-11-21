@@ -2539,6 +2539,14 @@ Publish on website,Auf Webseite veröffentlichen
 Website summary,Kurzbeschreibung für die Webseite
 Content (HTML),Inhalt (HTML)
 Content Updated At,Inhalt aktualisiert am
+"Guides for ERPNext and the Frappe Framework, written by our team.",Anleitungen zu ERPNext und dem Frappe Framework von unserem Team.
+No documentation is published yet.,Es ist noch keine Dokumentation veröffentlicht.
+{0} pages,{0} Seiten
+Start reading,Lesen beginnen
+Open on {0},Auf {0} öffnen
+Updated on {0},Aktualisiert am {0}
+Previous,Zurück
+1 page,1 Seite
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
@@ -2547,6 +2555,7 @@ Sync started in the background. The tree reloads when it is done.,"Synchronisier
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Leave me in peace,Lass mich in Ruhe
 Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
 Quiet until {0},Ruhig bis {0}

@@ -1,0 +1,30 @@
+{#- /de/doku/<book>. Context: book.py. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-docs wp-docs-book">
+	<header class="wp-page-head">
+		<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
+		<div class="wp-page-head-main">
+			<div>
+				<h1>{{ book.title | e }}</h1>
+				{%- if book.summary %}<p class="wp-intro">{{ book.summary | e }}</p>{% endif %}
+			</div>
+			{%- if first_page %}<a class="wp-button wp-button-primary" href="{{ first_page.url | e }}">{{ _("Start reading") }}</a>{% endif %}
+		</div>
+	</header>
+
+	<nav class="wp-docs-contents" aria-label="{{ _('Contents') }}">
+		{{ toc(contents, headings=True) }}
+	</nav>
+
+	{%- if book.source_url %}
+	<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a></p>
+	{%- endif %}
+</main>
+{% endblock %}
