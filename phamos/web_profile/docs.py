@@ -354,6 +354,7 @@ def website_href(href, index, lang=DEFAULT_LANGUAGE):
 def render_html(page, lang=DEFAULT_LANGUAGE) -> dict:
 	"""{"html", "headings"} of a page, cached: the stored HTML with links to shown pages pointing at
 	the website, every h2 / h3 with an id, and those headings for "On this page" (#2045)."""
+	lang = _lang(lang)  # runs before init_page checks the route's language: no cache entry for "?lang=xx" (review)
 	stamp = page.get("content_updated_at") or page.get("updated_at") or ""
 	return _cached(f"html:{lang}:{page.name}:{stamp}", lambda: _render(page.html or "", lang))
 
