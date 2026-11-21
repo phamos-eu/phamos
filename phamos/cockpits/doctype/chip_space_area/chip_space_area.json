@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-21 22:00:00.000000",
+ "description": "A meeting area of the Chip Space (#2060): a rectangle of the grid with a fixed Jitsi meeting. Whoever stops inside joins it. Written only by phamos.api.chip_space.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "meeting_url",
+  "column_break_main",
+  "x",
+  "y",
+  "width",
+  "height",
+  "section_jitsi",
+  "jitsi_domain",
+  "jitsi_room"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "description": "https://<allowed Jitsi server>/<room>, for example https://meet.jit.si/OurStandup",
+   "fieldname": "meeting_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Meeting URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Left edge, in tiles.",
+   "fieldname": "x",
+   "fieldtype": "Int",
+   "label": "X",
+   "reqd": 1
+  },
+  {
+   "description": "Top edge, in tiles.",
+   "fieldname": "y",
+   "fieldtype": "Int",
+   "label": "Y",
+   "reqd": 1
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width",
+   "reqd": 1
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Int",
+   "label": "Height",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_jitsi",
+   "fieldtype": "Section Break",
+   "label": "Jitsi"
+  },
+  {
+   "description": "From the meeting URL.",
+   "fieldname": "jitsi_domain",
+   "fieldtype": "Data",
+   "label": "Jitsi Domain",
+   "read_only": 1
+  },
+  {
+   "description": "From the meeting URL.",
+   "fieldname": "jitsi_room",
+   "fieldtype": "Data",
+   "label": "Jitsi Room",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-21 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Chip Space Area",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

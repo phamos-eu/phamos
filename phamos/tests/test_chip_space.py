@@ -370,7 +370,10 @@ class ChipSpaceBackgroundTestCase(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.saved = frappe.db.get_default(chip_space.BACKGROUND_KEY)
+		# Start without a background: replacing one deletes the previous File, and deleting a
+		# File removes it from disk, which no rollback brings back. A site's real background
+		# image must never be "the previous one" here (it was, once: a lost background).
+		frappe.db.set_default(chip_space.BACKGROUND_KEY, "")
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -411,3 +414,63 @@ class ChipSpaceBackgroundTestCase(FrappeTestCase):
 			chip_space._store_background(self._png(), "x.png")
 			chip_space.remove_background()
 		self.assertEqual(chip_space.get_space()["background"], "")
+
+
+	def test_background_layout_is_clamped_and_shared(self):
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			with self.assertRaises(frappe.ValidationError):
+				chip_space.set_background_layout(0, 150, 10, 90)  # no background yet
+			chip_space._store_background(self._png(), "map.png")
+			self.assertEqual(chip_space.get_space()["background_layout"], {"fit": True, "scale": 100, "x": 50, "y": 50})
+			layout = chip_space.set_background_layout(0, 999, -5, 40)
+		self.assertEqual(layout, {"fit": False, "scale": 300, "x": 0.0, "y": 40.0})
+		self.assertEqual(chip_space.get_space()["background_layout"], layout)
+
+class ChipSpaceAreaTestCase(FrappeTestCase):
+	"""Meeting areas (#2060): rectangles with a fixed Jitsi meeting."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.conf = patch.dict(frappe.conf, {"chip_space_jitsi_domain": None, "chip_space_jitsi_domains": ["jitsi.example.org"]})
+		self.conf.start()
+		self.publish = patch.object(chip_space.frappe, "publish_realtime")
+		self.publish.start()
+
+	def tearDown(self):
+		self.publish.stop()
+		self.conf.stop()
+		frappe.db.rollback()
+
+	def test_save_reads_the_room_from_the_url_and_shows_in_the_space(self):
+		name = chip_space.save_area("Standup", " https://meet.jit.si/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
+		area = next(a for a in chip_space.get_space()["areas"] if a.name == name)
+		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.jit.si", "FullTimeDefencesRejectOverly"))
+		self.assertEqual((area.x, area.y, area.width, area.height), (2, 3, 4, 2))
+		self.assertEqual(area.meeting_url, "https://meet.jit.si/FullTimeDefencesRejectOverly")
+
+	def test_only_allowed_jitsi_servers_and_proper_rooms(self):
+		self.assertEqual(chip_space._parse_meeting_url("https://jitsi.example.org/Team_1"), ("jitsi.example.org", "Team_1"))
+		for url in (
+			"http://meet.jit.si/Room",  # not https
+			"https://evil.example.com/Room",  # not an allowed server
+			"https://meet.jit.si/",  # no room
+			"https://meet.jit.si/a/b",  # not one room name
+			"javascript:alert(1)",
+		):
+			with self.assertRaises(frappe.ValidationError, msg=url):
+				chip_space._parse_meeting_url(url)
+
+	def test_rectangle_stays_inside_the_grid_and_areas_do_not_overlap(self):
+		name = chip_space.save_area("Corner", "https://meet.jit.si/CornerRoom", 38, 24, 10, 10)
+		area = frappe.get_doc("Chip Space Area", name)
+		self.assertEqual((area.x, area.y, area.width, area.height), (38, 24, 2, 1))
+		with self.assertRaises(frappe.ValidationError):
+			chip_space.save_area("Clash", "https://meet.jit.si/ClashRoom", 37, 23, 2, 2)
+		# moving an area onto itself is fine
+		chip_space.save_area("Corner", "https://meet.jit.si/CornerRoom", 38, 23, 2, 2, name=name)
+
+	def test_delete(self):
+		name = chip_space.save_area("Gone", "https://meet.jit.si/GoneRoom", 1, 1, 1, 1)
+		chip_space.delete_area(name)
+		self.assertFalse(frappe.db.exists("Chip Space Area", name))
+

@@ -81,6 +81,12 @@ EVENT_BURNED = "chip_space_burned"
 # Site config: "chip_space_jitsi_domain" (default meet.jit.si), "chip_space_video": 0 turns it off.
 JITSI_DEFAULT_DOMAIN = "meet.jit.si"
 
+# Meeting areas (#2060): rectangles of the grid with a fixed Jitsi meeting.
+AREA_DOCTYPE = "Chip Space Area"
+EVENT_AREAS = "chip_space_areas"
+MAX_AREAS = 50
+AREA_TITLE_LENGTH = 60
+
 
 def _require_user():
 	if frappe.session.user == "Guest":
@@ -184,6 +190,8 @@ def get_space():
 		# Burn notices still running for me (#2057), e.g. after a reload.
 		"notices": _my_notices(user),
 		"background": _background().get("url") or "",
+		"background_layout": _background_layout(_background()),
+		"areas": _areas(),
 	}
 
 
@@ -247,12 +255,45 @@ def _background():
 	return value if isinstance(value, dict) else {}
 
 
+# How the image lies on the grid: "fit" (cover), or a size in % of the grid width and a
+# position in % (CSS background-position) - so the map can be spaced to the grid.
+BACKGROUND_SCALE_RANGE = (20, 300)
+
+
+def _background_layout(value):
+	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
+	if layout.get("fit", True):
+		return {"fit": True, "scale": 100, "x": 50, "y": 50}
+	return {
+		"fit": False,
+		"scale": max(BACKGROUND_SCALE_RANGE[0], min(BACKGROUND_SCALE_RANGE[1], frappe.utils.flt(layout.get("scale"), 1) or 100)),
+		"x": max(0.0, min(100.0, frappe.utils.flt(layout.get("x"), 1))),
+		"y": max(0.0, min(100.0, frappe.utils.flt(layout.get("y"), 1))),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_background_layout(fit=1, scale=100, x=50, y=50):
+	"""Size and position of the background image on the grid, for everyone."""
+	_require_user()
+	value = _background()
+	if not value.get("url"):
+		frappe.throw(_("Upload a background first."))
+	value["layout"] = {"fit": bool(frappe.utils.cint(fit)), "scale": scale, "x": x, "y": y}
+	layout = _background_layout(value)
+	value["layout"] = layout
+	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")))
+	_publish(EVENT_BACKGROUND, {"url": value["url"], "layout": layout, "by": frappe.session.user})
+	return layout
+
+
 def _set_background(value):
 	previous = _background().get("file")
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")) if value else "")
 	if previous and previous != value.get("file") and frappe.db.exists("File", previous):
 		frappe.delete_doc("File", previous, ignore_permissions=True, delete_permanently=True)
-	_publish(EVENT_BACKGROUND, {"url": value.get("url", ""), "by": frappe.session.user})
+	# A new image starts fitted to the grid.
+	_publish(EVENT_BACKGROUND, {"url": value.get("url", ""), "layout": _background_layout(value), "by": frappe.session.user})
 
 
 def _store_background(content, filename):
@@ -810,3 +851,113 @@ def _part_all_mine(user):
 		ENCOUNTER_DOCTYPE, filters={"status": "Open"}, or_filters={"user_a": user, "user_b": user}, fields=ENCOUNTER_FIELDS
 	):
 		_start_parting(doc)
+
+
+# --- Meeting areas (#2060).
+
+
+def _allowed_jitsi_domains():
+	"""The Jitsi servers areas may point to. The page loads external_api.js from that server, so
+	only servers the site trusts: the configured one plus an optional list."""
+	domains = {str(frappe.conf.get("chip_space_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().lower()}
+	extra = frappe.conf.get("chip_space_jitsi_domains") or []
+	if isinstance(extra, list):
+		domains |= {str(d).strip().lower() for d in extra if d}
+	return domains
+
+
+def _parse_meeting_url(url):
+	"""(domain, room) of https://<allowed Jitsi server>/<room>, or a clear error."""
+	from urllib.parse import unquote, urlparse
+
+	parsed = urlparse((url or "").strip())
+	domain = (parsed.hostname or "").lower()
+	if parsed.port:
+		domain = f"{domain}:{parsed.port}"
+	room = unquote(parsed.path.strip("/"))
+	if parsed.scheme != "https" or not domain:
+		frappe.throw(_("The meeting URL must start with https://, for example https://meet.jit.si/OurStandup."))
+	if domain not in _allowed_jitsi_domains():
+		frappe.throw(
+			_("Only meetings on {0} can be used here.").format(", ".join(sorted(_allowed_jitsi_domains())))
+		)
+	# One path segment of letters, digits, - and _: what Jitsi accepts as a room name.
+	if not re.fullmatch(r"[A-Za-z0-9_-]{3,128}", room):
+		frappe.throw(_("The meeting URL needs a room name after the server, for example /OurStandup."))
+	return domain, room
+
+
+def _areas():
+	return frappe.get_all(
+		AREA_DOCTYPE,
+		fields=["name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room"],
+		order_by="creation asc",
+		limit=MAX_AREAS,
+	)
+
+
+def _clean_rect(x, y, width, height):
+	"""A rectangle of whole tiles inside the grid, at least 1×1."""
+	x = _clamp_int(x, COLS)
+	y = _clamp_int(y, ROWS)
+	width = max(1, min(COLS - x, frappe.utils.cint(width)))
+	height = max(1, min(ROWS - y, frappe.utils.cint(height)))
+	return x, y, width, height
+
+
+def _clamp_int(value, cells):
+	return max(0, min(cells - 1, frappe.utils.cint(value)))
+
+
+def _overlaps(name, x, y, width, height):
+	for area in _areas():
+		if area.name == name:
+			continue
+		if x < area.x + area.width and area.x < x + width and y < area.y + area.height and area.y < y + height:
+			return area.title
+	return None
+
+
+@frappe.whitelist(methods=["POST"])
+def save_area(title, meeting_url, x, y, width, height, name=None):
+	"""Create or change a meeting area, for everyone (any Space user may, like the background)."""
+	_require_user()
+	title = (title or "").strip()[:AREA_TITLE_LENGTH]
+	if not title:
+		frappe.throw(_("Give the area a name."))
+	domain, room = _parse_meeting_url(meeting_url)
+	x, y, width, height = _clean_rect(x, y, width, height)
+	clash = _overlaps(name, x, y, width, height)
+	if clash:
+		frappe.throw(_("This overlaps the area {0}.").format(clash))
+	values = {
+		"title": title,
+		"meeting_url": f"https://{domain}/{room}",
+		"jitsi_domain": domain,
+		"jitsi_room": room,
+		"x": x,
+		"y": y,
+		"width": width,
+		"height": height,
+	}
+	if name:
+		if not frappe.db.exists(AREA_DOCTYPE, name):
+			frappe.throw(_("This area no longer exists."))
+		doc = frappe.get_doc(AREA_DOCTYPE, name)
+		doc.update(values)
+		doc.save(ignore_permissions=True)
+	else:
+		if frappe.db.count(AREA_DOCTYPE) >= MAX_AREAS:
+			frappe.throw(_("The Space has room for at most {0} meeting areas.").format(MAX_AREAS))
+		doc = frappe.get_doc({"doctype": AREA_DOCTYPE, **values}).insert(ignore_permissions=True)
+	_publish(EVENT_AREAS, {"areas": _areas()})
+	return doc.name
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_area(name):
+	"""Remove a meeting area, for everyone."""
+	_require_user()
+	if frappe.db.exists(AREA_DOCTYPE, name):
+		frappe.delete_doc(AREA_DOCTYPE, name, ignore_permissions=True)
+	_publish(EVENT_AREAS, {"areas": _areas()})

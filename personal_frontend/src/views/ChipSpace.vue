@@ -13,6 +13,17 @@
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, hold Shift to go faster") }}
 			</div>
+			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. -->
+			<Button
+				v-if="me"
+				:variant="editingAreas ? 'solid' : 'subtle'"
+				:title="__('Draw and edit meeting areas, for everyone')"
+				:aria-pressed="editingAreas"
+				@click="editingAreas = !editingAreas"
+			>
+				<template #prefix><FeatherIcon name="video" class="h-4 w-4" /></template>
+				{{ editingAreas ? __("Done") : __("Meeting areas") }}
+			</Button>
 			<!-- The Space's background, one for everyone (#2053). -->
 			<input
 				ref="backgroundInput"
@@ -33,6 +44,16 @@
 			</Button>
 			<Button
 				v-if="me && background"
+				:variant="adjustingBackground ? 'solid' : 'subtle'"
+				:title="__('Size and position of the background image on the grid, for everyone')"
+				:aria-pressed="adjustingBackground"
+				@click="adjustingBackground = !adjustingBackground"
+			>
+				<template #prefix><FeatherIcon name="maximize-2" class="h-4 w-4" /></template>
+				{{ __("Adjust") }}
+			</Button>
+			<Button
+				v-if="me && background"
 				variant="ghost"
 				:disabled="backgroundBusy"
 				:title="__('Remove the background, for everyone')"
@@ -43,6 +64,62 @@
 		</header>
 
 		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+			<!-- Size and position of the background image against the grid (#2058), top left. -->
+			<div
+				v-if="adjustingBackground && background"
+				class="absolute left-6 top-6 z-30 w-72 space-y-3 rounded-xl border border-outline-gray-2 bg-surface-white p-3 text-sm text-ink-gray-9 shadow-xl"
+				data-testid="background-adjust"
+			>
+				<div class="flex items-center justify-between">
+					<span class="font-medium">{{ __("Background image") }}</span>
+					<Button variant="ghost" :disabled="backgroundLayout.fit" @click="setLayout({ fit: true })">
+						{{ __("Fit") }}
+					</Button>
+				</div>
+				<label class="block">
+					<span class="flex justify-between text-xs text-ink-gray-6">
+						<span>{{ __("Size") }}</span><span>{{ backgroundLayout.fit ? __("Fit") : `${backgroundLayout.scale} %` }}</span>
+					</span>
+					<input
+						type="range" min="20" max="300" step="1" class="w-full"
+						:value="backgroundLayout.scale"
+						data-testid="background-scale"
+						@input="setLayout({ fit: false, scale: +$event.target.value })"
+					/>
+				</label>
+				<label class="block">
+					<span class="text-xs text-ink-gray-6">{{ __("Horizontal position") }}</span>
+					<input
+						type="range" min="0" max="100" step="0.5" class="w-full"
+						:value="backgroundLayout.x"
+						@input="setLayout({ fit: false, x: +$event.target.value })"
+					/>
+				</label>
+				<label class="block">
+					<span class="text-xs text-ink-gray-6">{{ __("Vertical position") }}</span>
+					<input
+						type="range" min="0" max="100" step="0.5" class="w-full"
+						:value="backgroundLayout.y"
+						@input="setLayout({ fit: false, y: +$event.target.value })"
+					/>
+				</label>
+				<p class="text-xs text-ink-gray-5">{{ __("The grid stays as it is; everyone sees the change.") }}</p>
+			</div>
+			<!-- The meeting of the area I stand in (#2060), top right. -->
+			<MeetingPanel
+				v-if="meetingArea"
+				class="absolute right-6 top-6 z-30"
+				:area="meetingArea"
+				:display-name="me?.full_name"
+				@leave="leaveMeeting(true)"
+			/>
+			<AreaDialog :area="areaDraft" :on-save="saveArea" :on-delete="deleteArea" @close="areaDraft = null" />
+			<p
+				v-if="editingAreas"
+				class="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+			>
+				{{ __("Drag on the grid to mark a meeting area, click an area to edit it") }}
+			</p>
 			<!-- Burn notices (#2057): bottom centre, above the grid. -->
 			<div
 				v-if="noticeList.length"
@@ -64,6 +141,16 @@
 				:class="{ 'chip-space-grid--image': background }"
 				:style="gridStyle"
 			>
+				<AreaLayer
+					:areas="areas"
+					:tile="tile"
+					:cols="me.cols"
+					:rows="me.rows"
+					:editing="editingAreas"
+					:active-name="meetingArea?.name || ''"
+					@draw="(rect) => (areaDraft = { ...rect })"
+					@pick="(area) => (areaDraft = { ...area })"
+				/>
 				<!-- Perimeters (#2056): touching circles = in conversation. Below the chips, no clicks. -->
 				<div
 					v-for="chip in perimeterList"
@@ -133,6 +220,9 @@ import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
+import AreaLayer from "../components/AreaLayer.vue"
+import AreaDialog from "../components/AreaDialog.vue"
+import MeetingPanel from "../components/MeetingPanel.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
@@ -196,11 +286,36 @@ const gridStyle = computed(() => ({
 	"--tile": `${tile.value}px`,
 	// The grid lines stay on top of the image (see .chip-space-grid--image).
 	"--background-image": background.value ? `url("${encodeURI(background.value)}")` : "none",
+	// Size in % of the grid width, position in %: the map can be spaced against the grid.
+	"--background-size": backgroundLayout.value.fit ? "cover" : `${backgroundLayout.value.scale}% auto`,
+	"--background-position": backgroundLayout.value.fit
+		? "center"
+		: `${backgroundLayout.value.x}% ${backgroundLayout.value.y}%`,
 }))
 
 // --- Background image (one for everyone, anyone may change it).
 
 const background = ref("")
+const FITTED = { fit: true, scale: 100, x: 50, y: 50 }
+const backgroundLayout = ref({ ...FITTED })
+const adjustingBackground = ref(false)
+let layoutTimer = null
+
+// Live for me while dragging; saved (and sent to everyone) a moment after the last change.
+function setLayout(change) {
+	backgroundLayout.value = change.fit ? { ...FITTED } : { ...backgroundLayout.value, ...change, fit: false }
+	clearTimeout(layoutTimer)
+	layoutTimer = setTimeout(async () => {
+		const { fit, scale, x, y } = backgroundLayout.value
+		try {
+			await call(`${API}.set_background_layout`, { fit: fit ? 1 : 0, scale, x, y })
+		} catch (e) {
+			toast.error(errorText(e) || __("The background could not be adjusted."))
+		} finally {
+			layoutTimer = null
+		}
+	}, 300)
+}
 const backgroundInput = ref(null)
 const backgroundBusy = ref(false)
 
@@ -297,6 +412,11 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
+	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length) {
+		event.preventDefault()
+		leaveMeeting(true)
+		return
+	}
 	if (!held.size && !event.repeat) {
 		// Typed while the chat that just opened is still loading: keep it for the chat.
 		if (bufferWhileOpening(event)) return
@@ -341,6 +461,7 @@ function nearestInRange() {
 
 /** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
 function chatOnStop() {
+	joinAreaIfInside()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
 	const bubble = bubbles[other.user]
@@ -437,7 +558,8 @@ const bubbleList = computed(() => Object.values(bubbles))
 
 // Video (#2059): one call at a time, with the nearest person whose chat is open.
 const videoUser = computed(() => {
-	if (!me.value) return null
+	// One call at a time: an area's meeting wins over the encounter call (#2060).
+	if (!me.value || meetingArea.value) return null
 	let best = null
 	for (const bubble of Object.values(bubbles)) {
 		if (!bubble.video) continue
@@ -585,6 +707,74 @@ function errorText(e) {
 	return new DOMParser().parseFromString(first, "text/html").body.textContent || ""
 }
 
+// --- Meeting areas (#2060).
+
+const areas = ref([])
+const editingAreas = ref(false)
+const areaDraft = ref(null)
+const meetingArea = ref(null)
+// Left with Esc or "Leave": no rejoining until walking out of that area.
+let meetingLeftHere = null
+
+function areaAt(chip) {
+	if (!chip) return null
+	const cx = chip.x + 0.5
+	const cy = chip.y + 0.5
+	return areas.value.find((a) => cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height) || null
+}
+
+function joinAreaIfInside() {
+	const area = areaAt(me.value)
+	if (!area || meetingArea.value?.name === area.name || meetingLeftHere === area.name) return
+	meetingArea.value = area
+}
+
+function leaveMeetingIfOutside() {
+	const here = areaAt(me.value)
+	if (meetingLeftHere && here?.name !== meetingLeftHere) meetingLeftHere = null
+	if (meetingArea.value && here?.name !== meetingArea.value.name) leaveMeeting(false)
+}
+
+function leaveMeeting(byChoice) {
+	if (byChoice && meetingArea.value) meetingLeftHere = meetingArea.value.name
+	meetingArea.value = null
+}
+
+function setAreas(list) {
+	areas.value = list || []
+	// The area I am meeting in was changed or deleted by someone.
+	if (meetingArea.value) {
+		const same = areas.value.find((a) => a.name === meetingArea.value.name)
+		if (!same || same.jitsi_room !== meetingArea.value.jitsi_room || same.jitsi_domain !== meetingArea.value.jitsi_domain) {
+			meetingArea.value = null
+		} else meetingArea.value = same
+	}
+}
+
+async function saveArea(values) {
+	try {
+		await call(`${API}.save_area`, {
+			name: values.name || null,
+			title: values.title,
+			meeting_url: values.meeting_url,
+			x: values.x,
+			y: values.y,
+			width: values.width,
+			height: values.height,
+		})
+	} catch (e) {
+		throw new Error(errorText(e) || __("The area could not be saved."))
+	}
+}
+
+async function deleteArea(area) {
+	try {
+		await call(`${API}.delete_area`, { name: area.name })
+	} catch (e) {
+		throw new Error(errorText(e) || __("The area could not be deleted."))
+	}
+}
+
 // --- Burn notices (#2057).
 
 const notices = reactive({})
@@ -717,7 +907,16 @@ const SOCKET_EVENTS = [
 	["chip_space_leave", onRemoteLeave],
 	["chip_space_message", onEncounterMessage],
 	["chip_space_encounter_started", onEncounterStarted],
-	["chip_space_background", (message) => (background.value = message?.url || "")],
+	["chip_space_areas", (message) => setAreas(message?.areas)],
+	[
+		"chip_space_background",
+		(message) => {
+			background.value = message?.url || ""
+			// Not while I'm dragging the sliders myself (my own echo would jump back).
+			if (!layoutTimer) backgroundLayout.value = message?.layout || { ...FITTED }
+			if (!background.value) adjustingBackground.value = false
+		},
+	],
 	...NOTICE_EVENTS,
 	// Rejoin after a lost connection: the others may have moved meanwhile.
 	["connect", () => (heartbeat(), refreshOthers())],
@@ -761,6 +960,7 @@ function tick(now) {
 		scheduleSave()
 		queueMove()
 		checkEncounters()
+		leaveMeetingIfOutside()
 	}
 	frame = requestAnimationFrame(tick)
 }
@@ -807,6 +1007,8 @@ onMounted(async () => {
 		saved = { x: me.value.x, y: me.value.y }
 		presenceTtlMs = (data.presence_ttl || 45) * 1000
 		background.value = data.background || ""
+		backgroundLayout.value = data.background_layout || { ...FITTED }
+		setAreas(data.areas)
 		for (const notice of data.notices || []) upsertNotice(notice)
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
@@ -850,8 +1052,8 @@ onBeforeUnmount(() => {
 .chip-space-grid--image {
 	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px), var(--background-image);
-	background-size: var(--tile) var(--tile), var(--tile) var(--tile), cover;
-	background-position: 0 0, 0 0, center;
+	background-size: var(--tile) var(--tile), var(--tile) var(--tile), var(--background-size, cover);
+	background-position: 0 0, 0 0, var(--background-position, center);
 	background-repeat: repeat, repeat, no-repeat;
 }
 .chip-space-chip {
