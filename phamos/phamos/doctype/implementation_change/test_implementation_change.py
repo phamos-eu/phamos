@@ -382,7 +382,8 @@ class TestImplementationChange(FrappeTestCase):
 
 		# a direct edit of the dates stays locked
 		chapter.target_date = "2026-12-31"
-		self.assertRaises(frappe.ValidationError, chapter.save)
+		with self.assertRaisesRegex(frappe.ValidationError, "can no longer be edited directly"):
+			chapter.save()
 
 	def test_outsiders_learn_nothing_about_a_change(self):
 		name = propose_change(
