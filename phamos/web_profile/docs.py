@@ -204,7 +204,8 @@ def find_page(book: frappe._dict, page_slug, lang=DEFAULT_LANGUAGE) -> frappe._d
 	if not page:
 		return None
 	page.title = page.title or page.slug
-	page.html = render_html(page, lang)
+	rendered = render_html(page, lang)
+	page.html, page.headings = rendered["html"], rendered["headings"]
 	page.chapter_title = page.chapter and frappe.db.get_value("Bookstack Chapter", page.chapter, "title")
 	order = reading_order(book_contents(book, lang))
 	index = next((i for i, p in enumerate(order) if p["slug"] == page.slug), None)
@@ -350,13 +351,16 @@ def website_href(href, index, lang=DEFAULT_LANGUAGE):
 	return docs_url(lang, family_book, anchor=fragment) if family_book else None
 
 
-def render_html(page, lang=DEFAULT_LANGUAGE) -> str:
-	"""The page's stored HTML with links to shown pages pointing at the website (cached)."""
+def render_html(page, lang=DEFAULT_LANGUAGE) -> dict:
+	"""{"html", "headings"} of a page, cached: the stored HTML with links to shown pages pointing at
+	the website, every h2 / h3 with an id, and those headings for "On this page" (#2045)."""
+	lang = _lang(lang)  # runs before init_page checks the route's language: no cache entry for "?lang=xx" (review)
 	stamp = page.get("content_updated_at") or page.get("updated_at") or ""
-	return _cached(f"html:{lang}:{page.name}:{stamp}", lambda: _render_links(page.html or "", lang))
+	# "html2": the value became {"html", "headings"} (#2045); an entry of the older shape must never be read
+	return _cached(f"html2:{lang}:{page.name}:{stamp}", lambda: _render(page.html or "", lang))
 
 
-def _render_links(html, lang):
+def _render(html, lang):
 	index = link_index()
 	soup = BeautifulSoup(html, "html.parser")
 	for a in soup.find_all("a", href=True):
@@ -365,7 +369,31 @@ def _render_links(html, lang):
 			a["href"] = target
 			if a.get("rel"):
 				del a["rel"]  # noopener is for other sites
-	return str(soup)
+
+	# Wide tables scroll sideways in a box of their own; web_docs.bundle.js marks a clipped edge
+	# the way the cockpits do (ScrollHint, #1922).
+	for table in soup.find_all("table"):
+		if table.parent and "wp-docs-table-scroll" in (table.parent.get("class") or []):
+			continue
+		box = soup.new_tag("div", attrs={"class": "wp-docs-table", "data-wp-docs-table": ""})
+		scroller = soup.new_tag("div", attrs={"class": "wp-docs-table-scroll"})
+		table.wrap(scroller)
+		scroller.wrap(box)
+
+	headings, used = [], {tag["id"] for tag in soup.find_all(id=True)}
+	for n, tag in enumerate(soup.find_all(["h2", "h3"]), 1):
+		text = " ".join(tag.get_text(" ").split())
+		if not text:
+			continue
+		if not tag.get("id"):
+			# BookStack gives most headings a "bkmrk-" id; the rest get one so they can be jumped to.
+			candidate = f"wp-h-{n}"
+			while candidate in used:
+				candidate += "-x"
+			tag["id"] = candidate
+			used.add(candidate)
+		headings.append({"id": tag["id"], "text": text, "level": int(tag.name[1])})
+	return {"html": str(soup), "headings": headings}
 
 
 # --- www pages ------------------------------------------------------------------------------------

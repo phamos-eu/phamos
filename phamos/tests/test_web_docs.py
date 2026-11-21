@@ -39,7 +39,9 @@ def _is_404(html):
 	return "is_404 = true" in html
 
 
-class TestWebDocs(FrappeTestCase):
+class DocsFixture(FrappeTestCase):
+	"""Published book with a chapter, an unpublished book; no tests of its own."""
+
 	def setUp(self):
 		frappe.db.savepoint("web_docs_test")
 		frappe.get_doc({
@@ -70,6 +72,8 @@ class TestWebDocs(FrappeTestCase):
 		doc.insert(ignore_permissions=True)
 		return doc.name
 
+
+class TestWebDocs(DocsFixture):
 	def test_overview_lists_published_books_only(self):
 		html = _render("de/dokumentation")
 
@@ -94,6 +98,9 @@ class TestWebDocs(FrappeTestCase):
 		html = _render("de/dokumentation/handbuch-test/konten")
 
 		self.assertIn("<td>1200</td>", html)
+		# wide tables scroll in a box of their own, with the cockpit's scroll hint (#2045)
+		self.assertRegex(html, r'<div class="wp-docs-table" data-wp-docs-table=""><div class="wp-docs-table-scroll"><table>')
+		self.assertIn('data-label-more-right="Mehr rechts"', html)
 		self.assertIn('rel="prev"', html)
 		self.assertIn('href="/de/dokumentation/handbuch-test/erste-schritte" rel="prev"', html)
 		self.assertNotIn('rel="next"', html, "last page has no next")
@@ -169,7 +176,7 @@ class TestWebDocs(FrappeTestCase):
 MODULE = "WP Docs Test Module"
 
 
-class TestModuleDocumentationLinks(TestWebDocs):
+class TestModuleDocumentationLinks(DocsFixture):
 	"""Module pages link their books, the book page links back (phamos/phamos#2006)."""
 
 	def setUp(self):
@@ -234,7 +241,7 @@ class TestModuleDocumentationLinks(TestWebDocs):
 		self.assertIsNone(frappe.cache.hget("web_profile_items", "modules:de"))
 
 
-class TestDocsEnglishAndLinks(TestWebDocs):
+class TestDocsEnglishAndLinks(DocsFixture):
 	"""English pages and links to the website pages (phamos/phamos#2044)."""
 
 	def setUp(self):
@@ -326,3 +333,48 @@ class TestDocsEnglishAndLinks(TestWebDocs):
 		base = "https://doku.example.test"
 		self.assertEqual(html, f'<a href="{base}/books/handbuch-test/page/konten#bkmrk-a">p</a>'
 			f'<a href="{base}/books/handbuch-test/chapter/grundlagen">c</a><a href="{base}/books/handbuch-test">b</a>')
+
+
+class TestDocsLayout(DocsFixture):
+	"""Full-width layouts, collapsible contents, "On this page", jump buttons (phamos/phamos#2045)."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "html",
+			'<h2 id="bkmrk-a">Erster Teil</h2><p>a</p><h3>Unterpunkt</h3><p>b</p><h2>Zweiter Teil</h2>')
+		docs.clear_cache()
+
+	def test_page_lists_its_headings_and_gives_each_an_id(self):
+		html = _render("de/dokumentation/handbuch-test/konten")
+
+		self.assertIn("Auf dieser Seite", html)
+		self.assertIn('href="#bkmrk-a" data-wp-docs-onpage="bkmrk-a">Erster Teil', html)
+		self.assertRegex(html, r'<h3 id="(wp-h-\d+)">Unterpunkt</h3>')
+		heading_id = re.search(r'<h3 id="(wp-h-\d+)">Unterpunkt', html).group(1)
+		self.assertIn(f'href="#{heading_id}" data-wp-docs-onpage="{heading_id}">Unterpunkt', html)
+		self.assertIn('class="wp-docs-onpage-h3"', html)
+
+	def test_page_without_headings_has_no_on_this_page(self):
+		self.assertNotIn("Auf dieser Seite", _render("de/dokumentation/handbuch-test/erste-schritte"))
+
+	def test_contents_open_the_current_chapter_and_can_be_hidden(self):
+		html = _render("de/dokumentation/handbuch-test/konten")
+
+		self.assertRegex(html, r'<details open>\s*<summary>Grundlagen</summary>')
+		self.assertIn("data-wp-docs-nav-toggle hidden", html, "the button appears with the script")
+		self.assertIn('data-label-hide="Inhalt ausblenden"', html)
+		self.assertRegex(html, r'<script[^>]+src="[^"]*web_docs\.bundle')
+		self.assertIn('data-wp-docs-next="h2, h3"', html)
+
+	def test_book_shows_numbered_folding_chapters(self):
+		html = _render("de/dokumentation/handbuch-test")
+
+		self.assertRegex(html, r'<details class="wp-docs-chapter" id="grundlagen" data-wp-docs-chapter>')
+		self.assertIn('<span class="wp-docs-chapter-num" aria-hidden="true">1</span>', html)
+		self.assertIn("1 Seite", html)
+		self.assertNotIn("Lesen beginnen", html)
+		self.assertIn('data-wp-docs-next="[data-wp-docs-chapter]"', html)
+		self.assertIn('class="wp-docs-loose"', html, "a page outside chapters stays in its place")
+
+	def test_other_website_pages_do_not_load_the_docs_script(self):
+		self.assertNotRegex(_render("de/module"), r'<script[^>]+src="[^"]*web_docs\.bundle')
