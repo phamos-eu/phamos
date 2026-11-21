@@ -37,16 +37,28 @@ export const SVG = `
 	</g>
 </svg>`;
 
-// The hand that goes with a bubble (#1990): say(html, ms, "<gesture>"). Yellow emoji, default
-// skin tone; the motion names a keyframe below.
+// The hand that goes with a bubble (#1990), say(html, ms, "<gesture>"), and the reactions
+// without words, react("<gesture>") (#2009). The system's own emoji, default skin tone, so they
+// look like the emoji people know on their device (PM, 2026-11-21). The motion names a keyframe
+// below.
 export const GESTURES = {
 	wave: { hand: "👋", motion: "wave" }, // "Click me!" and the first greeting
 	thumbs_up: { hand: "👍", motion: "bounce" }, // report saved
+	thumbs_down: { hand: "👎", motion: "sink" },
 	fingers_crossed: { hand: "🤞", motion: "sway" }, // sending
 	wait: { hand: "✋", motion: "still" }, // "One moment…"
 	point_up: { hand: "☝️", motion: "up" }, // at the bubble: an unsent or failed report
 	point: { hand: "👉", motion: "point" }, // at Phriend: "Report it?"
+	thanks: { hand: "🙏", motion: "bow" },
+	praise: { hand: "🙌", motion: "raise" },
+	high_five: { hand: "🖐️", motion: "slap" },
+	clap: { hand: "👏", motion: "clap" },
+	heart: { hand: "❤️", motion: "beat" },
+	star: { hand: "⭐", motion: "twinkle" },
+	alert: { hand: "‼️", motion: "pulse" }, // the red double exclamation
 };
+
+const REACT_MS = 1600; // how long a reaction without words shows
 
 // Colours and type for everything inside the Shadow DOM (the flow adds its own rules).
 const BASE_CSS = `
@@ -120,11 +132,27 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .hand.show[data-motion="sway"] { animation: hand-sway 1.2s ease-in-out infinite alternate; }
 .hand.show[data-motion="up"] { animation: hand-up 1s ease-in-out infinite; }
 .hand.show[data-motion="point"] { animation: hand-point 1s ease-in-out infinite; }
+.hand.show[data-motion="sink"] { animation: hand-sink 0.6s ease-out 1; }
+.hand.show[data-motion="slap"] { animation: hand-slap 0.5s ease-out 1; }
+.hand.show[data-motion="bow"] { animation: hand-bow 0.8s ease-in-out 2; }
+.hand.show[data-motion="raise"] { animation: hand-raise 0.4s ease-in-out infinite alternate; }
+.hand.show[data-motion="clap"] { animation: hand-clap 0.3s ease-in-out infinite alternate; }
+.hand.show[data-motion="beat"] { animation: hand-beat 0.8s ease-in-out infinite; }
+.hand.show[data-motion="twinkle"] { animation: hand-twinkle 1.2s ease-in-out infinite; }
+.hand.show[data-motion="pulse"] { animation: hand-pulse 0.7s ease-in-out infinite; }
 @keyframes hand-wave { from { transform: rotate(-14deg); } to { transform: rotate(22deg); } }
 @keyframes hand-bounce { 0% { transform: scale(0.4); } 55% { transform: translateY(-5px) scale(1.25); } 100% { transform: none; } }
+@keyframes hand-sink { 0% { transform: scale(0.4); } 55% { transform: translateY(4px) scale(1.15); } 100% { transform: none; } }
 @keyframes hand-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
 @keyframes hand-up { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 @keyframes hand-point { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes hand-slap { 0% { transform: translateX(-6px) rotate(-20deg) scale(0.6); } 60% { transform: translateX(3px) rotate(6deg) scale(1.2); } 100% { transform: none; } }
+@keyframes hand-bow { 0%, 100% { transform: none; } 40% { transform: translateY(3px) rotate(10deg); } }
+@keyframes hand-raise { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+@keyframes hand-clap { from { transform: scale(1); } to { transform: scale(0.85) rotate(-6deg); } }
+@keyframes hand-beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(0.95); } 60% { transform: scale(1.12); } }
+@keyframes hand-twinkle { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(18deg) scale(1.15); } }
+@keyframes hand-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 .badge {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;
@@ -178,7 +206,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 `;
 
 export class Ball {
-	// options: { label, on_click, on_badge_click, on_first_interest, start }
+	// options: { label, on_click, on_badge_click, on_first_interest, start, hands }
+	// hands: false when "Hands and reactions" is off in Phriend Settings (#2009)
 	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
 	// of their own buttons in the corner)
 	constructor(options) {
@@ -377,8 +406,10 @@ export class Ball {
 	// gesture: a key of GESTURES; the hand shows while this bubble shows.
 	say(html, ms = 4000, gesture = null) {
 		clearTimeout(this._bubble_timer);
+		clearTimeout(this._react_timer);
 		this.bubble.innerHTML = html;
 		this.bubble.classList.add("show");
+		this._bubble_gesture = gesture;
 		this.set_hand(gesture);
 		// a bubble that stays (failures, "One moment…") can be closed
 		this.bubble.classList.toggle("sticky", !ms);
@@ -398,7 +429,9 @@ export class Ball {
 
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
+		clearTimeout(this._react_timer);
 		this.bubble.classList.remove("show");
+		this._bubble_gesture = null;
 		this.set_hand(null);
 	}
 
@@ -406,8 +439,23 @@ export class Ball {
 		return this.bubble.classList.contains("show");
 	}
 
+	// A reaction without words (#2009): the emoji shows for a moment beside the ball. Over a
+	// bubble it borrows the bubble's place and gives the bubble's hand back afterwards.
+	react(name, ms = REACT_MS) {
+		if (!GESTURES[name] || this.options.hands === false) return false;
+		clearTimeout(this._react_timer);
+		this.set_hand(name);
+		if (name === "praise" || name === "high_five") this.hop();
+		this._react_timer = setTimeout(
+			() => this.set_hand(this.bubble_showing() ? this._bubble_gesture : null),
+			ms
+		);
+		return true;
+	}
+
 	set_hand(gesture) {
-		const g = gesture && GESTURES[gesture];
+		// no hands at all when "Hands and reactions" is off (Phriend Settings → Features)
+		const g = this.options.hands !== false && gesture && GESTURES[gesture];
 		this.hand.classList.remove("show");
 		if (!g) return; // keep the emoji while it fades out
 		this.hand.textContent = g.hand;

@@ -214,6 +214,7 @@ def ensure_issue_fields():
 def ensure_default_settings():
 	"""Fill the settings once, on the first migrate; later changes in the form are kept."""
 	ensure_default_shortcut()
+	ensure_default_features()
 	if frappe.db.get_single_value("Phriend Settings", "gitlab_project"):
 		return
 	frappe.db.set_single_value("Phriend Settings", DEFAULT_SETTINGS)
@@ -231,3 +232,20 @@ def ensure_default_shortcut():
 	)
 	if not has_row:
 		frappe.db.set_single_value("Phriend Settings", "shortcut", "Mod+P")
+
+
+# Feature switches that start on (#2009): they keep what Phriend already did. New features of
+# the companion (#2008) start off and are not listed here.
+FEATURES_ON_BY_DEFAULT = ("reactions",)
+
+
+def ensure_default_features():
+	"""Switch on the features listed above on sites that saved Phriend Settings before the
+	switch existed: a new Check on a saved Single reads 0, not its JSON default. Only when the
+	field has no row yet; a switch turned off later in the form is kept."""
+	for field in FEATURES_ON_BY_DEFAULT:
+		has_row = frappe.db.sql(
+			"select 1 from `tabSingles` where doctype='Phriend Settings' and field=%s", field
+		)
+		if not has_row:
+			frappe.db.set_single_value("Phriend Settings", field, 1)

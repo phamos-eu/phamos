@@ -14,8 +14,9 @@
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"
 //   start                     optional: { right, bottom } where the ball sits until it is dragged
 //   user                      the logged-in user, so an unsent draft is offered only to them
+//   features                  optional: the switches of Phriend Settings → Features, { reactions: 1, … } (#2009)
 
-import { Ball } from "./ball";
+import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
 import * as nudge from "./nudge";
 import { format, matches, parse } from "./shortcut";
@@ -26,6 +27,8 @@ const GREETED_KEY = "phriend:greeted";
 const NUDGE_DELAY = 4000; // after the page (or the tab) shows
 const NUDGE_CHECK = 30 * 60 * 1000; // Desk tabs stay open all day
 const NUDGE_MS = 8000;
+const DEBUG_KEY = "phriend:debug"; // localStorage.setItem("phriend:debug", 1): window.phriend.react() and demo()
+const DEMO_STEP = 1800;
 
 export function create_phriend(host) {
 	return new Phriend(host);
@@ -40,6 +43,37 @@ class Phriend {
 		this.log.on_failed_request((item) => this.on_failed_request(item));
 		this.recording = false; // the flow is taking a new shortcut: keys are for it
 		this.set_shortcut(host.shortcut || "");
+	}
+
+	// A switch of Phriend Settings → Features. Missing means on: a host that doesn't send the
+	// switches yet (an older cockpit build) keeps today's behaviour.
+	feature(name) {
+		const features = this.host.features || {};
+		return !(name in features) || !!features[name];
+	}
+
+	// A reaction without words (#2009): react("thanks"), react("high_five"), react("alert")…
+	react(name) {
+		return !!this.ball && this.ball.react(name);
+	}
+
+	// Every reaction once, one after another: for looking at them (debug only).
+	demo() {
+		Object.keys(GESTURES).forEach((name, i) =>
+			setTimeout(() => {
+				console.log(`Phriend: ${name}`);
+				this.react(name);
+			}, i * DEMO_STEP)
+		);
+		return Object.keys(GESTURES);
+	}
+
+	expose_debug() {
+		if (!storage_get(DEBUG_KEY)) return;
+		const api = (window.phriend = window.phriend || {});
+		api.react = (name) => this.react(name);
+		api.demo = () => this.demo();
+		api.reactions = Object.keys(GESTURES);
 	}
 
 	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
@@ -90,8 +124,10 @@ class Phriend {
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
 			close_label: __("Close"),
+			hands: this.feature("reactions"),
 		});
 		this.ball.set_keys(format(this.shortcut));
+		this.expose_debug();
 
 		this.listen_for_shortcut();
 		if (this.host.on_route_change) this.host.on_route_change(() => this.refresh_badge());
