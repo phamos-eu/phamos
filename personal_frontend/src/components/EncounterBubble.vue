@@ -30,6 +30,7 @@
 			:room="video.room"
 			:display-name="displayName"
 			@joined="keepChatFocus"
+			@toggled="input?.focus()"
 		/>
 
 		<div ref="list" class="max-h-48 min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm">

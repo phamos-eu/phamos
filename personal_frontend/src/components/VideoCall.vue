@@ -9,11 +9,38 @@
 		>
 			{{ state === "failed" ? __("The video call could not be started.") : __("Joining the call…") }}
 		</p>
+		<!-- Our own switches: Jitsi hides its toolbar in a frame this small. They drive Jitsi
+		     through its API and show the state Jitsi reports. -->
+		<div v-if="ready" class="absolute left-2 top-2 flex gap-1.5" data-testid="call-controls">
+			<button
+				type="button"
+				class="flex h-8 w-8 items-center justify-center rounded-full text-white shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+				:class="audioMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-black/60 hover:bg-black/80'"
+				:title="audioMuted ? __('Turn on the microphone') : __('Turn off the microphone')"
+				:aria-pressed="!audioMuted"
+				data-testid="toggle-mic"
+				@click="toggle('toggleAudio')"
+			>
+				<FeatherIcon :name="audioMuted ? 'mic-off' : 'mic'" class="h-4 w-4" />
+			</button>
+			<button
+				type="button"
+				class="flex h-8 w-8 items-center justify-center rounded-full text-white shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+				:class="videoMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-black/60 hover:bg-black/80'"
+				:title="videoMuted ? __('Turn on the camera') : __('Turn off the camera')"
+				:aria-pressed="!videoMuted"
+				data-testid="toggle-camera"
+				@click="toggle('toggleVideo')"
+			>
+				<FeatherIcon :name="videoMuted ? 'video-off' : 'video'" class="h-4 w-4" />
+			</button>
+		</div>
 	</div>
 </template>
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue"
+import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -22,7 +49,7 @@ const props = defineProps({
 	room: { type: String, required: true },
 	displayName: { type: String, default: "" },
 })
-const emit = defineEmits(["joined"])
+const emit = defineEmits(["joined", "toggled"])
 
 const host = ref(null)
 const state = ref("joining")
@@ -31,6 +58,16 @@ const quiet = ref(false)
 const quietTimer = setTimeout(() => (quiet.value = true), 8000)
 let api = null
 let disposed = false
+// Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
+const ready = ref(false)
+const audioMuted = ref(true)
+const videoMuted = ref(true)
+
+function toggle(command) {
+	api?.executeCommand(command)
+	// The chat keeps the keyboard after a click on a switch.
+	emit("toggled")
+}
 
 // external_api.js once per page and domain.
 const scripts = (window.__phamosJitsiScripts ||= {})
@@ -71,13 +108,20 @@ onMounted(async () => {
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
 			toolbarButtons: ["microphone", "camera", "tileview", "hangup"],
+			toolbarConfig: { alwaysVisible: true },
 		},
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
 	})
+	ready.value = true
 	api.addListener("videoConferenceJoined", () => {
 		state.value = "joined"
 		emit("joined")
+		// The real state, should Jitsi have ignored the start settings.
+		api?.isAudioMuted().then((muted) => (audioMuted.value = muted))
+		api?.isVideoMuted().then((muted) => (videoMuted.value = muted))
 	})
+	api.addListener("audioMuteStatusChanged", ({ muted }) => (audioMuted.value = muted))
+	api.addListener("videoMuteStatusChanged", ({ muted }) => (videoMuted.value = muted))
 	// Hanging up inside Jitsi just leaves; the chat stays.
 	api.addListener("readyToClose", () => dispose())
 })
@@ -90,6 +134,7 @@ function dispose() {
 		// already gone
 	}
 	api = null
+	ready.value = false
 }
 
 // Walking away or Esc unmounts the bubble: leave the call.
