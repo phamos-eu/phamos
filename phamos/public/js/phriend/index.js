@@ -231,7 +231,9 @@ class Phriend {
 	event_html(payload) {
 		const text = escape_html(payload.text || "");
 		const link = String(payload.link || "");
-		if (!link || !(link.startsWith("/") || link.startsWith("https://"))) return text;
+		// this site ("/app/…", not "//host" or "/\\host") or https only (AI review of !1279)
+		const local = link.startsWith("/") && !link.startsWith("//") && !link.startsWith("/\\");
+		if (!link || !(local || link.startsWith("https://"))) return text;
 		const external = link.startsWith("https://");
 		return `${text} <a href="${escape_html(link)}"${external ? ' target="_blank" rel="noopener"' : ""}>${escape_html(this.__("Open"))}</a>`;
 	}

@@ -11,6 +11,8 @@ its one voice (#2011): a reaction, a note behind the dot, a question, or a red w
 Sending never fails the caller: Phriend is a companion, not a reason for an error.
 """
 
+from urllib.parse import quote
+
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr
@@ -42,6 +44,12 @@ def _for_user(settings, user):
 	return not settings.allowed_role or settings.allowed_role in frappe.get_roles(user)
 
 
+def safe_link(link):
+	"""A path on this site ("/app/…", not "//host" or "/\\host", which browsers open elsewhere)
+	or an https URL (AI review of !1279)."""
+	return (link.startswith("/") and not link.startswith(("//", "/\\"))) or link.startswith("https://")
+
+
 def level_of(settings, kind):
 	spec = KINDS[kind]
 	field = spec.get("warn_field")
@@ -56,7 +64,7 @@ def send(user, kind, text="", link=None):
 		if kind not in KINDS or not _for_user(settings, user):
 			return False
 		link = cstr(link)
-		if link and not (link.startswith("/") or link.startswith("https://")):
+		if link and not safe_link(link):
 			link = ""
 		payload = {
 			"kind": kind,
@@ -115,7 +123,7 @@ def ai_run_failed(run):
 		run.get("triggered_by"),
 		"ai_run_failed",
 		_("The AI agent couldn't finish on {0} {1}.").format(_(run.reference_doctype), run.reference_name),
-		f"/app/{frappe.scrub(run.reference_doctype).replace('_', '-')}/{run.reference_name}",
+		f"/app/{frappe.scrub(run.reference_doctype).replace('_', '-')}/{quote(cstr(run.reference_name), safe='')}",
 	)
 
 

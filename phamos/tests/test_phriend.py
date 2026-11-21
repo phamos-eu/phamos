@@ -466,8 +466,11 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(publish.call_args.args[1]["level"], "note")
 
 		# a link only to this site or https; never to Guest, unknown kinds or users without the role
-		phriend_events.send("Administrator", "gitlab_issue", "x", "javascript:alert(1)")
-		self.assertEqual(publish.call_args.args[1]["link"], "")
+		for bad in ("javascript:alert(1)", "//evil.example/x", "/\\evil.example", "http://plain.example"):
+			phriend_events.send("Administrator", "gitlab_issue", "x", bad)
+			self.assertEqual(publish.call_args.args[1]["link"], "", bad)
+		phriend_events.send("Administrator", "gitlab_issue", "x", "/app/issue/ISS 1")
+		self.assertEqual(publish.call_args.args[1]["link"], "/app/issue/ISS 1")
 		publish.reset_mock()
 		self.assertFalse(phriend_events.send("Guest", "idea_vote"))
 		self.assertFalse(phriend_events.send("Administrator", "no_such_kind"))
