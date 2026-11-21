@@ -84,20 +84,20 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30) -> dict:
 		.limit(ROW_LIMIT)
 	).run(as_dict=True)
 
+	# Rows come ordered from the database (title hits first, then by title); a snippet is built only
+	# for the rows that are shown, not for every row read (review of !1291).
 	pages = []
-	for r in rows:
+	for r in rows[:limit]:
 		book = by_name[r.book]
-		in_title = matches(r.title)
 		pages.append({
 			"title": r.title or r.slug,
 			"url": docs.page_url(book.slug, r.slug, lang),
 			"book_title": book.title,
 			"chapter_title": r.chapter_title,
 			"snippet": snippet(r.search_text, words),
-			"in_title": in_title,
+			"in_title": matches(r.title),
 		})
-	pages.sort(key=lambda p: (not p["in_title"], p["title"].lower()))
-	return {"books": book_hits, "pages": pages[:limit], "total": total, "words": words}
+	return {"books": book_hits, "pages": pages, "total": total, "words": words}
 
 
 def snippet(text, words) -> str:
