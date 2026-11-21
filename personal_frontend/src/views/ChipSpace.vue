@@ -64,6 +64,20 @@
 				:class="{ 'chip-space-grid--image': background }"
 				:style="gridStyle"
 			>
+				<!-- Perimeters (#2056): touching circles = in conversation. Below the chips, no clicks. -->
+				<div
+					v-for="chip in perimeterList"
+					:key="`perimeter-${chip.user}`"
+					class="chip-space-perimeter pointer-events-none absolute rounded-full"
+					:class="{
+						'chip-space-perimeter--me': chip.mine,
+						'chip-space-perimeter--contact': chip.contact,
+						'chip-space-chip--remote': !chip.mine,
+					}"
+					:style="perimeterStyle(chip)"
+					:data-testid="chip.mine ? 'my-perimeter' : 'other-perimeter'"
+					:data-contact="chip.contact ? '1' : '0'"
+				/>
 				<div
 					v-for="other in others"
 					:key="other.user"
@@ -149,8 +163,10 @@ const REMOTE_MOVING_MS = 250
 const API = "phamos.api.chip_space"
 // Encounters (#2056): closer than this (centres, tiles) opens the chat; farther than the second
 // closes it again, so standing right at the edge does not flicker.
-const ENCOUNTER_DISTANCE = 1.2
-const PART_DISTANCE = 1.5
+// Each chip's perimeter has half the encounter distance as radius: two touching circles = in range.
+const ENCOUNTER_DISTANCE = 2
+const PART_DISTANCE = 2.4
+const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
 const BUBBLE_WIDTH_VIDEO = 384
 
@@ -230,6 +246,31 @@ function serverMessages(data) {
 		return []
 	}
 }
+// Every chip with its perimeter; "contact" when it touches another one (anyone's, so groups
+// show as touching circles too).
+const perimeterList = computed(() => {
+	if (!me.value) return []
+	const chips = [{ ...me.value, mine: true }, ...others.value.map((o) => ({ ...o, mine: false }))]
+	return chips.map((chip) => ({
+		user: chip.user,
+		x: chip.x,
+		y: chip.y,
+		mine: chip.mine,
+		contact: chips.some((o) => o.user !== chip.user && Math.hypot(o.x - chip.x, o.y - chip.y) < ENCOUNTER_DISTANCE),
+	}))
+})
+
+function perimeterStyle(chip) {
+	const size = PERIMETER_RADIUS * 2 * tile.value
+	// Centred on the chip's tile centre.
+	const offset = (0.5 - PERIMETER_RADIUS) * tile.value
+	return {
+		width: `${size}px`,
+		height: `${size}px`,
+		transform: `translate(${chip.x * tile.value + offset}px, ${chip.y * tile.value + offset}px)`,
+	}
+}
+
 function chipStyle(chip) {
 	return {
 		width: `${tile.value}px`,
@@ -275,6 +316,13 @@ function onKeyup(event) {
 	shift = event.shiftKey
 	// With Shift held, "w" arrives as "W": lower-case both ways.
 	held.delete(event.key.toLowerCase())
+	// All movement keys let go, still next to someone: now the chip sticks and the chat types.
+	if (!held.size && focusWhenReleased) {
+		const user = focusWhenReleased
+		focusWhenReleased = null
+		const other = others.value.find((o) => o.user === user)
+		if (other && bubbles[user] && distanceTo(other) <= PART_DISTANCE) focusBubble(user)
+	}
 }
 
 // Leaving the window drops every held key, or the chip would keep sailing.
@@ -433,16 +481,25 @@ async function openBubble(other) {
 	} finally {
 		bubble.loading = false
 	}
-	// Walked up to someone: the chat has the keyboard right away, and the chip stops.
+	// Walked up to someone: the chat takes the keyboard, but only once no movement key is
+	// held. Whoever is still walking walks on (and may leave the range again).
 	if (bubble.encounter && bubbles[other.user] === bubble) {
-		releaseAll()
-		await nextTick()
-		bubbleRefs[other.user]?.focus()
+		if (held.size) focusWhenReleased = other.user
+		else focusBubble(other.user)
 	}
+}
+
+// The chat waiting for the keys to be let go (see openBubble).
+let focusWhenReleased = null
+
+async function focusBubble(user) {
+	await nextTick()
+	if (bubbles[user]?.encounter) bubbleRefs[user]?.focus()
 }
 
 // Esc: the chat closes and the keys move the chip again.
 function closeBubble(user) {
+	if (focusWhenReleased === user) focusWhenReleased = null
 	delete bubbles[user]
 	dismissed.add(user)
 	document.activeElement?.blur?.()
@@ -769,6 +826,26 @@ onBeforeUnmount(() => {
 	top: 0;
 	left: 0;
 	will-change: transform;
+}
+/* Perimeters: a circle per chip, stronger for my own, green when touching another. A light edge
+   with a thin dark outline keeps it visible on any background image, light or dark. */
+.chip-space-perimeter {
+	top: 0;
+	left: 0;
+	border: 2px dashed rgba(255, 255, 255, 0.85);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+	background: rgba(255, 255, 255, 0.14);
+	transition: background-color 150ms, border-color 150ms;
+	will-change: transform;
+}
+.chip-space-perimeter--me {
+	border-color: rgba(96, 165, 250, 0.95);
+	background: rgba(59, 130, 246, 0.18);
+}
+.chip-space-perimeter--contact {
+	border-style: solid;
+	border-color: rgba(74, 222, 128, 0.95);
+	background: rgba(34, 197, 94, 0.24);
 }
 /* Other chips arrive about 8 times a second: glide between the updates. */
 .chip-space-chip--remote {

@@ -61,7 +61,7 @@ BACKGROUND_FORMATS = {"PNG": "png", "JPEG": "jpg", "WEBP": "webp", "GIF": "gif"}
 
 # Encounters (#2056): two chips closer than ENCOUNTER_DISTANCE (centres, in tiles) meet. The
 # server allows some slack, since positions it knows may be a few hundred ms old.
-ENCOUNTER_DISTANCE = 1.2
+ENCOUNTER_DISTANCE = 2.0  # the pages draw a perimeter of radius 1 tile around every chip
 SERVER_DISTANCE_SLACK = 1.5
 ENCOUNTER_DOCTYPE = "Chip Space Encounter"
 MAX_MESSAGE_LENGTH = 2000
