@@ -81,8 +81,8 @@
 {% macro search_box(action, lang, book=None, query="") -%}
 <form class="wp-searchbar wp-docs-search" role="search" action="{{ action | e }}" method="get" data-wp-docs-search data-lang="{{ lang }}">
 	{%- set placeholder = _("Search in {0}").format(book.title) if book else _("Search the documentation") %}
-	<label class="wp-visually-hidden" for="wp-docs-q-{{ book.slug if book else 'all' }}">{{ placeholder | e }}</label>
-	<input id="wp-docs-q-{{ book.slug if book else 'all' }}" class="wp-search" type="search" name="q" value="{{ query | e }}"
+	<label class="wp-visually-hidden" for="wp-docs-q-{{ (book.slug if book else 'all') | e }}">{{ placeholder | e }}</label>
+	<input id="wp-docs-q-{{ (book.slug if book else 'all') | e }}" class="wp-search" type="search" name="q" value="{{ query | e }}"
 		minlength="2" maxlength="100" autocomplete="off" placeholder="{{ placeholder | e }}" data-wp-docs-search-input>
 	{%- if book %}
 	<label class="wp-docs-search-scope"><input type="checkbox" name="book" value="{{ book.slug | e }}" checked data-wp-docs-search-book> {{ _("Only this book") }}</label>

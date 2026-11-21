@@ -13,7 +13,8 @@ from __future__ import annotations
 import re
 
 import frappe
-from frappe.query_builder import Criterion
+from frappe.query_builder import Case, Criterion
+from frappe.query_builder.functions import Count
 from frappe.rate_limiter import rate_limit
 from frappe.utils import escape_html
 
@@ -23,6 +24,7 @@ MIN_LENGTH = 2
 MAX_LENGTH = 100
 MAX_WORDS = 6
 SNIPPET_CHARS = 90
+ROW_LIMIT = 200  # pages read per search; the count and the order don't depend on it
 
 
 def search_url(lang, query="", book_slug=None):
@@ -63,14 +65,23 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30) -> dict:
 	by_name = {b.name: b for b in books}
 	page = frappe.qb.DocType("Bookstack Page")
 	chapter = frappe.qb.DocType("Bookstack Chapter")
+	found = Criterion.all([
+		page.book.isin(list(by_name)),
+		page.html.isnotnull() & (page.html != ""),
+		*[page.title.like(_like(w)) | page.search_text.like(_like(w)) for w in words],
+	])
+	# Counted on their own and ordered in the database: the list is cut at 200 rows, and both the
+	# count and the title hits must not depend on which 200 came back (review of !1291).
+	total = frappe.qb.from_(page).select(Count("*")).where(found).run()[0][0]
+	title_first = Case().when(Criterion.all([page.title.like(_like(w)) for w in words]), 0).else_(1)
 	rows = (
 		frappe.qb.from_(page)
 		.left_join(chapter).on(chapter.name == page.chapter)
 		.select(page.name, page.slug, page.title, page.book, page.search_text, chapter.title.as_("chapter_title"))
-		.where(page.book.isin(list(by_name)))
-		.where(page.html.isnotnull() & (page.html != ""))
-		.where(Criterion.all([page.title.like(_like(w)) | page.search_text.like(_like(w)) for w in words]))
-		.limit(200)
+		.where(found)
+		.orderby(title_first)
+		.orderby(page.title)
+		.limit(ROW_LIMIT)
 	).run(as_dict=True)
 
 	pages = []
@@ -86,7 +97,7 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30) -> dict:
 			"in_title": in_title,
 		})
 	pages.sort(key=lambda p: (not p["in_title"], p["title"].lower()))
-	return {"books": book_hits, "pages": pages[:limit], "total": len(pages), "words": words}
+	return {"books": book_hits, "pages": pages[:limit], "total": total, "words": words}
 
 
 def snippet(text, words) -> str:
