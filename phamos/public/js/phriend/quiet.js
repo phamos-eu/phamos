@@ -30,6 +30,15 @@ export function end_of_today(now) {
 	return d.getTime();
 }
 
+// "I'm back", "ready", "let's go": coming back is a different gesture each time (PM, 2026-11-21).
+export const BACK_GESTURES = ["wave", "high_five", "praise", "thumbs_up", "clap", "muscle", "rocket"];
+
+// A back gesture, never the same as the last one. random: () => [0, 1), for the tests.
+export function pick_back(previous, random = Math.random) {
+	const choices = BACK_GESTURES.filter((g) => g !== previous);
+	return choices[Math.min(choices.length - 1, Math.floor(random() * choices.length))];
+}
+
 // When to come back by itself: ms from now, or null (not quiet, or until called back).
 export function back_in(state, now) {
 	const until = state && state.quiet_until;

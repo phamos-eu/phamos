@@ -47,18 +47,28 @@ class Phriend {
 		this.log = new ErrorLog(); // start recording errors as early as possible
 		this.log.on_failed_request((item) => this.on_failed_request(item));
 		this.recording = false; // the flow is taking a new shortcut: keys are for it
-		this.quiet = host.quiet || null; // leave me in peace (#2010)
+		this.set_quiet_state(host.quiet || null); // leave me in peace (#2010)
 		this.set_shortcut(host.shortcut || "");
 	}
 
 	// ---- leave me in peace (#2010)
+
+	// The quiet times are on the server's clock; server_now tells how far this browser's clock is off.
+	set_quiet_state(state) {
+		this.quiet = state;
+		this.clock_offset = state && state.server_now ? state.server_now - Date.now() : 0;
+	}
+
+	now() {
+		return Date.now() + (this.clock_offset || 0);
+	}
 
 	has_menu() {
 		return this.feature("quiet_mode") && "quiet_mode" in (this.host.features || {});
 	}
 
 	is_quiet() {
-		return this.has_menu() && quiet.is_quiet(this.quiet, Date.now());
+		return this.has_menu() && quiet.is_quiet(this.quiet, this.now());
 	}
 
 	time_label(ms) {
@@ -67,21 +77,25 @@ class Phriend {
 
 	menu_entries() {
 		const __ = this.__;
-		const now = Date.now();
+		const now = this.now();
 		const entries = [];
 		if (quiet.is_quiet(this.quiet, now)) {
 			const until = this.quiet.quiet_until;
 			entries.push(
 				{ heading: __("Leave me in peace") },
 				{ note: until === quiet.FOREVER ? __("Quiet until you call me back") : __("Quiet until {0}", [this.time_label(until)]) },
-				{ label: __("Come back"), action: () => this.set_quiet("") }
+				{ label: __("Come back"), action: () => this.set_quiet({ until: "" }) }
 			);
 		} else {
 			entries.push(
 				{ heading: __("Leave me in peace") },
-				{ label: __("For 1 hour"), action: () => this.set_quiet(now + quiet.HOUR_MS) },
-				{ label: __("For today"), action: () => this.set_quiet(quiet.end_of_today(Date.now())) },
-				{ label: __("Until I call you back"), action: () => this.set_quiet(quiet.FOREVER) }
+				// an hour is counted on the server; "today" ends at this browser's midnight, on the server's clock
+				{ label: __("For 1 hour"), action: () => this.set_quiet({ minutes: 60 }) },
+				{
+					label: __("For today"),
+					action: () => this.set_quiet({ until: quiet.end_of_today(Date.now()) + (this.clock_offset || 0) }),
+				},
+				{ label: __("Until I call you back"), action: () => this.set_quiet({ until: quiet.FOREVER }) }
 			);
 		}
 		entries.push({ heading: __("Mute warnings") });
@@ -105,10 +119,10 @@ class Phriend {
 		return entries;
 	}
 
-	async set_quiet(until) {
-		if (!(await this.save_quiet("phamos.phriend.api.set_my_quiet", { until }))) return;
+	// args: { minutes } or { until: ms | "forever" | "" }
+	async set_quiet(args) {
+		if (!(await this.save_quiet("phamos.phriend.api.set_my_quiet", args))) return;
 		if (this.is_quiet()) this.ball.hide_bubble();
-		else this.ball.react("wave"); // back
 	}
 
 	async set_warning_mute(minutes) {
@@ -117,7 +131,7 @@ class Phriend {
 
 	async save_quiet(method, args) {
 		try {
-			this.quiet = await call(method, args, this.host.csrf_token());
+			this.set_quiet_state(await call(method, args, this.host.csrf_token()));
 			this.apply_quiet();
 			return true;
 		} catch (e) {
@@ -131,9 +145,16 @@ class Phriend {
 	// Step back while quiet (smaller, faded, still there), and come back when the time is up.
 	apply_quiet() {
 		if (!this.ball) return;
-		this.ball.set_resting(this.is_quiet());
+		const was_resting = this.ball.root.classList.contains("resting");
+		const resting = this.is_quiet();
+		this.ball.set_resting(resting);
+		if (was_resting && !resting) {
+			// back: called back or the time is up; a different gesture each time
+			this._last_back = quiet.pick_back(this._last_back);
+			this.ball.react(this._last_back);
+		}
 		clearTimeout(this._back_timer);
-		const back = quiet.back_in(this.quiet, Date.now());
+		const back = quiet.back_in(this.quiet, this.now());
 		// a quiet time is at most a day; setTimeout can't wait much longer than 24 days anyway
 		if (back !== null) this._back_timer = setTimeout(() => this.apply_quiet(), back + 500);
 	}
@@ -149,7 +170,7 @@ class Phriend {
 	react(name) {
 		if (!this.ball) return false;
 		// while quiet only the red warning gets through, and not while warnings are muted (#2010)
-		if (this.has_menu() && !quiet.may_react(name, this.quiet, Date.now())) return false;
+		if (this.has_menu() && !quiet.may_react(name, this.quiet, this.now())) return false;
 		return this.ball.react(name);
 	}
 

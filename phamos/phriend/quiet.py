@@ -36,18 +36,25 @@ def _read(key, now):
 
 
 def state(now=None):
-	"""{"quiet_until": ms | "forever" | None, "warnings_muted_until": ms | None} for the boot."""
+	"""{"quiet_until": ms | "forever" | None, "warnings_muted_until": ms | None, "server_now": ms}
+	for the boot. server_now lets the browser compare these times on the server's clock, so a
+	browser clock that is off doesn't shorten or lengthen them (AI review of !1273)."""
 	now = now or now_ms()
 	mute = _read(MUTE_DEFAULT, now)
 	return {
 		"quiet_until": _read(QUIET_DEFAULT, now),
 		"warnings_muted_until": mute if mute != FOREVER else None,
+		"server_now": now,
 	}
 
 
-def set_quiet(until, now=None):
-	"""until: "forever", a time in ms within the next 25 hours, or empty to call Phriend back."""
+def set_quiet(until=None, minutes=None, now=None):
+	"""minutes: quiet for that long, counted on the server's clock ("for 1 hour"); or until:
+	"forever", a time in ms within the next 25 hours ("for today", the browser's midnight), or
+	empty to call Phriend back."""
 	now = now or now_ms()
+	if cint(minutes):
+		until = now + cint(minutes) * 60 * 1000
 	value = cstr(until).strip()
 	if not value:
 		frappe.defaults.clear_user_default(QUIET_DEFAULT)
@@ -55,7 +62,9 @@ def set_quiet(until, now=None):
 		frappe.defaults.set_user_default(QUIET_DEFAULT, FOREVER)
 	else:
 		ms = cint(value)
-		if not now < ms <= now + MAX_QUIET_MS:
+		if ms <= now:
+			frappe.throw(_("That time has already passed. Is your computer's clock right?"))
+		if ms > now + MAX_QUIET_MS:
 			frappe.throw(_("Phriend can be quiet for today at most, or until you call it back."))
 		frappe.defaults.set_user_default(QUIET_DEFAULT, str(ms))
 	return state(now)

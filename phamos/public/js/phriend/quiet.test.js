@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { FOREVER, HOUR_MS, end_of_today, is_quiet, may_react, back_in, warnings_muted } from "./quiet.js"
+import { BACK_GESTURES, FOREVER, HOUR_MS, back_in, end_of_today, is_quiet, may_react, pick_back, warnings_muted } from "./quiet.js"
+import { GESTURES } from "./ball.js"
 
 const now = new Date(2026, 10, 21, 14, 30).getTime()
 
@@ -21,6 +22,12 @@ describe("leave me in peace (#2010)", () => {
 	})
 	it("ends 'for today' at local midnight", () => {
 		expect(end_of_today(now)).toBe(new Date(2026, 10, 22, 0, 0).getTime())
+	})
+	it("comes back with a different gesture each time, all of them real gestures", () => {
+		for (const g of BACK_GESTURES) expect(GESTURES[g], g).toBeTruthy()
+		for (const r of [0, 0.3, 0.6, 0.9999]) expect(pick_back("wave", () => r)).not.toBe("wave")
+		const seen = new Set(Array.from({ length: 200 }, () => pick_back(null)))
+		expect(seen.size).toBeGreaterThan(3)
 	})
 	it("comes back by itself only from a timed quiet", () => {
 		expect(back_in({ quiet_until: now + 5000 }, now)).toBe(5000)

@@ -56,6 +56,8 @@ export const GESTURES = {
 	heart: { hand: "❤️", motion: "beat" },
 	star: { hand: "⭐", motion: "twinkle" },
 	alert: { hand: "‼️", motion: "pulse" }, // the red double exclamation
+	muscle: { hand: "💪", motion: "flex" }, // "ready", back from quiet (#2010)
+	rocket: { hand: "🚀", motion: "launch" }, // "let's go", back from quiet (#2010)
 };
 
 const REACT_MS = 1600; // how long a reaction without words shows
@@ -170,6 +172,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .hand.show[data-motion="beat"] { animation: hand-beat 0.8s ease-in-out infinite; }
 .hand.show[data-motion="twinkle"] { animation: hand-twinkle 1.2s ease-in-out infinite; }
 .hand.show[data-motion="pulse"] { animation: hand-pulse 0.7s ease-in-out infinite; }
+.hand.show[data-motion="flex"] { animation: hand-flex 0.5s ease-in-out 3 alternate; }
+.hand.show[data-motion="launch"] { animation: hand-launch 1.4s ease-in 1 forwards; }
 @keyframes hand-wave { from { transform: rotate(-14deg); } to { transform: rotate(22deg); } }
 @keyframes hand-bounce { 0% { transform: scale(0.4); } 55% { transform: translateY(-5px) scale(1.25); } 100% { transform: none; } }
 @keyframes hand-sink { 0% { transform: scale(0.4); } 55% { transform: translateY(4px) scale(1.15); } 100% { transform: none; } }
@@ -183,6 +187,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @keyframes hand-beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(0.95); } 60% { transform: scale(1.12); } }
 @keyframes hand-twinkle { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(18deg) scale(1.15); } }
 @keyframes hand-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes hand-flex { from { transform: rotate(0) scale(1); } to { transform: rotate(-12deg) scale(1.2); } }
+@keyframes hand-launch { 0% { transform: none; } 30% { transform: translate(-2px, 2px); } 100% { transform: translate(14px, -26px); opacity: 0; } }
 .badge {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;

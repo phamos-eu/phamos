@@ -380,10 +380,19 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(api.set_my_quiet(str(hour))["quiet_until"], hour)
 		self.assertEqual(phriend_boot()["quiet"]["quiet_until"], hour)
 		self.assertEqual(api.set_my_quiet("forever")["quiet_until"], "forever")
+		# "for 1 hour" is counted on the server's clock, and the state carries that clock
+		state = api.set_my_quiet(minutes=60)
+		self.assertAlmostEqual(state["quiet_until"], state["server_now"] + 60 * 60 * 1000, delta=1000)
 		for refused in (now - 1000, now + 26 * 60 * 60 * 1000, "soon"):
 			with self.subTest(until=refused), self.assertRaises(frappe.ValidationError):
 				api.set_my_quiet(refused)
 		self.assertIsNone(api.set_my_quiet("")["quiet_until"])  # back
+
+		# a migrate doesn't switch the new feature on (only the ones that start on)
+		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "quiet_mode"})
+		setup.ensure_default_features()
+		self.assertFalse(frappe.db.get_single_value("Phriend Settings", "quiet_mode"))
+		self.set_settings(quiet_mode=1)
 
 		muted = api.set_my_warning_mute(90)["warnings_muted_until"]
 		self.assertAlmostEqual(muted, now + 90 * 60 * 1000, delta=60 * 1000)
