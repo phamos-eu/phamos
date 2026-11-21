@@ -30,6 +30,7 @@
 			:room="video.room"
 			:display-name="displayName"
 			@joined="keepChatFocus"
+			@stolen="keepChatFocus"
 			@toggled="input?.focus()"
 		/>
 
@@ -60,6 +61,7 @@
 				:maxlength="2000"
 				:aria-busy="sending || undefined"
 				@keydown="onInputKeydown"
+				@focus="chatActive = true"
 			/>
 		</form>
 	</div>
@@ -117,10 +119,24 @@ watch(
 	{ immediate: true }
 )
 
-// Jitsi's frame may take the focus when it joins: give it back to the chat.
+// Jitsi's frame may take the focus by itself (on load, on join). Give it back: to the chat if
+// the user was in it, otherwise to the Space, so the keys move the chip again.
+const chatActive = ref(false)
 function keepChatFocus() {
-	if (document.activeElement?.tagName === "IFRAME") input.value?.focus()
+	if (document.activeElement?.tagName !== "IFRAME") return
+	if (chatActive.value) input.value?.focus()
+	else {
+		document.activeElement.blur()
+		window.focus()
+	}
 }
 
-defineExpose({ focus: () => input.value?.focus() })
+defineExpose({
+	focus: () => input.value?.focus(),
+	/** The key that started the chat becomes its first character. */
+	insert: (text) => {
+		draft.value += text
+		input.value?.focus()
+	},
+})
 </script>

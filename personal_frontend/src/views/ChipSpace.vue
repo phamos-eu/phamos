@@ -95,6 +95,15 @@
 						/>
 					</span>
 				</div>
+				<!-- Standing next to someone (#2056): the next key starts the chat. -->
+				<p
+					v-if="chatHint"
+					class="pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-black/75 px-3 py-1 text-xs text-white shadow"
+					:style="chatHint.style"
+					data-testid="chat-hint"
+				>
+					{{ __("Press any key to chat with {0}, Esc to walk on", [chatHint.name]) }}
+				</p>
 				<EncounterBubble
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
@@ -297,14 +306,14 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
-	if (event.key === "Enter" && focusNearestBubble()) {
-		event.preventDefault()
-		return
-	}
+	// Standing (no movement key held) next to someone: any key starts the chat. Whoever is
+	// still walking (keys held, also overlapping ones) walks on (PM, 2026-11-21).
+	if (!held.size && !event.repeat && startChatWithKey(event)) return
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
 	held.add(key)
+	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
 	if (!frame) {
 		lastTime = performance.now()
@@ -316,18 +325,55 @@ function onKeyup(event) {
 	shift = event.shiftKey
 	// With Shift held, "w" arrives as "W": lower-case both ways.
 	held.delete(event.key.toLowerCase())
-	// All movement keys let go, still next to someone: now the chip sticks and the chat types.
-	if (!held.size && focusWhenReleased) {
-		const user = focusWhenReleased
-		focusWhenReleased = null
-		const other = others.value.find((o) => o.user === user)
-		if (other && bubbles[user] && distanceTo(other) <= PART_DISTANCE) focusBubble(user)
+	heldCount.value = held.size
+}
+
+// Keys that never start a chat on their own (they come with others, or mean something else).
+const NOT_A_START = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab", "Fn", "Dead"])
+
+/** The nearest chip within the encounter distance, or null. */
+function nearestInRange() {
+	let best = null
+	for (const other of others.value) {
+		const distance = distanceTo(other)
+		if (distance < ENCOUNTER_DISTANCE && (!best || distance < best.distance)) best = { other, distance }
 	}
+	return best?.other || null
+}
+
+/**
+ * A key pressed while standing. Next to someone it starts (or enters) the chat and is used up;
+ * a letter that isn't a movement key becomes the first character. Esc walks on instead.
+ */
+function startChatWithKey(event) {
+	if (NOT_A_START.has(event.key)) return false
+	const other = nearestInRange()
+	if (!other) return false
+	if (event.key === "Escape") {
+		if (bubbles[other.user]) closeBubble(other.user)
+		else if (dismissed.has(other.user)) return false
+		else dismissed.add(other.user)
+		event.preventDefault()
+		return true
+	}
+	if (dismissed.has(other.user)) {
+		// Esc said "walk on"; only Enter brings the chat back while still here.
+		if (event.key !== "Enter") return false
+		dismissed.delete(other.user)
+	}
+	event.preventDefault()
+	const text = event.key.length === 1 && !DIRECTIONS[event.key.toLowerCase()] ? event.key : ""
+	const bubble = bubbles[other.user]
+	if (!bubble) openBubble(other, { focus: true, text })
+	else if (bubble.loading) bubble.pendingText += text
+	else focusBubble(other.user, text)
+	return true
 }
 
 // Leaving the window drops every held key, or the chip would keep sailing.
 function releaseAll() {
 	held.clear()
+	heldCount.value = 0
 	tapped.clear()
 	shift = false
 }
@@ -439,8 +485,8 @@ function checkEncounters() {
 	if (!me.value) return
 	for (const other of others.value) {
 		const distance = distanceTo(other)
-		if (distance < ENCOUNTER_DISTANCE && !bubbles[other.user] && !dismissed.has(other.user)) openBubble(other)
-		else if (distance > PART_DISTANCE) {
+		// Chats no longer open by walking past: see startChatWithKey and onEncounterStarted.
+		if (distance > PART_DISTANCE) {
 			delete bubbles[other.user]
 			dismissed.delete(other.user)
 			partFrom(other.user)
@@ -455,8 +501,9 @@ function checkEncounters() {
 	}
 }
 
-async function openBubble(other) {
+async function openBubble(other, { focus = false, text = "", fromPeer = false } = {}) {
 	const bubble = reactive({
+		pendingText: text,
 		user: other.user,
 		peer: { user: other.user, full_name: other.full_name, user_image: other.user_image },
 		encounter: null,
@@ -481,25 +528,45 @@ async function openBubble(other) {
 	} finally {
 		bubble.loading = false
 	}
-	// Walked up to someone: the chat takes the keyboard, but only once no movement key is
-	// held. Whoever is still walking walks on (and may leave the range again).
-	if (bubble.encounter && bubbles[other.user] === bubble) {
-		if (held.size) focusWhenReleased = other.user
-		else focusBubble(other.user)
-	}
+	if (!bubble.encounter || bubbles[other.user] !== bubble) return
+	// Started here with a key: the chat has the keyboard. Started by the other person: only
+	// if I'm standing; whoever is walking walks on.
+	if (focus || (fromPeer && !held.size)) focusBubble(other.user, bubble.pendingText)
+	bubble.pendingText = ""
 }
 
-// The chat waiting for the keys to be let go (see openBubble).
-let focusWhenReleased = null
-
-async function focusBubble(user) {
+async function focusBubble(user, text = "") {
 	await nextTick()
-	if (bubbles[user]?.encounter) bubbleRefs[user]?.focus()
+	if (!bubbles[user]?.encounter) return
+	bubbleRefs[user]?.focus()
+	if (text) bubbleRefs[user]?.insert(text)
 }
+
+// The other person started the chat (open_encounter tells this page): open it here too.
+function onEncounterStarted(message) {
+	const other = others.value.find((o) => o.user === message?.with)
+	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
+	if (distanceTo(other) > PART_DISTANCE) return
+	openBubble(other, { fromPeer: true })
+}
+
+// Standing next to someone without a chat: the hint above the two.
+const heldCount = ref(0)
+const chatHint = computed(() => {
+	if (!me.value || heldCount.value) return null
+	const other = nearestInRange()
+	if (!other || bubbles[other.user] || dismissed.has(other.user)) return null
+	const t = tile.value
+	const left = ((me.value.x + other.x) / 2 + 0.5) * t
+	const top = Math.min(me.value.y, other.y) * t - PERIMETER_RADIUS * t + 0.2 * t
+	return {
+		name: (other.full_name || "").split(" ")[0] || other.full_name,
+		style: { left: `${left}px`, top: `${top}px`, transform: "translate(-50%, -100%)" },
+	}
+})
 
 // Esc: the chat closes and the keys move the chip again.
 function closeBubble(user) {
-	if (focusWhenReleased === user) focusWhenReleased = null
 	delete bubbles[user]
 	dismissed.add(user)
 	document.activeElement?.blur?.()
@@ -532,26 +599,6 @@ function errorText(e) {
 	const first = Array.isArray(e?.messages) ? e.messages[0] : ""
 	if (!first || typeof first !== "string") return ""
 	return new DOMParser().parseFromString(first, "text/html").body.textContent || ""
-}
-
-// Enter (while not typing) jumps into the chat of the nearest chip.
-function focusNearestBubble() {
-	// A chat closed with Esc, with its person still right here: open it again.
-	const near = others.value.find((o) => dismissed.has(o.user) && distanceTo(o) < ENCOUNTER_DISTANCE)
-	if (near) {
-		dismissed.delete(near.user)
-		openBubble(near)
-		return true
-	}
-	const open = Object.values(bubbles).filter((b) => b.encounter)
-	if (!open.length) return false
-	const nearest = open
-		.map((b) => [b, others.value.find((o) => o.user === b.user)])
-		.filter(([, o]) => o)
-		.sort((a, b) => distanceTo(a[1]) - distanceTo(b[1]))[0]
-	if (!nearest) return false
-	bubbleRefs[nearest[0].user]?.focus()
-	return true
 }
 
 // --- Burn notices (#2057).
@@ -685,6 +732,7 @@ const SOCKET_EVENTS = [
 	["chip_space_move", onRemoteMove],
 	["chip_space_leave", onRemoteLeave],
 	["chip_space_message", onEncounterMessage],
+	["chip_space_encounter_started", onEncounterStarted],
 	["chip_space_background", (message) => (background.value = message?.url || "")],
 	...NOTICE_EVENTS,
 	// Rejoin after a lost connection: the others may have moved meanwhile.

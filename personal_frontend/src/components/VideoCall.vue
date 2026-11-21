@@ -1,6 +1,11 @@
 <template>
 	<!-- The video call of an encounter (#2059): Jitsi, joined muted with the camera off. -->
-	<div class="relative aspect-video w-full overflow-hidden bg-surface-gray-7" data-testid="video-call">
+	<div
+		class="relative aspect-video w-full overflow-hidden bg-surface-gray-7"
+		data-testid="video-call"
+		@mouseenter="pointerOver = true"
+		@mouseleave="pointerOver = false"
+	>
 		<div ref="host" class="h-full w-full" />
 		<!-- Never in Jitsi's way: no clicks, at the bottom edge, and gone after a while. -->
 		<p
@@ -60,7 +65,7 @@ const props = defineProps({
 	room: { type: String, required: true },
 	displayName: { type: String, default: "" },
 })
-const emit = defineEmits(["joined", "toggled"])
+const emit = defineEmits(["joined", "toggled", "stolen"])
 
 const host = ref(null)
 const state = ref("joining")
@@ -71,11 +76,16 @@ let api = null
 let disposed = false
 // Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
 const ready = ref(false)
-// A click into Jitsi's frame moves the focus there: the page's window loses it (blur).
+// A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
+// the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
+// and the keyboard goes back to the Space ("stolen").
 const frameClicked = ref(false)
+const pointerOver = ref(false)
 function onWindowBlur() {
 	setTimeout(() => {
-		if (host.value && host.value.contains(document.activeElement)) frameClicked.value = true
+		if (!host.value || !host.value.contains(document.activeElement)) return
+		if (pointerOver.value) frameClicked.value = true
+		else emit("stolen")
 	})
 }
 const audioMuted = ref(true)

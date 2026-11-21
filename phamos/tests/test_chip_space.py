@@ -216,6 +216,14 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		# ...and released with the transaction.
 		self.assertIsNone(frappe.db.sql("SELECT IS_USED_LOCK(%s)", (name,))[0][0])
 
+	def test_starting_a_chat_opens_it_on_the_other_side(self):
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			started = self._open(self.A, self.B)
+		calls = [c for c in publish.call_args_list if c.args[0] == chip_space.EVENT_STARTED]
+		self.assertEqual(len(calls), 1)
+		self.assertEqual(calls[0].kwargs["user"], self.B)
+		self.assertEqual(calls[0].args[1], {"encounter": started["encounter"], "with": self.A})
+
 	def test_too_far_apart(self):
 		with self.assertRaises(frappe.ValidationError):
 			self._open(self.A, self.C)

@@ -50,6 +50,8 @@ EVENT_PRESENCE = "chip_space_presence"
 EVENT_MOVE = "chip_space_move"
 EVENT_LEAVE = "chip_space_leave"
 EVENT_MESSAGE = "chip_space_message"
+# The other person's page opens the chat too when one of the two starts it (#2056).
+EVENT_STARTED = "chip_space_encounter_started"
 EVENT_BACKGROUND = "chip_space_background"
 
 # The Space's background image: one for everyone, any Space user may change it (PM, 2026-11-21).
@@ -511,7 +513,11 @@ def open_encounter(with_user):
 			doc.db_set("raven_channel", _create_channel(user_a, user_b), update_modified=False)
 			name = doc.name
 	# Locking read again: this transaction's snapshot may predate the other page's commit.
-	return _encounter_payload(_require_party(name, for_update=True))
+	payload = _encounter_payload(_require_party(name, for_update=True))
+	# Chats start on a key press now (standing next to someone), not by walking past: tell the
+	# other page, so its bubble opens without a key press there.
+	frappe.publish_realtime(EVENT_STARTED, {"encounter": name, "with": me}, user=with_user, after_commit=True)
+	return payload
 
 
 @frappe.whitelist()
