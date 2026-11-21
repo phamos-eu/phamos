@@ -258,6 +258,23 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 :host([data-theme="dark"]) .bubble .shape { filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55)); }
 .bubble .shape path { fill: var(--ph-bg); stroke: var(--ph-border-strong); stroke-width: 1; }
 .bubble .content { position: relative; }
+/* Rating a fix (#2014): thumbs or stars, then an optional comment, inside the bubble. */
+.rate-q { margin-bottom: 6px; }
+.rate-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rate-row button.pick { min-width: 36px; height: 32px; padding: 0 8px; border: 1px solid var(--ph-border-strong); border-radius: 8px;
+	background: var(--ph-surface); color: var(--ph-text); font-size: 18px; line-height: 1; cursor: pointer;
+	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--ph-font); }
+.rate-row button.pick:hover, .rate-row button.pick:focus-visible { border-color: var(--ph-focus); outline: none; }
+.rate-row.stars button.pick { min-width: 0; width: 30px; padding: 0; font-size: 17px; color: #e0a800; }
+.rate-row.stars button.pick.on { background: #fff6d6; }
+:host([data-theme="dark"]) .rate-row.stars button.pick.on { background: #3a3215; }
+.rate-foot { margin-top: 6px; font-size: 12px; color: var(--ph-muted); }
+.rate-comment { display: block; width: 100%; min-width: 220px; margin: 6px 0; padding: 6px 8px; resize: vertical;
+	border: 1px solid var(--ph-border-strong); border-radius: 8px; background: var(--ph-bg); color: var(--ph-text);
+	font: inherit; font-size: 13px; }
+.rate-comment:focus { outline: 2px solid var(--ph-focus); outline-offset: 0; }
+.rate-send { padding: 4px 12px; border: 0; border-radius: 8px; background: var(--ph-accent); color: var(--ph-on-accent);
+	font: inherit; font-size: 13px; cursor: pointer; }
 .bubble.sticky { padding-right: 28px; }
 .bubble-close { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px;
 	background: transparent; color: var(--ph-muted); font: inherit; font-size: 15px; line-height: 20px; cursor: pointer; }
@@ -658,10 +675,19 @@ export class Ball {
 	// html: trusted markup built by Phriend itself (user text is escaped by the caller).
 	// ms = 0 keeps the bubble until the next say() or hide_bubble().
 	// gesture: a key of GESTURES; its emoji shows inside the bubble, in front of the text.
-	say(html, ms = 4000, gesture = null) {
+	// on_close: called when the user closes a bubble that stays (ms = 0) with ×, not when it is
+	// replaced or hidden by code (#2014: a rating question put off to another day)
+	say(html, ms = 4000, gesture = null, { on_close = null } = {}) {
 		clearTimeout(this._react_timer);
 		this._bubble_gesture = gesture;
-		this.show_bubble(`${this.emoji_html(gesture)}${html}`, ms, false);
+		this.show_bubble(`${this.emoji_html(gesture)}${html}`, ms, false, on_close);
+		return this.bubble;
+	}
+
+	// New content in the bubble that is showing (a next step), redrawn to its size, same place.
+	refill_bubble(html) {
+		this.bubble_content.innerHTML = html;
+		this.draw_bubble(false);
 		return this.bubble;
 	}
 
@@ -671,7 +697,7 @@ export class Ball {
 		return g ? `<span class="emoji" data-motion="${g.motion}" aria-hidden="true">${g.hand}</span>` : "";
 	}
 
-	show_bubble(html, ms, only_emoji) {
+	show_bubble(html, ms, only_emoji, on_close = null) {
 		this.close_menu(false); // the bubble sits where the menu is
 		clearTimeout(this._bubble_timer);
 		const old_close = this.bubble.querySelector(".bubble-close");
@@ -686,7 +712,10 @@ export class Ball {
 			close.className = "bubble-close";
 			close.textContent = "×";
 			close.setAttribute("aria-label", this.options.close_label || "Close");
-			close.addEventListener("click", () => this.hide_bubble());
+			close.addEventListener("click", () => {
+				this.hide_bubble();
+				if (on_close) on_close();
+			});
 			this.bubble.appendChild(close);
 		}
 		this.draw_bubble();
@@ -694,9 +723,10 @@ export class Ball {
 		if (ms) this._bubble_timer = setTimeout(() => this.hide_bubble(), ms);
 	}
 
-	// The outline to the bubble's size, landing a little off each time.
-	draw_bubble() {
-		const j = jitter();
+	// The outline to the bubble's size, landing a little off each time (again: a new place).
+	draw_bubble(again = true) {
+		const j = again || !this._jitter ? jitter() : this._jitter;
+		this._jitter = j;
 		this.bubble.style.setProperty("--jx", `${j.x}px`);
 		this.bubble.style.setProperty("--jy", `${j.y}px`);
 		this.bubble.style.setProperty("--jr", `${j.rot}deg`);

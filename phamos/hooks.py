@@ -618,6 +618,8 @@ scheduler_events = {
         "phamos.bookstack_integration.sync.sync_all_instances",
     ],
     "daily": [
+        # Phriend: rating questions for reports that went live (#2014)
+        "phamos.phriend.feedback.create_due_requests",
         # Implementation Release: capacity shrinks every day, leave changes (#1986)
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
@@ -744,6 +746,8 @@ user_data_fields = [
 	},
 	{"doctype": "Idea Writing Session", "filter_by": "user"},
 	{"doctype": "Idea Vote", "filter_by": "user"},
+	# Phriend's rating questions and answers (#2014)
+	{"doctype": "Phriend Feedback", "filter_by": "user", "redact_fields": ["comment"]},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import cint
 
+from phamos.phriend.feedback import open_requests as open_feedback
 from phamos.phriend.quiet import state as quiet_state
 from phamos.phriend.shortcut import site_shortcut, user_shortcut
 from phamos.phriend.voice import state as voice_state
@@ -46,11 +47,13 @@ def phriend_boot():
 		"can_configure": 1 if frappe.has_permission("Phriend Settings", "write") else 0,
 		# one voice (#2011): today's unprompted bubbles, while the feature is on
 		"voice": voice_state(settings) if on["one_voice"] else None,
+		# rating a fix (#2014): the user's open rating questions
+		"feedback": open_feedback() if on["rate_fixes"] else None,
 	}
 
 
 # Phriend Settings → Features: one switch per feature (#2008); the companion slices add theirs.
-FEATURE_FIELDS = ("reactions", "quiet_mode", "one_voice", "events", "easter_eggs")
+FEATURE_FIELDS = ("reactions", "quiet_mode", "one_voice", "events", "easter_eggs", "rate_fixes")
 
 
 def features(settings):

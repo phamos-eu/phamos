@@ -176,6 +176,8 @@ const desk = {
 	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
 	// events (#2012): the user's own realtime room
 	on_event: (cb) => frappe.realtime && frappe.realtime.on("phriend_event", cb),
+	// rating a fix (#2014)
+	feedback: (frappe.boot.phriend && frappe.boot.phriend.feedback) || [],
 };
 
 frappe.provide("phriend");

@@ -20,6 +20,7 @@
 //   open_settings()           optional: open Phriend Settings
 //   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
 //   on_event(cb)              optional: call cb(payload) for every "phriend_event" of this user (#2012)
+//   feedback                  optional: the user's open rating questions from the boot (#2014)
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
@@ -27,6 +28,7 @@ import * as nudge from "./nudge";
 import * as play from "./play";
 import * as quiet from "./quiet";
 import { call } from "./request";
+import { rating_item } from "./rating";
 import { Voice } from "./voice";
 import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
@@ -210,6 +212,9 @@ class Phriend {
 		// easter eggs (#2013): a move by name, or a random one
 		api.play = (name) => (name ? this.play_move(name) : this.play_from("debug", play.HOVER_MOVES, true));
 		api.moves = Object.keys(play.MOVES);
+		// rating a fix (#2014): ask the question for a report now, live or not
+		api.ask_rating = (issue, round) =>
+			call("phamos.phriend.api.ask_feedback_now", { issue, round }, this.host.csrf_token()).catch((e) => console.warn(e));
 	}
 
 	// ---- easter eggs (#2013)
@@ -278,6 +283,7 @@ class Phriend {
 
 	on_event(payload) {
 		if (!payload || !this.ball) return;
+		if (payload.kind === "rate_fix") return this.ask_rating(payload.feedback); // #2014
 		if (payload.kind === "quiet") {
 			// leave me in peace changed in another tab
 			this.set_quiet_state(payload.state || null);
@@ -291,6 +297,18 @@ class Phriend {
 			this.voice.note({ ...item, gesture: null });
 		} else if (payload.level === "question") this.voice.ask(item);
 		else if (payload.level === "warning") this.voice.warn(item);
+	}
+
+	// ---- rating a fix (#2014)
+
+	// A rating question through the voice: a question, so it uses the day's bubble or waits
+	// behind the dot. Each question once per page (the boot and a live event can both bring it).
+	ask_rating(req) {
+		if (!req || !req.name || !this.ball) return;
+		this._asked_ratings = this._asked_ratings || new Set();
+		if (this._asked_ratings.has(req.name)) return;
+		this._asked_ratings.add(req.name);
+		this.voice.ask(rating_item(this, req));
 	}
 
 	// plain text from the server, escaped; a link on this site or https only (events.py checks too)
@@ -365,6 +383,7 @@ class Phriend {
 		this.voice = new Voice(this); // one voice (#2011)
 		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
 		this.setup_play(); // easter eggs (#2013)
+		for (const req of this.host.feedback || []) this.ask_rating(req); // open rating questions (#2014)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
