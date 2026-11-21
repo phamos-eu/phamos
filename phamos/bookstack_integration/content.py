@@ -10,12 +10,13 @@ is removed here, before it is stored.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from urllib.parse import urljoin, urlsplit
 
 import frappe
 from bleach.css_sanitizer import CSSSanitizer
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from frappe.utils.html_utils import sanitize_html
 
 DOCS_ROUTE = "/de/doku"
@@ -34,6 +35,17 @@ _SAFE_CSS = CSSSanitizer(allowed_css_properties=[
 	"border-width", "border-style", "border-collapse", "padding", "margin-left", "list-style-type",
 	"white-space",
 ])
+
+# Classes BookStack's editor sets that the website styles. Any other class could borrow phamos.eu's
+# own (a stretched link, a fixed overlay) and cover the page, so it is dropped (review S6).
+_SAFE_CLASSES = {"callout", "info", "success", "warning", "danger", "align-left", "align-center",
+	"align-right", "align-justify"}
+_SAFE_CLASS_PREFIXES = ("language-",)  # code blocks
+# BookStack's heading anchors; other ids could clobber the website's scripts.
+_SAFE_ID = re.compile(r"^bkmrk-[\w-]*$")
+# Attributes bleach keeps that a copied page has no use for: "ping" makes the visitor's browser
+# post to any host on click, "name" clobbers DOM globals.
+_DROP_ATTRS = ("ping", "name")
 
 _PAGE_PATH = re.compile(r"^/books/(?P<book>[^/]+)(?:/(?P<kind>page|chapter)/(?P<slug>[^/]+))?/?$")
 _PERMALINK_PATH = re.compile(r"^/link/(?P<id>\d+)/?$")
@@ -61,6 +73,13 @@ def published_link_map(instance: str) -> dict:
 	}
 
 
+def link_map_hash(link_map: dict) -> str:
+	"""Fingerprint of what is published: when it changes, every copy's links must be rewritten (S5)."""
+	parts = sorted(link_map["books"]) + sorted("/".join(p) for p in link_map["pages"])
+	parts += sorted(f"{i}:{'/'.join(p)}" for i, p in link_map["page_ids"].items())
+	return hashlib.sha1("\n".join(parts).encode()).hexdigest()
+
+
 def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 	"""Return BookStack page HTML that is safe to print on phamos.eu."""
 	if not html:
@@ -73,23 +92,41 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 	safe = sanitize_html(str(soup), always_sanitize=True, disallowed_tags=_DROP_TAGS)
 
 	soup = BeautifulSoup(safe, "html.parser")
+	# Comments are published verbatim otherwise: internal notes, and a surface for parser tricks.
+	for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+		comment.extract()
 	for tag in soup.find_all(True):
-		for attr in [a for a in tag.attrs if a.startswith("data-")]:
+		for attr in [a for a in tag.attrs if a.startswith("data-") or a in _DROP_ATTRS]:
 			del tag[attr]
 		if tag.get("style"):
 			tag["style"] = _SAFE_CSS.sanitize_css(tag["style"])
 			if not tag["style"].strip():
 				del tag["style"]
+		if tag.get("class"):
+			classes = tag["class"] if isinstance(tag["class"], list) else tag["class"].split()
+			keep = [c for c in classes if c in _SAFE_CLASSES or c.startswith(_SAFE_CLASS_PREFIXES)]
+			if keep:
+				tag["class"] = keep
+			else:
+				del tag["class"]
+		if tag.get("id") and not _SAFE_ID.match(tag["id"]):
+			del tag["id"]
 
 	base = base_url.rstrip("/") + "/"
+	instance_host = urlsplit(base).netloc
 	for a in soup.find_all("a", href=True):
 		a["href"] = _rewrite_href(a["href"], base, link_map)
 		if not a["href"].startswith(("/", "#")):
 			rel = a.get("rel") or []
 			a["rel"] = sorted({*(rel if isinstance(rel, list) else rel.split()), "noopener"})
 	for img in soup.find_all("img"):
-		if img.get("src"):
-			img["src"] = urljoin(base, img["src"])
+		src = urljoin(base, img.get("src") or "")
+		# Only images from the BookStack host: any other host would learn every visitor's IP
+		# address (privacy, decided 2026-11-21). Copying images to phamos.eu comes later.
+		if urlsplit(src).netloc != instance_host or urlsplit(src).scheme not in ("http", "https"):
+			img.decompose()
+			continue
+		img["src"] = src
 		img["loading"] = "lazy"
 	return str(soup)
 
