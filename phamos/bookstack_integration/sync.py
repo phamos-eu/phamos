@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Any
 
 import frappe
@@ -326,27 +327,65 @@ def remove_deleted(instance: str, seen: dict) -> int:
 	return removed
 
 
-def _run_steps(instance: str, steps: list) -> dict[str, Any]:
-	client = BookstackClient(instance)
-	stats: dict[str, Any] = {"instance": instance}
-	seen: dict[str, set] = {}
-	errors = 0
+# A first copy of a big book takes minutes (one call per page); the lock outlives any run, and
+# expires by itself if a worker dies mid-run.
+SYNC_LOCK_SECONDS = 30 * 60
 
-	for label, fn in steps:
+
+class SyncRunning(frappe.ValidationError):
+	"""Another sync of the same Bookstack Configuration holds the lock."""
+
+
+def _lock(instance: str):
+	return frappe.cache.lock(frappe.cache.make_key(f"bookstack_sync:{instance}"), timeout=SYNC_LOCK_SECONDS)
+
+
+def is_running(instance: str) -> bool:
+	return _lock(instance).locked()
+
+
+@contextmanager
+def sync_lock(instance: str):
+	"""One sync per instance at a time (#2004).
+
+	Two syncs of one instance write the same records: they wait on each other's row locks until
+	MariaDB gives up, and documents change under them. A manual sync started while the hourly job
+	runs is refused; the scheduler skips an instance that is busy.
+	"""
+	lock = _lock(instance)
+	if not lock.acquire(blocking=False):
+		raise SyncRunning(_("A sync of {0} is already running. Try again when it has finished.").format(instance))
+	try:
+		yield
+	finally:
 		try:
-			if label == "removed":
-				stats[label] = fn(instance, seen)
-			elif label in _TRACKED_STEPS:
-				stats[label] = fn(client, instance, seen)
-			else:
-				stats[label] = fn(client, instance)
-		except Exception as exc:
-			errors += 1
-			stats[label] = f"error: {exc}"
-			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance} :: {label}")
+			lock.release()
+		except Exception:
+			pass  # expired after SYNC_LOCK_SECONDS; nothing left to release
 
-	stats["errors"] = errors
-	return stats
+
+def _run_steps(instance: str, steps: list) -> dict[str, Any]:
+	with sync_lock(instance):
+		client = BookstackClient(instance)
+		stats: dict[str, Any] = {"instance": instance}
+		seen: dict[str, set] = {}
+		errors = 0
+
+		for label, fn in steps:
+			try:
+				if label == "removed":
+					stats[label] = fn(instance, seen)
+				elif label in _TRACKED_STEPS:
+					stats[label] = fn(client, instance, seen)
+				else:
+					stats[label] = fn(client, instance)
+			except Exception as exc:
+				errors += 1
+				stats[label] = f"error: {exc}"
+				frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance} :: {label}")
+
+		stats["errors"] = errors
+		return stats
 
 
 _TRACKED_STEPS = {"shelves", "books", "chapters", "pages"}
@@ -365,6 +404,17 @@ SYNC_STEPS = {
 }
 
 
+def _chosen_steps(steps) -> list[str]:
+	"""``steps`` as the dialog sends it (list or JSON), checked; None means every step."""
+	chosen = frappe.parse_json(steps) if steps else list(SYNC_STEPS)
+	unknown = set(chosen) - set(SYNC_STEPS)
+	if unknown:
+		frappe.throw(_("Unknown sync step: {0}").format(", ".join(sorted(unknown))))
+	if not chosen:
+		frappe.throw(_("Choose at least one part to sync."))
+	return chosen
+
+
 @frappe.whitelist()
 def sync_instance(instance: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
 	"""Sync one Bookstack Configuration: every step, or only ``steps`` (names from SYNC_STEPS).
@@ -376,12 +426,7 @@ def sync_instance(instance: str, steps=None, remove_deleted_records=1) -> dict[s
 	# Whitelisted for the "Sync" buttons; the sync deletes records, so not for every logged-in user.
 	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
 
-	chosen = frappe.parse_json(steps) if steps else list(SYNC_STEPS)
-	unknown = set(chosen) - set(SYNC_STEPS)
-	if unknown:
-		frappe.throw(_("Unknown sync step: {0}").format(", ".join(sorted(unknown))))
-	if not chosen:
-		frappe.throw(_("Choose at least one part to sync."))
+	chosen = _chosen_steps(steps)
 
 	plan = [(name, fn) for name, fn in SYNC_STEPS.items() if name in chosen]
 	if frappe.utils.cint(remove_deleted_records) and _TRACKED_STEPS & set(chosen):
@@ -419,6 +464,8 @@ def sync_all_instances() -> list[dict[str, Any]]:
 	for name in frappe.get_all("Bookstack Configuration", filters={"enabled": 1}, pluck="name"):
 		try:
 			results.append(sync_instance(name))
+		except SyncRunning:
+			continue  # a manual sync of this instance is running; it does the same work
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {name}")
 	return results
@@ -435,6 +482,58 @@ def sync_published_content() -> list[dict[str, Any]]:
 			continue
 		try:
 			results.append(sync_published_instance(name))
+		except SyncRunning:
+			continue  # another sync of this instance is running; the next hour catches up
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {name}")
 	return results
+
+
+# --- manual sync in the background ----------------------------------------------------------------
+
+REALTIME_EVENT = "bookstack_sync_done"
+
+
+def _job_id(instance: str) -> str:
+	return f"bookstack_sync::{instance}"
+
+
+@frappe.whitelist()
+def start_sync(instance: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
+	"""The "Sync" buttons: queue a sync of one instance and return at once (#2004).
+
+	``steps`` and ``remove_deleted_records`` as in sync_instance: the dialog's choice (#2029),
+	checked here so a wrong choice fails at once and not in the job.
+
+	A first copy of a big book takes minutes, longer than a web request may run. The result
+	reaches the user who started it as the realtime event ``bookstack_sync_done``.
+	"""
+	from frappe.utils.background_jobs import is_job_enqueued
+
+	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
+	chosen = _chosen_steps(steps)
+	if is_running(instance) or is_job_enqueued(_job_id(instance)):
+		raise SyncRunning(_("A sync of {0} is already running. Try again when it has finished.").format(instance))
+	frappe.enqueue(
+		"phamos.bookstack_integration.sync.run_sync_job",
+		queue="long",
+		timeout=SYNC_LOCK_SECONDS,
+		job_id=_job_id(instance),
+		deduplicate=True,
+		instance=instance,
+		user=frappe.session.user,
+		steps=chosen,
+		remove_deleted_records=frappe.utils.cint(remove_deleted_records),
+	)
+	return {"queued": True}
+
+
+def run_sync_job(instance: str, user: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
+	"""Background job behind start_sync: run the sync, then tell the user who started it."""
+	try:
+		stats = sync_instance(instance, steps=steps, remove_deleted_records=remove_deleted_records)
+	except Exception as exc:
+		frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance}")
+		stats = {"instance": instance, "errors": 1, "failed": str(exc)}
+	frappe.publish_realtime(REALTIME_EVENT, stats, user=user, after_commit=False)
+	return stats

@@ -2,6 +2,17 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Bookstack Configuration", {
+	onload(frm) {
+		// Result of a sync started with "Sync All" (phamos.bookstack_integration.sync.run_sync_job).
+		// Registered once per page load; the Bookstack Browser has a listener of its own.
+		if (frappe._bookstack_sync_listener) return;
+		frappe._bookstack_sync_listener = true;
+		frappe.realtime.on("bookstack_sync_done", (stats) => {
+			if (cur_frm?.doctype !== "Bookstack Configuration") return;
+			bookstack_show_sync_result(stats);
+			if (cur_frm.doc.name === stats.instance) cur_frm.reload_doc();
+		});
+	},
 	refresh(frm) {
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("Test Connection"), () => {
@@ -112,23 +123,24 @@ function bookstack_sync_dialog(frm) {
 				frappe.msgprint(__("Choose at least one part to sync."));
 				return;
 			}
-			bookstack_save_selection(frm, tree).then(() => {
-				d.hide();
-				// By name, not frm.call on the form: saving the selection has just changed the document.
-				return frappe.call({
-					method: "phamos.bookstack_integration.sync.sync_instance",
-					args: {
+			bookstack_save_selection(frm, tree)
+				.then(() =>
+					// A background job (#2004): a first copy of a big book takes minutes. The result
+					// arrives as the realtime event "bookstack_sync_done" (see onload).
+					frappe.xcall("phamos.bookstack_integration.sync.start_sync", {
 						instance: frm.doc.name,
 						steps,
 						remove_deleted_records: values.remove_deleted_records ? 1 : 0,
-					},
-					freeze: true,
-					freeze_message: __("Syncing Bookstack..."),
+					})
+				)
+				.then(() => {
+					d.hide();
+					frm.reload_doc();
+					frappe.show_alert({
+						message: __("Sync started in the background. The result shows here when it is done."),
+						indicator: "blue",
+					}, 10);
 				});
-			}).then((r) => {
-				if (r && r.message) bookstack_show_sync_result(r.message);
-				frm.reload_doc();
-			});
 		},
 		secondary_action_label: __("Save selection"),
 		secondary_action() {
@@ -272,9 +284,13 @@ function bookstack_show_sync_result(stats) {
 				<td class="${failed ? "text-danger" : "text-right"}">${frappe.utils.escape_html(String(value))}</td></tr>`;
 		})
 		.join("");
+	// A sync that could not start (e.g. another one was running) has no steps, only "failed".
+	const failed = stats.failed
+		? `<p class="text-danger">${frappe.utils.escape_html(stats.failed)}</p>`
+		: "";
 	frappe.msgprint({
 		title: stats.errors ? __("Sync finished with errors") : __("Sync complete"),
 		indicator: stats.errors ? "orange" : "green",
-		message: `<table class="table table-sm"><tbody>${rows}</tbody></table>`,
+		message: `${failed}<table class="table table-sm"><tbody>${rows}</tbody></table>`,
 	});
 }
