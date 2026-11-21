@@ -43,17 +43,17 @@ export function cooled_down(last, now, cooldown = COOLDOWN_MS) {
 // The fastest stretch of a drag: samples [{x, y, t}] in order. The path travelled over at least
 // SPEED_WINDOW_MS, so two events a millisecond apart (fast mice, touch, rounded time stamps) can't
 // make a calm drag look like a shake (AI review of !1285); a shake back and forth still counts.
-export function top_speed(samples, window = SPEED_WINDOW_MS) {
+export function top_speed(samples, window_ms = SPEED_WINDOW_MS) {
 	let top = 0;
 	for (let i = 1; i < samples.length; i++) {
 		let path = 0;
 		let j = i;
-		while (j > 0 && samples[i].t - samples[j].t < window) {
+		while (j > 0 && samples[i].t - samples[j].t < window_ms) {
 			path += Math.hypot(samples[j].x - samples[j - 1].x, samples[j].y - samples[j - 1].y);
 			j--;
 		}
 		const dt = samples[i].t - samples[j].t;
-		if (dt < window) continue; // not long enough yet
+		if (dt < window_ms) continue; // not long enough yet
 		top = Math.max(top, path / dt);
 	}
 	return top;

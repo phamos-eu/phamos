@@ -234,6 +234,8 @@ FEATURE_VALUES_BY_DEFAULT = {
 	"warn_email_failed": 1,
 	"warn_gitlab_sync_failed": 1,
 	"warning_role": "System Manager",
+	# #2014: the second rating question, after this many weeks in daily use
+	"battle_tested_weeks": 6,
 }
 
 
