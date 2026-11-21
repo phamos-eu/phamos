@@ -1,0 +1,33 @@
+{#- Building blocks of the documentation pages (phamos/phamos#2005). Every database value is
+    escaped with `| e`; only page content (Bookstack Page.html, sanitised by the sync) is printed raw. -#}
+
+{% macro book_tile(book, heading="h3") -%}
+<li class="wp-tile-item">
+	<div class="wp-tile wp-docs-tile">
+		<{{ heading }} class="wp-tile-title"><a class="wp-stretched-link" href="{{ book.url | e }}">{{ book.title | e }}</a></{{ heading }}>
+		{%- if book.summary %}<span class="wp-tile-subtitle">{{ book.summary | truncate(180) | e }}</span>{% endif %}
+		<span class="wp-chips"><span class="wp-chip">{{ _("1 page") if book.page_count == 1 else _("{0} pages").format(book.page_count) }}</span></span>
+	</div>
+</li>
+{%- endmacro %}
+
+{#- Table of contents of a book; `current` marks the page being read. -#}
+{% macro contents(entries, current=None, headings=False) -%}
+<ol class="wp-docs-toc">
+	{%- for entry in entries %}
+	{%- if entry.type == "chapter" %}
+	<li class="wp-docs-toc-chapter">
+		{%- if headings %}<h2 id="{{ entry.slug | e }}">{{ entry.title | e }}</h2>{% else %}<span class="wp-docs-toc-label">{{ entry.title | e }}</span>{% endif %}
+		{%- if headings and entry.description %}<p class="wp-section-intro">{{ entry.description | e }}</p>{% endif %}
+		<ol>
+			{%- for p in entry.pages %}{{ toc_link(p, current) }}{% endfor %}
+		</ol>
+	</li>
+	{%- else %}{{ toc_link(entry, current) }}{% endif %}
+	{%- endfor %}
+</ol>
+{%- endmacro %}
+
+{% macro toc_link(p, current) -%}
+<li><a href="{{ p.url | e }}"{% if current == p.slug %} aria-current="page"{% endif %}>{{ p.title | e }}</a></li>
+{%- endmacro %}
