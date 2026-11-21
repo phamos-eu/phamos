@@ -50,6 +50,7 @@
 					:sending="bubble.sending"
 					:style="bubbleStyle(bubble)"
 					@send="(text, done) => sendMessage(bubble, text, done)"
+					@close="closeBubble(bubble.user)"
 				/>
 				<div
 					class="chip-space-chip absolute flex items-center justify-center"
@@ -68,7 +69,7 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { call, FeatherIcon } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
@@ -241,6 +242,8 @@ async function refreshOthers() {
 
 const bubbles = reactive({})
 const bubbleRefs = {}
+// Chats closed with Esc stay closed until the two walk apart (or Enter opens them again).
+const dismissed = new Set()
 const bubbleList = computed(() => Object.values(bubbles))
 
 function setBubbleRef(user, el) {
@@ -271,8 +274,11 @@ function checkEncounters() {
 	if (!me.value) return
 	for (const other of others.value) {
 		const distance = distanceTo(other)
-		if (distance < ENCOUNTER_DISTANCE && !bubbles[other.user]) openBubble(other)
-		else if (distance > PART_DISTANCE && bubbles[other.user]) delete bubbles[other.user]
+		if (distance < ENCOUNTER_DISTANCE && !bubbles[other.user] && !dismissed.has(other.user)) openBubble(other)
+		else if (distance > PART_DISTANCE) {
+			delete bubbles[other.user]
+			dismissed.delete(other.user)
+		}
 	}
 	// Someone who left the page also leaves the chat.
 	for (const user of Object.keys(bubbles)) {
@@ -302,6 +308,19 @@ async function openBubble(other) {
 	} finally {
 		bubble.loading = false
 	}
+	// Walked up to someone: the chat has the keyboard right away, and the chip stops.
+	if (bubble.encounter && bubbles[other.user] === bubble) {
+		releaseAll()
+		await nextTick()
+		bubbleRefs[other.user]?.focus()
+	}
+}
+
+// Esc: the chat closes and the keys move the chip again.
+function closeBubble(user) {
+	delete bubbles[user]
+	dismissed.add(user)
+	document.activeElement?.blur?.()
 }
 
 async function sendMessage(bubble, text, done) {
@@ -336,6 +355,13 @@ function errorText(e) {
 
 // Enter (while not typing) jumps into the chat of the nearest chip.
 function focusNearestBubble() {
+	// A chat closed with Esc, with its person still right here: open it again.
+	const near = others.value.find((o) => dismissed.has(o.user) && distanceTo(o) < ENCOUNTER_DISTANCE)
+	if (near) {
+		dismissed.delete(near.user)
+		openBubble(near)
+		return true
+	}
 	const open = Object.values(bubbles).filter((b) => b.encounter)
 	if (!open.length) return false
 	const nearest = open

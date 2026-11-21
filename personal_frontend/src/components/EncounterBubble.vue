@@ -7,10 +7,19 @@
 		:aria-label="__('Chat with {0}', [peer.full_name])"
 		data-testid="encounter-bubble"
 		@keydown.stop
+		@keydown.escape.prevent="emit('close')"
 	>
 		<header class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
 			<UserAvatar :name="peer.user" :label="peer.full_name" :image="peer.user_image" size="xs" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ peer.full_name }}</span>
+			<button
+				type="button"
+				class="flex-shrink-0 rounded px-1.5 py-0.5 text-xs text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+				:title="__('Close the chat and walk on')"
+				@click="emit('close')"
+			>
+				{{ __("Esc to close") }}
+			</button>
 		</header>
 
 		<div ref="list" class="max-h-48 min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm">
@@ -39,7 +48,7 @@
 				:placeholder="__('Write to {0}, Enter to send', [firstName])"
 				:maxlength="2000"
 				:disabled="sending"
-				@keydown.escape.prevent="input?.blur()"
+				@keydown="onInputKeydown"
 			/>
 		</form>
 	</div>
@@ -60,12 +69,18 @@ const props = defineProps({
 	error: { type: String, default: "" },
 	sending: { type: Boolean, default: false },
 })
-const emit = defineEmits(["send"])
+const emit = defineEmits(["send", "close"])
 
 const draft = ref("")
 const list = ref(null)
 const input = ref(null)
 const firstName = computed(() => (props.peer.full_name || "").split(" ")[0] || props.peer.full_name)
+
+// The chat takes the focus while the user may still hold a movement key: its repeats must not
+// type "dddd" into the empty field.
+function onInputKeydown(event) {
+	if (event.repeat && !draft.value) event.preventDefault()
+}
 
 function send() {
 	const text = draft.value.trim()
