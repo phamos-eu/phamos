@@ -2580,8 +2580,6 @@ Unknown item type: {0},Unbekannter Typ: {0}
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
-Sync finished with errors,Synchronisierung mit Fehlern beendet
-Sync complete,Synchronisierung abgeschlossen
 Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Leave me in peace,Lass mich in Ruhe
 Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
