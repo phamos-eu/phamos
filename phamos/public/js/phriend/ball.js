@@ -41,23 +41,27 @@ export const SVG = `
 // without words, react("<gesture>") (#2009). The system's own emoji, default skin tone, so they
 // look like the emoji people know on their device (PM, 2026-11-21). The motion names a keyframe
 // below.
+// side: where the emoji is attached to Phriend, the side its wrist, arm or flame points to
+// (PM, 2026-11-21), as Apple draws them: 💪 and 👏 on the left, 👉 on the right. No side: the
+// emoji is upright or symmetric and goes on the side that faces into the window. Never mirrored.
+// Check them with phriend.hands() (debug).
 export const GESTURES = {
-	wave: { hand: "👋", motion: "wave" }, // "Click me!" and the first greeting
+	wave: { hand: "👋", motion: "wave", side: "left" }, // "Click me!" and the first greeting
 	thumbs_up: { hand: "👍", motion: "bounce" }, // report saved
 	thumbs_down: { hand: "👎", motion: "sink" },
 	fingers_crossed: { hand: "🤞", motion: "sway" }, // sending
 	wait: { hand: "✋", motion: "still" }, // "One moment…"
 	point_up: { hand: "☝️", motion: "up" }, // at the bubble: an unsent or failed report
-	point: { hand: "👉", motion: "point" }, // at Phriend: "Report it?"
+	point: { hand: "👉", motion: "point", side: "right" }, // at Phriend: "Report it?"
 	thanks: { hand: "🙏", motion: "bow" },
 	praise: { hand: "🙌", motion: "raise" },
-	high_five: { hand: "🖐️", motion: "slap" },
-	clap: { hand: "👏", motion: "clap" },
+	high_five: { hand: "🖐️", motion: "slap", side: "left" },
+	clap: { hand: "👏", motion: "clap", side: "left" },
 	heart: { hand: "❤️", motion: "beat" },
 	star: { hand: "⭐", motion: "twinkle" },
 	alert: { hand: "‼️", motion: "pulse" }, // the red double exclamation
-	muscle: { hand: "💪", motion: "flex" }, // "ready", back from quiet (#2010)
-	rocket: { hand: "🚀", motion: "launch" }, // "let's go", back from quiet (#2010)
+	muscle: { hand: "💪", motion: "flex", side: "left" }, // "ready", back from quiet (#2010)
+	rocket: { hand: "🚀", motion: "launch", side: "right" }, // "let's go", back from quiet (#2010)
 };
 
 const REACT_MS = 1600; // how long a reaction without words shows
@@ -151,17 +155,14 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .menu button:hover, .menu button:focus-visible { background: var(--ph-surface); outline: none; }
 .menu button:focus-visible { box-shadow: 0 0 0 2px var(--ph-focus); }
 /* The hand at "heart" height (PM, 2026-11-21): on the lower edge of the sphere, a little in
-   front of it, on the side that faces into the screen, and gesturing into the screen, never at
-   the edge. Phriend in the right half: hand on its left, mirrored so it points left; in the
-   left half (hand-right): hand on its right, as the emoji are drawn. */
+   front of it, on the side the emoji is attached (GESTURES side), as the emoji is drawn. */
 .hand {
 	position: absolute; left: -5px; top: 33px; font-size: 22px; line-height: 1; pointer-events: none;
 	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-	scale: -1 1;
 	opacity: 0; transform: scale(0.4); transform-origin: 50% 85%; transition: opacity 0.2s, transform 0.2s;
 }
 .hand.show { opacity: 1; transform: none; }
-.ball.hand-right .hand { left: auto; right: -5px; scale: none; }
+.hand.on-right { left: auto; right: -5px; }
 .hand.show[data-motion="wave"] { animation: hand-wave 0.5s ease-in-out infinite alternate; }
 .hand.show[data-motion="bounce"] { animation: hand-bounce 0.6s ease-out 1; }
 .hand.show[data-motion="sway"] { animation: hand-sway 1.2s ease-in-out infinite alternate; }
@@ -357,10 +358,23 @@ export class Ball {
 	}
 
 	// The hand goes on the side that faces into the screen (PM, 2026-11-21).
+	// The side that faces into the window: for emoji without a side of their own.
 	update_hand_side() {
 		const rect = this.root.getBoundingClientRect();
 		const centre = rect.width ? rect.left + rect.width / 2 : window.innerWidth; // not laid out: right corner
-		this.root.classList.toggle("hand-right", centre < window.innerWidth / 2);
+		this.inner_side = centre < window.innerWidth / 2 ? "right" : "left";
+		if (this.hand && this.hand.dataset.name) this.place_hand(this.hand.dataset.name);
+	}
+
+	// side_overrides: { gesture: "left" | "right" | "auto" }, set by the debug panel (phriend.hands())
+	hand_side(gesture) {
+		const g = GESTURES[gesture];
+		const side = (this.side_overrides && this.side_overrides[gesture]) || (g && g.side) || "auto";
+		return side === "auto" ? this.inner_side || "left" : side;
+	}
+
+	place_hand(gesture) {
+		this.hand.classList.toggle("on-right", this.hand_side(gesture) === "right");
 	}
 
 	clamp_into_view() {
@@ -645,7 +659,9 @@ export class Ball {
 		this.hand.classList.remove("show");
 		if (!g) return; // keep the emoji while it fades out
 		this.hand.textContent = g.hand;
+		this.hand.dataset.name = gesture;
 		this.hand.dataset.motion = g.motion;
+		this.place_hand(gesture);
 		void this.hand.offsetWidth; // restart the motion when the same hand comes again
 		this.hand.classList.add("show");
 	}

@@ -21,6 +21,7 @@
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
+import { open_hands_panel } from "./hands_panel";
 import * as nudge from "./nudge";
 import * as quiet from "./quiet";
 import { call } from "./request";
@@ -191,6 +192,8 @@ class Phriend {
 		api.react = (name) => this.react(name);
 		api.demo = () => this.demo();
 		api.reactions = Object.keys(GESTURES);
+		// which side each emoji is attached (#2010): a panel to look and try
+		api.hands = () => this.ball && open_hands_panel(this.ball, (name) => this.ball.react(name, 2500));
 	}
 
 	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
