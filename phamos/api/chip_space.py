@@ -397,13 +397,13 @@ DUMMY_REPLY_DELAY = 1.0
 
 
 def dummy_reply(encounter, dummy):
-	"""Background job: a test dummy (site config only) answers "Yes" or "No" at random."""
+	"""Background job: a test dummy (site config only) answers "Yes", "No" or "Maybe" at random."""
 	if dummy not in _dummy_users():
 		return
 	time.sleep(DUMMY_REPLY_DELAY)  # a moment to "think", so it reads like a reply
 	frappe.set_user(dummy)
 	try:
-		send_encounter_message(encounter, random.choice((_("Yes"), _("No"))))
+		send_encounter_message(encounter, random.choice((_("Yes"), _("No"), _("Maybe"))))
 	except frappe.ValidationError:
 		# The encounter ended meanwhile.
 		pass

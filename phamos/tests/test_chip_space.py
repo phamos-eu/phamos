@@ -205,7 +205,7 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			chip_space.send_encounter_message(encounter, "   ")
 
-	def test_dummy_answers_yes_or_no(self):
+	def test_dummy_answers_yes_no_or_maybe(self):
 		encounter = self._open(self.A, self.B)["encounter"]
 		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: [{"user": self.B, "x": 6, "y": 5}]}):
 			with patch.object(chip_space.frappe, "enqueue") as enqueue:
@@ -216,7 +216,7 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 			frappe.set_user(self.A)
 			messages = chip_space.get_encounter(encounter)["messages"]
 		self.assertEqual(messages[-1]["owner"], self.B)
-		self.assertIn(messages[-1]["text"], ("Yes", "No"))
+		self.assertIn(messages[-1]["text"], ("Yes", "No", "Maybe"))
 
 	def test_real_people_get_no_auto_reply(self):
 		encounter = self._open(self.A, self.B)["encounter"]
