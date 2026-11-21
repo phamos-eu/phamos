@@ -1,6 +1,6 @@
 {#- /de/doku/<book>. Context: book.py. -#}
 {% extends "templates/base.html" %}
-{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, tile with context %}
 {% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
@@ -22,6 +22,15 @@
 	<nav class="wp-docs-contents" aria-label="{{ _('Contents') }}">
 		{{ toc(contents, headings=True) }}
 	</nav>
+
+	{%- if modules %}
+	<section class="wp-related" aria-labelledby="wp-docs-modules">
+		<div class="wp-related-head"><h2 id="wp-docs-modules">{{ _("Matching module") if modules | length == 1 else _("Matching modules") }}</h2></div>
+		<ul class="wp-grid wp-grid-compact">
+			{%- for module in modules %}{{ tile(module, heading="h3") }}{% endfor %}
+		</ul>
+	</section>
+	{%- endif %}
 
 	{%- if book.source_url %}
 	<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a></p>

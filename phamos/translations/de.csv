@@ -2547,6 +2547,12 @@ Open on {0},Auf {0} öffnen
 Updated on {0},Aktualisiert am {0}
 Previous,Zurück
 1 page,1 Seite
+Guides for {0} from our documentation.,Anleitungen zu {0} aus unserer Dokumentation.
+The documentation is in German.,Die Dokumentation ist auf Deutsch.
+in German,auf Deutsch
+Matching module,Passendes Modul
+Matching modules,Passende Module
+Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
@@ -2613,3 +2619,17 @@ A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 Only users who may edit this configuration change the selection.,"Nur wer diese Konfiguration bearbeiten darf, ändert die Auswahl."
 "BookStack could not be reached. The saved selection stays as it is, and Sync uses it.",BookStack ist nicht erreichbar. Die gespeicherte Auswahl bleibt unverändert und gilt für die Synchronisierung.
 Invalid BookStack ID: {0},Ungültige BookStack-ID: {0}
+Warnings Go To,Warnungen gehen an
+Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
+Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
+Warn: GitLab Sync Failed,Warnen: GitLab-Abgleich fehlgeschlagen
+"Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.","Phriend erfährt, was passiert: Ihre Meldung wurde ein GitLab-Issue, jemand hat für Ihre Idee gestimmt, ein KI-Agent-Lauf ist fehlgeschlagen, Beleg-E-Mails konnten nicht gelesen werden, der GitLab-Abgleich ist fehlgeschlagen."
+"Who gets warnings about the whole system, such as a failed GitLab sync.","Wer Warnungen zum ganzen System bekommt, zum Beispiel einen fehlgeschlagenen GitLab-Abgleich."
+Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.,Angehakt: eine rote ‼️-Warnung. Nicht angehakt: eine Notiz hinter dem blauen Punkt.
+Your report is now a GitLab issue: {0},Ihre Meldung ist jetzt ein GitLab-Issue: {0}
+Someone voted for your idea: {0},Jemand hat für Ihre Idee gestimmt: {0}
+The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht abschließen.
+The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
+Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
+Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
