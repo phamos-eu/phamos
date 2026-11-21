@@ -12,6 +12,9 @@
   "title",
   "slug",
   "shelf",
+  "section_website",
+  "publish_on_website",
+  "website_summary",
   "section_content",
   "description",
   "url",
@@ -65,6 +68,28 @@
    "options": "Bookstack Shelf",
    "in_standard_filter": 1,
    "description": "Primary shelf this book appears on (a book can appear on multiple shelves in Bookstack; this stores the last seen)."
+  },
+  {
+   "fieldname": "section_website",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "description": "Show this book, its chapters and pages on phamos.eu under /de/doku. The page content is copied at the next sync.",
+   "fieldname": "publish_on_website",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Publish on website",
+   "permlevel": 1
+  },
+  {
+   "depends_on": "publish_on_website",
+   "description": "Short teaser for the website. Empty: the description is used.",
+   "fieldname": "website_summary",
+   "fieldtype": "Small Text",
+   "label": "Website summary",
+   "permlevel": 1
   },
   {
    "fieldname": "section_content",
@@ -181,6 +206,35 @@
    "role": "Bookstack Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "write": 1,
+   "role": "System Manager"
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "write": 1,
+   "role": "Bookstack Manager"
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "write": 1,
+   "role": "Website Manager"
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Bookstack User"
   }
  ],
  "row_format": "Dynamic",

@@ -600,6 +600,14 @@ fixtures = [
 ]
 
 scheduler_events = {
+    # BookStack (#2004): on the long queue, a first copy of a big book takes minutes
+    "hourly_long": [
+        # keep the website copy of published books fresh
+        "phamos.bookstack_integration.sync.sync_published_content",
+    ],
+    "daily_long": [
+        "phamos.bookstack_integration.sync.sync_all_instances",
+    ],
     "daily": [
         # Implementation Release: capacity shrinks every day, leave changes (#1986)
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
@@ -608,7 +616,6 @@ scheduler_events = {
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
-        "phamos.bookstack_integration.sync.sync_all_instances",
         # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)

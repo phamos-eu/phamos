@@ -55,21 +55,32 @@ phamos.BookstackBrowser = class BookstackBrowser {
 
 		this.page.set_primary_action(__("Refresh"), () => this.load_tree(), "refresh");
 
+		// Result of "Sync Instance Now" (phamos.bookstack_integration.sync.run_sync_job, #2004).
+		frappe.realtime.on("bookstack_sync_done", (stats) => {
+			if (stats.instance !== this.instance) return;
+			const failed = stats.failed || stats.errors;
+			frappe.show_alert({
+				message: failed ? __("Sync finished with errors") : __("Sync complete"),
+				indicator: failed ? "orange" : "green",
+			});
+			this.load_tree();
+		});
+
 		this.page.add_menu_item(__("Sync Instance Now"), () => {
 			if (!this.instance) {
 				frappe.show_alert({ message: __("Select an instance first"), indicator: "orange" });
 				return;
 			}
 			frappe.confirm(__("Trigger a full sync of {0}?", [this.instance]), () => {
-				frappe.call({
-					method: "phamos.bookstack_integration.sync.sync_instance",
-					args: { instance: this.instance },
-					freeze: true,
-					freeze_message: __("Syncing Bookstack..."),
-				}).then(() => {
-					frappe.show_alert({ message: __("Sync complete"), indicator: "green" });
-					this.load_tree();
-				});
+				// A background job (#2004); the tree reloads when it is done.
+				frappe
+					.xcall("phamos.bookstack_integration.sync.start_sync", { instance: this.instance })
+					.then(() =>
+						frappe.show_alert({
+							message: __("Sync started in the background. The tree reloads when it is done."),
+							indicator: "blue",
+						}, 10)
+					);
 			});
 		});
 
