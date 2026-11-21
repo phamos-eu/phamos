@@ -333,7 +333,6 @@ async function sendMessage(bubble, text, done) {
 		bubble.error = errorText(e) || __("The message could not be sent.")
 	} finally {
 		bubble.sending = false
-		bubbleRefs[bubble.user]?.focus()
 	}
 }
 

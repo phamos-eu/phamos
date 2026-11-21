@@ -47,7 +47,7 @@
 				class="w-full rounded-md border-0 bg-surface-gray-2 px-2.5 py-1.5 text-sm text-ink-gray-9 placeholder-ink-gray-5 focus:ring-2 focus:ring-outline-gray-3"
 				:placeholder="__('Write to {0}, Enter to send', [firstName])"
 				:maxlength="2000"
-				:disabled="sending"
+				:aria-busy="sending || undefined"
 				@keydown="onInputKeydown"
 			/>
 		</form>
@@ -75,6 +75,9 @@ const draft = ref("")
 const list = ref(null)
 const input = ref(null)
 const firstName = computed(() => (props.peer.full_name || "").split(" ")[0] || props.peer.full_name)
+
+// Never disabled while sending: a disabled field drops the focus, and the next message should
+// follow with just Enter again. send() ignores Enter until the last message went out.
 
 // The chat takes the focus while the user may still hold a movement key: its repeats must not
 // type "dddd" into the empty field.
