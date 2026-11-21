@@ -204,3 +204,23 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		encounter = self._open(self.A, self.B)["encounter"]
 		with self.assertRaises(frappe.ValidationError):
 			chip_space.send_encounter_message(encounter, "   ")
+
+	def test_dummy_answers_yes_or_no(self):
+		encounter = self._open(self.A, self.B)["encounter"]
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: [{"user": self.B, "x": 6, "y": 5}]}):
+			with patch.object(chip_space.frappe, "enqueue") as enqueue:
+				chip_space.send_encounter_message(encounter, "Coffee?")
+			self.assertEqual(enqueue.call_args.kwargs["dummy"], self.B)
+			with patch.object(chip_space, "DUMMY_REPLY_DELAY", 0), patch.object(chip_space.frappe, "publish_realtime"):
+				chip_space.dummy_reply(encounter, self.B)
+			frappe.set_user(self.A)
+			messages = chip_space.get_encounter(encounter)["messages"]
+		self.assertEqual(messages[-1]["owner"], self.B)
+		self.assertIn(messages[-1]["text"], ("Yes", "No"))
+
+	def test_real_people_get_no_auto_reply(self):
+		encounter = self._open(self.A, self.B)["encounter"]
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: None}):
+			with patch.object(chip_space.frappe, "enqueue") as enqueue:
+				chip_space.send_encounter_message(encounter, "Coffee?")
+		enqueue.assert_not_called()

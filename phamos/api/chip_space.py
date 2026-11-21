@@ -23,6 +23,7 @@ not set them:
 import html
 import json
 import math
+import random
 import re
 import time
 
@@ -375,4 +376,34 @@ def send_encounter_message(encounter, text):
 	# Raven's own events differ between Raven 2 and 3; the bubble listens to this one only.
 	for user in (doc.user_a, doc.user_b):
 		frappe.publish_realtime(EVENT_MESSAGE, payload, user=user, after_commit=True)
+	peer = _peer(doc)
+	if peer in _dummy_users() and frappe.session.user not in _dummy_users():
+		frappe.enqueue(
+			"phamos.api.chip_space.dummy_reply",
+			queue="short",
+			enqueue_after_commit=True,
+			encounter=doc.name,
+			dummy=peer,
+		)
 	return row
+
+
+def _dummy_users():
+	entries = frappe.conf.get(DUMMIES_CONF_KEY) or []
+	return {e.get("user") for e in entries if isinstance(e, dict)} if isinstance(entries, list) else set()
+
+
+DUMMY_REPLY_DELAY = 1.0
+
+
+def dummy_reply(encounter, dummy):
+	"""Background job: a test dummy (site config only) answers "Yes" or "No" at random."""
+	if dummy not in _dummy_users():
+		return
+	time.sleep(DUMMY_REPLY_DELAY)  # a moment to "think", so it reads like a reply
+	frappe.set_user(dummy)
+	try:
+		send_encounter_message(encounter, random.choice((_("Yes"), _("No"))))
+	except frappe.ValidationError:
+		# The encounter ended meanwhile.
+		pass
