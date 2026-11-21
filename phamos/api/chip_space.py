@@ -20,6 +20,7 @@ not set them:
 	"chip_space_dummies": [{"user": "chip-buddy@example.com", "x": 24, "y": 12}]
 """
 
+import hashlib
 import html
 import json
 import math
@@ -320,6 +321,24 @@ def _position_of(user):
 	return None
 
 
+PAIR_LOCK_SECONDS = 10
+
+
+def _lock_pair(pair_key):
+	"""MariaDB GET_LOCK for this pair, released when this request commits or rolls back."""
+	# Lock names are at most 64 characters.
+	name = "phamos_chip_space_" + hashlib.md5(pair_key.encode()).hexdigest()
+	got = frappe.db.sql("SELECT GET_LOCK(%s, %s)", (name, PAIR_LOCK_SECONDS))[0][0]
+	if not got:
+		frappe.throw(_("The chat is just being opened. Please try again."))
+
+	def release():
+		frappe.db.sql("SELECT RELEASE_LOCK(%s)", (name,))
+
+	frappe.db.after_commit.add(release)
+	frappe.db.after_rollback.add(release)
+
+
 def _pair_key(user_a, user_b):
 	return "|".join(sorted((user_a, user_b)))
 
@@ -330,15 +349,18 @@ def _open_encounter_name(pair_key, for_update=False):
 	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key}, "name", for_update=for_update)
 
 
-ENCOUNTER_FIELDS = ["name", "user_a", "user_b", "status", "raven_channel", "burn_at", "saved_by_a", "saved_by_b"]
+ENCOUNTER_FIELDS = [
+	"name", "user_a", "user_b", "status", "raven_channel", "jitsi_room", "burn_at", "saved_by_a", "saved_by_b"
+]
 
 
-def _require_party(encounter, statuses=("Open",)):
+def _require_party(encounter, statuses=("Open",), for_update=False):
 	"""The encounter, if the session user is one of its two people and it is in one of `statuses`.
 
-	A saved or burned encounter no longer exists: "This chat has ended."
+	A saved or burned encounter no longer exists: "This chat has ended." `for_update` reads the
+	latest committed row (see open_encounter).
 	"""
-	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True)
+	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True, for_update=for_update)
 	if not doc:
 		frappe.throw(_("This chat has ended."))
 	if frappe.session.user not in (doc.user_a, doc.user_b):
@@ -413,7 +435,8 @@ def _video(doc):
 	# A bare host name: the page loads https://<domain>/external_api.js from it.
 	if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", domain):
 		return None
-	room = frappe.db.get_value(ENCOUNTER_DOCTYPE, doc.name, "jitsi_room")
+	# From the row the caller read: open_encounter reads it fresh, so both pages get one room.
+	room = doc.get("jitsi_room")
 	if not room:
 		# Encounters from before #2059 get their room on first use.
 		room = _new_jitsi_room()
@@ -440,8 +463,9 @@ def _encounter_payload(doc):
 def open_encounter(with_user):
 	"""Two chips met: get or start the encounter chat of the pair and return it with its messages.
 
-	Both pages notice the meeting and both call this; the pair key's unique index makes sure
-	only one encounter is created.
+	Both pages notice the meeting and both call this at the same moment. A database lock per
+	pair, held until this request commits, lets them run one after the other: the second one
+	finds the first one's encounter. (Racing inserts on the unique pair key deadlocked.)
 	"""
 	_require_user()
 	me = frappe.session.user
@@ -452,10 +476,12 @@ def open_encounter(with_user):
 		frappe.throw(_("Move closer to chat."))
 
 	pair_key = _pair_key(me, with_user)
-	name = _open_encounter_name(pair_key)
+	_lock_pair(pair_key)
+	# A locking read: it sees what the other request committed while this one waited.
+	name = _open_encounter_name(pair_key, for_update=True)
 	if name:
 		# Met again while the burn notice ran: the chat goes on.
-		_cancel_burn(_require_party(name, ("Open", "Parting")))
+		_cancel_burn(_require_party(name, ("Open", "Parting"), for_update=True))
 	else:
 		user_a, user_b = sorted((me, with_user))
 		doc = frappe.get_doc(
@@ -469,8 +495,7 @@ def open_encounter(with_user):
 				"jitsi_room": _new_jitsi_room(),
 			}
 		)
-		# Both pages notice the meeting and call this at the same moment; the pair key's unique
-		# index lets one insert win. The other undoes only its insert and takes the winner's.
+		# The lock keeps the other page out; the unique index stays the last line of defence.
 		frappe.db.savepoint("chip_space_encounter")
 		try:
 			doc.insert(ignore_permissions=True)
@@ -479,13 +504,14 @@ def open_encounter(with_user):
 			# Frappe msgprints "Pair Key must be unique" before raising: drop it, or the page
 			# shows an error although the chat opens fine.
 			frappe.clear_last_message()
-			name = _open_encounter_name(pair_key, for_update=True)
+			name = _open_encounter_name(pair_key)
 			if not name:
 				frappe.throw(_("The chat is just being opened. Please try again."))
 		else:
 			doc.db_set("raven_channel", _create_channel(user_a, user_b), update_modified=False)
 			name = doc.name
-	return _encounter_payload(_require_party(name))
+	# Locking read again: this transaction's snapshot may predate the other page's commit.
+	return _encounter_payload(_require_party(name, for_update=True))
 
 
 @frappe.whitelist()

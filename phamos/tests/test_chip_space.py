@@ -114,7 +114,8 @@ class ChipSpacePresenceTestCase(FrappeTestCase):
 		chip_space.heartbeat(1, 1)
 		with patch.object(chip_space.frappe, "publish_realtime") as publish:
 			chip_space.leave()
-		self.assertEqual(publish.call_args.args, (chip_space.EVENT_LEAVE, {"user": "Administrator"}))
+		# Other events may follow (the site's own encounters of Administrator part too).
+		self.assertIn(((chip_space.EVENT_LEAVE, {"user": "Administrator"}),), [(c.args,) for c in publish.call_args_list])
 		self.assertEqual(chip_space._online(), [])
 
 	def test_website_user_refused(self):
@@ -204,6 +205,16 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		self.assertFalse(any("must be unique" in str(m) for m in frappe.local.message_log))
 		# The users and the first encounter of this test survived: only the failed insert was undone.
 		self.assertTrue(frappe.db.exists("User", self.A))
+
+	def test_open_holds_the_pair_lock_until_the_end(self):
+		"""Two pages opening at once wait for each other instead of racing (deadlock seen live)."""
+		self._open(self.A, self.B)
+		name = "phamos_chip_space_" + chip_space.hashlib.md5(chip_space._pair_key(self.A, self.B).encode()).hexdigest()
+		# Held by this connection (still in the request's transaction)...
+		self.assertEqual(frappe.db.sql("SELECT IS_USED_LOCK(%s) = CONNECTION_ID()", (name,))[0][0], 1)
+		frappe.db.rollback()
+		# ...and released with the transaction.
+		self.assertIsNone(frappe.db.sql("SELECT IS_USED_LOCK(%s)", (name,))[0][0])
 
 	def test_too_far_apart(self):
 		with self.assertRaises(frappe.ValidationError):
