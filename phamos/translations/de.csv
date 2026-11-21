@@ -2577,3 +2577,9 @@ Drag onto the task that follows,Auf die nachfolgende Aufgabe ziehen
 Dependency,Abhängigkeit
 must finish before,muss fertig sein vor
 "Starts {0}, but {1} ends {2}","Beginnt {0}, aber {1} endet {2}"
+Bookstack Browser,Bookstack-Browser
+Books,Bücher
+Shelves,Regale
+Chapters,Kapitel
+Bookstack Users,Bookstack-Benutzer
+Bookstack Roles,Bookstack-Rollen

@@ -9,6 +9,14 @@ import frappe
 from frappe import _
 
 
+APP_ROLES = {"Bookstack User", "Bookstack Manager", "System Manager"}
+
+
+def check_app_permission():
+	"""Show the Bookstack tile on the Apps screen (add_to_apps_screen in hooks.py, #2028)."""
+	return bool(APP_ROLES & set(frappe.get_roles()))
+
+
 @frappe.whitelist()
 def list_instances():
 	"""Return the list of enabled Bookstack Configurations the user can read."""
