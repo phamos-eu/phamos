@@ -363,6 +363,16 @@ def _render(html, lang):
 			if a.get("rel"):
 				del a["rel"]  # noopener is for other sites
 
+	# Wide tables scroll sideways in a box of their own; web_docs.bundle.js marks a clipped edge
+	# the way the cockpits do (ScrollHint, #1922).
+	for table in soup.find_all("table"):
+		if table.parent and "wp-docs-table-scroll" in (table.parent.get("class") or []):
+			continue
+		box = soup.new_tag("div", attrs={"class": "wp-docs-table", "data-wp-docs-table": ""})
+		scroller = soup.new_tag("div", attrs={"class": "wp-docs-table-scroll"})
+		table.wrap(scroller)
+		scroller.wrap(box)
+
 	headings, used = [], {tag["id"] for tag in soup.find_all(id=True)}
 	for n, tag in enumerate(soup.find_all(["h2", "h3"]), 1):
 		text = " ".join(tag.get_text(" ").split())

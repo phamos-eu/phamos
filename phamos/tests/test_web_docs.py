@@ -98,6 +98,9 @@ class TestWebDocs(DocsFixture):
 		html = _render("de/dokumentation/handbuch-test/konten")
 
 		self.assertIn("<td>1200</td>", html)
+		# wide tables scroll in a box of their own, with the cockpit's scroll hint (#2045)
+		self.assertRegex(html, r'<div class="wp-docs-table" data-wp-docs-table=""><div class="wp-docs-table-scroll"><table>')
+		self.assertIn('data-label-more-right="Mehr rechts"', html)
 		self.assertIn('rel="prev"', html)
 		self.assertIn('href="/de/dokumentation/handbuch-test/erste-schritte" rel="prev"', html)
 		self.assertNotIn('rel="next"', html, "last page has no next")

@@ -33,7 +33,8 @@
 				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</header>
 			{#- Sanitised by the BookStack sync (content.clean_page_html); links pointed at the website by docs.render_html. -#}
-			<div class="wp-body wp-docs-content" lang="de" data-wp-docs-content>{{ page.html }}</div>
+			<div class="wp-body wp-docs-content" lang="de" data-wp-docs-content
+				data-label-more-right="{{ _('More to the right') }}" data-label-scroll-rest="{{ _('Scroll to see the rest') }}">{{ page.html }}</div>
 
 			<nav class="wp-docs-pager" aria-label="{{ _('Pages') }}">
 				{%- if page.previous %}<a class="wp-link-card" href="{{ page.previous.url | e }}" rel="prev"><span class="wp-docs-pager-label">{{ _("Previous") }}</span><span>{{ page.previous.title | e }}</span></a>{% else %}<span></span>{% endif %}

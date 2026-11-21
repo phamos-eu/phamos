@@ -735,7 +735,22 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-docs-content p, .wp-docs-content ul, .wp-docs-content ol { margin: 0 0 1em; }
 .wp-docs-content a { color: var(--wp-ink); text-decoration: underline; text-underline-offset: 3px; }
 .wp-docs-content img { max-width: 100%; height: auto; border-radius: var(--wp-radius-sm); }
-.wp-docs-content table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0 0 1.2em; font-size: 14px; }
+.wp-docs-content table { border-collapse: collapse; margin: 0; font-size: 14px; }
+/* Wide tables scroll in their box; the hint marks a clipped edge (cockpit ScrollHint, #1922). */
+.wp-docs-table { position: relative; margin: 0 0 1.2em; }
+.wp-docs-table-scroll { overflow-x: auto; }
+.wp-docs-table-fade { position: absolute; top: 0; bottom: 0; width: 72px; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+.wp-docs-table-fade-left { left: 0; width: 24px; background: linear-gradient(to right, rgb(0 0 0 / 10%), transparent); }
+.wp-docs-table-fade-right { right: 0; display: flex; flex-direction: column; align-items: flex-end; padding: 8px 6px 0 0; background: linear-gradient(to left, var(--wp-surface) 15%, transparent); }
+.wp-docs-table.is-clipped-left .wp-docs-table-fade-left, .wp-docs-table.is-clipped-right .wp-docs-table-fade-right { opacity: 1; }
+/* The pill stays in view along a tall table while the page scrolls. */
+.wp-docs-table-more { position: sticky; top: calc(50vh - 14px); display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px 2px 10px;
+	border: 1px solid var(--wp-line); border-radius: 999px; background: var(--wp-surface); color: var(--wp-ink-2); font: inherit; font-size: 12px; font-weight: 500;
+	white-space: nowrap; box-shadow: var(--wp-shadow-sm); cursor: pointer; pointer-events: none; }
+.wp-docs-table.is-clipped-right .wp-docs-table-more { pointer-events: auto; }
+.wp-docs-table-more:hover { color: var(--wp-ink); }
+.wp-docs-table-more:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
+.wp-docs-table-more svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .wp-docs-content th, .wp-docs-content td { padding: 6px 10px; border: 1px solid var(--wp-line); vertical-align: top; }
 .wp-docs-content th, .wp-docs-content thead td { background: var(--wp-surface-2); font-weight: 600; }
 .wp-docs-content code { padding: 1px 5px; border-radius: 4px; background: var(--wp-surface-3); font-size: 0.9em; }
