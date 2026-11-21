@@ -17,7 +17,11 @@ def get_context(context):
 	context.query = query
 	context.book = book
 	context.too_short = bool(query) and not docs_search.words_of(query)
-	context.result = docs_search.search(query, lang, book_slug=book.slug if book else None)
+	exact = frappe.form_dict.get("exact") == "1"
+	context.result = docs_search.search(query, lang, book_slug=book.slug if book else None, exact=exact)
+	corrected = context.result.get("corrected") or {}
+	context.corrected_query = docs_search.corrected_query(query, corrected) if corrected else None
+	context.exact_url = docs_search.search_url(lang, query, book.slug if book else None, exact=True) if corrected else None
 	context.all_books_url = docs_search.search_url(lang, query) if book else None
 	label = _("Search")
 	context.crumbs.append({"label": label, "url": docs.search_path(lang)})
