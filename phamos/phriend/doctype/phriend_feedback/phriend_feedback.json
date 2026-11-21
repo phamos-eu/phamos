@@ -1,0 +1,171 @@
+{
+ "actions": [],
+ "autoname": "format:PF-{#####}",
+ "creation": "2026-11-21 13:30:00.000000",
+ "description": "One rating question of Phriend to one person about one thing that went live (#2014).",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "subject_doctype",
+  "subject_name",
+  "subject_title",
+  "round",
+  "column_break_main",
+  "user",
+  "anonymous",
+  "status",
+  "answer_section",
+  "kind",
+  "rating",
+  "comment",
+  "column_break_answer",
+  "live_since",
+  "asked_at",
+  "times_deferred",
+  "answered_at"
+ ],
+ "fields": [
+  {
+   "default": "Issue",
+   "fieldname": "subject_doctype",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "About (DocType)",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "About",
+   "options": "subject_doctype",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "round",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Round",
+   "options": "First impression\nBattle tested",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Kept also for anonymous feedback, only so nobody is asked twice; never shown then.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Asked",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "anonymous",
+   "fieldtype": "Check",
+   "label": "Anonymous",
+   "read_only": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nAnswered\nDeclined"
+  },
+  {
+   "fieldname": "answer_section",
+   "fieldtype": "Section Break",
+   "label": "Answer"
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Thumbs\nStars",
+   "reqd": 1
+  },
+  {
+   "description": "Thumbs: 1 up, -1 down. Stars: 1 to 5.",
+   "fieldname": "rating",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Rating"
+  },
+  {
+   "fieldname": "comment",
+   "fieldtype": "Small Text",
+   "label": "Comment"
+  },
+  {
+   "fieldname": "column_break_answer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "live_since",
+   "fieldtype": "Datetime",
+   "label": "Live Since",
+   "read_only": 1
+  },
+  {
+   "fieldname": "asked_at",
+   "fieldtype": "Datetime",
+   "label": "Asked At",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "times_deferred",
+   "fieldtype": "Int",
+   "label": "Times Put Off",
+   "read_only": 1
+  },
+  {
+   "fieldname": "answered_at",
+   "fieldtype": "Datetime",
+   "label": "Answered At",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-21 13:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phriend",
+ "name": "Phriend Feedback",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "subject_title",
+ "track_changes": 0
+}
