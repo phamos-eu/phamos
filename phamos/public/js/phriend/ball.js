@@ -29,10 +29,14 @@ export const SVG = `
 		<circle class="sphere" cx="32" cy="32" r="24" fill="url(#phriend-grad)"/>
 		<ellipse cx="23" cy="20" rx="6" ry="3.5" fill="#fff" opacity="0.16" transform="rotate(-30 23 20)"/>
 		<g class="eyes">
-			<ellipse cx="24" cy="30" rx="5.5" ry="6.5" fill="#fff"/>
-			<ellipse cx="40" cy="30" rx="5.5" ry="6.5" fill="#fff"/>
-			<circle class="pupil" cx="24" cy="31" r="2.8" fill="#111"/>
-			<circle class="pupil" cx="40" cy="31" r="2.8" fill="#111"/>
+			<g class="eye eye-l">
+				<ellipse cx="24" cy="30" rx="5.5" ry="6.5" fill="#fff"/>
+				<circle class="pupil" cx="24" cy="31" r="2.8" fill="#111"/>
+			</g>
+			<g class="eye eye-r">
+				<ellipse cx="40" cy="30" rx="5.5" ry="6.5" fill="#fff"/>
+				<circle class="pupil" cx="40" cy="31" r="2.8" fill="#111"/>
+			</g>
 		</g>
 		<path class="mouth" d="M27 42 Q32 46.5 37 42" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.85"/>
 	</g>
@@ -59,6 +63,8 @@ export const GESTURES = {
 	alert: { hand: "‼️", motion: "pulse" }, // the red double exclamation
 	muscle: { hand: "💪", motion: "flex" }, // "ready", back from quiet (#2010)
 	rocket: { hand: "🚀", motion: "launch" }, // "let's go", back from quiet (#2010)
+	music: { hand: "🎵", motion: "sway" }, // dancing (#2013)
+	dizzy: { hand: "💫", motion: "twinkle" }, // shaken around (#2013)
 };
 
 const REACT_MS = 1600; // how long a reaction without words shows
@@ -114,6 +120,31 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .ball:hover .leg-r { animation: wiggle-r 0.35s ease-in-out infinite alternate; }
 .ball.hop .body { animation: hop 0.45s ease-out 1; }
 .ball.busy .eyes { animation: squint 0.6s ease-in-out infinite alternate; }
+/* Easter eggs (#2013): one move at a time, class "play-<move>" for its length (play.js). */
+.eye { transform-box: fill-box; transform-origin: center; }
+.ball.play-spin .body { transform-origin: 50% 39%; animation: ph-spin 0.9s ease-in-out 1; }
+.ball.play-double_hop .body { animation: ph-double-hop 0.95s ease-out 1; }
+.ball.play-double_hop .leg-l { animation: wiggle-l 0.24s ease-in-out 4 alternate; }
+.ball.play-double_hop .leg-r { animation: wiggle-r 0.24s ease-in-out 4 alternate; }
+.ball.play-wink .eyes { animation: none; }
+.ball.play-wink .eye-r { animation: ph-wink 0.7s ease-in-out 1; }
+.ball.play-peekaboo .eyes { animation: ph-peekaboo 1.1s ease-in-out 1; }
+.ball.play-look_around .eyes { animation: ph-look 1.7s ease-in-out 1; }
+.ball.play-dance .body { animation: ph-dance 0.5s ease-in-out 4 alternate; }
+.ball.play-dance .leg-l { animation: wiggle-l 0.25s ease-in-out 8 alternate; }
+.ball.play-dance .leg-r { animation: wiggle-r 0.25s ease-in-out 8 alternate; }
+.ball.play-dizzy .body { animation: ph-wobble 0.3s ease-in-out 5 alternate; }
+.ball.play-dizzy .eyes { animation: none; }
+.ball.play-dizzy .eye { animation: ph-dizzy-eye 0.5s linear 3; }
+@keyframes ph-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes ph-double-hop { 0%, 50%, 100% { transform: translateY(0); } 20% { transform: translateY(-12px); }
+	70% { transform: translateY(-9px); } 40%, 90% { transform: translateY(0) scale(1.04, 0.96); } }
+@keyframes ph-wink { 0%, 100% { transform: scaleY(1); } 30%, 65% { transform: scaleY(0.1); } }
+@keyframes ph-peekaboo { 0% { transform: scale(1); } 15%, 50% { transform: scaleY(0.08); } 65% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes ph-look { 0%, 100% { transform: translateX(0); } 20%, 35% { transform: translateX(-3.5px); } 55%, 75% { transform: translateX(3.5px); } }
+@keyframes ph-dance { from { transform: rotate(-7deg) translateY(0); } to { transform: rotate(7deg) translateY(-3px); } }
+@keyframes ph-wobble { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+@keyframes ph-dizzy-eye { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 /* Leave me in peace (#2010): Phriend steps back but stays there, ready. Never asleep ("sleeping
    on the job" is not the message, PM 2026-11-21): smaller, a little faded, without face and
    legs; still breathing. Full strength again while the pointer is on it. */
@@ -129,6 +160,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @media (prefers-reduced-motion: reduce) {
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
+	.ball[class*="play-"] .body, .ball[class*="play-"] .eyes, .ball[class*="play-"] .eye, .ball[class*="play-"] .leg { animation: none !important; }
 	.emoji { animation: none !important; }
 	.hit svg, .eyes, .mouth, .leg { transition: none; }
 }
@@ -258,6 +290,7 @@ export class Ball {
 	// hands: false when "Hands and reactions" is off in Phriend Settings (#2009)
 	// menu: optional () => entries for the menu (#2010), see open_menu(); none = no menu
 	// on_waiting_click, waiting_label(count): the blue dot of things waiting (#2011)
+	// on_drag_end(samples): a drag ended, with its last moves [{x, y, t}] (#2013)
 	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
 	// of their own buttons in the corner)
 	constructor(options) {
@@ -381,6 +414,7 @@ export class Ball {
 		let dragging = false;
 		let pressed = false; // a long press opened the menu: no click when the finger lifts
 		let press_timer = null;
+		let samples = []; // the drag's last moves, to tell a fast shake (#2013)
 
 		this.hit.addEventListener("pointerdown", (e) => {
 			if (e.button !== 0) return;
@@ -388,6 +422,7 @@ export class Ball {
 			start = { x: e.clientX, y: e.clientY, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
 			dragging = false;
 			pressed = false;
+			samples = [];
 			this.hit.setPointerCapture(e.pointerId);
 			// touch and pen have no right click: a long press opens the menu (#2010)
 			clearTimeout(press_timer);
@@ -407,7 +442,11 @@ export class Ball {
 				clearTimeout(press_timer);
 				this.root.classList.add("dragging");
 			}
-			if (dragging) this.set_position(e.clientX - start.dx, e.clientY - start.dy);
+			if (dragging) {
+				this.set_position(e.clientX - start.dx, e.clientY - start.dy);
+				samples.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
+				if (samples.length > 12) samples.shift();
+			}
 		});
 
 		const end = (e, cancelled) => {
@@ -419,6 +458,7 @@ export class Ball {
 				pressed = false;
 			} else if (dragging) {
 				this.root.classList.remove("dragging");
+				if (this.options.on_drag_end) this.options.on_drag_end(samples);
 				storage_set(
 					POS_KEY,
 					JSON.stringify({ left: parseFloat(this.root.style.left), top: parseFloat(this.root.style.top) })
@@ -463,6 +503,18 @@ export class Ball {
 		void this.root.offsetWidth; // restart the animation
 		this.root.classList.add("hop");
 		setTimeout(() => this.root.classList.remove("hop"), 500);
+	}
+
+	// An easter egg (#2013): one move of play.js MOVES for `ms`; the next one waits.
+	play(name, ms) {
+		if (this._playing) return false;
+		this._playing = name;
+		this.root.classList.add(`play-${name}`);
+		setTimeout(() => {
+			this.root.classList.remove(`play-${name}`);
+			this._playing = null;
+		}, ms);
+		return true;
 	}
 
 	set_busy(busy) {

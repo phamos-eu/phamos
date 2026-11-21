@@ -46,7 +46,7 @@ class TestPhriend(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("phriend_test")
-		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1, events=0,
+		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1, events=0, easter_eggs=0,
 			warning_role="System Manager", warn_ai_run_failed=1, warn_email_failed=1, warn_gitlab_sync_failed=1,
 			gitlab_url="https://git.example.com", gitlab_project="phamos/phamos", gitlab_labels="phriend")
 
@@ -326,7 +326,8 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
-				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0}, "quiet": None, "can_configure": 1,
+				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0, "easter_eggs": 0}, "quiet": None,
+				"can_configure": 1,
 				"voice": None},
 		)
 
@@ -487,6 +488,14 @@ class TestPhriend(FrappeTestCase):
 		users = {c.kwargs["user"] for c in publish.call_args_list if c.args[0] == "phriend_event"}
 		self.assertIn("Administrator", users)
 		self.assertTrue(all(c.args[1]["kind"] == "gitlab_sync_failed" for c in publish.call_args_list))
+
+	@patch("frappe.publish_realtime")
+	def test_a_failed_ai_run_links_to_its_record_with_the_name_encoded(self, publish, _enqueue):
+		# AI review of !1279: a name with a space or "/" must not break the link
+		self.set_settings(events=1)
+		run = frappe._dict(triggered_by="Administrator", reference_doctype="Accounting Receipt", reference_name="AR 1/2")
+		phriend_events.ai_run_failed(run)
+		self.assertEqual(publish.call_args.args[1]["link"], "/app/accounting-receipt/AR%201%2F2")
 
 	@patch("frappe.publish_realtime")
 	def test_quiet_changes_reach_the_users_other_tabs(self, publish, _enqueue):
