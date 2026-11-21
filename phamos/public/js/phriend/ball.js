@@ -33,7 +33,7 @@ export const SVG = `
 			<circle class="pupil" cx="24" cy="31" r="2.8" fill="#111"/>
 			<circle class="pupil" cx="40" cy="31" r="2.8" fill="#111"/>
 		</g>
-		<path d="M27 42 Q32 46.5 37 42" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.85"/>
+		<path class="mouth" d="M27 42 Q32 46.5 37 42" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.85"/>
 	</g>
 </svg>`;
 
@@ -41,24 +41,31 @@ export const SVG = `
 // without words, react("<gesture>") (#2009). The system's own emoji, default skin tone, so they
 // look like the emoji people know on their device (PM, 2026-11-21). The motion names a keyframe
 // below.
+// side: where the emoji is attached to Phriend, the side its wrist, arm or flame points to
+// (PM, 2026-11-21), as Apple draws them: 💪 and 👏 on the left, 👉 on the right. No side: the
+// emoji is upright or symmetric and goes on the side that faces into the window. Never mirrored.
+// Check them with phriend.hands() (debug).
 export const GESTURES = {
-	wave: { hand: "👋", motion: "wave" }, // "Click me!" and the first greeting
+	wave: { hand: "👋", motion: "wave", side: "left" }, // "Click me!" and the first greeting
 	thumbs_up: { hand: "👍", motion: "bounce" }, // report saved
 	thumbs_down: { hand: "👎", motion: "sink" },
 	fingers_crossed: { hand: "🤞", motion: "sway" }, // sending
 	wait: { hand: "✋", motion: "still" }, // "One moment…"
 	point_up: { hand: "☝️", motion: "up" }, // at the bubble: an unsent or failed report
-	point: { hand: "👉", motion: "point" }, // at Phriend: "Report it?"
+	point: { hand: "👉", motion: "point", side: "right" }, // at Phriend: "Report it?"
 	thanks: { hand: "🙏", motion: "bow" },
 	praise: { hand: "🙌", motion: "raise" },
-	high_five: { hand: "🖐️", motion: "slap" },
-	clap: { hand: "👏", motion: "clap" },
+	high_five: { hand: "🖐️", motion: "slap", side: "left" },
+	clap: { hand: "👏", motion: "clap", side: "left" },
 	heart: { hand: "❤️", motion: "beat" },
 	star: { hand: "⭐", motion: "twinkle" },
 	alert: { hand: "‼️", motion: "pulse" }, // the red double exclamation
+	muscle: { hand: "💪", motion: "flex", side: "left" }, // "ready", back from quiet (#2010)
+	rocket: { hand: "🚀", motion: "launch", side: "right" }, // "let's go", back from quiet (#2010)
 };
 
 const REACT_MS = 1600; // how long a reaction without words shows
+const LONG_PRESS_MS = 550; // touch: a press this long opens the menu (#2010)
 
 // Colours and type for everything inside the Shadow DOM (the flow adds its own rules).
 const BASE_CSS = `
@@ -110,6 +117,15 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .ball:hover .leg-r { animation: wiggle-r 0.35s ease-in-out infinite alternate; }
 .ball.hop .body { animation: hop 0.45s ease-out 1; }
 .ball.busy .eyes { animation: squint 0.6s ease-in-out infinite alternate; }
+/* Leave me in peace (#2010): Phriend steps back but stays there, ready. Never asleep ("sleeping
+   on the job" is not the message, PM 2026-11-21): smaller, a little faded, without face and
+   legs; still breathing. Full strength again while the pointer is on it. */
+.ball svg { transition: transform 0.4s ease, opacity 0.4s ease; transform-origin: 50% 60%; }
+.eyes, .mouth, .leg { transition: opacity 0.3s ease; }
+.ball.resting svg { transform: translateY(10px) scale(0.6); opacity: 0.55; }
+.ball.resting .eyes, .ball.resting .mouth, .ball.resting .leg { opacity: 0; }
+.ball.resting .shadow { opacity: 0; animation: none; }
+.ball.resting:hover svg, .ball.resting .hit:focus-visible svg { opacity: 0.9; }
 :host([data-paused]) * { animation-play-state: paused !important; }
 /* "hidden" always hides, whatever display a class sets (AI review of !1162) */
 [hidden] { display: none !important; }
@@ -117,16 +133,36 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
 	.hand.show { animation: none !important; }
+	.ball svg, .eyes, .mouth, .leg { transition: none; }
 }
-/* The hand beside the ball, at the side away from the badge (top right). Near the left edge
-   (flip) it moves to the right side, mirrored, so it stays on screen and still faces Phriend. */
+/* The phriend's menu (#2010): right-click, long press or the context-menu key. Where the
+   bubble would be; the bubble steps aside while it is open. */
+.menu {
+	position: absolute; bottom: calc(100% + 8px); right: 0; min-width: 220px; max-width: 280px; padding: 6px;
+	border-radius: 12px; background: var(--ph-bg); color: var(--ph-text); border: 1px solid var(--ph-border);
+	box-shadow: var(--ph-shadow); font-size: 13px; line-height: 1.35; cursor: auto;
+}
+.ball.flip .menu { right: auto; left: 0; }
+.menu.below { bottom: auto; top: calc(100% + 8px); }
+.menu.scroll { overflow-y: auto; }
+.menu-heading { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ph-muted); }
+.menu-note { padding: 2px 8px 6px; font-size: 12px; color: var(--ph-muted); }
+.menu-sep { height: 1px; margin: 4px 2px; background: var(--ph-border); }
+.menu-row { display: flex; gap: 4px; padding: 2px 4px 4px; }
+.menu button { display: block; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent;
+	color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.menu-row button { flex: 1; padding: 5px 4px; text-align: center; border: 1px solid var(--ph-border); }
+.menu button:hover, .menu button:focus-visible { background: var(--ph-surface); outline: none; }
+.menu button:focus-visible { box-shadow: 0 0 0 2px var(--ph-focus); }
+/* The hand at "heart" height (PM, 2026-11-21): on the lower edge of the sphere, a little in
+   front of it, on the side the emoji is attached (GESTURES side), as the emoji is drawn. */
 .hand {
-	position: absolute; left: -16px; top: 20px; font-size: 22px; line-height: 1; pointer-events: none;
+	position: absolute; left: -5px; top: 33px; font-size: 22px; line-height: 1; pointer-events: none;
 	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-	opacity: 0; transform: scale(0.4); transform-origin: 70% 90%; transition: opacity 0.2s, transform 0.2s;
+	opacity: 0; transform: scale(0.4); transform-origin: 50% 85%; transition: opacity 0.2s, transform 0.2s;
 }
 .hand.show { opacity: 1; transform: none; }
-.ball.flip .hand { left: auto; right: -10px; scale: -1 1; }
+.hand.on-right { left: auto; right: -5px; }
 .hand.show[data-motion="wave"] { animation: hand-wave 0.5s ease-in-out infinite alternate; }
 .hand.show[data-motion="bounce"] { animation: hand-bounce 0.6s ease-out 1; }
 .hand.show[data-motion="sway"] { animation: hand-sway 1.2s ease-in-out infinite alternate; }
@@ -140,6 +176,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .hand.show[data-motion="beat"] { animation: hand-beat 0.8s ease-in-out infinite; }
 .hand.show[data-motion="twinkle"] { animation: hand-twinkle 1.2s ease-in-out infinite; }
 .hand.show[data-motion="pulse"] { animation: hand-pulse 0.7s ease-in-out infinite; }
+.hand.show[data-motion="flex"] { animation: hand-flex 0.5s ease-in-out 3 alternate; }
+.hand.show[data-motion="launch"] { animation: hand-launch 1.4s ease-in 1 forwards; }
 @keyframes hand-wave { from { transform: rotate(-14deg); } to { transform: rotate(22deg); } }
 @keyframes hand-bounce { 0% { transform: scale(0.4); } 55% { transform: translateY(-5px) scale(1.25); } 100% { transform: none; } }
 @keyframes hand-sink { 0% { transform: scale(0.4); } 55% { transform: translateY(4px) scale(1.15); } 100% { transform: none; } }
@@ -153,6 +191,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @keyframes hand-beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(0.95); } 60% { transform: scale(1.12); } }
 @keyframes hand-twinkle { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(18deg) scale(1.15); } }
 @keyframes hand-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes hand-flex { from { transform: rotate(0) scale(1); } to { transform: rotate(-12deg) scale(1.2); } }
+@keyframes hand-launch { 0% { transform: none; } 30% { transform: translate(-2px, 2px); } 100% { transform: translate(14px, -26px); opacity: 0; } }
 .badge {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;
@@ -169,6 +209,12 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .pending { position: absolute; left: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%;
 	background: #e8a23a; box-shadow: 0 0 0 2px var(--ph-bg); display: none; }
 .ball.has-pending .pending { display: block; }
+/* One voice (#2011): something waits for the user. Click: the oldest one, in a bubble. */
+.waiting { position: absolute; left: 12px; top: -5px; min-width: 14px; height: 14px; padding: 0 3px; border: 0;
+	border-radius: 7px; background: #2f6fdb; color: #fff; font: 600 9px/14px var(--ph-font); text-align: center;
+	cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg); }
+.waiting:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 2px; }
+.ball.resting .waiting { opacity: 0.7; }
 .bubble {
 	position: absolute; bottom: calc(100% + 8px); right: 0; width: max-content; max-width: 260px;
 	padding: 8px 12px; border-radius: 12px; background: var(--ph-bg); color: var(--ph-text);
@@ -206,8 +252,10 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 `;
 
 export class Ball {
-	// options: { label, on_click, on_badge_click, on_first_interest, start, hands }
+	// options: { label, on_click, on_badge_click, on_first_interest, start, hands, menu }
 	// hands: false when "Hands and reactions" is off in Phriend Settings (#2009)
+	// menu: optional () => entries for the menu (#2010), see open_menu(); none = no menu
+	// on_waiting_click, waiting_label(count): the blue dot of things waiting (#2011)
 	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
 	// of their own buttons in the corner)
 	constructor(options) {
@@ -219,9 +267,11 @@ export class Ball {
 			<style>${BASE_CSS}</style>
 			<div class="ball">
 				<div class="bubble" role="status" aria-live="polite"></div>
+				<div class="menu" role="menu" hidden></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="hand" aria-hidden="true"></span>
 				<span class="pending"></span>
+				<button type="button" class="waiting" hidden></button>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
 			</div>
@@ -231,8 +281,10 @@ export class Ball {
 		this.root = this.shadow.querySelector(".ball");
 		this.hit = this.shadow.querySelector(".hit"); // the ball itself: drag, click, keyboard
 		this.bubble = this.shadow.querySelector(".bubble");
+		this.menu = this.shadow.querySelector(".menu");
 		this.hand = this.shadow.querySelector(".hand");
 		this.badge = this.shadow.querySelector(".badge");
+		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
@@ -243,10 +295,12 @@ export class Ball {
 			this.root.style.bottom = `${options.start.bottom}px`;
 		}
 		this.restore_position();
+		this.update_hand_side();
 		this.setup_drag();
 		this.setup_eyes();
 		this.setup_interest();
 		this.setup_pause();
+		this.setup_menu();
 
 		this.badge.addEventListener("pointerdown", (e) => e.stopPropagation());
 		this.badge.addEventListener("click", (e) => {
@@ -254,6 +308,11 @@ export class Ball {
 			options.on_badge_click && options.on_badge_click();
 		});
 		this.bubble.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.waiting.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.waiting.addEventListener("click", (e) => {
+			e.stopPropagation();
+			options.on_waiting_click && options.on_waiting_click();
+		});
 		this.hit.addEventListener("keydown", (e) => {
 			if (e.key === "Enter" || e.key === " ") {
 				e.preventDefault();
@@ -309,39 +368,76 @@ export class Ball {
 		top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
 		Object.assign(this.root.style, { left: `${left}px`, top: `${top}px`, right: "auto", bottom: "auto" });
 		this.root.classList.toggle("flip", left < 260); // keep the speech bubble on screen
+		this.update_hand_side();
+	}
+
+	// The hand goes on the side that faces into the screen (PM, 2026-11-21).
+	// The side that faces into the window: for emoji without a side of their own.
+	update_hand_side() {
+		const rect = this.root.getBoundingClientRect();
+		const centre = rect.width ? rect.left + rect.width / 2 : window.innerWidth; // not laid out: right corner
+		this.inner_side = centre < window.innerWidth / 2 ? "right" : "left";
+		if (this.hand && this.hand.dataset.name) this.place_hand(this.hand.dataset.name);
+	}
+
+	// side_overrides: { gesture: "left" | "right" | "auto" }, set by the debug panel (phriend.hands())
+	hand_side(gesture) {
+		const g = GESTURES[gesture];
+		const side = (this.side_overrides && this.side_overrides[gesture]) || (g && g.side) || "auto";
+		return side === "auto" ? this.inner_side || "left" : side;
+	}
+
+	place_hand(gesture) {
+		this.hand.classList.toggle("on-right", this.hand_side(gesture) === "right");
 	}
 
 	clamp_into_view() {
-		if (!this.root.style.left) return;
+		if (!this.root.style.left) return this.update_hand_side();
 		this.set_position(parseFloat(this.root.style.left), parseFloat(this.root.style.top));
 	}
 
 	setup_drag() {
 		let start = null;
 		let dragging = false;
+		let pressed = false; // a long press opened the menu: no click when the finger lifts
+		let press_timer = null;
 
 		this.hit.addEventListener("pointerdown", (e) => {
 			if (e.button !== 0) return;
 			const rect = this.root.getBoundingClientRect();
 			start = { x: e.clientX, y: e.clientY, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
 			dragging = false;
+			pressed = false;
 			this.hit.setPointerCapture(e.pointerId);
+			// touch and pen have no right click: a long press opens the menu (#2010)
+			clearTimeout(press_timer);
+			if (e.pointerType !== "mouse" && this.options.menu) {
+				press_timer = setTimeout(() => {
+					if (!start || dragging) return;
+					pressed = true;
+					this.open_menu();
+				}, LONG_PRESS_MS);
+			}
 		});
 
 		this.hit.addEventListener("pointermove", (e) => {
 			if (!start) return;
-			if (!dragging && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
+			if (!dragging && !pressed && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
 				dragging = true;
+				clearTimeout(press_timer);
 				this.root.classList.add("dragging");
 			}
 			if (dragging) this.set_position(e.clientX - start.dx, e.clientY - start.dy);
 		});
 
 		const end = (e, cancelled) => {
+			clearTimeout(press_timer);
 			if (!start) return;
 			this.hit.releasePointerCapture(e.pointerId);
 			start = null;
-			if (dragging) {
+			if (pressed) {
+				pressed = false;
+			} else if (dragging) {
 				this.root.classList.remove("dragging");
 				storage_set(
 					POS_KEY,
@@ -397,14 +493,141 @@ export class Ball {
 		this.root.classList.toggle("away", !!away);
 	}
 
+	// One voice (#2011): how many things wait behind the dot; 0 hides it.
+	set_waiting(count) {
+		this.waiting.hidden = !count;
+		this.waiting.textContent = count > 1 ? String(count) : "";
+		const label = this.options.waiting_label ? this.options.waiting_label(count) : "";
+		this.waiting.title = label;
+		this.waiting.setAttribute("aria-label", label);
+	}
+
 	set_pending(pending) {
 		this.root.classList.toggle("has-pending", !!pending);
+	}
+
+	// Leave me in peace (#2010): smaller, faded, no face and legs, but there and ready.
+	set_resting(resting) {
+		this.root.classList.toggle("resting", !!resting);
+	}
+
+	// ---- the menu (#2010)
+
+	setup_menu() {
+		if (!this.options.menu) return;
+		this.hit.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.open_menu();
+		});
+		this.hit.addEventListener("keydown", (e) => {
+			if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+				e.preventDefault();
+				this.open_menu();
+			}
+		});
+		this.menu.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.menu.addEventListener("keydown", (e) => this.on_menu_key(e));
+		// a click anywhere else closes it; inside the shadow root the path tells where it was
+		document.addEventListener(
+			"pointerdown",
+			(e) => this.menu_open() && !e.composedPath().includes(this.root) && this.close_menu(false),
+			true
+		);
+	}
+
+	menu_open() {
+		return !this.menu.hidden;
+	}
+
+	// entries from options.menu(): { heading }, { note }, { separator: true },
+	// { label, action }, or { row: [{ label, action, title }] } for buttons side by side.
+	// Labels and notes are plain text.
+	open_menu() {
+		const entries = (this.options.menu && this.options.menu()) || [];
+		if (!entries.length) return;
+		this.hide_bubble();
+		this.menu.replaceChildren(...entries.map((entry) => this.menu_entry(entry)));
+		this.menu.hidden = false;
+		this.fit_menu();
+		const first = this.menu.querySelector("button");
+		if (first) first.focus();
+	}
+
+	menu_entry(entry) {
+		const div = (cls, text) => {
+			const el = document.createElement("div");
+			el.className = cls;
+			if (text) el.textContent = text;
+			return el;
+		};
+		const button = (item) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.setAttribute("role", "menuitem");
+			b.textContent = item.label;
+			if (item.title) b.title = item.title;
+			b.addEventListener("click", () => {
+				this.close_menu(false);
+				item.action();
+			});
+			return b;
+		};
+		if (entry.separator) return div("menu-sep");
+		if (entry.heading) return div("menu-heading", entry.heading);
+		if (entry.note) return div("menu-note", entry.note);
+		if (entry.row) {
+			const row = div("menu-row");
+			row.setAttribute("role", "group");
+			row.append(...entry.row.map(button));
+			return row;
+		}
+		return button(entry);
+	}
+
+	// Above the ball if it fits, else below when there is more room there; scroll if neither fits.
+	fit_menu() {
+		const GAP = 8 + 4; // the gap to the ball and a margin to the window edge
+		this.menu.classList.remove("below", "scroll");
+		this.menu.style.maxHeight = "";
+		const ball = this.root.getBoundingClientRect();
+		const height = this.menu.offsetHeight;
+		const above = ball.top - GAP;
+		const below = window.innerHeight - ball.bottom - GAP;
+		if (height <= above) return;
+		const room = Math.max(above, below);
+		this.menu.classList.toggle("below", below > above);
+		if (height > room) {
+			this.menu.classList.add("scroll");
+			this.menu.style.maxHeight = `${Math.max(room, 120)}px`;
+		}
+	}
+
+	close_menu(focus_ball = true) {
+		if (!this.menu_open()) return;
+		this.menu.hidden = true;
+		this.menu.replaceChildren();
+		if (focus_ball) this.hit.focus();
+	}
+
+	on_menu_key(e) {
+		if (e.key === "Escape" || e.key === "Tab") {
+			e.preventDefault();
+			this.close_menu(true);
+			return;
+		}
+		if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+		e.preventDefault();
+		const buttons = [...this.menu.querySelectorAll("button")];
+		const i = buttons.indexOf(this.shadow.activeElement);
+		const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
+		buttons[(i + step + buttons.length) % buttons.length].focus();
 	}
 
 	// html: trusted markup built by Phriend itself (user text is escaped by the caller).
 	// ms = 0 keeps the bubble until the next say() or hide_bubble().
 	// gesture: a key of GESTURES; the hand shows while this bubble shows.
 	say(html, ms = 4000, gesture = null) {
+		this.close_menu(false); // the bubble sits where the menu is
 		clearTimeout(this._bubble_timer);
 		clearTimeout(this._react_timer);
 		this.bubble.innerHTML = html;
@@ -429,10 +652,14 @@ export class Ball {
 
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
-		clearTimeout(this._react_timer);
+		const was_showing = this.bubble_showing();
 		this.bubble.classList.remove("show");
 		this._bubble_gesture = null;
-		this.set_hand(null);
+		// a reaction of its own keeps running (AI review of !1269)
+		if (was_showing) {
+			clearTimeout(this._react_timer);
+			this.set_hand(null);
+		}
 	}
 
 	bubble_showing() {
@@ -459,7 +686,9 @@ export class Ball {
 		this.hand.classList.remove("show");
 		if (!g) return; // keep the emoji while it fades out
 		this.hand.textContent = g.hand;
+		this.hand.dataset.name = gesture;
 		this.hand.dataset.motion = g.motion;
+		this.place_hand(gesture);
 		void this.hand.offsetWidth; // restart the motion when the same hand comes again
 		this.hand.classList.add("show");
 	}

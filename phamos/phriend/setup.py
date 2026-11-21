@@ -237,15 +237,19 @@ def ensure_default_shortcut():
 # Feature switches that start on (#2009): they keep what Phriend already did. New features of
 # the companion (#2008) start off and are not listed here.
 FEATURES_ON_BY_DEFAULT = ("reactions",)
+# Numbers whose 0 would mean something else than "not set yet" (#2011: 0 bubbles = Phriend never
+# speaks by itself).
+FEATURE_VALUES_BY_DEFAULT = {"bubbles_per_day": 1}
 
 
 def ensure_default_features():
-	"""Switch on the features listed above on sites that saved Phriend Settings before the
-	switch existed: a new Check on a saved Single reads 0, not its JSON default. Only when the
-	field has no row yet; a switch turned off later in the form is kept."""
-	for field in FEATURES_ON_BY_DEFAULT:
+	"""Fill the values listed above on sites that saved Phriend Settings before the field
+	existed: a new Check or Int on a saved Single reads 0, not its JSON default. Only when the
+	field has no row yet; a value changed later in the form is kept."""
+	defaults = {field: 1 for field in FEATURES_ON_BY_DEFAULT} | FEATURE_VALUES_BY_DEFAULT
+	for field, value in defaults.items():
 		has_row = frappe.db.sql(
 			"select 1 from `tabSingles` where doctype='Phriend Settings' and field=%s", field
 		)
 		if not has_row:
-			frappe.db.set_single_value("Phriend Settings", field, 1)
+			frappe.db.set_single_value("Phriend Settings", field, value)
