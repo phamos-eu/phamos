@@ -98,9 +98,9 @@ a { color: inherit; text-decoration: underline; cursor: pointer; }
 .hit:focus-visible svg { outline: 2px solid var(--ph-focus); outline-offset: 2px; border-radius: 50%; }
 button.link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 1px; border-radius: 2px; }
-.ball svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25)); }
+.hit svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25)); }
 /* Dark mode: Phriend stays black and glows, so it stands out on a black page (#1934). */
-:host([data-theme="dark"]) .ball svg {
+:host([data-theme="dark"]) .hit svg {
 	filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 12px rgba(255, 255, 255, 0.25));
 }
 /* Box breathing, one 21 s cycle: in 4 s, hold 5 s, out 7 s, hold 5 s. The ball fills up from
@@ -117,12 +117,12 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 /* Leave me in peace (#2010): Phriend steps back but stays there, ready. Never asleep ("sleeping
    on the job" is not the message, PM 2026-11-21): smaller, a little faded, without face and
    legs; still breathing. Full strength again while the pointer is on it. */
-.ball svg { transition: transform 0.4s ease, opacity 0.4s ease; transform-origin: 50% 60%; }
+.hit svg { transition: transform 0.4s ease, opacity 0.4s ease; transform-origin: 50% 60%; }
 .eyes, .mouth, .leg { transition: opacity 0.3s ease; }
-.ball.resting svg { transform: translateY(10px) scale(0.6); opacity: 0.55; }
+.ball.resting .hit svg { transform: translateY(10px) scale(0.6); opacity: 0.55; }
 .ball.resting .eyes, .ball.resting .mouth, .ball.resting .leg { opacity: 0; }
 .ball.resting .shadow { opacity: 0; animation: none; }
-.ball.resting:hover svg, .ball.resting .hit:focus-visible svg { opacity: 0.9; }
+.ball.resting:hover .hit svg, .ball.resting .hit:focus-visible svg { opacity: 0.9; }
 :host([data-paused]) * { animation-play-state: paused !important; }
 /* "hidden" always hides, whatever display a class sets (AI review of !1162) */
 [hidden] { display: none !important; }
@@ -130,7 +130,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
 	.emoji { animation: none !important; }
-	.ball svg, .eyes, .mouth, .leg { transition: none; }
+	.hit svg, .eyes, .mouth, .leg { transition: none; }
 }
 /* The phriend's menu (#2010): right-click, long press or the context-menu key. Where the
    bubble would be; the bubble steps aside while it is open. */
