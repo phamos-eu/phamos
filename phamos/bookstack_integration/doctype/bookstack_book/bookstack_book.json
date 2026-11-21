@@ -12,6 +12,9 @@
   "title",
   "slug",
   "shelf",
+  "section_website",
+  "publish_on_website",
+  "website_summary",
   "section_content",
   "description",
   "url",
@@ -65,6 +68,26 @@
    "options": "Bookstack Shelf",
    "in_standard_filter": 1,
    "description": "Primary shelf this book appears on (a book can appear on multiple shelves in Bookstack; this stores the last seen)."
+  },
+  {
+   "fieldname": "section_website",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "description": "Show this book, its chapters and pages on phamos.eu under /de/doku. The page content is copied at the next sync.",
+   "fieldname": "publish_on_website",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Publish on website"
+  },
+  {
+   "depends_on": "publish_on_website",
+   "description": "Short teaser for the website. Empty: the description is used.",
+   "fieldname": "website_summary",
+   "fieldtype": "Small Text",
+   "label": "Website summary"
   },
   {
    "fieldname": "section_content",

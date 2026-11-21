@@ -600,6 +600,10 @@ fixtures = [
 ]
 
 scheduler_events = {
+    "hourly": [
+        # BookStack: keep the website copy of published books fresh (#2004)
+        "phamos.bookstack_integration.sync.sync_published_content",
+    ],
     "daily": [
         # Implementation Release: capacity shrinks every day, leave changes (#1986)
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",

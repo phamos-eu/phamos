@@ -9,6 +9,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
+from phamos.bookstack_integration.content import clean_page_html, published_link_map
 
 
 LOG_TITLE = "Bookstack Sync"
@@ -100,10 +101,12 @@ def _owner_id(value):
 		return value.get("id")
 	return value
 
-def sync_shelves(client: BookstackClient, instance: str) -> int:
+def sync_shelves(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
+	ids = set()
 	for shelf in client.paginate("shelves"):
 		detail = client.get(f"shelves/{shelf['id']}")
+		ids.add(detail["id"])
 		books = []
 		book_names = []
 		for b in detail.get("books", []) or []:
@@ -131,13 +134,16 @@ def sync_shelves(client: BookstackClient, instance: str) -> int:
 				book_doc.save(ignore_permissions=True)
 
 		count += 1
+	if seen is not None:
+		seen["Bookstack Shelf"] = ids
 	return count
 
 
-def sync_books(client: BookstackClient, instance: str) -> int:
+def sync_books(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
+	ids = set()
 	for book in client.paginate("books"):
-
+		ids.add(book["id"])
 		_upsert("Bookstack Book", instance, book["id"], {
 			"title": book.get("name"),
 			"slug": book.get("slug"),
@@ -149,12 +155,16 @@ def sync_books(client: BookstackClient, instance: str) -> int:
 			"updated_at": _iso(book.get("updated_at")),
 		})
 		count += 1
+	if seen is not None:
+		seen["Bookstack Book"] = ids
 	return count
 
 
-def sync_chapters(client: BookstackClient, instance: str) -> int:
+def sync_chapters(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
+	ids = set()
 	for chapter in client.paginate("chapters"):
+		ids.add(chapter["id"])
 		book_name = _lookup_name("Bookstack Book", instance, chapter.get("book_id"))
 		_upsert("Bookstack Chapter", instance, chapter["id"], {
 			"title": chapter.get("name"),
@@ -168,6 +178,8 @@ def sync_chapters(client: BookstackClient, instance: str) -> int:
 			"updated_at": _iso(chapter.get("updated_at")),
 		})
 		count += 1
+	if seen is not None:
+		seen["Bookstack Chapter"] = ids
 	return count
 
 
@@ -181,9 +193,11 @@ def _chapter_url(client: BookstackClient, chapter: dict, book_name: str | None, 
 	return f"{client.base_url}/books/{book_slug}/chapter/{slug}"
 
 
-def sync_pages(client: BookstackClient, instance: str) -> int:
+def sync_pages(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
+	ids = set()
 	for page in client.paginate("pages"):
+		ids.add(page["id"])
 		book_name = _lookup_name("Bookstack Book", instance, page.get("book_id"))
 		chapter_name = _lookup_name("Bookstack Chapter", instance, page.get("chapter_id"))
 		_upsert("Bookstack Page", instance, page["id"], {
@@ -202,6 +216,8 @@ def sync_pages(client: BookstackClient, instance: str) -> int:
 			"updated_at": _iso(page.get("updated_at")),
 		})
 		count += 1
+	if seen is not None:
+		seen["Bookstack Page"] = ids
 	return count
 
 
@@ -216,37 +232,146 @@ def _page_url(client: BookstackClient, page: dict, book_name: str | None) -> str
 
 
 
-@frappe.whitelist()
-def sync_instance(instance: str) -> dict[str, Any]:
-	"""Full sync for a single Bookstack Configuration."""
+def sync_page_content(client: BookstackClient, instance: str) -> int:
+	"""Copy the sanitised HTML of every page shown on the website (#2004).
+
+	Only pages of books with "Publish on website" are fetched, and only when BookStack
+	reports a newer version than the stored copy. Content of every other page is cleared,
+	so a page that left a published book, or became a draft, is not shown any more.
+	"""
+	link_map = published_link_map(instance)
+	books = frappe.get_all(
+		"Bookstack Book", filters={"instance": instance, "publish_on_website": 1}, pluck="name"
+	)
+	pages = []
+	if books:
+		pages = frappe.get_all(
+			"Bookstack Page",
+			filters={"instance": instance, "book": ["in", books], "draft": 0, "template": 0},
+			fields=["name", "bookstack_id", "updated_at", "content_updated_at"],
+		)
+
+	shown = [p.name for p in pages]
+	page = frappe.qb.DocType("Bookstack Page")
+	clear = (
+		frappe.qb.update(page)
+		.set(page.html, None)
+		.set(page.content_updated_at, None)
+		.where(page.instance == instance)
+		.where(page.html.isnotnull() | page.content_updated_at.isnotnull())
+	)
+	if shown:
+		clear = clear.where(page.name.notin(shown))
+	clear.run()
+
+	count = 0
+	for p in pages:
+		if p.content_updated_at and p.content_updated_at == p.updated_at:
+			continue
+		try:
+			data = client.get(f"pages/{p.bookstack_id}")
+		except BookstackAPIError:
+			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance} :: page {p.bookstack_id}")
+			continue
+		frappe.db.set_value(
+			"Bookstack Page",
+			p.name,
+			{
+				"html": clean_page_html(data.get("html") or "", client.base_url, link_map),
+				"content_updated_at": p.updated_at,
+			},
+			update_modified=False,
+		)
+		count += 1
+	return count
+
+
+# Children first, so a parent is never removed while a record still points to it.
+_REMOVAL_ORDER = ("Bookstack Page", "Bookstack Chapter", "Bookstack Book", "Bookstack Shelf")
+
+
+def remove_deleted(instance: str, seen: dict) -> int:
+	"""Delete records that BookStack no longer returns.
+
+	Only for doctypes whose list call finished in this run (they are keys of `seen`).
+	An empty answer is not trusted: it more likely means a token without access
+	than a wiki without content, so nothing is deleted then.
+	"""
+	removed = 0
+	for doctype in _REMOVAL_ORDER:
+		ids = seen.get(doctype)
+		if not ids:
+			continue
+		stale = frappe.get_all(
+			doctype,
+			filters={"instance": instance, "bookstack_id": ["not in", list(ids)]},
+			pluck="name",
+		)
+		for name in stale:
+			frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
+			removed += 1
+		if doctype == "Bookstack Shelf" and stale:
+			frappe.db.set_value("Bookstack Book", {"shelf": ["in", stale]}, "shelf", None)
+	return removed
+
+
+def _run_steps(instance: str, steps: list) -> dict[str, Any]:
 	client = BookstackClient(instance)
-
 	stats: dict[str, Any] = {"instance": instance}
+	seen: dict[str, set] = {}
 	errors = 0
-
-	steps = [
-		("roles", sync_roles),
-		("users", sync_users),
-		("books", sync_books),        
-		("shelves", sync_shelves),
-		("chapters", sync_chapters),
-		("pages", sync_pages),
-	]
 
 	for label, fn in steps:
 		try:
-			stats[label] = fn(client, instance)
-		except Exception as exc:  
+			if label == "removed":
+				stats[label] = fn(instance, seen)
+			elif label in _TRACKED_STEPS:
+				stats[label] = fn(client, instance, seen)
+			else:
+				stats[label] = fn(client, instance)
+		except Exception as exc:
 			errors += 1
 			stats[label] = f"error: {exc}"
 			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance} :: {label}")
 
+	stats["errors"] = errors
+	return stats
+
+
+_TRACKED_STEPS = {"shelves", "books", "chapters", "pages"}
+
+
+@frappe.whitelist()
+def sync_instance(instance: str) -> dict[str, Any]:
+	"""Full sync for a single Bookstack Configuration."""
+	stats = _run_steps(instance, [
+		("roles", sync_roles),
+		("users", sync_users),
+		("books", sync_books),
+		("shelves", sync_shelves),
+		("chapters", sync_chapters),
+		("pages", sync_pages),
+		("removed", remove_deleted),
+		("content", sync_page_content),
+	])
 	frappe.db.set_value("Bookstack Configuration", instance, {
 		"last_synced": now_datetime(),
-		"sync_error_count": errors,
+		"sync_error_count": stats["errors"],
 	})
 	frappe.db.commit()
-	stats["errors"] = errors
+	return stats
+
+
+def sync_published_instance(instance: str) -> dict[str, Any]:
+	"""Books, chapters, pages and website content only; no users, roles or shelves."""
+	stats = _run_steps(instance, [
+		("books", sync_books),
+		("chapters", sync_chapters),
+		("pages", sync_pages),
+		("removed", remove_deleted),
+		("content", sync_page_content),
+	])
+	frappe.db.commit()
 	return stats
 
 
@@ -257,6 +382,22 @@ def sync_all_instances() -> list[dict[str, Any]]:
 	for name in frappe.get_all("Bookstack Configuration", filters={"enabled": 1}, pluck="name"):
 		try:
 			results.append(sync_instance(name))
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {name}")
+	return results
+
+
+def sync_published_content() -> list[dict[str, Any]]:
+	"""Hourly scheduler entry point: keep website content fresh for instances with published books."""
+	instances = frappe.get_all(
+		"Bookstack Book", filters={"publish_on_website": 1}, pluck="instance", distinct=True
+	)
+	results = []
+	for name in instances:
+		if not frappe.db.get_value("Bookstack Configuration", name, "enabled"):
+			continue
+		try:
+			results.append(sync_published_instance(name))
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {name}")
 	return results
