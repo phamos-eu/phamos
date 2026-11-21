@@ -72,12 +72,14 @@ export function topDialog(root = typeof document !== "undefined" ? document : nu
 // white-text toggles like the appointment weekday chips are not. Red ones are destructive.
 // A disabled or loading frappe-ui button loses these classes and looks like any other
 // disabled button, so its variant can't be told from the DOM.
-const SOLID_ACTIVE = ["active:bg-surface-gray-5", "active:bg-blue-700", "active:bg-green-800"]
+// shortcuts.test.js checks these names against the installed frappe-ui Button.vue.
+export const SOLID_ACTIVE = ["active:bg-surface-gray-5", "active:bg-blue-700", "active:bg-green-800"]
 const isWhite = (button) =>
 	button.classList.contains("text-ink-white") &&
 	SOLID_ACTIVE.some((name) => button.classList.contains(name)) &&
 	!button.hasAttribute?.("aria-pressed")
-const isRed = (button) => button.classList.contains("bg-surface-red-5")
+export const SOLID_RED = "bg-surface-red-5"
+const isRed = (button) => button.classList.contains(SOLID_RED)
 
 // What Ctrl/Cmd+S runs in a dialog: a button to click, a form to submit, or null.
 // - a button marked data-primary-action wins;

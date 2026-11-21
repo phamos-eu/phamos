@@ -77,7 +77,6 @@ const glow = useCockpitGlow()
 onMounted(() => mountPhriend(router, () => props.title))
 
 // Ctrl/Cmd+S runs the open dialog's primary action, as in Frappe Desk (#2032).
-const onSaveKey = (event) => onDialogSaveKey(event)
-onMounted(() => document.addEventListener("keydown", onSaveKey, true))
-onBeforeUnmount(() => document.removeEventListener("keydown", onSaveKey, true))
+onMounted(() => document.addEventListener("keydown", onDialogSaveKey, true))
+onBeforeUnmount(() => document.removeEventListener("keydown", onDialogSaveKey, true))
 </script>

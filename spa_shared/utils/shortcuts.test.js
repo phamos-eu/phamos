@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import {
 	dialogOpen,
@@ -9,6 +10,8 @@ import {
 	listDirection,
 	nextListIndex,
 	onDialogSaveKey,
+	SOLID_ACTIVE,
+	SOLID_RED,
 	topDialog,
 } from "./shortcuts.js"
 
@@ -192,5 +195,16 @@ describe("cockpit shortcuts", () => {
 			onDialogSaveKey(event, root)
 			expect(event.defaultPrevented).toBe(false)
 		})
+	})
+
+	// The solid-button rule reads frappe-ui's own classes; a frappe-ui upgrade that renames them
+	// would silently switch Cmd+S off, so pin them to the installed Button.vue.
+	it("matches the installed frappe-ui solid Button classes", () => {
+		const source = readFileSync(
+			new URL("../../personal_frontend/node_modules/frappe-ui/src/components/Button/Button.vue", import.meta.url),
+			"utf8",
+		)
+		const solid = source.slice(source.indexOf("let solidClasses"), source.indexOf("let subtleClasses"))
+		for (const name of [...SOLID_ACTIVE, SOLID_RED, "text-ink-white"]) expect(solid).toContain(name)
 	})
 })
