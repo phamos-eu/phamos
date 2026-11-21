@@ -179,12 +179,16 @@ class ImplementationChapter(Document):
 
 	def validate_agreed_content_locked(self):
 		"""Once a Chapter leaves Draft, its agreed content is frozen against a direct
-		edit on the Chapter. A submitted Stakeholder Meeting is the only exception:
-		a Scope Change there pushes its new Revision's content back onto the Chapter,
-		which it does under frappe.flags.in_stakeholder_meeting_submit (and undoes
-		under frappe.flags.in_stakeholder_meeting_cancel)."""
+		edit on the Chapter. Two exceptions:
+		- a submitted Stakeholder Meeting: a Scope Change there pushes its new Revision's
+		  content back onto the Chapter, under frappe.flags.in_stakeholder_meeting_submit
+		  (and undoes it under frappe.flags.in_stakeholder_meeting_cancel);
+		- an Implementation Change both sides agreed to, applied outside a meeting
+		  (#2050). Its apply() sets self.flags.from_implementation_change, which a
+		  Desk save cannot set (flags is a reserved key)."""
 		if (
 			self.is_new()
+			or self.flags.from_implementation_change
 			or frappe.flags.in_stakeholder_meeting_submit
 			or frappe.flags.in_stakeholder_meeting_cancel
 		):
