@@ -26,6 +26,7 @@ PAGE_HTML = f"""
 <style>body {{ display: none }}</style>
 <form action="https://evil.test"><input name="q"></form>
 <table><tr><td>Zelle</td></tr></table>
+<p style="position: fixed; z-index: 999; top: 0; text-align: center" data-wp-contact="x">Mitte</p>
 <img src="/uploads/images/bild.png" alt="Bild">
 <a href="{BASE}/books/handbuch/page/zweite#bkmrk-a">Zweite</a>
 <a href="/books/intern/page/geheim">Intern</a>
@@ -145,6 +146,9 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 
 		for unsafe in ("<script", "alert(", "<style", "display: none", "<form", "<input", "onclick", "javascript:"):
 			self.assertNotIn(unsafe, html)
+		for unsafe in ("position", "z-index", "data-wp-contact"):
+			self.assertNotIn(unsafe, html, "styles and data attributes that could cover the site")
+		self.assertIn('style="text-align: center;"', html)
 		self.assertIn('<table>', html)
 		self.assertIn('id="bkmrk-intro"', html)
 		self.assertIn('class="callout info"', html)
@@ -198,6 +202,14 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
 		self.assertFalse(frappe.db.exists("Bookstack Chapter", f"{INSTANCE}-BSC-10"))
 		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-100"))
+
+	def test_sync_needs_access_to_the_configuration(self):
+		frappe.set_user("Guest")
+		try:
+			self.assertRaises(frappe.PermissionError, sync.sync_instance, INSTANCE)
+			self.assertRaises(frappe.PermissionError, sync.sync_all_instances)
+		finally:
+			frappe.set_user("Administrator")
 
 	def test_nothing_is_removed_when_bookstack_fails_or_returns_nothing(self):
 		self._sync()

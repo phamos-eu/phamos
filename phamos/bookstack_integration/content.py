@@ -14,6 +14,7 @@ import re
 from urllib.parse import urljoin, urlsplit
 
 import frappe
+from bleach.css_sanitizer import CSSSanitizer
 from bs4 import BeautifulSoup
 from frappe.utils.html_utils import sanitize_html
 
@@ -24,6 +25,15 @@ _DROP_TAGS = (
 	"script", "style", "link", "meta", "iframe", "frame", "object", "embed", "noscript",
 	"form", "input", "button", "select", "textarea", "template", "base", "html", "head", "body",
 )
+
+# Inline styles BookStack's editor writes (alignment, colours, table sizes). Frappe's own list also
+# allows position, z-index, display and the like, which would let a wiki page cover phamos.eu.
+_SAFE_CSS = CSSSanitizer(allowed_css_properties=[
+	"text-align", "vertical-align", "color", "background-color", "font-weight", "font-style",
+	"text-decoration", "width", "height", "min-width", "max-width", "border", "border-color",
+	"border-width", "border-style", "border-collapse", "padding", "margin-left", "list-style-type",
+	"white-space",
+])
 
 _PAGE_PATH = re.compile(r"^/books/(?P<book>[^/]+)(?:/(?P<kind>page|chapter)/(?P<slug>[^/]+))?/?$")
 _PERMALINK_PATH = re.compile(r"^/link/(?P<id>\d+)/?$")
@@ -63,11 +73,20 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 	safe = sanitize_html(str(soup), always_sanitize=True, disallowed_tags=_DROP_TAGS)
 
 	soup = BeautifulSoup(safe, "html.parser")
+	for tag in soup.find_all(True):
+		for attr in [a for a in tag.attrs if a.startswith("data-")]:
+			del tag[attr]
+		if tag.get("style"):
+			tag["style"] = _SAFE_CSS.sanitize_css(tag["style"])
+			if not tag["style"].strip():
+				del tag["style"]
+
 	base = base_url.rstrip("/") + "/"
 	for a in soup.find_all("a", href=True):
 		a["href"] = _rewrite_href(a["href"], base, link_map)
 		if not a["href"].startswith(("/", "#")):
-			a["rel"] = "noopener"
+			rel = a.get("rel") or []
+			a["rel"] = sorted({*(rel if isinstance(rel, list) else rel.split()), "noopener"})
 	for img in soup.find_all("img"):
 		if img.get("src"):
 			img["src"] = urljoin(base, img["src"])

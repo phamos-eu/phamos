@@ -344,6 +344,8 @@ _TRACKED_STEPS = {"shelves", "books", "chapters", "pages"}
 @frappe.whitelist()
 def sync_instance(instance: str) -> dict[str, Any]:
 	"""Full sync for a single Bookstack Configuration."""
+	# Whitelisted for the "Sync" buttons; the sync deletes records, so not for every logged-in user.
+	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
 	stats = _run_steps(instance, [
 		("roles", sync_roles),
 		("users", sync_users),
@@ -378,6 +380,8 @@ def sync_published_instance(instance: str) -> dict[str, Any]:
 @frappe.whitelist()
 def sync_all_instances() -> list[dict[str, Any]]:
 	"""Scheduler entry point — sync every enabled Bookstack Configuration."""
+	# Whitelisted, but only for those who manage the configurations (the scheduler runs as Administrator).
+	frappe.has_permission("Bookstack Configuration", "write", throw=True)
 	results = []
 	for name in frappe.get_all("Bookstack Configuration", filters={"enabled": 1}, pluck="name"):
 		try:
