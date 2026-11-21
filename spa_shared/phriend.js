@@ -29,8 +29,9 @@ function boot() {
  * the cockpit boot says Phriend is for this user (phamos/www/spa_boot.py).
  * @param {object} router  the cockpit's vue-router
  * @param {() => string} heading  the page heading the shell shows, for "Reported on"
+ * @param {object} [socket]  the cockpit's realtime socket (frappe-ui), for Phriend's events (#2012)
  */
-export function mountPhriend(router, heading) {
+export function mountPhriend(router, heading, socket) {
 	watchFailedRequests()
 	if (instance || !boot().phriend?.enabled) return
 	const current = () =>
@@ -70,6 +71,16 @@ export function mountPhriend(router, heading) {
 		shortcut: boot().phriend.shortcut || "",
 		default_shortcut: boot().phriend.default_shortcut || "",
 		user: boot().user?.name || "",
+		// Phriend Settings → Features (#2009)
+		features: boot().phriend.features || {},
+		// leave me in peace (#2010)
+		quiet: boot().phriend.quiet || null,
+		can_configure: !!boot().phriend.can_configure,
+		open_settings: () => window.open("/app/phriend-settings", "_blank", "noopener"),
+		// one voice (#2011)
+		voice: boot().phriend.voice || null,
+		// events (#2012): the user's own realtime room
+		on_event: socket?.on ? (cb) => socket.on("phriend_event", cb) : null,
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})
