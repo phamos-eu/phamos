@@ -11,6 +11,8 @@ Run with
 import json
 import re
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import set_request
@@ -481,6 +483,18 @@ class TestDocsSearch(DocsFixture):
 		from phamos.web_profile import docs_search
 
 		self.assertTrue(hasattr(docs_search.suggest, "__wrapped__"), "rate_limit wraps the method")
+
+	def test_count_and_title_hits_do_not_depend_on_the_row_limit(self):
+		from phamos.web_profile import docs_search
+
+		# "Konten" gets the word in its title; "Erste Schritte" (alphabetically first) only in its text
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzmonatsende im Text")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "title", "Zum Xqzmonatsende")
+		docs.clear_cache()
+		with patch.object(docs_search, "ROW_LIMIT", 1):
+			result = self._search("Xqzmonatsende")
+		self.assertEqual(result["total"], 2, "counted, not the rows read")
+		self.assertEqual([p["title"] for p in result["pages"]], ["Zum Xqzmonatsende"], "the title hit is the row read")
 
 	def test_plain_text_for_the_search(self):
 		from phamos.bookstack_integration.content import plain_text

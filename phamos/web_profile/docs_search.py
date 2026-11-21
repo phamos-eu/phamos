@@ -16,7 +16,8 @@ from __future__ import annotations
 import re
 
 import frappe
-from frappe.query_builder import Criterion
+from frappe.query_builder import Case, Criterion
+from frappe.query_builder.functions import Count
 from frappe.rate_limiter import rate_limit
 from frappe.utils import escape_html
 
@@ -26,6 +27,7 @@ MIN_LENGTH = 2
 MAX_LENGTH = 100
 MAX_WORDS = 6
 SNIPPET_CHARS = 90
+ROW_LIMIT = 200  # pages read per search; the count and the order don't depend on it
 
 
 def search_url(lang, query="", book_slug=None, exact=False):
@@ -139,18 +141,31 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 	by_name = {b.name: b for b in books}
 	page = frappe.qb.DocType("Bookstack Page")
 	chapter = frappe.qb.DocType("Bookstack Chapter")
-	per_word = [
-		Criterion.any([page.title.like(_like(v)) | page.search_text.like(_like(v)) for v in variants[w]])
-		for w in words
-	]
+	def any_variant(w, field):
+		return Criterion.any([field.like(_like(v)) for v in variants[w]])
+
+	found = Criterion.all([
+		page.book.isin(list(by_name)),
+		page.html.isnotnull() & (page.html != ""),
+		*[any_variant(w, page.title) | any_variant(w, page.search_text) for w in words],
+	])
+	# Counted on their own and ordered in the database: the list is cut at ROW_LIMIT rows, and the
+	# count and the order must not depend on which rows came back (review of !1291). Order: pages with
+	# the words as typed, then pages with the words in the title, then by title.
+	total = frappe.qb.from_(page).select(Count("*")).where(found).run()[0][0]
+	exact_first = Case().when(
+		Criterion.all([page.title.like(_like(w)) | page.search_text.like(_like(w)) for w in words]), 0
+	).else_(1)
+	title_first = Case().when(Criterion.all([any_variant(w, page.title) for w in words]), 0).else_(1)
 	rows = (
 		frappe.qb.from_(page)
 		.left_join(chapter).on(chapter.name == page.chapter)
 		.select(page.name, page.slug, page.title, page.book, page.search_text, chapter.title.as_("chapter_title"))
-		.where(page.book.isin(list(by_name)))
-		.where(page.html.isnotnull() & (page.html != ""))
-		.where(Criterion.all(per_word))
-		.limit(200)
+		.where(found)
+		.orderby(exact_first)
+		.orderby(title_first)
+		.orderby(page.title)
+		.limit(ROW_LIMIT)
 	).run(as_dict=True)
 
 	every_variant = [v for w in words for v in variants[w]]
@@ -167,7 +182,7 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 			"exact": matches(f"{r.title} {r.search_text}", strict=True),
 		})
 	pages.sort(key=lambda p: (not p["exact"], not p["in_title"], p["title"].lower()))
-	return {"books": book_hits, "pages": pages[:limit], "total": len(pages), "words": words, "corrected": corrected}
+	return {"books": book_hits, "pages": pages[:limit], "total": total, "words": words, "corrected": corrected}
 
 
 def corrected_query(query, corrected) -> str:
