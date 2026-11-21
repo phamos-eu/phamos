@@ -2698,3 +2698,11 @@ Write something first.,Schreiben Sie zuerst etwas.
 A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
 Esc to close,Esc zum Schließen
 Close the chat and walk on,Chat schließen und weitergehen
+"Upload an image as the background of the Space, for everyone","Ein Bild als Hintergrund des Space hochladen, für alle"
+"Remove the background, for everyone","Den Hintergrund entfernen, für alle"
+The image could not be uploaded.,Das Bild konnte nicht hochgeladen werden.
+The background could not be removed.,Der Hintergrund konnte nicht entfernt werden.
+Choose an image first.,Wählen Sie zuerst ein Bild.
+The image can be at most {0} MB.,Das Bild darf höchstens {0} MB groß sein.
+"This file is not an image the Space can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das der Space zeigen kann (PNG, JPEG, WebP oder GIF)."
+Background,Hintergrund

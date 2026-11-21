@@ -224,3 +224,51 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 			with patch.object(chip_space.frappe, "enqueue") as enqueue:
 				chip_space.send_encounter_message(encounter, "Coffee?")
 		enqueue.assert_not_called()
+
+
+class ChipSpaceBackgroundTestCase(FrappeTestCase):
+	"""The Space's shared background image."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.saved = frappe.db.get_default(chip_space.BACKGROUND_KEY)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _png(self, colour="red"):
+		from io import BytesIO
+
+		from PIL import Image
+
+		buffer = BytesIO()
+		Image.new("RGB", (4, 4), colour).save(buffer, format="PNG")
+		return buffer.getvalue()
+
+	def test_image_becomes_the_background_and_replaces_the_old_one(self):
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			first = chip_space._store_background(self._png(), "My Office.png")
+			first_file = chip_space._background()["file"]
+			second = chip_space._store_background(self._png("blue"), "beach.png")
+		self.assertTrue(first.startswith("/files/chip-space-My-Office"))
+		self.assertEqual(chip_space.get_space()["background"], second)
+		self.assertFalse(frappe.db.exists("File", first_file))
+		self.assertEqual(publish.call_args.args[0], chip_space.EVENT_BACKGROUND)
+
+	def test_not_an_image_is_refused(self):
+		svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+		for content in (svg, b"plain text", b""):
+			with self.assertRaises(frappe.ValidationError):
+				chip_space._store_background(content, "evil.png")
+
+	def test_too_big_is_refused(self):
+		with patch.object(chip_space, "BACKGROUND_MAX_BYTES", 10):
+			with self.assertRaises(frappe.ValidationError):
+				chip_space._store_background(self._png(), "big.png")
+
+	def test_remove(self):
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			chip_space._store_background(self._png(), "x.png")
+			chip_space.remove_background()
+		self.assertEqual(chip_space.get_space()["background"], "")

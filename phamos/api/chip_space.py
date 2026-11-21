@@ -49,6 +49,14 @@ EVENT_PRESENCE = "chip_space_presence"
 EVENT_MOVE = "chip_space_move"
 EVENT_LEAVE = "chip_space_leave"
 EVENT_MESSAGE = "chip_space_message"
+EVENT_BACKGROUND = "chip_space_background"
+
+# The Space's background image: one for everyone, any Space user may change it (PM, 2026-11-21).
+# Stored as a global default {"url", "file"}; the previous image's File is deleted on change.
+BACKGROUND_KEY = "phamos_chip_space_background"
+BACKGROUND_MAX_BYTES = 5 * 1024 * 1024
+# Checked by opening the image, not by the file name: no SVG (scripts), no disguised files.
+BACKGROUND_FORMATS = {"PNG": "png", "JPEG": "jpg", "WEBP": "webp", "GIF": "gif"}
 
 # Encounters (#2056): two chips closer than ENCOUNTER_DISTANCE (centres, in tiles) meet. The
 # server allows some slack, since positions it knows may be a few hundred ms old.
@@ -158,6 +166,7 @@ def get_space():
 		"me": {**_chip(user, _stored_position() or _spawn()), "cols": COLS, "rows": ROWS},
 		"others": dummies + [c for c in _online(exclude=user) if c["user"] not in dummy_users],
 		"presence_ttl": PRESENCE_TTL,
+		"background": _background().get("url") or "",
 	}
 
 
@@ -203,6 +212,79 @@ def save_my_position(x, y):
 	position = {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)}
 	frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	return position
+
+
+# --- Background image of the Space (shared).
+
+
+def _background():
+	try:
+		value = json.loads(frappe.db.get_default(BACKGROUND_KEY) or "{}")
+	except (TypeError, ValueError):
+		value = {}
+	return value if isinstance(value, dict) else {}
+
+
+def _set_background(value):
+	previous = _background().get("file")
+	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")) if value else "")
+	if previous and previous != value.get("file") and frappe.db.exists("File", previous):
+		frappe.delete_doc("File", previous, ignore_permissions=True, delete_permanently=True)
+	_publish(EVENT_BACKGROUND, {"url": value.get("url", ""), "by": frappe.session.user})
+
+
+def _store_background(content, filename):
+	"""Check that the bytes are a real image of an allowed format, save them as a public File and
+	make it the background. Returns the URL."""
+	from io import BytesIO
+
+	from PIL import Image, UnidentifiedImageError
+
+	if not content:
+		frappe.throw(_("Choose an image first."))
+	if len(content) > BACKGROUND_MAX_BYTES:
+		frappe.throw(_("The image can be at most {0} MB.").format(BACKGROUND_MAX_BYTES // (1024 * 1024)))
+	try:
+		with Image.open(BytesIO(content)) as image:
+			image_format = image.format
+			image.verify()
+	except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
+		frappe.throw(_("This file is not an image the Space can show (PNG, JPEG, WebP or GIF)."))
+	extension = BACKGROUND_FORMATS.get(image_format)
+	if not extension:
+		frappe.throw(_("This file is not an image the Space can show (PNG, JPEG, WebP or GIF)."))
+	stem = re.sub(r"[^A-Za-z0-9_-]+", "-", (filename or "").rsplit(".", 1)[0]).strip("-")[:60] or "background"
+	file_doc = frappe.get_doc(
+		{
+			"doctype": "File",
+			"file_name": f"chip-space-{stem}.{extension}",
+			"content": content,
+			# Public: every Space user loads it as a CSS background (see "Verify before production").
+			"is_private": 0,
+			"folder": "Home",
+		}
+	).insert(ignore_permissions=True)
+	_set_background({"url": file_doc.file_url, "file": file_doc.name})
+	return file_doc.file_url
+
+
+@frappe.whitelist(methods=["POST"])
+def upload_background():
+	"""Upload an image (multipart field "file") as the Space's background, for everyone."""
+	_require_user()
+	upload = frappe.request.files.get("file") if frappe.request else None
+	if not upload:
+		frappe.throw(_("Choose an image first."))
+	# One byte more than allowed is enough to know it is too big.
+	content = upload.stream.read(BACKGROUND_MAX_BYTES + 1)
+	return {"url": _store_background(content, upload.filename)}
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_background():
+	"""Back to the plain grid, for everyone."""
+	_require_user()
+	_set_background({})
 
 
 # --- Encounters (#2056): a temporary private Raven channel for two chips that meet.

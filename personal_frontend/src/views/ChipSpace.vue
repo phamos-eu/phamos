@@ -13,12 +13,40 @@
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, hold Shift to go faster") }}
 			</div>
+			<!-- The Space's background, one for everyone (#2053). -->
+			<input
+				ref="backgroundInput"
+				type="file"
+				accept="image/png,image/jpeg,image/webp,image/gif"
+				class="hidden"
+				@change="uploadBackground"
+			/>
+			<Button
+				v-if="me"
+				variant="subtle"
+				:loading="backgroundBusy"
+				:title="__('Upload an image as the background of the Space, for everyone')"
+				@click="backgroundInput?.click()"
+			>
+				<template #prefix><FeatherIcon name="image" class="h-4 w-4" /></template>
+				{{ __("Background") }}
+			</Button>
+			<Button
+				v-if="me && background"
+				variant="ghost"
+				:disabled="backgroundBusy"
+				:title="__('Remove the background, for everyone')"
+				@click="removeBackground"
+			>
+				{{ __("Remove") }}
+			</Button>
 		</header>
 
 		<div ref="stage" class="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
 			<div
 				v-if="me"
 				class="chip-space-grid relative rounded-lg border border-outline-gray-2 bg-surface-white"
+				:class="{ 'chip-space-grid--image': background }"
 				:style="gridStyle"
 			>
 				<div
@@ -70,7 +98,7 @@
 
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
-import { call, FeatherIcon } from "frappe-ui"
+import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -131,7 +159,58 @@ const gridStyle = computed(() => ({
 	width: `${tile.value * me.value.cols}px`,
 	height: `${tile.value * me.value.rows}px`,
 	"--tile": `${tile.value}px`,
+	// The grid lines stay on top of the image (see .chip-space-grid--image).
+	"--background-image": background.value ? `url("${encodeURI(background.value)}")` : "none",
 }))
+
+// --- Background image (one for everyone, anyone may change it).
+
+const background = ref("")
+const backgroundInput = ref(null)
+const backgroundBusy = ref(false)
+
+async function uploadBackground(event) {
+	const file = event.target.files?.[0]
+	event.target.value = ""
+	if (!file) return
+	backgroundBusy.value = true
+	try {
+		const form = new FormData()
+		form.append("file", file, file.name)
+		const response = await fetch(`/api/method/${API}.upload_background`, {
+			method: "POST",
+			body: form,
+			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "" },
+		})
+		const data = await response.json().catch(() => ({}))
+		if (!response.ok) throw { messages: serverMessages(data) }
+		background.value = data.message?.url || ""
+	} catch (e) {
+		toast.error(errorText(e) || __("The image could not be uploaded."))
+	} finally {
+		backgroundBusy.value = false
+	}
+}
+
+async function removeBackground() {
+	backgroundBusy.value = true
+	try {
+		await call(`${API}.remove_background`)
+		background.value = ""
+	} catch (e) {
+		toast.error(errorText(e) || __("The background could not be removed."))
+	} finally {
+		backgroundBusy.value = false
+	}
+}
+
+function serverMessages(data) {
+	try {
+		return JSON.parse(data._server_messages || "[]").map((m) => JSON.parse(m).message)
+	} catch {
+		return []
+	}
+}
 function chipStyle(chip) {
 	return {
 		width: `${tile.value}px`,
@@ -418,6 +497,7 @@ const SOCKET_EVENTS = [
 	["chip_space_move", onRemoteMove],
 	["chip_space_leave", onRemoteLeave],
 	["chip_space_message", onEncounterMessage],
+	["chip_space_background", (message) => (background.value = message?.url || "")],
 	// Rejoin after a lost connection: the others may have moved meanwhile.
 	["connect", () => (heartbeat(), refreshOthers())],
 ]
@@ -505,6 +585,7 @@ onMounted(async () => {
 		me.value = data.me
 		saved = { x: me.value.x, y: me.value.y }
 		presenceTtlMs = (data.presence_ttl || 45) * 1000
+		background.value = data.background || ""
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("The Space could not be loaded.")
@@ -541,6 +622,14 @@ onBeforeUnmount(() => {
 	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px);
 	background-size: var(--tile) var(--tile);
+}
+/* An uploaded image fills the grid; the lines stay on top of it. */
+.chip-space-grid--image {
+	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
+		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px), var(--background-image);
+	background-size: var(--tile) var(--tile), var(--tile) var(--tile), cover;
+	background-position: 0 0, 0 0, center;
+	background-repeat: repeat, repeat, no-repeat;
 }
 .chip-space-chip {
 	top: 0;
