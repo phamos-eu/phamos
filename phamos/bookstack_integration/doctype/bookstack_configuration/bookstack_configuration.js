@@ -126,17 +126,21 @@ function bookstack_sync_dialog(frm) {
 				frappe.msgprint(__("Choose at least one part to sync."));
 				return;
 			}
-			(can_save ? bookstack_save_selection(frm, tree) : Promise.resolve())
-				.then(() =>
-					// A background job (#2004): a first copy of a big book takes minutes. The result
-					// arrives as the realtime event "bookstack_sync_done" (see onload).
-					frappe.xcall("phamos.bookstack_integration.sync.start_sync", {
-						instance: frm.doc.name,
-						steps,
-						remove_deleted_records: values.remove_deleted_records ? 1 : 0,
-					})
+			(can_save ? bookstack_save_selection(frm, tree) : Promise.resolve({ removed: 0 }))
+				.then((saved) =>
+					// null: the user said No to removing the left-out records; nothing is synced.
+					saved === null
+						? null
+						: // A background job (#2004): a first copy of a big book takes minutes. The
+						  // result arrives as the realtime event "bookstack_sync_done" (see onload).
+						  frappe.xcall("phamos.bookstack_integration.sync.start_sync", {
+								instance: frm.doc.name,
+								steps,
+								remove_deleted_records: values.remove_deleted_records ? 1 : 0,
+						  })
 				)
-				.then(() => {
+				.then((started) => {
+					if (started === null) return;
 					d.hide();
 					frm.reload_doc();
 					frappe.show_alert({
@@ -151,6 +155,7 @@ function bookstack_sync_dialog(frm) {
 			secondary_action() {
 				if (!tree) return;
 				bookstack_save_selection(frm, tree).then((r) => {
+					if (r === null) return; // the user said No
 					d.hide();
 					frappe.show_alert({
 						message: __("Selection saved; {0} records removed from ERPNext.", [r.removed]),
@@ -192,7 +197,7 @@ function bookstack_render_tree($area, books, readonly = false) {
 	// Under a left-out book or chapter everything shows unticked: the parent stands for all of it.
 	const item = (n, parent_on = true) => {
 		const on = n.included && parent_on;
-		const box = `<input type="checkbox" class="bs-tree-box" data-type="${n.type}" data-id="${n.id}"
+		const box = `<input type="checkbox" class="bs-tree-box" data-type="${n.type}" data-id="${esc(String(n.id))}"
 			data-title="${esc(n.title)}" ${on ? "checked" : ""}${readonly ? " disabled" : ""}>`;
 		const label = `<label class="bs-tree-label">${box}<span>${esc(n.title)}</span>
 			<span class="text-muted small">${__(n.type)}</span></label>`;
@@ -287,11 +292,25 @@ function bookstack_collect_exclusions($area) {
 	return out;
 }
 
+// Saves the selection after asking when it removes anything (decided 2026-11-21): "None" plus a
+// click would otherwise delete every chapter and page at once. Resolves to null when the user
+// says No, so the callers stop.
 function bookstack_save_selection(frm, $tree) {
 	if (!$tree) return Promise.resolve({ removed: 0 }); // tree not loaded: keep the saved selection
-	return frappe.xcall("phamos.bookstack_integration.selection.save_sync_selection", {
-		instance: frm.doc.name,
-		excluded: bookstack_collect_exclusions($tree),
+	const args = { instance: frm.doc.name, excluded: bookstack_collect_exclusions($tree) };
+	const save = () => frappe.xcall("phamos.bookstack_integration.selection.save_sync_selection", args);
+	return frappe.xcall("phamos.bookstack_integration.selection.preview_selection", args).then((count) => {
+		if (!count.chapters && !count.pages) return save();
+		return new Promise((resolve, reject) => {
+			frappe.confirm(
+				__("This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?", [
+					count.chapters,
+					count.pages,
+				]),
+				() => save().then(resolve, reject),
+				() => resolve(null)
+			);
+		});
 	});
 }
 

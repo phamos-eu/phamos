@@ -2570,7 +2570,6 @@ Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchron
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
-Syncing Bookstack...,Bookstack wird synchronisiert...
 "Books, chapters and pages","Bücher, Kapitel und Seiten"
 Save selection,Auswahl speichern
 Selection saved; {0} records removed from ERPNext.,Auswahl gespeichert; {0} Einträge aus ERPNext entfernt.
@@ -2640,3 +2639,4 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+"This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"

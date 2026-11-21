@@ -373,6 +373,9 @@ def remove_deleted(instance: str, seen: dict) -> int:
 		# must have come in complete, which they may do empty (a wiki without chapters).
 		if not ids or any(child not in seen for child in _CHILDREN.get(doctype, ())):
 			continue
+		if doctype == "Bookstack Book":
+			# A left-out book is not listed by the sync but keeps its record (decided 2026-11-21).
+			ids = ids | exclusions(instance)["Book"]
 		stale = frappe.get_all(
 			doctype,
 			filters={"instance": instance, "bookstack_id": ["not in", list(ids)]},

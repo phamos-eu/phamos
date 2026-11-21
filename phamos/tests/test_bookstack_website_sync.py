@@ -351,10 +351,36 @@ class TestSyncSelection(_BookstackSyncCase):
 
 		result = self._exclude(("Chapter", 10), ("Book", 2))
 
-		self.assertEqual(result, {"excluded": 2, "removed": 4})  # book 2, its page 200, chapter 10, its page 100
+		self.assertEqual(result, {"excluded": 2, "removed": 3})  # page 200 of book 2, chapter 10, its page 100
 		self.assertFalse(self._exists("Bookstack Page", 100))
-		self.assertFalse(self._exists("Bookstack Book", 2))
+		self.assertFalse(self._exists("Bookstack Page", 200))
+		self.assertTrue(self._exists("Bookstack Book", 2), "a left-out book keeps its record")
 		self.assertTrue(self._exists("Bookstack Page", 102))
+
+	def test_left_out_book_keeps_its_settings_and_comes_back_complete(self):
+		self._sync()
+		self._publish(2)
+		self._sync()
+		self.assertIsNotNone(_page(200))
+
+		self._exclude(("Book", 2))
+		self._sync()  # the regular sync must not remove the left-out book either
+		self.assertTrue(self._exists("Bookstack Book", 2))
+		self.assertFalse(self._exists("Bookstack Page", 200))
+
+		self._exclude()  # ticked again
+		self._sync()
+		self.assertEqual(frappe.db.get_value("Bookstack Book", f"{INSTANCE}-BSB-2", "publish_on_website"), 1)
+		self.assertIsNotNone(_page(200), "its pages and their website copy are back")
+
+	def test_preview_counts_what_saving_would_remove(self):
+		from phamos.bookstack_integration.selection import preview_selection
+
+		self._sync()
+		count = preview_selection(INSTANCE, [{"item_type": "Book", "bookstack_id": 1}])
+		self.assertEqual(count, {"chapters": 1, "pages": 3})  # chapter 10; pages 100, 101 (draft), 102
+		self.assertEqual(preview_selection(INSTANCE, []), {"chapters": 0, "pages": 0})
+		self.assertTrue(self._exists("Bookstack Page", 100), "the preview removes nothing")
 
 	def test_ticking_again_brings_items_back(self):
 		self._exclude(("Book", 2))

@@ -101,7 +101,11 @@ def save_sync_selection(instance: str, excluded) -> dict:
 	# Under the sync lock: a sync running meanwhile has read the old selection and would put the
 	# removed records right back (review S8). A running sync makes this fail with SyncRunning.
 	with sync_lock(instance):
-		return _save_sync_selection(instance, config, excluded)
+		result = _save_sync_selection(instance, config, excluded)
+		# Committed before the lock is released: a sync taking the lock right after must already
+		# read the new selection, not the old one (review of !1275).
+		frappe.db.commit()
+		return result
 
 
 def _save_sync_selection(instance: str, config, excluded) -> dict:
@@ -132,31 +136,57 @@ def _save_sync_selection(instance: str, config, excluded) -> dict:
 	return {"excluded": len(rows), "removed": removed}
 
 
-def remove_excluded(instance: str) -> int:
-	"""Delete the ERPNext copies of everything the instance leaves out, pages first."""
-	excluded = exclusions(instance)
+def _excluded_names(instance: str, excluded: dict[str, set[int]]) -> tuple[list[str], list[str]]:
+	"""(chapters, pages) in ERPNext that the selection leaves out, including those under a
+	left-out book or chapter. Book records themselves are kept (see remove_excluded)."""
 
-	def names(doctype, ids):
-		if not ids:
-			return []
-		return frappe.get_all(doctype, filters={"instance": instance, "bookstack_id": ["in", list(ids)]}, pluck="name")
+	def names(doctype, filters_list):
+		found = set()
+		for f in filters_list:
+			found.update(frappe.get_all(doctype, filters={"instance": instance, **f}, pluck="name"))
+		return sorted(found)
 
-	books = names("Bookstack Book", excluded["Book"])
-	chapter_filters = [{"instance": instance, "bookstack_id": ["in", list(excluded["Chapter"])]}] if excluded["Chapter"] else []
+	books = []
+	if excluded["Book"]:
+		books = frappe.get_all(
+			"Bookstack Book", filters={"instance": instance, "bookstack_id": ["in", list(excluded["Book"])]}, pluck="name"
+		)
+	chapter_filters = [{"bookstack_id": ["in", list(excluded["Chapter"])]}] if excluded["Chapter"] else []
 	if books:
-		chapter_filters.append({"instance": instance, "book": ["in", books]})
-	chapters = sorted({n for f in chapter_filters for n in frappe.get_all("Bookstack Chapter", filters=f, pluck="name")})
+		chapter_filters.append({"book": ["in", books]})
+	chapters = names("Bookstack Chapter", chapter_filters)
 
-	page_filters = [{"instance": instance, "bookstack_id": ["in", list(excluded["Page"])]}] if excluded["Page"] else []
+	page_filters = [{"bookstack_id": ["in", list(excluded["Page"])]}] if excluded["Page"] else []
 	if books:
-		page_filters.append({"instance": instance, "book": ["in", books]})
+		page_filters.append({"book": ["in", books]})
 	if chapters:
-		page_filters.append({"instance": instance, "chapter": ["in", chapters]})
-	pages = sorted({n for f in page_filters for n in frappe.get_all("Bookstack Page", filters=f, pluck="name")})
+		page_filters.append({"chapter": ["in", chapters]})
+	return chapters, names("Bookstack Page", page_filters)
 
-	removed = 0
-	for doctype, todo in (("Bookstack Page", pages), ("Bookstack Chapter", chapters), ("Bookstack Book", books)):
-		for name in todo:
-			frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
-			removed += 1
-	return removed
+
+def remove_excluded(instance: str) -> int:
+	"""Delete the ERPNext copies of the chapters and pages the instance leaves out, pages first.
+
+	A left-out book keeps its record, with its "Publish on website" setting and its links on module
+	pages (decided 2026-11-21): without pages it is not shown on the website, and ticking it again
+	brings it back as it was. Bulk deletes: a big book has thousands of pages, too many for one
+	delete_doc each in a web request; these records have no hooks or child tables.
+	"""
+	chapters, pages = _excluded_names(instance, exclusions(instance))
+	if pages:
+		frappe.db.delete("Bookstack Page", {"name": ["in", pages]})
+	if chapters:
+		frappe.db.delete("Bookstack Chapter", {"name": ["in", chapters]})
+	return len(pages) + len(chapters)
+
+
+@frappe.whitelist()
+def preview_selection(instance: str, excluded) -> dict:
+	"""What saving ``excluded`` would remove from ERPNext, for the dialog's confirmation."""
+	frappe.get_doc("Bookstack Configuration", instance).check_permission("write")
+	wanted = {t: set() for t in ITEM_TYPES}
+	for row in frappe.parse_json(excluded) or []:
+		if row.get("item_type") in ITEM_TYPES:
+			wanted[row["item_type"]].add(frappe.utils.cint(row.get("bookstack_id")))
+	chapters, pages = _excluded_names(instance, wanted)
+	return {"chapters": len(chapters), "pages": len(pages)}
