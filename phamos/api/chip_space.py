@@ -29,7 +29,7 @@ import time
 
 import frappe
 from frappe import _
-from frappe.utils import escape_html, now_datetime, strip_html
+from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, strip_html
 
 # One shared world for everyone; the frontend draws exactly this grid.
 COLS = 40
@@ -65,6 +65,14 @@ SERVER_DISTANCE_SLACK = 1.5
 ENCOUNTER_DOCTYPE = "Chip Space Encounter"
 MAX_MESSAGE_LENGTH = 2000
 MESSAGES_SHOWN = 100
+
+# Burn notice (#2057): after parting, the chat burns this many seconds later unless both save it.
+BURN_SECONDS = 60
+EVENT_BURN_NOTICE = "chip_space_burn_notice"
+EVENT_BURN_CANCEL = "chip_space_burn_cancel"
+EVENT_SAVE_VOTE = "chip_space_save_vote"
+EVENT_SAVED = "chip_space_saved"
+EVENT_BURNED = "chip_space_burned"
 
 
 def _require_user():
@@ -166,6 +174,8 @@ def get_space():
 		"me": {**_chip(user, _stored_position() or _spawn()), "cols": COLS, "rows": ROWS},
 		"others": dummies + [c for c in _online(exclude=user) if c["user"] not in dummy_users],
 		"presence_ttl": PRESENCE_TTL,
+		# Burn notices still running for me (#2057), e.g. after a reload.
+		"notices": _my_notices(user),
 		"background": _background().get("url") or "",
 	}
 
@@ -203,6 +213,8 @@ def leave():
 	user = frappe.session.user
 	frappe.cache.hdel(PRESENCE_CACHE_KEY, user)
 	_publish(EVENT_LEAVE, {"user": user})
+	# Leaving the page is parting from everyone I was chatting with (#2057).
+	_part_all_mine(user)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -218,8 +230,11 @@ def save_my_position(x, y):
 
 
 def _background():
+	# Read from the table, not frappe.db.get_default(): its Redis cache survives a rollback and
+	# could show a background whose File was never committed.
+	raw = frappe.db.get_value("DefaultValue", {"parent": "__default", "defkey": BACKGROUND_KEY}, "defvalue")
 	try:
-		value = json.loads(frappe.db.get_default(BACKGROUND_KEY) or "{}")
+		value = json.loads(raw or "{}")
 	except (TypeError, ValueError):
 		value = {}
 	return value if isinstance(value, dict) else {}
@@ -306,17 +321,24 @@ def _pair_key(user_a, user_b):
 
 
 def _open_encounter_name(pair_key):
-	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key, "status": "Open"}, "name")
+	# Open or Parting: the record exists only until it is saved or burned.
+	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key}, "name")
 
 
-def _require_party(encounter):
-	"""The encounter, if the session user is one of its two people and it is still open."""
-	doc = frappe.db.get_value(
-		ENCOUNTER_DOCTYPE, encounter, ["name", "user_a", "user_b", "status", "raven_channel"], as_dict=True
-	)
-	if not doc or frappe.session.user not in (doc.user_a, doc.user_b):
+ENCOUNTER_FIELDS = ["name", "user_a", "user_b", "status", "raven_channel", "burn_at", "saved_by_a", "saved_by_b"]
+
+
+def _require_party(encounter, statuses=("Open",)):
+	"""The encounter, if the session user is one of its two people and it is in one of `statuses`.
+
+	A saved or burned encounter no longer exists: "This chat has ended."
+	"""
+	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True)
+	if not doc:
+		frappe.throw(_("This chat has ended."))
+	if frappe.session.user not in (doc.user_a, doc.user_b):
 		frappe.throw(_("This chat is not yours."), frappe.PermissionError)
-	if doc.status != "Open":
+	if doc.status not in statuses:
 		frappe.throw(_("This chat has ended."))
 	return doc
 
@@ -403,7 +425,10 @@ def open_encounter(with_user):
 
 	pair_key = _pair_key(me, with_user)
 	name = _open_encounter_name(pair_key)
-	if not name:
+	if name:
+		# Met again while the burn notice ran: the chat goes on.
+		_cancel_burn(_require_party(name, ("Open", "Parting")))
+	else:
 		user_a, user_b = sorted((me, with_user))
 		doc = frappe.get_doc(
 			{
@@ -429,9 +454,9 @@ def open_encounter(with_user):
 
 @frappe.whitelist()
 def get_encounter(encounter):
-	"""An open encounter of mine, with its latest messages."""
+	"""An encounter of mine (open or parting), with its latest messages."""
 	_require_user()
-	return _encounter_payload(_require_party(encounter))
+	return _encounter_payload(_require_party(encounter, ("Open", "Parting")))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -489,3 +514,231 @@ def dummy_reply(encounter, dummy):
 	except frappe.ValidationError:
 		# The encounter ended meanwhile.
 		pass
+
+
+# --- Burn notice, save, burn (#2057).
+#
+# Parting starts a countdown (status Parting, burn_at). Meeting again cancels it. When both press
+# Save, the messages move into the two people's Raven DM; otherwise the channel and its messages
+# are deleted for good when the countdown ends (the page asks at zero; burn_due_encounters runs
+# every minute for closed tabs). Either way the encounter record itself is deleted.
+
+
+def _saved_flags(doc, user):
+	"""(I saved, they saved) from `user`'s point of view."""
+	if user == doc.user_a:
+		return bool(doc.saved_by_a), bool(doc.saved_by_b)
+	return bool(doc.saved_by_b), bool(doc.saved_by_a)
+
+
+def _notice_for(doc, user):
+	peer = doc.user_b if user == doc.user_a else doc.user_a
+	saved_me, saved_peer = _saved_flags(doc, user)
+	full_name, user_image = frappe.db.get_value("User", peer, ["full_name", "user_image"]) or ("", "")
+	return {
+		"encounter": doc.name,
+		"with": peer,
+		"full_name": full_name or peer,
+		"user_image": user_image or "",
+		# Seconds, not a timestamp: browser and server clocks need not agree.
+		"burn_in": max(0, round((get_datetime(doc.burn_at) - now_datetime()).total_seconds(), 1)),
+		"saved_by_me": saved_me,
+		"saved_by_peer": saved_peer,
+	}
+
+
+def _publish_notice(doc, event=EVENT_BURN_NOTICE):
+	for user in (doc.user_a, doc.user_b):
+		frappe.publish_realtime(event, _notice_for(doc, user), user=user, after_commit=True)
+
+
+def _publish_both(doc, event, message):
+	for user in (doc.user_a, doc.user_b):
+		frappe.publish_realtime(event, message, user=user, after_commit=True)
+
+
+def _has_messages(doc):
+	return bool(
+		doc.raven_channel
+		and frappe.db.exists("Raven Message", {"channel_id": doc.raven_channel, "message_type": ("!=", "System")})
+	)
+
+
+def _start_parting(doc):
+	"""Open → Parting with a fresh countdown; an empty chat simply disappears."""
+	if doc.status != "Open":
+		return
+	if not _has_messages(doc):
+		_burn(doc, silent=True)
+		return
+	burn_at = add_to_date(now_datetime(), seconds=BURN_SECONDS)
+	frappe.db.set_value(
+		ENCOUNTER_DOCTYPE,
+		doc.name,
+		{"status": "Parting", "burn_at": burn_at, "saved_by_a": 0, "saved_by_b": 0},
+		update_modified=False,
+	)
+	doc.update({"status": "Parting", "burn_at": burn_at, "saved_by_a": 0, "saved_by_b": 0})
+	_publish_notice(doc)
+
+
+def _cancel_burn(doc):
+	if doc.status != "Parting":
+		return
+	frappe.db.set_value(
+		ENCOUNTER_DOCTYPE,
+		doc.name,
+		{"status": "Open", "burn_at": None, "saved_by_a": 0, "saved_by_b": 0},
+		update_modified=False,
+	)
+	_publish_both(doc, EVENT_BURN_CANCEL, {"encounter": doc.name})
+
+
+def _delete_permanently(doctype, name):
+	# No Deleted Document copy: burned means gone.
+	frappe.delete_doc(doctype, name, ignore_permissions=True, force=True, delete_permanently=True)
+
+
+def _burn(doc, silent=False):
+	"""Delete the chat for good: every message the Raven way (search index, attached files,
+	Raven's own events), then the channel, then the encounter."""
+	if doc.raven_channel and frappe.db.exists("Raven Channel", doc.raven_channel):
+		for message in frappe.get_all("Raven Message", filters={"channel_id": doc.raven_channel}, pluck="name"):
+			_delete_permanently("Raven Message", message)
+		_delete_permanently("Raven Channel", doc.raven_channel)
+	_delete_permanently(ENCOUNTER_DOCTYPE, doc.name)
+	if not silent:
+		_publish_both(doc, EVENT_BURNED, {"encounter": doc.name})
+
+
+def _save(doc):
+	"""Both said save: move the messages into the two people's Raven DM, unchanged (sender, time,
+	files, reactions) and without notifying anyone again; then drop the temporary channel."""
+	from raven.api.raven_channel import create_direct_message_channel
+
+	peer = _peer(doc)
+	dm_channel = create_direct_message_channel(peer)
+	messages = frappe.get_all(
+		"Raven Message", filters={"channel_id": doc.raven_channel}, fields=["name", "creation"], order_by="creation"
+	)
+	names = [m.name for m in messages]
+	if names:
+		for doctype, field in (("Raven Message", "name"), ("Raven Message Reaction", "message")):
+			if not frappe.db.table_exists(doctype):
+				continue
+			table = frappe.qb.DocType(doctype)
+			frappe.qb.update(table).set(table.channel_id, dm_channel).where(table[field].isin(names)).run()
+		latest = messages[-1].creation
+		current = frappe.db.get_value("Raven Channel", dm_channel, "last_message_timestamp")
+		if not current or get_datetime(current) < get_datetime(latest):
+			frappe.db.set_value("Raven Channel", dm_channel, "last_message_timestamp", latest, update_modified=False)
+		_reindex_messages(names)
+	# The temporary channel is empty now; Raven's on_trash removes its members.
+	if frappe.db.exists("Raven Channel", doc.raven_channel):
+		_delete_permanently("Raven Channel", doc.raven_channel)
+	_delete_permanently(ENCOUNTER_DOCTYPE, doc.name)
+	_publish_both(doc, EVENT_SAVED, {"encounter": doc.name, "dm_channel": dm_channel})
+	return dm_channel
+
+
+def _reindex_messages(names):
+	"""Raven's search index stores the channel of each message: point it at the DM."""
+	try:
+		from raven.api.search import RavenSearch
+
+		search = RavenSearch()
+		for name in names:
+			search.index_doc("Raven Message", name)
+	except Exception:  # noqa: BLE001
+		# No index on this site (or another Raven version): search catches up on its next
+		# rebuild. Saving the chat must not fail because of the search index.
+		pass
+
+
+@frappe.whitelist(methods=["POST"])
+def part_encounter(encounter):
+	"""The two chips walked apart: start the burn notice (both pages call this; once is enough)."""
+	_require_user()
+	doc = _require_party(encounter, ("Open", "Parting"))
+	_start_parting(doc)
+	if not frappe.db.exists(ENCOUNTER_DOCTYPE, doc.name):
+		return None
+	return _notice_for(frappe.db.get_value(ENCOUNTER_DOCTYPE, doc.name, ENCOUNTER_FIELDS, as_dict=True), frappe.session.user)
+
+
+@frappe.whitelist(methods=["POST"])
+def save_encounter(encounter):
+	"""I want to keep this chat. Saved for real only when the other person says so too."""
+	_require_user()
+	doc = _require_party(encounter, ("Parting",))
+	field = "saved_by_a" if frappe.session.user == doc.user_a else "saved_by_b"
+	frappe.db.set_value(ENCOUNTER_DOCTYPE, doc.name, field, 1, update_modified=False)
+	doc[field] = 1
+	if doc.saved_by_a and doc.saved_by_b:
+		return {"saved": True, "dm_channel": _save(doc)}
+	_publish_notice(doc, EVENT_SAVE_VOTE)
+	peer = _peer(doc)
+	if peer in _dummy_users() and frappe.session.user not in _dummy_users():
+		# A test dummy agrees, so the save path can be tried alone.
+		frappe.enqueue(
+			"phamos.api.chip_space.dummy_save", queue="short", enqueue_after_commit=True, encounter=doc.name, dummy=peer
+		)
+	return {"saved": False}
+
+
+def dummy_save(encounter, dummy):
+	"""Background job: a test dummy (site config only) also presses Save."""
+	if dummy not in _dummy_users():
+		return
+	time.sleep(DUMMY_REPLY_DELAY)
+	frappe.set_user(dummy)
+	try:
+		save_encounter(encounter)
+	except frappe.ValidationError:
+		pass  # burned or met again meanwhile
+
+
+@frappe.whitelist(methods=["POST"])
+def burn_if_due(encounter):
+	"""The countdown on the page reached zero: burn now, unless it was saved or met again."""
+	_require_user()
+	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True)
+	if not doc or frappe.session.user not in (doc.user_a, doc.user_b):
+		return {"burned": True}
+	# One second of slack for the page's clock.
+	if doc.status == "Parting" and get_datetime(doc.burn_at) <= add_to_date(now_datetime(), seconds=1):
+		_burn(doc)
+		return {"burned": True}
+	return {"burned": False}
+
+
+def burn_due_encounters():
+	"""Scheduler, every minute: burn what is overdue, and start the countdown for encounters whose
+	other person has left (tab closed, connection gone) without anyone walking away."""
+	for doc in frappe.get_all(
+		ENCOUNTER_DOCTYPE,
+		filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
+		fields=ENCOUNTER_FIELDS,
+	):
+		_burn(doc)
+	for doc in frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS):
+		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
+			_start_parting(doc)
+	frappe.db.commit()
+
+
+def _my_notices(user):
+	rows = frappe.get_all(
+		ENCOUNTER_DOCTYPE,
+		filters={"status": "Parting"},
+		or_filters={"user_a": user, "user_b": user},
+		fields=ENCOUNTER_FIELDS,
+	)
+	return [_notice_for(row, user) for row in rows]
+
+
+def _part_all_mine(user):
+	for doc in frappe.get_all(
+		ENCOUNTER_DOCTYPE, filters={"status": "Open"}, or_filters={"user_a": user, "user_b": user}, fields=ENCOUNTER_FIELDS
+	):
+		_start_parting(doc)

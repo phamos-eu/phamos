@@ -42,7 +42,22 @@
 			</Button>
 		</header>
 
-		<div ref="stage" class="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+			<!-- Burn notices (#2057): bottom centre, above the grid. -->
+			<div
+				v-if="noticeList.length"
+				class="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex flex-col items-center gap-2"
+			>
+				<BurnNotice
+					v-for="notice in noticeList"
+					:key="notice.encounter"
+					class="pointer-events-auto"
+					:notice="notice"
+					:now="now"
+					:saving="notice.saving"
+					@save="saveEncounter(notice)"
+				/>
+			</div>
 			<div
 				v-if="me"
 				class="chip-space-grid relative rounded-lg border border-outline-gray-2 bg-surface-white"
@@ -101,6 +116,7 @@ import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMoun
 import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
+import BurnNotice from "../components/BurnNotice.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
@@ -323,6 +339,8 @@ const bubbles = reactive({})
 const bubbleRefs = {}
 // Chats closed with Esc stay closed until the two walk apart (or Enter opens them again).
 const dismissed = new Set()
+// The open encounter with each chip, also while its bubble is closed (Esc): parting needs it.
+const encounterByUser = new Map()
 const bubbleList = computed(() => Object.values(bubbles))
 
 function setBubbleRef(user, el) {
@@ -357,11 +375,15 @@ function checkEncounters() {
 		else if (distance > PART_DISTANCE) {
 			delete bubbles[other.user]
 			dismissed.delete(other.user)
+			partFrom(other.user)
 		}
 	}
 	// Someone who left the page also leaves the chat.
-	for (const user of Object.keys(bubbles)) {
-		if (!others.value.some((o) => o.user === user)) delete bubbles[user]
+	for (const user of new Set([...Object.keys(bubbles), ...encounterByUser.keys()])) {
+		if (!others.value.some((o) => o.user === user)) {
+			delete bubbles[user]
+			partFrom(user)
+		}
 	}
 }
 
@@ -382,6 +404,9 @@ async function openBubble(other) {
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
 		bubble.encounter = data.encounter
 		bubble.messages = data.messages || []
+		encounterByUser.set(other.user, data.encounter)
+		// Met again before the chat burned: it goes on.
+		delete notices[data.encounter]
 	} catch (e) {
 		bubble.error = errorText(e) || __("The chat could not be opened.")
 	} finally {
@@ -451,6 +476,91 @@ function focusNearestBubble() {
 	return true
 }
 
+// --- Burn notices (#2057).
+
+const notices = reactive({})
+const noticeList = computed(() => Object.values(notices))
+const now = ref(Date.now())
+let nowTimer = null
+
+function partFrom(user) {
+	const encounter = encounterByUser.get(user)
+	if (!encounter) return
+	encounterByUser.delete(user)
+	call(`${API}.part_encounter`, { encounter })
+		.then((notice) => notice && upsertNotice(notice))
+		.catch(() => {})
+}
+
+function upsertNotice(notice) {
+	if (!notice?.encounter) return
+	const existing = notices[notice.encounter]
+	if (existing?.state) return // already saved or burned
+	const fields = {
+		encounter: notice.encounter,
+		with: notice.with,
+		full_name: notice.full_name,
+		user_image: notice.user_image,
+		deadline: Date.now() + notice.burn_in * 1000,
+		total: 60,
+		saved_by_me: notice.saved_by_me,
+		saved_by_peer: notice.saved_by_peer,
+	}
+	if (existing) Object.assign(existing, fields)
+	else notices[notice.encounter] = reactive({ ...fields, state: "", saving: false, burnAsked: false })
+	startClock()
+}
+
+function finishNotice(encounter, state) {
+	const notice = notices[encounter]
+	for (const [user, open] of encounterByUser) if (open === encounter) encounterByUser.delete(user)
+	for (const bubble of Object.values(bubbles)) if (bubble.encounter === encounter) delete bubbles[bubble.user]
+	if (!notice) return
+	notice.state = state
+	setTimeout(() => delete notices[encounter], state === "saved" ? 5000 : 4000)
+}
+
+async function saveEncounter(notice) {
+	notice.saving = true
+	try {
+		const result = await call(`${API}.save_encounter`, { encounter: notice.encounter })
+		notice.saved_by_me = true
+		if (result?.saved) finishNotice(notice.encounter, "saved")
+	} catch (e) {
+		toast.error(errorText(e) || __("The chat could not be saved."))
+	} finally {
+		notice.saving = false
+	}
+}
+
+// The countdown: at zero the page asks the server to burn (the scheduler does it for closed tabs).
+function startClock() {
+	if (nowTimer) return
+	nowTimer = setInterval(() => {
+		now.value = Date.now()
+		for (const notice of Object.values(notices)) {
+			if (!notice.state && !notice.burnAsked && notice.deadline <= now.value) {
+				notice.burnAsked = true
+				call(`${API}.burn_if_due`, { encounter: notice.encounter })
+					.then((r) => r?.burned && finishNotice(notice.encounter, "burned"))
+					.catch(() => {})
+			}
+		}
+		if (!Object.keys(notices).length) {
+			clearInterval(nowTimer)
+			nowTimer = null
+		}
+	}, 250)
+}
+
+const NOTICE_EVENTS = [
+	["chip_space_burn_notice", upsertNotice],
+	["chip_space_save_vote", upsertNotice],
+	["chip_space_burn_cancel", (m) => delete notices[m?.encounter]],
+	["chip_space_saved", (m) => finishNotice(m?.encounter, "saved")],
+	["chip_space_burned", (m) => finishNotice(m?.encounter, "burned")],
+]
+
 // --- My presence.
 
 let lastSent = 0
@@ -498,6 +608,7 @@ const SOCKET_EVENTS = [
 	["chip_space_leave", onRemoteLeave],
 	["chip_space_message", onEncounterMessage],
 	["chip_space_background", (message) => (background.value = message?.url || "")],
+	...NOTICE_EVENTS,
 	// Rejoin after a lost connection: the others may have moved meanwhile.
 	["connect", () => (heartbeat(), refreshOthers())],
 ]
@@ -586,6 +697,7 @@ onMounted(async () => {
 		saved = { x: me.value.x, y: me.value.y }
 		presenceTtlMs = (data.presence_ttl || 45) * 1000
 		background.value = data.background || ""
+		for (const notice of data.notices || []) upsertNotice(notice)
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("The Space could not be loaded.")
@@ -604,6 +716,7 @@ onBeforeUnmount(() => {
 	window.removeEventListener("pagehide", leaveOnPagehide)
 	for (const [event, handler] of SOCKET_EVENTS) socket?.off?.(event, handler)
 	clearInterval(heartbeatTimer)
+	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)
 	if (me.value) call(`${API}.leave`).catch(() => {})

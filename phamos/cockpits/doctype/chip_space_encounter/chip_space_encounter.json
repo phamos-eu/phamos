@@ -2,16 +2,19 @@
  "actions": [],
  "autoname": "hash",
  "creation": "2026-11-21 18:00:00.000000",
- "description": "A Chip Space encounter (#2053, #2056): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.chip_space; no history kept (no Version rows), since an encounter chat may be burned later (#2057).",
+ "description": "A Chip Space encounter (#2053, #2056, #2057): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.chip_space. When the two part, a burn notice runs; if both save, the messages move into their Raven DM, otherwise they are burned. Either way this record is deleted (no Deleted Document, no Version): no history of who met whom is kept.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "user_a",
   "user_b",
   "status",
+  "burn_at",
   "column_break_main",
   "raven_channel",
   "opened_at",
+  "saved_by_a",
+  "saved_by_b",
   "pair_key"
  ],
  "fields": [
@@ -40,8 +43,16 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Open\nClosed",
-   "read_only": 1
+   "options": "Open\nParting",
+   "read_only": 1,
+   "description": "Open while the two stand together; Parting while the burn notice runs."
+  },
+  {
+   "fieldname": "burn_at",
+   "fieldtype": "Datetime",
+   "label": "Burn At",
+   "read_only": 1,
+   "description": "While parting: when the chat is burned unless both saved it."
   },
   {
    "fieldname": "column_break_main",
@@ -61,6 +72,20 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "fieldname": "saved_by_a",
+   "fieldtype": "Check",
+   "label": "Saved by User A",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saved_by_b",
+   "fieldtype": "Check",
+   "label": "Saved by User B",
+   "read_only": 1
+  },
+  {
    "description": "\"user_a|user_b\" (sorted) while the encounter is open, empty afterwards: at most one open encounter per pair, guarded by the unique index.",
    "fieldname": "pair_key",
    "fieldtype": "Data",
@@ -72,7 +97,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-21 18:00:00.000000",
+ "modified": "2026-11-21 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Chip Space Encounter",

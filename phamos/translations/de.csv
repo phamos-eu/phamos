@@ -2706,3 +2706,13 @@ Choose an image first.,Wählen Sie zuerst ein Bild.
 The image can be at most {0} MB.,Das Bild darf höchstens {0} MB groß sein.
 "This file is not an image the Space can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das der Space zeigen kann (PNG, JPEG, WebP oder GIF)."
 Background,Hintergrund
+Kept,Behalten
+Moved to your Raven chat with {0}.,In Ihren Raven-Chat mit {0} verschoben.
+Burned,Verbrannt
+The chat with {0} is gone.,Der Chat mit {0} ist gelöscht.
+Chat with {0} burns in {1},Chat mit {0} verbrennt in {1}
+Saved,Gespeichert
+"You want to keep it. Waiting for {0}.","Sie möchten ihn behalten. Warten auf {0}."
+"{0} wants to keep it. Save to keep it.","{0} möchte ihn behalten. Speichern Sie, um ihn zu behalten."
+Kept only if you both save it.,"Er bleibt nur, wenn Sie beide speichern."
+The chat could not be saved.,Der Chat konnte nicht gespeichert werden.

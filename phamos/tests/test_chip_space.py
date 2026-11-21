@@ -226,6 +226,99 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		enqueue.assert_not_called()
 
 
+	# --- Burn notice, save, burn (#2057)
+
+	def _chat(self):
+		"""A opens the encounter with B and writes one message; returns the encounter row."""
+		encounter = self._open(self.A, self.B)["encounter"]
+		with patch.object(chip_space.frappe, "publish_realtime"), patch.object(chip_space.frappe, "enqueue"):
+			chip_space.send_encounter_message(encounter, "Lunch?")
+		return frappe.db.get_value("Chip Space Encounter", encounter, chip_space.ENCOUNTER_FIELDS, as_dict=True)
+
+	def _no_trace(self, doc, messages):
+		self.assertFalse(frappe.db.exists("Chip Space Encounter", doc.name))
+		self.assertFalse(frappe.db.exists("Raven Channel", doc.raven_channel))
+		self.assertFalse(
+			frappe.db.exists("Deleted Document", {"deleted_doctype": ("in", ["Raven Message", "Raven Channel", "Chip Space Encounter"]), "deleted_name": ("in", [doc.name, doc.raven_channel, *messages])})
+		)
+
+	def test_parting_starts_the_burn_notice_for_both(self):
+		doc = self._chat()
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			notice = chip_space.part_encounter(doc.name)
+		self.assertEqual(frappe.db.get_value("Chip Space Encounter", doc.name, "status"), "Parting")
+		self.assertAlmostEqual(notice["burn_in"], chip_space.BURN_SECONDS, delta=2)
+		self.assertEqual((notice["with"], notice["saved_by_me"]), (self.B, False))
+		notices = [c for c in publish.call_args_list if c.args[0] == chip_space.EVENT_BURN_NOTICE]
+		self.assertEqual({c.kwargs["user"] for c in notices}, {self.A, self.B})
+
+	def test_parting_from_an_empty_chat_leaves_nothing(self):
+		encounter = self._open(self.A, self.B)
+		doc = frappe.db.get_value("Chip Space Encounter", encounter["encounter"], chip_space.ENCOUNTER_FIELDS, as_dict=True)
+		self.assertIsNone(chip_space.part_encounter(doc.name))
+		self._no_trace(doc, [])
+
+	def test_meeting_again_cancels_the_burn(self):
+		doc = self._chat()
+		chip_space.part_encounter(doc.name)
+		again = self._open(self.B, self.A)
+		self.assertEqual(again["encounter"], doc.name)
+		self.assertEqual([m["text"] for m in again["messages"]], ["Lunch?"])
+		self.assertEqual(frappe.db.get_value("Chip Space Encounter", doc.name, ["status", "burn_at"]), ("Open", None))
+
+	def test_one_save_is_not_enough_both_saves_move_into_the_dm(self):
+		doc = self._chat()
+		messages = frappe.get_all("Raven Message", filters={"channel_id": doc.raven_channel}, pluck="name")
+		chip_space.part_encounter(doc.name)
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			self.assertEqual(chip_space.save_encounter(doc.name), {"saved": False})
+			frappe.set_user(self.B)
+			result = chip_space.save_encounter(doc.name)
+		self.assertTrue(result["saved"])
+		dm = frappe.get_doc("Raven Channel", result["dm_channel"])
+		self.assertTrue(dm.is_direct_message)
+		moved = frappe.get_all("Raven Message", filters={"channel_id": dm.name}, fields=["name", "owner"])
+		self.assertEqual({(m.name, m.owner) for m in moved}, {(name, self.A) for name in messages})
+		self._no_trace(doc, [])
+
+	def test_burn_only_when_due(self):
+		doc = self._chat()
+		messages = frappe.get_all("Raven Message", filters={"channel_id": doc.raven_channel}, pluck="name")
+		chip_space.part_encounter(doc.name)
+		chip_space.save_encounter(doc.name)  # only one of the two
+		self.assertEqual(chip_space.burn_if_due(doc.name), {"burned": False})
+		frappe.db.set_value("Chip Space Encounter", doc.name, "burn_at", chip_space.add_to_date(chip_space.now_datetime(), seconds=-1))
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			self.assertEqual(chip_space.burn_if_due(doc.name), {"burned": True})
+		self.assertFalse(frappe.db.exists("Raven Message", {"name": ("in", messages)}))
+		self._no_trace(doc, messages)
+
+	def test_scheduler_burns_overdue_and_parts_when_someone_is_gone(self):
+		overdue = self._chat()
+		chip_space.part_encounter(overdue.name)
+		frappe.db.set_value("Chip Space Encounter", overdue.name, "burn_at", chip_space.add_to_date(chip_space.now_datetime(), seconds=-5))
+		self._put(self.C, 7, 5)
+		frappe.set_user(self.C)
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: None}):
+			open_one = chip_space.open_encounter(self.B)["encounter"]
+			with patch.object(chip_space.frappe, "publish_realtime"), patch.object(chip_space.frappe, "enqueue"):
+				chip_space.send_encounter_message(open_one, "Hi B")
+			frappe.cache.hdel(chip_space.PRESENCE_CACHE_KEY, self.C)  # C closed the tab
+			with patch.object(chip_space.frappe.db, "commit"), patch.object(chip_space.frappe, "publish_realtime"):
+				chip_space.burn_due_encounters()
+		self.assertFalse(frappe.db.exists("Chip Space Encounter", overdue.name))
+		self.assertEqual(frappe.db.get_value("Chip Space Encounter", open_one, "status"), "Parting")
+
+	def test_leaving_the_page_parts(self):
+		doc = self._chat()
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			chip_space.leave()
+		self.assertEqual(frappe.db.get_value("Chip Space Encounter", doc.name, "status"), "Parting")
+		frappe.set_user(self.B)
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: None}):
+			self.assertEqual([n["encounter"] for n in chip_space.get_space()["notices"]], [doc.name])
+
+
 class ChipSpaceBackgroundTestCase(FrappeTestCase):
 	"""The Space's shared background image."""
 
