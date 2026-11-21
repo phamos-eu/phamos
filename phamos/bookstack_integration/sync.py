@@ -453,7 +453,8 @@ def _run_steps(instance: str, steps: list) -> dict[str, Any]:
 
 		from phamos.web_profile.docs import clear_cache
 
-		clear_cache()  # the /de/doku pages show the new state at once (#2005)
+		# the /de/doku pages show the new state at once (#2005); after the commit, see BookstackBook
+		frappe.db.after_commit.add(clear_cache)
 		stats["errors"] = errors
 		return stats
 

@@ -119,7 +119,24 @@ class TestWebDocs(FrappeTestCase):
 		book = frappe.get_doc("Bookstack Book", self.book)
 		book.publish_on_website = 0
 		book.save(ignore_permissions=True)
+		frappe.db.after_commit.run()  # what a commit does; the tests never commit
 		self.assertTrue(_is_404(_render("de/doku/handbuch-test")))
+
+	def test_pages_only_under_their_route(self):
+		for path in ("doku?lang=de", "doku/index?lang=de", "doku/book?lang=de&book_slug=handbuch-test"):
+			self.assertTrue(_is_404(_render(path)), path)
+
+	def test_sync_may_save_a_published_book_whose_address_clashes(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, {"publish_on_website": 1, "slug": "intern-test"})
+		book = frappe.get_doc("Bookstack Book", self.hidden)
+		book.slug = "handbuch-test"  # renamed in BookStack into a clash
+		book.save(ignore_permissions=True)  # what the sync does: no error
+
+		other = frappe.get_doc("Bookstack Book", self.hidden)
+		other.publish_on_website = 0
+		other.save(ignore_permissions=True)
+		other.publish_on_website = 1
+		self.assertRaises(frappe.ValidationError, other.save, ignore_permissions=True)
 
 	def test_footer_heading_lists_the_books(self):
 		from phamos.web_profile.chrome import _footer_items

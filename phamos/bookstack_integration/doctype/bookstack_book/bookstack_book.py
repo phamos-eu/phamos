@@ -14,7 +14,9 @@ class BookstackBook(Document):
 	def validate_unique_web_address(self):
 		"""Two published books with one slug would share /de/doku/<slug>; only one could be shown,
 		and links of the other instance would lead to the wrong book (review S9)."""
-		if not (self.publish_on_website and self.slug):
+		# Only when someone publishes: the sync saves published books too, and a slug BookStack renamed
+		# into a clash must not make every sync fail (the website shows one of the two anyway).
+		if not (self.publish_on_website and self.slug and self.has_value_changed("publish_on_website")):
 			return
 		if frappe.db.exists("Bookstack Book", {"publish_on_website": 1, "slug": self.slug, "name": ["!=", self.name]}):
 			frappe.throw(frappe._("Another published book already uses the web address /de/doku/{0}.").format(self.slug))
@@ -26,10 +28,11 @@ class BookstackBook(Document):
 		was_published = before.publish_on_website if before else 0
 		if bool(was_published) != bool(self.publish_on_website):
 			self.refresh_website_copies()
-		clear_docs_cache()
+		# After the commit: a request between clearing and committing would cache the old rows again.
+		frappe.db.after_commit.add(clear_docs_cache)
 
 	def on_trash(self):
-		clear_docs_cache()
+		frappe.db.after_commit.add(clear_docs_cache)
 
 	def refresh_website_copies(self):
 		"""Make the next content sync pick up a changed "Publish on website" (#2004).
