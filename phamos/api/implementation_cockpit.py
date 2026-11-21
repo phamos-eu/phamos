@@ -1249,7 +1249,9 @@ def get_roadmap(implementation):
 	module_of_chapter = {i.implementation_chapter: i.module for i in items if i.implementation_chapter and i.module}
 	rows = {}
 	for item in items:
-		if item.module:
+		# a row whose chapter the viewer doesn't see (Draft, for customers) would show up empty
+		# and give the chapter away
+		if item.module and (not item.implementation_chapter or item.implementation_chapter in chapter_names):
 			rows.setdefault(item.module, {"module": item.module, "label": item.module, "bars": [], "events": []})
 	no_module = {"bars": [], "events": []}
 	for chapter in chapters:
