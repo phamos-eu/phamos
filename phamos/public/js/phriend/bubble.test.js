@@ -13,6 +13,11 @@ describe("the speech bubble (PM, 2026-11-21)", () => {
 		expect(tip_x(bubble_path(60, 30, 200))).toBeLessThanOrEqual(60 - 0.5 - 12 - 7)
 		expect(tip_x(bubble_path(60, 30, -50))).toBeGreaterThanOrEqual(0.5 + 12 + 7)
 	})
+	it("leans its tail towards Phriend", () => {
+		const tip = (d) => Number(d.match(/Q\S+ \S+ (\S+) /)[1])
+		expect(tip(bubble_path(200, 40, 178, { lean: 7 }))).toBeCloseTo(tip(bubble_path(200, 40, 178)) + 7, 5)
+		expect(tip(bubble_path(200, 40, 40, { lean: -7 }))).toBeCloseTo(tip(bubble_path(200, 40, 40)) - 7, 5)
+	})
 	it("jitters a little, never far", () => {
 		for (const r of [0, 0.5, 0.9999]) {
 			const j = jitter(() => r)

@@ -6,12 +6,14 @@ export const RADIUS = 12;
 export const TAIL_W = 14; // where the tail meets the box
 export const TAIL_H = 8; // how far it reaches down to Phriend
 export const TAIL_INSET = 22; // from the box's right edge (left edge when flipped)
+export const TAIL_LEAN = 7; // the tip leans this far towards Phriend
 
 const r1 = (n) => Math.round(n * 10) / 10;
 
-// w, h: the box (the tail hangs below it); tail_x: where the tail's tip is, from the left.
-// Drawn half a pixel in, so a 1px border lands on whole pixels.
-export function bubble_path(w, h, tail_x, { r = RADIUS, tw = TAIL_W, th = TAIL_H } = {}) {
+// w, h: the box (the tail hangs below it); tail_x: where the tail meets the box, from the left;
+// lean: how far its tip leans sideways, towards Phriend. Drawn half a pixel in, so a 1px border
+// lands on whole pixels.
+export function bubble_path(w, h, tail_x, { r = RADIUS, tw = TAIL_W, th = TAIL_H, lean = 0 } = {}) {
 	const L = 0.5;
 	const T = 0.5;
 	const R = w - 0.5;
@@ -22,6 +24,7 @@ export function bubble_path(w, h, tail_x, { r = RADIUS, tw = TAIL_W, th = TAIL_H
 	const right = x + tw / 2;
 	const left = x - tw / 2;
 	const tip_y = B + th;
+	const tip_x = x + lean;
 	return [
 		`M${r1(L + r)} ${T}`,
 		`H${r1(R - r)}`,
@@ -30,8 +33,8 @@ export function bubble_path(w, h, tail_x, { r = RADIUS, tw = TAIL_W, th = TAIL_H
 		`A${r} ${r} 0 0 1 ${r1(R - r)} ${B}`,
 		`H${r1(right)}`,
 		// a soft tail: curved in, a rounded tip, curved back
-		`Q${r1(x + 1.5)} ${r1(B + th * 0.45)} ${r1(x)} ${r1(tip_y)}`,
-		`Q${r1(x - 2.5)} ${r1(B + th * 0.35)} ${r1(left)} ${B}`,
+		`Q${r1(x + 1.5 + lean * 0.6)} ${r1(B + th * 0.45)} ${r1(tip_x)} ${r1(tip_y)}`,
+		`Q${r1(x - 2.5 + lean * 0.3)} ${r1(B + th * 0.35)} ${r1(left)} ${B}`,
 		`H${r1(L + r)}`,
 		`A${r} ${r} 0 0 1 ${L} ${r1(B - r)}`,
 		`V${r1(T + r)}`,
