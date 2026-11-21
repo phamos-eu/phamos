@@ -45,9 +45,11 @@ def set_seo(context, *, title, description, path, alternates, image=None, canoni
 	context.canonical_url = get_url(canonical_path or path)
 	context.alternate_links = [{"lang": lang, "url": get_url(url)} for lang, url in alternates.items()]
 	context.alternate_links.append({"lang": "x-default", "url": get_url(alternates[DEFAULT_LANGUAGE])})
+	# Pages in one language only (the documentation, phamos/phamos#2005) pass just that language.
 	context.language_links = [
 		{"lang": lang, "label": LANGUAGE_NAMES[lang], "url": alternates[lang], "current": lang == context.lang}
 		for lang in LANGUAGES
+		if lang in alternates
 	]
 	context.metatags = {
 		"title": title,

@@ -1,0 +1,43 @@
+{#- /de/dokumentation/<book>/<page> (and English). Context: page.py. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-docs wp-docs-page">
+	<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
+
+	<div class="wp-docs-layout">
+		{#- Phones: the contents fold away above the text; desktop: a sidebar that stays in view. -#}
+		<details class="wp-docs-nav" open>
+			<summary><a href="{{ book.url | e }}">{{ book.title | e }}</a></summary>
+			<nav aria-label="{{ _('Contents') }}">{{ toc(contents, current=page.slug) }}</nav>
+		</details>
+		{#- Open without JavaScript; folded on phones so the text comes first. -#}
+		<script>document.currentScript.previousElementSibling.open = !matchMedia("(max-width: 860px)").matches;</script>
+
+		<article class="wp-docs-article">
+			<header>
+				{%- if page.chapter_title %}<span class="wp-badge">{{ page.chapter_title | e }}</span>{% endif %}
+				<h1 lang="de">{{ page.title | e }}</h1>
+				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
+			</header>
+			{#- Sanitised by the BookStack sync (content.clean_page_html); links pointed at the website by docs.render_html. -#}
+			<div class="wp-body wp-docs-content" lang="de">{{ page.html }}</div>
+
+			<nav class="wp-docs-pager" aria-label="{{ _('Pages') }}">
+				{%- if page.previous %}<a class="wp-link-card" href="{{ page.previous.url | e }}" rel="prev"><span class="wp-docs-pager-label">{{ _("Previous") }}</span><span>{{ page.previous.title | e }}</span></a>{% else %}<span></span>{% endif %}
+				{%- if page.next %}<a class="wp-link-card wp-docs-pager-next" href="{{ page.next.url | e }}" rel="next"><span class="wp-docs-pager-label">{{ _("Next") }}</span><span>{{ page.next.title | e }}</span></a>{% endif %}
+			</nav>
+
+			<p class="wp-docs-source">
+				{%- if page.updated_at %}{{ _("Updated on {0}").format(frappe.utils.formatdate(page.updated_at, "dd.MM.yyyy")) }} · {% endif -%}
+				{%- if page.url %}<a href="{{ page.url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a>{% endif %}
+			</p>
+		</article>
+	</div>
+</main>
+{% endblock %}

@@ -2539,14 +2539,35 @@ Publish on website,Auf Webseite veröffentlichen
 Website summary,Kurzbeschreibung für die Webseite
 Content (HTML),Inhalt (HTML)
 Content Updated At,Inhalt aktualisiert am
+"Guides for ERPNext and the Frappe Framework, written by our team.",Anleitungen zu ERPNext und dem Frappe Framework von unserem Team.
+No documentation is published yet.,Es ist noch keine Dokumentation veröffentlicht.
+{0} pages,{0} Seiten
+Start reading,Lesen beginnen
+Open on {0},Auf {0} öffnen
+Updated on {0},Aktualisiert am {0}
+Previous,Zurück
+1 page,1 Seite
+Guides for {0} from our documentation.,Anleitungen zu {0} aus unserer Dokumentation.
+The documentation is in German.,Die Dokumentation ist auf Deutsch.
+in German,auf Deutsch
+Matching module,Passendes Modul
+Matching modules,Passende Module
+Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Bookstack Browser,Bookstack-Browser
+Books,Bücher
+Shelves,Regale
+Chapters,Kapitel
+Bookstack Users,Bookstack-Benutzer
+Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
+Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
 Leave me in peace,Lass mich in Ruhe
 Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
 Quiet until {0},Ruhig bis {0}
@@ -2578,3 +2599,62 @@ One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phrie
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
 No module,Kein Modul
+Nothing planned yet,Noch nichts geplant
+On the critical path,Auf dem kritischen Pfad
+Baseline: {0} – {1},Planungsbasis: {0} – {1}
+GitLab milestone,GitLab-Meilenstein
+Against the baseline,Gegenüber der Planungsbasis
++{0} d,+{0} T
+{0} d,{0} T
+{0} d late,{0} T zu spät
+{0} d slack,{0} T Puffer
+Warnings Go To,Warnungen gehen an
+Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
+Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
+Warn: GitLab Sync Failed,Warnen: GitLab-Abgleich fehlgeschlagen
+"Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.","Phriend erfährt, was passiert: Ihre Meldung wurde ein GitLab-Issue, jemand hat für Ihre Idee gestimmt, ein KI-Agent-Lauf ist fehlgeschlagen, Beleg-E-Mails konnten nicht gelesen werden, der GitLab-Abgleich ist fehlgeschlagen."
+"Who gets warnings about the whole system, such as a failed GitLab sync.","Wer Warnungen zum ganzen System bekommt, zum Beispiel einen fehlgeschlagenen GitLab-Abgleich."
+Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.,Angehakt: eine rote ‼️-Warnung. Nicht angehakt: eine Notiz hinter dem blauen Punkt.
+Your report is now a GitLab issue: {0},Ihre Meldung ist jetzt ein GitLab-Issue: {0}
+Someone voted for your idea: {0},Jemand hat für Ihre Idee gestimmt: {0}
+The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht abschließen.
+The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
+Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
+Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Easter Eggs,Easter Eggs
+"Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+This documentation is in German.,Diese Dokumentation ist auf Deutsch.
+{0} has been live for a while. How do you like it now?,{0} ist schon eine Weile live. Wie gefällt es Ihnen jetzt?
+{0} is live. How do you like it?,{0} ist live. Wie gefällt es Ihnen?
+{0} has been live for a while. Still fixed?,{0} ist schon eine Weile live. Immer noch behoben?
+{0} is live. Did it fix it?,{0} ist live. Hat es das Problem gelöst?
+{0} of 5 stars,{0} von 5 Sternen
+"Yes, fixed","Ja, behoben"
+"No, not fixed","Nein, nicht behoben"
+No thanks,Nein danke
+Thank you! The team will see it.,Danke! Das Team bekommt es zu sehen.
+Thanks! Anything to add?,Danke! Möchten Sie noch etwas ergänzen?
+Send,Senden
+Rating Questions,Bewertungsfragen
+Battle-tested After (Weeks),Im Alltag erprobt nach (Wochen)
+Anonymous Feedback,Anonyme Rückmeldungen
+"When a Phriend report has gone live on production, Phriend asks the person who reported it how it turned out: right after, and again once it has been in daily use. Bugs get thumbs up or down, improvements 1 to 5 stars.","Wenn eine Phriend-Meldung auf Produktion live ist, fragt Phriend die meldende Person, wie es geworden ist: gleich danach und noch einmal nach einer Weile im Alltag. Fehler bekommen Daumen hoch oder runter, Verbesserungen 1 bis 5 Sterne."
+"The second question, ""Still good in daily use?"", this many weeks after going live.","Die zweite Frage, „Im Alltag immer noch gut?“, so viele Wochen nach dem Livegang."
+Answers are shown without the name of the person who gave them.,"Antworten werden ohne den Namen der Person gezeigt, die sie gegeben hat."
+This question was not for you.,Diese Frage war nicht für Sie.
+This question is already answered.,Diese Frage ist schon beantwortet.
+Please choose thumbs up or down.,Bitte wählen Sie Daumen hoch oder runter.
+Please choose 1 to 5 stars.,Bitte wählen Sie 1 bis 5 Sterne.
+Rating questions are switched off in Phriend Settings,Bewertungsfragen sind in den Phriend-Einstellungen ausgeschaltet
+Round is First impression or Battle tested.,Die Runde ist „First impression“ oder „Battle tested“.
+One rating question of Phriend to one person about one thing that went live (#2014).,"Eine Bewertungsfrage von Phriend an eine Person zu etwas, das live gegangen ist (#2014)."
+First impression,Erster Eindruck
+Battle tested,Im Alltag erprobt
+Thumbs,Daumen
+Stars,Sterne
+"Kept also for anonymous feedback, only so nobody is asked twice; never shown then.","Auch bei anonymen Rückmeldungen gespeichert, nur damit niemand zweimal gefragt wird; dann nie angezeigt."
+"Thumbs: 1 up, -1 down. Stars: 1 to 5.","Daumen: 1 hoch, -1 runter. Sterne: 1 bis 5."
+Times Put Off,Mal verschoben
+Live Since,Live seit
+Phriend Feedback,Phriend-Rückmeldung

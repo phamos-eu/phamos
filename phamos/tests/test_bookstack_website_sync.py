@@ -171,20 +171,20 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 		# images only from the BookStack host (privacy, 2026-11-21)
 		self.assertNotIn("tracker.test", html)
 
-	def test_links_to_published_pages_stay_on_the_website(self):
+	def test_copy_keeps_links_on_bookstack(self):
+		"""The website points links at its own pages when it shows them (#2044), not the sync."""
 		self._sync()
 		self._publish(1)
 		self._sync()
 		html = _page(100)
 
-		self.assertIn('href="/de/doku/handbuch/zweite#bkmrk-a"', html)
-		self.assertIn('href="/de/doku/handbuch/zweite"', html, "permalink /link/<id>")
-		self.assertIn('href="/de/doku/handbuch#start"', html, "chapter link")
-		self.assertIn(f'href="{BASE}/books/intern/page/geheim"', html, "unpublished book stays on BookStack")
-		self.assertIn(f'href="{BASE}/books/handbuch/page/entwurf"', html, "draft stays on BookStack")
+		self.assertIn(f'href="{BASE}/books/handbuch/page/zweite#bkmrk-a"', html)
+		self.assertIn(f'href="{BASE}/link/102"', html)
+		self.assertIn(f'href="{BASE}/books/intern/page/geheim"', html, "relative links made absolute")
 		self.assertIn('href="https://frappe.io/erpnext"', html)
+		self.assertNotIn('href="/de/', html)
 
-	def test_publishing_another_book_refreshes_links(self):
+	def test_publishing_another_book_fetches_only_its_pages(self):
 		self._sync()
 		self._publish(1)
 		self._sync()
@@ -193,8 +193,7 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 		self._publish(2)
 		self._sync()
 
-		self.assertCountEqual(FakeBookstack.fetched, [100, 102, 200])
-		self.assertIn('href="/de/doku/intern/geheim"', _page(100))
+		self.assertEqual(FakeBookstack.fetched, [200], "links are rewritten on the website, copies stay (#2044)")
 
 	def test_unpublishing_clears_content(self):
 		self._sync()
@@ -397,7 +396,7 @@ class TestReviewFixes(_BookstackSyncCase):
 		self._sync()
 		self.assertEqual(FakeBookstack.fetched, [])
 
-	def test_published_page_added_rewrites_links_everywhere(self):
+	def test_published_page_added_fetches_only_that_page(self):
 		self._sync()
 		self._publish(1)
 		self._sync()
@@ -405,17 +404,17 @@ class TestReviewFixes(_BookstackSyncCase):
 		FakeBookstack.data["pages"].append({"id": 103, "book_id": 1, "name": "Dritte", "slug": "dritte",
 			"priority": 3, "updated_at": "2026-11-01T10:00:00.000000Z"})
 		self._sync()
-		self.assertCountEqual(FakeBookstack.fetched, [100, 102, 103], "the link map changed, so every copy is refreshed")
+		self.assertEqual(FakeBookstack.fetched, [103], "only the new page; links are rewritten on the website")
 
 	def test_one_broken_page_does_not_stop_the_others(self):
 		self._sync()
 		self._publish(1)
 		real = sync.clean_page_html
 
-		def broken_for_100(html, base, link_map):
+		def broken_for_100(html, base):
 			if FakeBookstack.fetched[-1] == 100:
 				raise ValueError("parser")
-			return real(html, base, link_map)
+			return real(html, base)
 
 		with patch.object(sync, "clean_page_html", side_effect=broken_for_100):
 			stats = self._sync()
@@ -432,8 +431,7 @@ class TestReviewFixes(_BookstackSyncCase):
 	def test_image_without_source_is_removed(self):
 		from phamos.bookstack_integration.content import clean_page_html
 
-		html = clean_page_html('<p>a</p><img alt="leer"><img src="  "><img src="/uploads/x.png">', BASE,
-			{"books": set(), "pages": set(), "page_ids": {}})
+		html = clean_page_html('<p>a</p><img alt="leer"><img src="  "><img src="/uploads/x.png">', BASE)
 		self.assertEqual(html.count("<img"), 1)
 		self.assertIn(f'src="{BASE}/uploads/x.png"', html)
 
@@ -449,31 +447,6 @@ class TestReviewFixes(_BookstackSyncCase):
 		self._sync()
 		self.assertFalse(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"))
 
-	def test_interrupted_link_refresh_resumes_where_it_stopped(self):
-		from rq.timeouts import JobTimeoutException
-
-		self._sync()
-		self._publish(1)
-		self._sync()
-		self._publish(2)  # links to book 2 change: every copy needs new links
-		FakeBookstack.fetched = []
-		real_get = FakeBookstack.get
-
-		def stop_after_first(client, path, params=None):
-			if FakeBookstack.fetched:
-				raise JobTimeoutException("stopped")
-			return real_get(client, path, params)
-
-		with patch.object(FakeBookstack, "get", stop_after_first):
-			self.assertRaises(JobTimeoutException, self._sync)
-		first = list(FakeBookstack.fetched)
-		self.assertEqual(len(first), 1)
-
-		FakeBookstack.fetched = []
-		self._sync()
-		self.assertEqual(sorted(FakeBookstack.fetched + first), [100, 102, 200], "each page once, none twice")
-
-
 	def test_no_media_from_other_hosts(self):
 		from phamos.bookstack_integration.content import clean_page_html
 
@@ -485,7 +458,7 @@ class TestReviewFixes(_BookstackSyncCase):
 			'<img srcset="https://tracker.test/x 2x" src="/uploads/x.png">'
 			'<table background="https://tracker.test/b"><tr><td>Zelle</td></tr></table>'
 			'<video><track src="https://tracker.test/t"></video><picture><source srcset="https://tracker.test/p2"></picture>',
-			BASE, {"books": set(), "pages": set(), "page_ids": {}},
+			BASE,
 		)
 		self.assertNotIn("tracker.test", html)
 		self.assertNotIn("&lt;", html, "no tag shows up as text")

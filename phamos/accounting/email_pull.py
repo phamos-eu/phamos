@@ -104,11 +104,12 @@ def pull_and_notify(email_account, user, since):
 		# failed; those are in the Error Log and in "Unhandled Email".
 		frappe.db.rollback()
 		frappe.log_error(title=f"Fetch receipt e-mails: {email_account}")
-		frappe.publish_realtime(
-			REALTIME_EVENT,
-			{"email_account": email_account, "error": _("Some e-mails from {0} could not be read. See the Error Log.").format(email_account)},
-			user=user,
-		)
+		message = _("Some e-mails from {0} could not be read. See the Error Log.").format(email_account)
+		frappe.publish_realtime(REALTIME_EVENT, {"email_account": email_account, "error": message}, user=user)
+		# and a warning on that user's Phriend (#2012)
+		from phamos.phriend import events as phriend_events
+
+		phriend_events.email_failed(user, message)
 		return
 
 	created = receipts_created(email_account, since)

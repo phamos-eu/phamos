@@ -4,7 +4,9 @@
 //   note      waits behind the blue dot until the user clicks it
 //   question  opens a bubble if one of today's bubbles is left (Phriend Settings → Bubbles per
 //             day, counted on the server), else waits behind the dot (or is dropped)
-//   warning   ‼️ at once, also while quiet; behind the dot while warnings are muted
+//   warning   ‼️ at once, also while quiet and while someone types, also over another bubble;
+//             it only waits while the report flow or the menu is open (PM, 2026-11-21); behind
+//             the dot while warnings are muted
 //
 // Never while someone types, never over another bubble, the menu or the report flow: then it
 // tries again a little later. What the user does themselves (reports, "Report it?" after a
@@ -16,6 +18,8 @@ const TYPING_MS = 4000; // a key pressed this recently counts as typing
 const RETRY_MS = 5000;
 const RETRIES = 6; // then behind the dot
 const BUBBLE_MS = 8000;
+const WARN_WAIT_MS = 1000; // a warning checks this often whether the report flow is closed
+const WARN_WAIT_MAX = 30 * 60; // then behind the dot (half an hour of an open report flow)
 
 // The browser's own calendar day: "a day" is the user's day, not the server's.
 export function local_day(now) {
@@ -84,7 +88,12 @@ export class Voice {
 			await new Promise((r) => setTimeout(r, RETRY_MS));
 		}
 		if (!(await this.claim())) return this.later(item, drop);
-		if (this.busy()) return this.later(item, drop); // something else came first while asking
+		// the bubble is paid for: if something came first while asking, wait for it instead of
+		// losing it (AI review of !1276)
+		for (let attempt = 0; this.busy(); attempt++) {
+			if (attempt >= RETRIES) return this.later(item, false);
+			await new Promise((r) => setTimeout(r, RETRY_MS));
+		}
 		return this.show(item);
 	}
 
@@ -94,9 +103,15 @@ export class Voice {
 		return false;
 	}
 
-	warn(item) {
-		if (this.phriend.warnings_muted()) return this.later({ ...item, gesture: "alert" }, false);
-		return this.show({ ...item, gesture: "alert" });
+	async warn(item) {
+		const warning = { ...item, gesture: "alert" };
+		if (this.phriend.warnings_muted()) return this.later(warning, false);
+		// never on top of the report flow or the menu: the moment they close (PM, 2026-11-21)
+		for (let waited = 0; this.phriend.open || (this.phriend.ball && this.phriend.ball.menu_open()); waited++) {
+			if (waited >= WARN_WAIT_MAX) return this.later(warning, false);
+			await new Promise((r) => setTimeout(r, WARN_WAIT_MS));
+		}
+		return this.show(warning);
 	}
 
 	// One of today's bubbles, from the server (it counts across tabs and devices).
@@ -127,7 +142,7 @@ export class Voice {
 	show(item) {
 		const ball = this.phriend.ball;
 		if (!ball) return false;
-		ball.say(item.html, item.ms ?? BUBBLE_MS, item.gesture || null);
+		ball.say(item.html, item.ms ?? BUBBLE_MS, item.gesture || null, { on_close: item.on_close || null });
 		if (item.bind) item.bind(ball.bubble);
 		return true;
 	}

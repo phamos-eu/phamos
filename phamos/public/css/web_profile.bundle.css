@@ -675,3 +675,70 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 	background: var(--wp-surface); color: var(--wp-ink); box-shadow: var(--wp-shadow-sm); font-size: 13px; text-decoration: none; }
 .wp-edit-page:hover { background: var(--wp-surface-2); color: var(--wp-ink); text-decoration: none; }
 .wp-edit-page:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
+
+/* --- documentation (/de/dokumentation, phamos/phamos#2005) ----------------------------------------------- */
+/* Book contents beside the text on desktop; on phones they fold away above it. The text column is
+   capped for reading, the page itself stays full width like every other Web Profile page. */
+.wp-docs-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); column-gap: 48px; align-items: start; padding-bottom: 64px; }
+.wp-docs-nav { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; margin-top: 12px; padding-right: 8px; }
+.wp-docs-nav summary { list-style: none; margin-bottom: 10px; font-size: 15px; font-weight: 600; cursor: default; pointer-events: none; }
+.wp-docs-nav summary a { pointer-events: auto; }
+.wp-docs-nav summary::-webkit-details-marker { display: none; }
+.wp-docs-toc, .wp-docs-toc ol { list-style: none; margin: 0; padding: 0; }
+.wp-docs-toc a { display: block; padding: 4px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink-2); line-height: 1.4; }
+.wp-docs-toc a:hover { background: var(--wp-surface-2); color: var(--wp-ink); }
+.wp-docs-toc a[aria-current="page"] { background: var(--wp-surface-3); color: var(--wp-ink); font-weight: 600; }
+.wp-docs-toc-chapter { margin-top: 12px; }
+/* Chapter pages indented, so a loose page after a chapter is not read as part of it. */
+.wp-docs-nav .wp-docs-toc-chapter ol { margin-left: 10px; padding-left: 4px; border-left: 1px solid var(--wp-line-soft); }
+.wp-docs-nav .wp-docs-toc-chapter + li:not(.wp-docs-toc-chapter) { margin-top: 12px; }
+.wp-docs-toc-label { display: block; padding: 4px 8px; color: var(--wp-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* Book page: the contents are the page. */
+.wp-docs-contents { max-width: 760px; padding-bottom: 32px; }
+.wp-docs-contents .wp-docs-toc { font-size: 15px; }
+.wp-docs-contents .wp-docs-toc-chapter { margin-top: 28px; }
+.wp-docs-contents .wp-docs-toc-chapter h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; scroll-margin-top: 24px; }
+.wp-docs-contents .wp-docs-toc-chapter ol { padding-left: 0; }
+
+.wp-docs-article { max-width: 780px; min-width: 0; }
+.wp-docs-article > header { margin: 12px 0 20px; }
+.wp-docs-article h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; line-height: 1.15; margin-top: 6px; }
+
+/* Long-form content from BookStack: headings, lists, tables, code, images, callouts. */
+.wp-docs-content { font-size: 16px; line-height: 1.7; overflow-wrap: break-word; }
+.wp-docs-content h1, .wp-docs-content h2, .wp-docs-content h3, .wp-docs-content h4 { color: var(--wp-ink); font-weight: 600; line-height: 1.3; margin: 1.8em 0 0.5em; scroll-margin-top: 24px; }
+.wp-docs-content h1, .wp-docs-content h2 { font-size: 22px; }
+.wp-docs-content h3 { font-size: 18px; }
+.wp-docs-content h4 { font-size: 16px; }
+.wp-docs-content > :first-child { margin-top: 0; }
+.wp-docs-content p, .wp-docs-content ul, .wp-docs-content ol { margin: 0 0 1em; }
+.wp-docs-content a { color: var(--wp-ink); text-decoration: underline; text-underline-offset: 3px; }
+.wp-docs-content img { max-width: 100%; height: auto; border-radius: var(--wp-radius-sm); }
+.wp-docs-content table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0 0 1.2em; font-size: 14px; }
+.wp-docs-content th, .wp-docs-content td { padding: 6px 10px; border: 1px solid var(--wp-line); vertical-align: top; }
+.wp-docs-content th, .wp-docs-content thead td { background: var(--wp-surface-2); font-weight: 600; }
+.wp-docs-content code { padding: 1px 5px; border-radius: 4px; background: var(--wp-surface-3); font-size: 0.9em; }
+.wp-docs-content pre { margin: 0 0 1.2em; padding: 14px 16px; border-radius: var(--wp-radius-sm); background: var(--wp-surface-2); overflow-x: auto; font-size: 13px; line-height: 1.55; }
+.wp-docs-content pre code { padding: 0; background: none; }
+.wp-docs-content blockquote { margin: 0 0 1em; padding: 4px 16px; border-left: 3px solid var(--wp-line); color: var(--wp-muted); }
+.wp-docs-content .callout { margin: 0 0 1.2em; padding: 10px 14px; border-left: 3px solid var(--wp-focus); border-radius: var(--wp-radius-sm); background: #eef6fd; }
+.wp-docs-content .callout.success { border-color: #2f9e44; background: #ecf8ee; }
+.wp-docs-content .callout.warning { border-color: #e8a317; background: #fdf6e7; }
+.wp-docs-content .callout.danger { border-color: #e03131; background: #fdeeee; }
+
+.wp-docs-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 40px; }
+.wp-docs-pager .wp-link-card { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; }
+.wp-docs-pager-next { grid-column: 2; align-items: flex-end !important; text-align: right; }
+.wp-docs-pager-label { color: var(--wp-muted); font-size: 12px; font-weight: 400; }
+.wp-docs-source { margin: 24px 0 0; color: var(--wp-muted); font-size: 13px; }
+.wp-docs-source a { color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 860px) {
+	.wp-docs-layout { grid-template-columns: minmax(0, 1fr); }
+	.wp-docs-nav { position: static; max-height: none; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); }
+	.wp-docs-nav summary { margin: 0; cursor: pointer; pointer-events: auto; }
+	.wp-docs-nav[open] summary { margin-bottom: 8px; }
+	.wp-docs-pager { grid-template-columns: minmax(0, 1fr); }
+	.wp-docs-pager-next { grid-column: 1; }
+}

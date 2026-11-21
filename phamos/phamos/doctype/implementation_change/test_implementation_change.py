@@ -14,6 +14,7 @@ from phamos.phamos.doctype.implementation_baseline.implementation_baseline impor
 )
 from phamos.phamos.doctype.implementation_change.implementation_change import (
 	AWAITING,
+	_insert_change,
 	agree_change,
 	confirm_change,
 	dispute_change,
@@ -355,6 +356,34 @@ class TestImplementationChange(FrappeTestCase):
 		self.assertRaises(frappe.ValidationError, agree_change, name, contact="Not a stakeholder")
 		self.assertEqual(agree_change(name, contact=self.contact), "Applied")
 		self.assertEqual(frappe.db.get_value("Implementation Change", name, "agreed_by_customer"), self.contact)
+
+	def test_agreed_chapter_dates_apply_without_a_meeting(self):
+		# #2050: a planned chapter's agreed content is locked against direct edits, but not
+		# against a change both sides agreed to outside a Planning meeting
+		chapter = make_chapter(self.implementation.name, title="Warehouse")
+		self.assertEqual(chapter.status, "Planned")
+		# chapters are not proposed through propose_change; the Desk form inserts the change
+		name = _insert_change(
+			self.implementation.name,
+			"Implementation Chapter",
+			chapter.name,
+			"Dates",
+			{"planned_start": "2026-01-01", "target_date": "2026-06-30"},
+			{"planned_start": "2026-02-01", "target_date": "2026-09-30"},
+			status="Proposed",
+			agreed_by_phamos="Administrator",
+		).name
+
+		self.as_customer()
+		self.assertEqual(agree_change(name), "Applied")
+		frappe.set_user("Administrator")
+		chapter.reload()
+		self.assertEqual((str(chapter.planned_start), str(chapter.target_date)), ("2026-02-01", "2026-09-30"))
+
+		# a direct edit of the dates stays locked
+		chapter.target_date = "2026-12-31"
+		with self.assertRaisesRegex(frappe.ValidationError, "can no longer be edited directly"):
+			chapter.save()
 
 	def test_outsiders_learn_nothing_about_a_change(self):
 		name = propose_change(

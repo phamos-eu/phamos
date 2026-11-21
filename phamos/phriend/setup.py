@@ -239,7 +239,16 @@ def ensure_default_shortcut():
 FEATURES_ON_BY_DEFAULT = ("reactions",)
 # Numbers whose 0 would mean something else than "not set yet" (#2011: 0 bubbles = Phriend never
 # speaks by itself).
-FEATURE_VALUES_BY_DEFAULT = {"bubbles_per_day": 1}
+FEATURE_VALUES_BY_DEFAULT = {
+	"bubbles_per_day": 1,
+	# #2012: which events are red warnings, and who gets the system-wide ones
+	"warn_ai_run_failed": 1,
+	"warn_email_failed": 1,
+	"warn_gitlab_sync_failed": 1,
+	"warning_role": "System Manager",
+	# #2014: the second rating question, after this many weeks in daily use
+	"battle_tested_weeks": 6,
+}
 
 
 def ensure_default_features():

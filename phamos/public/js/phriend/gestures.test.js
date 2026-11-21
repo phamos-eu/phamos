@@ -10,19 +10,16 @@ describe("GESTURES (#1990, #2009)", () => {
 			"thumbs_down", "thanks", "praise", "high_five", "clap", "heart", "star", "alert"])
 			expect(GESTURES[name], name).toBeTruthy()
 	})
-	it("attaches each emoji on its own side, never mirrored (PM, 2026-11-21)", () => {
-		for (const [name, g] of Object.entries(GESTURES)) expect([undefined, "left", "right"], name).toContain(g.side)
-		expect(GESTURES.muscle.side).toBe("left")
-		expect(GESTURES.clap.side).toBe("left")
-		expect(GESTURES.point.side).toBe("right")
-		expect(ball_source).not.toMatch(/\.hand[^{]*\{[^}]*scale:\s*-1/)
+	it("shows the emoji inside the bubble, not beside Phriend (PM, 2026-11-21)", () => {
+		expect(ball_source).not.toContain('class="hand"')
+		for (const g of Object.values(GESTURES)) expect(g.side).toBeUndefined()
 	})
 	it("gives every gesture an emoji and a motion that has its keyframe", () => {
 		for (const [name, g] of Object.entries(GESTURES)) {
 			expect(g.hand, name).toMatch(/\p{Extended_Pictographic}/u)
 			if (g.motion === "still") continue
 			expect(ball_source, `${name}: @keyframes hand-${g.motion}`).toContain(`@keyframes hand-${g.motion} `)
-			expect(ball_source, `${name}: data-motion="${g.motion}"`).toContain(`data-motion="${g.motion}"`)
+			expect(ball_source, `${name}: .emoji[data-motion="${g.motion}"]`).toContain(`.emoji[data-motion="${g.motion}"]`)
 		}
 	})
 })

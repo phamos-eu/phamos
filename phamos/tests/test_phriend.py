@@ -12,6 +12,8 @@ from frappe.tests.utils import FrappeTestCase
 from PIL import Image
 
 from phamos.phriend import api, setup, shortcut
+from phamos.phriend import events as phriend_events
+from phamos.phriend import feedback as phriend_feedback
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import voice as phriend_voice
 from phamos.phriend.boot import boot_session, phriend_boot
@@ -45,7 +47,9 @@ class TestPhriend(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("phriend_test")
-		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1,
+		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1, events=0, easter_eggs=0,
+			rate_fixes=0, battle_tested_weeks=6, anonymous_feedback=0,
+			warning_role="System Manager", warn_ai_run_failed=1, warn_email_failed=1, warn_gitlab_sync_failed=1,
 			gitlab_url="https://git.example.com", gitlab_project="phamos/phamos", gitlab_labels="phriend")
 
 	def tearDown(self):
@@ -328,7 +332,8 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
-				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0}, "quiet": None, "can_configure": 1,
+				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0, "easter_eggs": 0,
+				"rate_fixes": 0}, "quiet": None, "can_configure": 1,
 				"voice": None},
 		)
 
@@ -413,6 +418,7 @@ class TestPhriend(FrappeTestCase):
 
 	def test_one_voice_counts_each_users_bubbles_per_day(self, _enqueue):
 		# #2011: at most "Bubbles per Day" unprompted bubbles per user and (the browser's) day
+		frappe.defaults.clear_user_default(phriend_voice.DAY_DEFAULT)  # a count from using the dev site
 		self.addCleanup(frappe.defaults.clear_user_default, phriend_voice.DAY_DEFAULT)
 		with self.assertRaises(frappe.PermissionError):
 			api.claim_my_bubble("2026-11-21")  # off by default
@@ -441,6 +447,161 @@ class TestPhriend(FrappeTestCase):
 
 		self.assertEqual(int(stored("bubbles_per_day")), 1)
 		self.assertFalse(int(stored("one_voice") or 0))
+
+	@patch("frappe.publish_realtime")
+	def test_events_reach_one_users_phriend_only_while_switched_on(self, publish, _enqueue):
+		# #2012: off by default, nothing is sent
+		self.assertFalse(phriend_events.send("Administrator", "idea_vote", "x"))
+		publish.assert_not_called()
+
+		self.set_settings(events=1)
+		self.assertTrue(phriend_events.send("Administrator", "idea_vote", "Someone voted"))
+		event, payload = publish.call_args.args
+		self.assertEqual(event, "phriend_event")
+		self.assertEqual(publish.call_args.kwargs["user"], "Administrator")
+		self.assertEqual((payload["kind"], payload["level"], payload["gesture"]), ("idea_vote", "reaction", "heart"))
+
+		# failures are red warnings while ticked, notes otherwise; sent at once (a rollback follows)
+		phriend_events.send("Administrator", "ai_run_failed", "x", "/app/issue/ISS-1")
+		self.assertEqual(publish.call_args.args[1]["level"], "warning")
+		self.assertFalse(publish.call_args.kwargs["after_commit"])
+		self.set_settings(warn_ai_run_failed=0)
+		phriend_events.send("Administrator", "ai_run_failed", "x")
+		self.assertEqual(publish.call_args.args[1]["level"], "note")
+
+		# a link only to this site or https; never to Guest, unknown kinds or users without the role
+		for bad in ("javascript:alert(1)", "//evil.example/x", "/\\evil.example", "http://plain.example"):
+			phriend_events.send("Administrator", "gitlab_issue", "x", bad)
+			self.assertEqual(publish.call_args.args[1]["link"], "", bad)
+		phriend_events.send("Administrator", "gitlab_issue", "x", "/app/issue/ISS 1")
+		self.assertEqual(publish.call_args.args[1]["link"], "/app/issue/ISS 1")
+		publish.reset_mock()
+		self.assertFalse(phriend_events.send("Guest", "idea_vote"))
+		self.assertFalse(phriend_events.send("Administrator", "no_such_kind"))
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertFalse(phriend_events.send("Administrator", "idea_vote"))
+		publish.assert_not_called()
+
+	@patch("frappe.publish_realtime")
+	def test_system_warnings_go_to_the_warning_role_and_the_sync_still_fails(self, publish, _enqueue):
+		from phamos.gitlab_integration import gitlab_utils
+
+		self.set_settings(events=1, warning_role="System Manager")
+		self.assertIn("Administrator", phriend_events.warning_receivers())
+		with patch.object(gitlab_utils, "sync_projects_only", side_effect=RuntimeError("GitLab down")):
+			with self.assertRaises(RuntimeError):
+				gitlab_utils.sync_gitlab_data()
+		users = {c.kwargs["user"] for c in publish.call_args_list if c.args[0] == "phriend_event"}
+		self.assertIn("Administrator", users)
+		self.assertTrue(all(c.args[1]["kind"] == "gitlab_sync_failed" for c in publish.call_args_list))
+
+	@patch("frappe.publish_realtime")
+	def test_a_failed_ai_run_links_to_its_record_with_the_name_encoded(self, publish, _enqueue):
+		# AI review of !1279: a name with a space or "/" must not break the link
+		self.set_settings(events=1)
+		run = frappe._dict(triggered_by="Administrator", reference_doctype="Accounting Receipt", reference_name="AR 1/2")
+		phriend_events.ai_run_failed(run)
+		self.assertEqual(publish.call_args.args[1]["link"], "/app/accounting-receipt/AR%201%2F2")
+
+	@patch("frappe.publish_realtime")
+	def test_quiet_changes_reach_the_users_other_tabs(self, publish, _enqueue):
+		self.addCleanup(frappe.defaults.clear_user_default, phriend_quiet.QUIET_DEFAULT)
+		self.set_settings(quiet_mode=1)
+		api.set_my_quiet("forever")
+		event, payload = publish.call_args.args
+		self.assertEqual((event, payload["kind"], payload["state"]["quiet_until"]), ("phriend_event", "quiet", "forever"))
+		self.assertEqual(publish.call_args.kwargs["user"], "Administrator")
+
+	@patch("frappe.publish_realtime")
+	def test_a_test_event_needs_the_switch_and_settings_rights(self, publish, _enqueue):
+		with self.assertRaises(frappe.PermissionError):
+			api.send_test_event("idea_vote")
+		self.set_settings(events=1)
+		self.assertTrue(api.send_test_event("gitlab_issue"))
+		with self.assertRaises(frappe.ValidationError):
+			api.send_test_event("nonsense")
+
+	# ---- rating a fix (#2014)
+
+	def live_report(self, report_type="Bug", days_ago=2, **dates):
+		"""A Phriend report of Administrator with one GitLab issue on production since `days_ago`."""
+		report = self.report(report_type=report_type)
+		frappe.db.set_value("Issue", report.name, "phriend_reported_by", "Administrator")
+		when = dates.get("when") or frappe.utils.add_days(frappe.utils.now_datetime(), -days_ago)
+		frappe.get_doc({"doctype": "GitLab Issue", "issue": report.name, "testing_on_production_at": when}).insert(
+			ignore_permissions=True)
+		return report
+
+	@patch("frappe.publish_realtime")
+	def test_a_live_report_is_rated_twice_by_its_reporter(self, publish, _enqueue):
+		self.assertEqual(phriend_feedback.create_due_requests(), [])  # off by default
+		self.set_settings(rate_fixes=1, battle_tested_weeks=6)
+		bug = self.live_report("Bug", days_ago=2)
+		improvement = self.live_report("Improvement", days_ago=6 * 7 + 3)
+		question = self.live_report("Question", days_ago=1)
+		created = phriend_feedback.create_due_requests()
+		rows = {r.subject_name: r for r in frappe.get_all(phriend_feedback.DOCTYPE, filters={"name": ["in", created]},
+			fields=["subject_name", "round", "kind", "user", "status"])}
+		self.assertEqual((rows[bug.name].round, rows[bug.name].kind), ("First impression", "Thumbs"))
+		self.assertEqual((rows[improvement.name].round, rows[improvement.name].kind), ("Battle tested", "Stars"))
+		self.assertNotIn(question.name, rows)  # questions aren't rated
+		self.assertTrue(all(r.user == "Administrator" and r.status == "Open" for r in rows.values()))
+		# the reporter's Phriend hears it at once, and nothing is asked twice
+		self.assertTrue(any(c.args[1].get("kind") == "rate_fix" for c in publish.call_args_list))
+		self.assertEqual(phriend_feedback.create_due_requests(), [])
+		# the user's open questions come fresh from the API (Desk caches the boot)
+		self.assertLessEqual(set(created), {r["name"] for r in api.get_my_feedback_requests()})
+
+	def test_not_live_until_every_gitlab_issue_is_on_production(self, _enqueue):
+		self.set_settings(rate_fixes=1)
+		report = self.live_report("Bug", days_ago=1)
+		self.assertIsNotNone(phriend_feedback.live_since(report.name))
+		frappe.get_doc({"doctype": "GitLab Issue", "issue": report.name}).insert(ignore_permissions=True)
+		self.assertIsNone(phriend_feedback.live_since(report.name))
+		now = frappe.utils.now_datetime()
+		self.assertEqual(phriend_feedback.due_round(frappe.utils.add_days(now, -13), now), "First impression")
+		self.assertIsNone(phriend_feedback.due_round(frappe.utils.add_days(now, -14), now))
+		self.assertEqual(phriend_feedback.due_round(frappe.utils.add_days(now, -42), now), "Battle tested")
+		self.assertIsNone(phriend_feedback.due_round(frappe.utils.add_days(now, -56), now))
+
+	@patch("frappe.publish_realtime")
+	def test_answers_are_checked_and_closing_puts_it_off_three_times(self, publish, _enqueue):
+		self.set_settings(rate_fixes=1)
+		bug = self.live_report("Bug", days_ago=1)
+		name = api.ask_feedback_now(bug.name, "First impression")
+		with self.assertRaises(frappe.ValidationError):
+			api.answer_feedback(name, 4)  # thumbs only
+		self.set_settings(anonymous_feedback=1)
+		api.answer_feedback(name, -1, "  still wrong on page 2 ")
+		doc = frappe.get_doc(phriend_feedback.DOCTYPE, name)
+		self.assertEqual((doc.status, doc.rating, doc.comment, doc.anonymous), ("Answered", -1, "still wrong on page 2", 1))
+		with self.assertRaises(frappe.ValidationError):
+			api.answer_feedback(name, 1)  # once
+
+		later = api.ask_feedback_now(bug.name, "Battle tested")
+		for _ in range(2):
+			self.assertEqual(api.defer_feedback(later)["status"], "Open")
+		self.assertEqual(api.defer_feedback(later)["status"], "Declined")  # the third time it rests
+
+		improvement = self.live_report("Improvement", days_ago=1)
+		third = api.ask_feedback_now(improvement.name, "First impression")
+		self.assertEqual(api.decline_feedback(third)["status"], "Declined")
+
+	@patch("frappe.publish_realtime")
+	def test_only_the_asked_person_may_answer(self, publish, _enqueue):
+		self.set_settings(rate_fixes=1)
+		name = api.ask_feedback_now(self.live_report("Bug").name, "First impression")
+		other = "phriend-other@example.com"
+		if not frappe.db.exists("User", other):
+			frappe.get_doc({"doctype": "User", "email": other, "first_name": "Other", "send_welcome_email": 0,
+				"roles": [{"role": "System Manager"}]}).insert(ignore_permissions=True)
+		frappe.set_user(other)
+		with self.assertRaises(frappe.PermissionError):
+			api.answer_feedback(name, 1)
+		frappe.set_user("Administrator")
+		self.set_settings(rate_fixes=0)
+		with self.assertRaises(frappe.PermissionError):
+			api.answer_feedback(name, 1)  # switched off
 
 	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
 		doc = frappe.get_doc("Phriend Settings")

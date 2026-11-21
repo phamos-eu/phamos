@@ -19,13 +19,15 @@
 //   can_configure             optional: the user may change Phriend Settings (the menu links there)
 //   open_settings()           optional: open Phriend Settings
 //   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
+//   on_event(cb)              optional: call cb(payload) for every "phriend_event" of this user (#2012)
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
-import { open_hands_panel } from "./hands_panel";
 import * as nudge from "./nudge";
+import * as play from "./play";
 import * as quiet from "./quiet";
 import { call } from "./request";
+import { rating_item } from "./rating";
 import { Voice } from "./voice";
 import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
@@ -198,13 +200,137 @@ class Phriend {
 		api.react = (name) => this.react(name);
 		api.demo = () => this.demo();
 		api.reactions = Object.keys(GESTURES);
-		// which side each emoji is attached (#2010): a panel to look and try
-		api.hands = () => this.ball && open_hands_panel(this.ball, (name) => this.ball.react(name, 2500));
 		// one voice (#2011): try the queue
 		const item = (text) => ({ html: escape_html(text || "Hello from the queue") });
 		api.note = (text) => this.voice.note(item(text));
 		api.ask = (text) => this.voice.ask(item(text));
 		api.warn = (text) => this.voice.warn(item(text));
+		// events (#2012): a sample event from the server to yourself
+		api.emit = (kind) =>
+			call("phamos.phriend.api.send_test_event", { kind }, this.host.csrf_token()).catch((e) => console.warn(e));
+		// easter eggs (#2013): a move by name, or a random one
+		api.play = (name) => (name ? this.play_move(name) : this.play_from("debug", play.HOVER_MOVES, true));
+		api.moves = Object.keys(play.MOVES);
+		// rating a fix (#2014): ask the question for a report now, live or not
+		api.ask_rating = (issue, round) =>
+			call("phamos.phriend.api.ask_feedback_now", { issue, round }, this.host.csrf_token()).catch((e) => console.warn(e));
+	}
+
+	// ---- easter eggs (#2013)
+
+	setup_play() {
+		const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		this.play_on = this.feature("easter_eggs") && "easter_eggs" in (this.host.features || {}) && !reduced;
+		if (!this.play_on) return;
+		this._play_last = {};
+		// the pointer rests on Phriend for 10 s
+		let hover_timer = null;
+		const stop_hover = () => clearTimeout(hover_timer);
+		this.ball.hit.addEventListener("pointerenter", () => {
+			stop_hover();
+			hover_timer = setTimeout(() => this.play_from("hover", play.HOVER_MOVES), play.HOVER_MS);
+		});
+		this.ball.hit.addEventListener("pointerleave", stop_hover);
+		this.ball.hit.addEventListener("pointerdown", stop_hover);
+		// no mouse or keyboard for 5 minutes: one sign of life, then nothing until active again
+		let last_active = Date.now();
+		let played_this_spell = false;
+		const active = () => {
+			last_active = Date.now();
+			played_this_spell = false;
+		};
+		for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"])
+			document.addEventListener(event, active, { passive: true, capture: true });
+		// coming back to the tab counts as activity: time in a hidden tab is not idle time (AI review of !1285)
+		document.addEventListener("visibilitychange", () => !document.hidden && active());
+		setInterval(() => {
+			if (played_this_spell || document.hidden || Date.now() - last_active < play.IDLE_MS) return;
+			// the spell is used up only by a move that really played, not by one quiet mode or the
+			// open menu held back (AI review of !1285)
+			if (this.play_from("idle", play.IDLE_MOVES)) played_this_spell = true;
+		}, 30 * 1000);
+	}
+
+	// dragged fast: dizzy
+	on_drag_end(samples) {
+		if (this.play_on && play.top_speed(samples) >= play.FAST_DRAG) this.play_from("drag", ["dizzy"]);
+	}
+
+	may_play() {
+		return !!this.ball && !this.is_quiet() && !this.open && !this.ball.menu_open() && !document.hidden;
+	}
+
+	// a move from `moves`, if this trigger hasn't played for a while (force: the debug call)
+	play_from(trigger, moves, force = false) {
+		const now = Date.now();
+		if (!force && (!this.may_play() || !play.cooled_down(this._play_last && this._play_last[trigger], now))) return false;
+		const move = play.pick(moves, this._last_move);
+		if (!this.play_move(move)) return false;
+		if (this._play_last) this._play_last[trigger] = now;
+		this._last_move = move;
+		return true;
+	}
+
+	play_move(name) {
+		const move = play.MOVES[name];
+		if (!move || !this.ball || !this.ball.play(name, move.ms)) return false;
+		if (move.emoji) this.react(move.emoji); // alone in a small bubble, never counted
+		return true;
+	}
+
+	// ---- events (#2012)
+
+	on_event(payload) {
+		if (!payload || !this.ball) return;
+		if (payload.kind === "rate_fix") return this.ask_rating(payload.feedback); // #2014
+		if (payload.kind === "quiet") {
+			// leave me in peace changed in another tab
+			this.set_quiet_state(payload.state || null);
+			this.apply_quiet();
+			return;
+		}
+		const item = { html: this.event_html(payload), gesture: payload.gesture };
+		if (payload.level === "reaction") this.react(payload.gesture);
+		else if (payload.level === "note") {
+			this.react(payload.gesture);
+			this.voice.note({ ...item, gesture: null });
+		} else if (payload.level === "question") this.voice.ask(item);
+		else if (payload.level === "warning") this.voice.warn(item);
+	}
+
+	// ---- rating a fix (#2014)
+
+	// The open questions, fresh from the server shortly after the page loads (Desk caches the boot).
+	load_ratings() {
+		const features = this.host.features || {};
+		if (!features.rate_fixes) return;
+		setTimeout(() => {
+			call("phamos.phriend.api.get_my_feedback_requests", {}, this.host.csrf_token())
+				.then((requests) => (requests || []).forEach((req) => this.ask_rating(req)))
+				.catch(() => {});
+		}, 1500);
+	}
+
+	// A rating question through the voice: a question, so it uses the day's bubble or waits
+	// behind the dot. Each question once per page (the boot and a live event can both bring it).
+	ask_rating(req) {
+		if (!req || !req.name || !this.ball) return;
+		this._asked_ratings = this._asked_ratings || new Set();
+		if (this._asked_ratings.has(req.name)) return;
+		this._asked_ratings.add(req.name);
+		this.voice.ask(rating_item(this, req));
+	}
+
+	// plain text from the server, escaped; a link on this site or https only (events.py checks too)
+	event_html(payload) {
+		const text = escape_html(payload.text || "");
+		const link = String(payload.link || "");
+		// this site ("/app/…", not "//host" or "/\\host") or https only (AI review of !1279);
+		// the same rule as phamos/phriend/events.py safe_link(): change both together
+		const local = link.startsWith("/") && !link.startsWith("//") && !link.startsWith("/\\");
+		if (!link || !(local || link.startsWith("https://"))) return text;
+		const external = link.startsWith("https://");
+		return `${text} <a href="${escape_html(link)}"${external ? ' target="_blank" rel="noopener"' : ""}>${escape_html(this.__("Open"))}</a>`;
 	}
 
 	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
@@ -260,10 +386,14 @@ class Phriend {
 			hands: this.feature("reactions"),
 			menu: this.has_menu() ? () => this.menu_entries() : null,
 			on_waiting_click: () => this.voice.open_next(),
+			on_drag_end: (samples) => this.on_drag_end(samples),
 			waiting_label: (count) =>
 				count > 1 ? __("Phriend has {0} things for you", [count]) : __("Phriend has something for you"),
 		});
 		this.voice = new Voice(this); // one voice (#2011)
+		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
+		this.setup_play(); // easter eggs (#2013)
+		this.load_ratings(); // open rating questions (#2014)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
