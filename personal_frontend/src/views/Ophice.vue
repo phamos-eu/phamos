@@ -11,7 +11,7 @@
 			</router-link>
 			<div class="text-base font-semibold tracking-tight">{{ __("Ophice") }}</div>
 			<div class="ml-auto text-sm text-ink-gray-5">
-				{{ __("Move with WASD or the arrow keys, hold Shift to go faster") }}
+				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump") }}
 			</div>
 			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. -->
 			<Button
@@ -205,7 +205,14 @@
 					data-testid="my-chip"
 				>
 					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
-						<ChipFigure :user="me.user" :label="me.full_name" :image="me.user_image" ring :moving="moving" />
+						<ChipFigure
+							:user="me.user"
+							:label="me.full_name"
+							:image="me.user_image"
+							ring
+							:moving="moving"
+							:jumping="jumping"
+						/>
 					</span>
 				</div>
 			</div>
@@ -425,6 +432,12 @@ function onKeydown(event) {
 			event.preventDefault()
 			return
 		}
+	}
+	// Space: jump, over other chips, so nobody gets stuck anywhere (PM, 2026-11-22).
+	if (event.code === "Space") {
+		event.preventDefault()
+		if (!event.repeat) startJump()
+		return
 	}
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
@@ -923,7 +936,48 @@ const SOCKET_EVENTS = [
 ]
 
 function blocked(x, y) {
+	// In the air nothing blocks: that is the point of jumping.
+	if (jump) return false
 	return others.value.some((o) => Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
+}
+
+// --- Jump (Space): a short hop forward that passes over other chips.
+
+const JUMP_MS = 420
+const JUMP_DISTANCE = 2 // tiles, in the direction walked (or last walked)
+const jumping = ref(false)
+let jump = null // { dir: [x, y], left: tiles still to cover }
+let lastDir = [1, 0]
+
+function startJump() {
+	if (jump || !me.value) return
+	jump = { dir: lastDir, left: JUMP_DISTANCE }
+	jumping.value = true
+	if (!frame) {
+		lastTime = performance.now()
+		frame = requestAnimationFrame(tick)
+	}
+}
+
+/** The jump's share of this frame's movement; on landing, slide on until no chip is underneath. */
+function jumpStep(dt) {
+	const step = Math.min(jump.left, (JUMP_DISTANCE * dt * 1000) / JUMP_MS)
+	jump.left -= step
+	const [dx, dy] = jump.dir
+	moveTo(me.value.x + dx * step, me.value.y + dy * step)
+	if (jump.left > 1e-6) return
+	const dir = jump.dir
+	jump = null
+	jumping.value = false
+	// Landed on someone: a little further along, up to 3 tiles; else back where the jump began.
+	for (let extra = 0; extra <= 3 && blocked(me.value.x, me.value.y); extra += 0.1) {
+		moveTo(me.value.x + dir[0] * 0.1, me.value.y + dir[1] * 0.1)
+	}
+}
+
+function moveTo(x, y) {
+	me.value.x = Math.max(0, Math.min(me.value.cols - 1, x))
+	me.value.y = Math.max(0, Math.min(me.value.rows - 1, y))
 }
 
 function tick(now) {
@@ -939,14 +993,23 @@ function tick(now) {
 		dx += DIRECTIONS[key][0]
 		dy += DIRECTIONS[key][1]
 	}
-	if (!keys.size || !me.value) {
+	if ((!keys.size && !jump) || !me.value) {
 		frame = null
 		moving.value = false
 		if (sendTimer) sendMove()
 		return
 	}
 	const length = Math.hypot(dx, dy)
-	if (length) {
+	if (length) lastDir = [dx / length, dy / length]
+	if (jump) {
+		moving.value = true
+		jumpStep(dt)
+		scheduleSave()
+		queueMove()
+		checkEncounters()
+		leaveMeetingIfOutside()
+	}
+	if (length && !jump) {
 		// Diagonal moves are not faster than straight ones.
 		const step = ((shift ? SHIFT_SPEED : SPEED) * dt) / length
 		const maxX = me.value.cols - 1

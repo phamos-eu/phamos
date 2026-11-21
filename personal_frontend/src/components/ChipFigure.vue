@@ -4,7 +4,7 @@
 		(same leg shapes as phamos/public/js/phriend/ball.js, viewBox 64×76, ball r=24).
 		The root is exactly the avatar (40px), the legs hang outside it, so layout ignores them.
 	-->
-	<span class="chip-figure relative inline-flex" :class="{ 'is-moving': moving }">
+	<span class="chip-figure relative inline-flex" :class="{ 'is-moving': moving, 'is-jumping': jumping }">
 		<svg class="chip-figure__legs" viewBox="0 0 64 76" aria-hidden="true">
 			<g class="chip-figure__leg chip-figure__leg--l">
 				<path d="M24 48 L20 66" stroke-width="4" stroke-linecap="round" />
@@ -32,6 +32,8 @@ defineProps({
 	ring: { type: Boolean, default: false },
 	/** Legs kick while the chip moves, and dangle slowly otherwise. */
 	moving: { type: Boolean, default: false },
+	/** In the air (Space): a hop with the legs tucked up. */
+	jumping: { type: Boolean, default: false },
 })
 </script>
 
@@ -68,6 +70,20 @@ defineProps({
 .is-moving .chip-figure__leg--r {
 	animation: chip-wiggle-r 0.18s ease-in-out infinite alternate;
 }
+/* The hop (Ophice, Space): up and down once, legs tucked while in the air. */
+.chip-figure.is-jumping {
+	animation: chip-hop 420ms ease-out;
+}
+.is-jumping .chip-figure__leg--l,
+.is-jumping .chip-figure__leg--r {
+	animation: none;
+	transform: scaleY(0.6);
+}
+@keyframes chip-hop {
+	0% { transform: translateY(0); }
+	45% { transform: translateY(-55%) scale(1.08); }
+	100% { transform: translateY(0); }
+}
 .chip-figure__ring {
 	box-shadow: 0 0 0 3px var(--surface-white), 0 0 0 5px var(--ink-blue-3, #3b82f6);
 }
@@ -89,6 +105,7 @@ defineProps({
 	to { transform: rotate(-4deg); }
 }
 @media (prefers-reduced-motion: reduce) {
+	.chip-figure.is-jumping,
 	.chip-figure__leg,
 	.is-moving .chip-figure__leg--l,
 	.is-moving .chip-figure__leg--r {

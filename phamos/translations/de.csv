@@ -2678,7 +2678,7 @@ Phriend Feedback,Phriend-Rückmeldung
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
 Ophice,Ophice
 Back to cockpit,Zurück zum Cockpit
-"Move with WASD or the arrow keys, hold Shift to go faster","Mit WASD oder den Pfeiltasten bewegen, mit gedrückter Umschalttaste schneller"
+"Move with WASD or the arrow keys, Shift to go faster, Space to jump","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen"
 Ophice could not be loaded.,Ophice konnte nicht geladen werden.
 Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
 Ophice is only available to System Users.,Ophice steht nur Systembenutzern zur Verfügung.
