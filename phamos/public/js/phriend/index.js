@@ -237,10 +237,13 @@ class Phriend {
 		};
 		for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"])
 			document.addEventListener(event, active, { passive: true, capture: true });
+		// coming back to the tab counts as activity: time in a hidden tab is not idle time (AI review of !1285)
+		document.addEventListener("visibilitychange", () => !document.hidden && active());
 		setInterval(() => {
 			if (played_this_spell || document.hidden || Date.now() - last_active < play.IDLE_MS) return;
-			played_this_spell = true;
-			this.play_from("idle", play.IDLE_MOVES);
+			// the spell is used up only by a move that really played, not by one quiet mode or the
+			// open menu held back (AI review of !1285)
+			if (this.play_from("idle", play.IDLE_MOVES)) played_this_spell = true;
 		}, 30 * 1000);
 	}
 

@@ -27,6 +27,7 @@ export const HOVER_MS = 10 * 1000;
 export const IDLE_MS = 5 * 60 * 1000;
 export const COOLDOWN_MS = 3 * 60 * 1000; // per trigger, so it stays a surprise
 export const FAST_DRAG = 1.8; // px per ms (1800 px/s) counts as shaking Phriend around
+export const SPEED_WINDOW_MS = 30; // speed is measured over at least this long, not between two events
 
 // A move from `moves`, never the same as the last one. random: () => [0, 1), for the tests.
 export function pick(moves, previous, random = Math.random) {
@@ -39,14 +40,21 @@ export function cooled_down(last, now, cooldown = COOLDOWN_MS) {
 	return !last || now - last >= cooldown;
 }
 
-// The fastest stretch of a drag: samples [{x, y, t}] in order.
-export function top_speed(samples) {
+// The fastest stretch of a drag: samples [{x, y, t}] in order. The path travelled over at least
+// SPEED_WINDOW_MS, so two events a millisecond apart (fast mice, touch, rounded time stamps) can't
+// make a calm drag look like a shake (AI review of !1285); a shake back and forth still counts.
+export function top_speed(samples, window = SPEED_WINDOW_MS) {
 	let top = 0;
 	for (let i = 1; i < samples.length; i++) {
-		const dt = samples[i].t - samples[i - 1].t;
-		if (dt <= 0) continue;
-		const d = Math.hypot(samples[i].x - samples[i - 1].x, samples[i].y - samples[i - 1].y);
-		top = Math.max(top, d / dt);
+		let path = 0;
+		let j = i;
+		while (j > 0 && samples[i].t - samples[j].t < window) {
+			path += Math.hypot(samples[j].x - samples[j - 1].x, samples[j].y - samples[j - 1].y);
+			j--;
+		}
+		const dt = samples[i].t - samples[j].t;
+		if (dt < window) continue; // not long enough yet
+		top = Math.max(top, path / dt);
 	}
 	return top;
 }
