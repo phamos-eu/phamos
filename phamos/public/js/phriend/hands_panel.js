@@ -5,12 +5,12 @@
 import { GESTURES } from "./ball";
 
 const CSS = `
-.hp { position: fixed; left: 16px; bottom: 16px; width: 330px; max-height: calc(100vh - 32px); overflow: auto;
+.hp { position: fixed; left: 16px; bottom: 16px; width: 400px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: auto;
 	padding: 10px 12px; border-radius: 12px; background: var(--ph-bg); color: var(--ph-text);
 	border: 1px solid var(--ph-border); box-shadow: var(--ph-shadow); font-size: 13px; z-index: 2; }
 .hp h3 { margin: 0 0 2px; font-size: 14px; }
 .hp p { margin: 0 0 8px; color: var(--ph-muted); font-size: 12px; }
-.hp-row { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 8px; padding: 4px 0;
+.hp-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 0;
 	border-top: 1px solid var(--ph-border); }
 .hp-mini { position: relative; height: 34px; }
 .hp-ball { position: absolute; left: 22px; top: 2px; width: 30px; height: 30px; border-radius: 50%;
@@ -21,7 +21,7 @@ const CSS = `
 .hp-name small { display: block; color: var(--ph-muted); }
 .hp-sides { display: flex; gap: 4px; }
 .hp button { padding: 3px 8px; border: 1px solid var(--ph-border); border-radius: 6px; background: transparent;
-	color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+	color: inherit; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
 .hp button[aria-pressed="true"] { background: var(--ph-accent); color: var(--ph-on-accent); border-color: var(--ph-accent); }
 .hp-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
 `;
