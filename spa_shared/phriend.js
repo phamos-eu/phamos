@@ -81,8 +81,6 @@ export function mountPhriend(router, heading, socket) {
 		voice: boot().phriend.voice || null,
 		// events (#2012): the user's own realtime room
 		on_event: socket?.on ? (cb) => socket.on("phriend_event", cb) : null,
-		// rating a fix (#2014)
-		feedback: boot().phriend.feedback || [],
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})

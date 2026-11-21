@@ -20,7 +20,6 @@
 //   open_settings()           optional: open Phriend Settings
 //   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
 //   on_event(cb)              optional: call cb(payload) for every "phriend_event" of this user (#2012)
-//   feedback                  optional: the user's open rating questions from the boot (#2014)
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
@@ -301,6 +300,17 @@ class Phriend {
 
 	// ---- rating a fix (#2014)
 
+	// The open questions, fresh from the server shortly after the page loads (Desk caches the boot).
+	load_ratings() {
+		const features = this.host.features || {};
+		if (!features.rate_fixes) return;
+		setTimeout(() => {
+			call("phamos.phriend.api.get_my_feedback_requests", {}, this.host.csrf_token())
+				.then((requests) => (requests || []).forEach((req) => this.ask_rating(req)))
+				.catch(() => {});
+		}, 1500);
+	}
+
 	// A rating question through the voice: a question, so it uses the day's bubble or waits
 	// behind the dot. Each question once per page (the boot and a live event can both bring it).
 	ask_rating(req) {
@@ -383,7 +393,7 @@ class Phriend {
 		this.voice = new Voice(this); // one voice (#2011)
 		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
 		this.setup_play(); // easter eggs (#2013)
-		for (const req of this.host.feedback || []) this.ask_rating(req); // open rating questions (#2014)
+		this.load_ratings(); // open rating questions (#2014)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();

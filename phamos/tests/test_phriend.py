@@ -333,7 +333,7 @@ class TestPhriend(FrappeTestCase):
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
 				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0, "easter_eggs": 0,
-				"rate_fixes": 0}, "quiet": None, "can_configure": 1, "feedback": None,
+				"rate_fixes": 0}, "quiet": None, "can_configure": 1,
 				"voice": None},
 		)
 
@@ -549,7 +549,8 @@ class TestPhriend(FrappeTestCase):
 		# the reporter's Phriend hears it at once, and nothing is asked twice
 		self.assertTrue(any(c.args[1].get("kind") == "rate_fix" for c in publish.call_args_list))
 		self.assertEqual(phriend_feedback.create_due_requests(), [])
-		self.assertEqual({r["name"] for r in phriend_boot()["feedback"]} & set(created), set(created[:3]) & set(created))
+		# the user's open questions come fresh from the API (Desk caches the boot)
+		self.assertLessEqual(set(created), {r["name"] for r in api.get_my_feedback_requests()})
 
 	def test_not_live_until_every_gitlab_issue_is_on_production(self, _enqueue):
 		self.set_settings(rate_fixes=1)

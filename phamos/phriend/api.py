@@ -323,6 +323,15 @@ def _check_feedback_allowed():
 
 
 @frappe.whitelist(methods=["POST"])
+def get_my_feedback_requests():
+	"""The current user's open rating questions (#2014). Fetched after the page loads, not in the
+	boot: Desk caches the boot per user, and a new question would not show until that cache is
+	cleared."""
+	_check_feedback_allowed()
+	return phriend_feedback.open_requests()
+
+
+@frappe.whitelist(methods=["POST"])
 def answer_feedback(name=None, rating=None, comment=None):
 	"""Rating a fix (#2014): the current user's answer to one of their questions."""
 	_check_feedback_allowed()

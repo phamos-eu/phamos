@@ -174,10 +174,16 @@ const desk = {
 	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
 	// one voice (#2011)
 	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
-	// events (#2012): the user's own realtime room
-	on_event: (cb) => frappe.realtime && frappe.realtime.on("phriend_event", cb),
-	// rating a fix (#2014)
-	feedback: (frappe.boot.phriend && frappe.boot.phriend.feedback) || [],
+	// events (#2012): the user's own realtime room. Phriend mounts before Desk creates its
+	// socket, and frappe.realtime.on() does nothing without one: wait for it (found in #2014).
+	on_event: (cb) => {
+		let tries = 0;
+		const attach = () => {
+			if (frappe.realtime && frappe.realtime.socket) frappe.realtime.on("phriend_event", cb);
+			else if (++tries < 120) setTimeout(attach, 500);
+		};
+		attach();
+	},
 };
 
 frappe.provide("phriend");
