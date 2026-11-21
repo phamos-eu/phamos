@@ -57,3 +57,70 @@ class ChipSpaceTestCase(FrappeTestCase):
 			chip_space.get_space()
 		with self.assertRaises(frappe.PermissionError):
 			chip_space.save_my_position(1, 1)
+
+
+class ChipSpacePresenceTestCase(FrappeTestCase):
+	"""Slice 2 (#2055): presence in the cache, moves and leaves over realtime."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.cache.delete_value(chip_space.PRESENCE_CACHE_KEY)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.cache.delete_value(chip_space.PRESENCE_CACHE_KEY)
+		frappe.db.rollback()
+
+	def _put(self, user, x, y, age=0):
+		frappe.cache.hset(
+			chip_space.PRESENCE_CACHE_KEY, user, {"user": user, "full_name": user, "user_image": "", "x": x, "y": y, "ts": chip_space.time.time() - age}
+		)
+
+	def test_heartbeat_joins_and_publishes(self):
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			chip = chip_space.heartbeat(4, 5)
+		self.assertEqual((chip["user"], chip["x"], chip["y"]), ("Administrator", 4.0, 5.0))
+		self.assertEqual(publish.call_args.args[0], chip_space.EVENT_PRESENCE)
+		self.assertIn("Administrator", {c["user"] for c in chip_space._online()})
+
+	def test_others_online_but_not_me_and_not_stale(self):
+		self._put("Administrator", 1, 1)
+		self._put("someone@example.com", 2, 3)
+		self._put("gone@example.com", 6, 6, age=chip_space.PRESENCE_TTL + 5)
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: None}):
+			others = chip_space.get_space()["others"]
+		self.assertEqual([(o["user"], o["x"], o["y"]) for o in others], [("someone@example.com", 2, 3)])
+		self.assertNotIn("ts", others[0])
+		# the stale entry was dropped from the cache
+		self.assertIsNone(frappe.cache.hget(chip_space.PRESENCE_CACHE_KEY, "gone@example.com"))
+
+	def test_move_needs_presence_and_is_clamped(self):
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			self.assertIsNone(chip_space.move(3, 3))
+			publish.assert_not_called()
+			chip_space.heartbeat(1, 1)
+			self.assertEqual(chip_space.move(99, -1), {"user": "Administrator", "x": chip_space.COLS - 1.0, "y": 0.0})
+		self.assertEqual(publish.call_args.args[0], chip_space.EVENT_MOVE)
+
+	def test_move_throttled_per_user(self):
+		chip_space.heartbeat(1, 1)
+		frappe.cache.delete_value(f"phamos_chip_space_moves:{frappe.session.user}")
+		with patch.object(chip_space.frappe, "publish_realtime"):
+			results = [chip_space.move(2, 2) for _ in range(chip_space.MOVE_LIMIT + 3)]
+		self.assertTrue(all(results[: chip_space.MOVE_LIMIT]))
+		self.assertEqual(results[chip_space.MOVE_LIMIT :], [None, None, None])
+
+	def test_leave_removes_and_publishes(self):
+		chip_space.heartbeat(1, 1)
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			chip_space.leave()
+		self.assertEqual(publish.call_args.args, (chip_space.EVENT_LEAVE, {"user": "Administrator"}))
+		self.assertEqual(chip_space._online(), [])
+
+	def test_website_user_refused(self):
+		email = "chip-space-web@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": "Web", "user_type": "Website User", "send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user(email)
+		with self.assertRaises(frappe.PermissionError):
+			chip_space.heartbeat(1, 1)

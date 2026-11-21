@@ -24,13 +24,18 @@
 				<div
 					v-for="other in others"
 					:key="other.user"
-					class="chip-space-chip absolute flex items-center justify-center"
+					class="chip-space-chip chip-space-chip--remote absolute flex items-center justify-center"
 					:style="chipStyle(other)"
 					:title="other.full_name"
 					data-testid="other-chip"
 				>
 					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
-						<ChipFigure :user="other.user" :label="other.full_name" :image="other.user_image" />
+						<ChipFigure
+							:user="other.user"
+							:label="other.full_name"
+							:image="other.user_image"
+							:moving="Boolean(other.moving)"
+						/>
 					</span>
 				</div>
 				<div
@@ -50,7 +55,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { computed, getCurrentInstance, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { call, FeatherIcon } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -75,6 +80,16 @@ const SAVE_AFTER_MS = 400
 const TAP_SECONDS = 0.05
 // The avatar is drawn at 40px and scaled to the tile.
 const AVATAR_PX = 40
+// Presence (#2055): a heartbeat keeps my chip on everyone's grid; moves go out at most this often.
+const HEARTBEAT_MS = 10000
+const SEND_MOVE_EVERY_MS = 120
+// Another chip's legs kick until this long after its last move arrived.
+const REMOTE_MOVING_MS = 250
+const API = "phamos.api.chip_space"
+
+// The cockpit's realtime socket (as in useUserRealtime); without it the Space still works alone.
+const instance = getCurrentInstance()
+const socket = instance?.appContext.config.globalProperties.$socket || inject("$socket", null)
 
 const stage = ref(null)
 const me = ref(null)
@@ -147,6 +162,104 @@ function releaseAll() {
 	shift = false
 }
 
+// --- Other chips: dummies from the site config and the people who have the page open (#2055).
+
+let presenceTtlMs = 45000
+const lastSeen = new Map()
+const movingTimers = new Map()
+
+function upsertOther(chip) {
+	if (!chip?.user || chip.user === me.value?.user) return
+	lastSeen.set(chip.user, Date.now())
+	const existing = others.value.find((o) => o.user === chip.user)
+	if (existing) Object.assign(existing, chip)
+	else others.value.push({ ...chip, moving: false })
+}
+
+function onRemoteMove(message) {
+	const other = others.value.find((o) => o.user === message?.user)
+	// A move from someone not on my grid yet (missed their join): ask for the full picture.
+	if (!other) return message?.user && message.user !== me.value?.user ? refreshOthers() : null
+	lastSeen.set(other.user, Date.now())
+	other.x = message.x
+	other.y = message.y
+	other.moving = true
+	clearTimeout(movingTimers.get(other.user))
+	movingTimers.set(
+		other.user,
+		setTimeout(() => (other.moving = false), REMOTE_MOVING_MS)
+	)
+}
+
+function onRemoteLeave(message) {
+	others.value = others.value.filter((o) => o.dummy || o.user !== message?.user)
+	lastSeen.delete(message?.user)
+}
+
+// Chips whose heartbeat stopped (tab killed, network gone) fade out after the presence TTL.
+function pruneOthers() {
+	const now = Date.now()
+	others.value = others.value.filter((o) => o.dummy || now - (lastSeen.get(o.user) || 0) < presenceTtlMs)
+}
+
+async function refreshOthers() {
+	try {
+		const data = await call(`${API}.get_space`)
+		for (const chip of data.others || []) upsertOther(chip)
+	} catch {
+		// The next heartbeat or event tries again.
+	}
+}
+
+// --- My presence.
+
+let lastSent = 0
+let sendTimer = null
+
+function sendMove() {
+	clearTimeout(sendTimer)
+	sendTimer = null
+	lastSent = performance.now()
+	if (!me.value) return
+	call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
+}
+
+// Leading and trailing: the first step goes out at once, the final spot always arrives.
+function queueMove() {
+	const wait = SEND_MOVE_EVERY_MS - (performance.now() - lastSent)
+	if (wait <= 0) sendMove()
+	else if (!sendTimer) sendTimer = setTimeout(sendMove, wait)
+}
+
+function heartbeat() {
+	if (!me.value) return
+	call(`${API}.heartbeat`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
+	pruneOthers()
+}
+
+// On tab close the component never unmounts: tell the server with a request that outlives the page.
+function leaveOnPagehide() {
+	try {
+		fetch(`/api/method/${API}.leave`, {
+			method: "POST",
+			keepalive: true,
+			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "" },
+		})
+	} catch {
+		// The presence TTL removes the chip anyway.
+	}
+}
+
+const round = (value) => Math.round(value * 100) / 100
+
+const SOCKET_EVENTS = [
+	["chip_space_presence", upsertOther],
+	["chip_space_move", onRemoteMove],
+	["chip_space_leave", onRemoteLeave],
+	// Rejoin after a lost connection: the others may have moved meanwhile.
+	["connect", () => (heartbeat(), refreshOthers())],
+]
+
 function blocked(x, y) {
 	return others.value.some((o) => Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
 }
@@ -167,6 +280,7 @@ function tick(now) {
 	if (!keys.size || !me.value) {
 		frame = null
 		moving.value = false
+		if (sendTimer) sendMove()
 		return
 	}
 	const length = Math.hypot(dx, dy)
@@ -182,6 +296,7 @@ function tick(now) {
 		if (!blocked(x, me.value.y)) me.value.x = x
 		if (!blocked(me.value.x, y)) me.value.y = y
 		scheduleSave()
+		queueMove()
 	}
 	frame = requestAnimationFrame(tick)
 }
@@ -194,11 +309,11 @@ function scheduleSave() {
 async function save() {
 	saveTimer = null
 	if (!me.value) return
-	const x = Math.round(me.value.x * 100) / 100
-	const y = Math.round(me.value.y * 100) / 100
+	const x = round(me.value.x)
+	const y = round(me.value.y)
 	if (saved && saved.x === x && saved.y === y) return
 	try {
-		await call("phamos.api.chip_space.save_my_position", { x, y })
+		await call(`${API}.save_my_position`, { x, y })
 		saved = { x, y }
 	} catch {
 		// The next move tries again; the chip stays where the user put it meanwhile.
@@ -206,6 +321,7 @@ async function save() {
 }
 
 let resizeObserver = null
+let heartbeatTimer = null
 function measure() {
 	const el = stage.value
 	if (!el) return
@@ -220,20 +336,32 @@ onMounted(async () => {
 	window.addEventListener("keydown", onKeydown)
 	window.addEventListener("keyup", onKeyup)
 	window.addEventListener("blur", releaseAll)
+	window.addEventListener("pagehide", leaveOnPagehide)
 	try {
-		const data = await call("phamos.api.chip_space.get_space")
-		others.value = data.others || []
+		const data = await call(`${API}.get_space`)
 		me.value = data.me
 		saved = { x: me.value.x, y: me.value.y }
+		presenceTtlMs = (data.presence_ttl || 45) * 1000
+		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("The Space could not be loaded.")
+		return
 	}
+	for (const [event, handler] of SOCKET_EVENTS) socket?.on?.(event, handler)
+	heartbeat()
+	heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS)
 })
 
 onBeforeUnmount(() => {
 	window.removeEventListener("keydown", onKeydown)
 	window.removeEventListener("keyup", onKeyup)
 	window.removeEventListener("blur", releaseAll)
+	window.removeEventListener("pagehide", leaveOnPagehide)
+	for (const [event, handler] of SOCKET_EVENTS) socket?.off?.(event, handler)
+	clearInterval(heartbeatTimer)
+	clearTimeout(sendTimer)
+	for (const timer of movingTimers.values()) clearTimeout(timer)
+	if (me.value) call(`${API}.leave`).catch(() => {})
 	if (frame) cancelAnimationFrame(frame)
 	resizeObserver?.disconnect()
 	if (saveTimer) {
@@ -254,5 +382,14 @@ onBeforeUnmount(() => {
 	top: 0;
 	left: 0;
 	will-change: transform;
+}
+/* Other chips arrive about 8 times a second: glide between the updates. */
+.chip-space-chip--remote {
+	transition: transform 130ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+	.chip-space-chip--remote {
+		transition: none;
+	}
 }
 </style>
