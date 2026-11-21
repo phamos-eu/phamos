@@ -66,22 +66,25 @@ export function topDialog(root = typeof document !== "undefined" ? document : nu
 }
 
 // frappe-ui solid buttons are the only ones with white text; red ones are destructive.
-function isSolid(button) {
-	return button.classList.contains("text-ink-white") && !button.classList.contains("bg-surface-red-5")
-}
+// A disabled or loading frappe-ui button loses these classes and looks like any other
+// disabled button, so its variant can't be told from the DOM.
+const isWhite = (button) => button.classList.contains("text-ink-white")
+const isRed = (button) => button.classList.contains("bg-surface-red-5")
 
 // What Ctrl/Cmd+S runs in a dialog: a button to click, a form to submit, or null.
 // - a button marked data-primary-action wins;
-// - otherwise the one solid, non-red button;
-// - a dialog without such a button submits its one form.
-// A disabled (or loading) button and an ambiguous choice run nothing, so nothing is guessed
-// and nothing is submitted twice. A disabled solid button also blocks the form fallback.
+// - otherwise the one enabled solid, non-red button;
+// - a dialog without one submits its single form, unless a button is disabled (it may be the
+//   greyed-out or loading primary: no double submit) or a red button is the only solid one.
+// An ambiguous choice runs nothing: better nothing than the wrong action.
 export function dialogPrimaryAction(dialog) {
 	if (!dialog) return null
 	const marked = dialog.querySelector("[data-primary-action]")
 	if (marked) return marked.disabled ? null : marked
-	const solid = [...dialog.querySelectorAll("button")].filter(isSolid)
-	if (solid.length) return solid.length === 1 && !solid[0].disabled ? solid[0] : null
+	const buttons = [...dialog.querySelectorAll("button")]
+	const solid = buttons.filter((b) => isWhite(b) && !isRed(b) && !b.disabled)
+	if (solid.length) return solid.length === 1 ? solid[0] : null
+	if (buttons.some((b) => b.disabled || isRed(b))) return null
 	const forms = dialog.querySelectorAll("form")
 	return forms.length === 1 ? forms[0] : null
 }

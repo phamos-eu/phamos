@@ -80,6 +80,8 @@ describe("cockpit shortcuts", () => {
 		const SOLID = "text-ink-white bg-surface-gray-7"
 		const RED = "text-ink-white bg-surface-red-5"
 		const SUBTLE = "text-ink-gray-8 bg-surface-gray-2"
+		// What frappe-ui renders for a disabled or loading button, whatever its variant.
+		const DISABLED = "text-ink-gray-4 bg-surface-gray-2"
 		const button = (classes, { disabled = false, marked = false } = {}) => ({
 			tagName: "BUTTON",
 			disabled,
@@ -96,12 +98,15 @@ describe("cockpit shortcuts", () => {
 			expect(dialogPrimaryAction(dialog([button(SUBTLE), ok]))).toBe(ok)
 		})
 
-		it("runs nothing while the button is disabled or loading", () => {
-			expect(dialogPrimaryAction(dialog([button(SOLID, { disabled: true })], [{ tagName: "FORM" }]))).toBe(null)
+		it("runs nothing while the button is disabled or loading, and never submits its form", () => {
+			const form = { tagName: "FORM" }
+			expect(dialogPrimaryAction(dialog([button(DISABLED, { disabled: true })], [form]))).toBe(null)
+			expect(dialogPrimaryAction(dialog([button(SUBTLE), button(DISABLED, { disabled: true })]))).toBe(null)
 		})
 
 		it("never runs a red button", () => {
 			expect(dialogPrimaryAction(dialog([button(RED)]))).toBe(null)
+			expect(dialogPrimaryAction(dialog([button(RED)], [{ tagName: "FORM" }]))).toBe(null)
 			const ok = button(SOLID)
 			expect(dialogPrimaryAction(dialog([button(RED), ok]))).toBe(ok)
 		})
