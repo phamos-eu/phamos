@@ -42,6 +42,15 @@ class TestWebsiteFont(FrappeTestCase):
 			if "Inter" in stack:
 				self.assertTrue(stack.strip().startswith("Questrial"), stack)
 
+	def test_frappe_font_variable_keeps_questrial_without_the_theme_font(self):
+		"""Frappe styles html/body and Web Page text with var(--font-stack); the theme sets Questrial in it
+		only while its Google Font field is filled, which is emptied to stop the request to Google."""
+		root = re.search(r":root\s*{([^}]*)}", CSS.read_text())
+		self.assertIsNotNone(root)
+		stack = re.search(r"--font-stack:\s*([^;]+);", root.group(1))
+		self.assertIsNotNone(stack, "web_profile.bundle.css sets --font-stack")
+		self.assertTrue(stack.group(1).strip().startswith('"Questrial"'), stack.group(1))
+
 	def test_nothing_in_the_app_loads_fonts_from_google(self):
 		offenders = []
 		for path in (APP_DIR / "public", APP_DIR / "templates", APP_DIR / "www"):

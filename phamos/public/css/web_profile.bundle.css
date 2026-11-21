@@ -6,13 +6,20 @@
 /* Company font Questrial, served from phamos.eu (phamos/phamos#2048): a font from Google's servers
  * would hand every visitor's IP address to Google and need consent (DSB). SIL Open Font License,
  * see /assets/phamos/fonts/questrial/OFL.txt; reduced to Latin. One weight: bold is drawn by the
- * browser. The Website Theme's own font stack starts with "Questrial" and finds this file too. */
+ * browser. */
 @font-face {
 	font-family: "Questrial";
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
 	src: url("/assets/phamos/fonts/questrial/Questrial-Regular.woff2") format("woff2");
+}
+/* Frappe's own website styles (html/body, the Text Editor content of Web Pages) use var(--font-stack).
+ * The Website Theme puts Questrial into it only while its "Google Font" field is set; once that is
+ * emptied (no request to Google), the variable falls back to Inter. This keeps Questrial. */
+:root {
+	--font-stack: "Questrial", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		"Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
 .wp-page {
