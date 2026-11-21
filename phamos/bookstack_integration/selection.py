@@ -14,6 +14,7 @@ import frappe
 from frappe import _
 
 from phamos.bookstack_integration.api_client import BookstackClient
+from phamos.web_profile.docs import clear_cache as clear_docs_cache
 
 ITEM_TYPES = ("Book", "Chapter", "Page")
 
@@ -119,12 +120,8 @@ def _save_sync_selection(instance: str, config, excluded) -> dict:
 	config.save()
 
 	removed = remove_excluded(instance)
-	try:  # the public /de/doku pages (#2005) show the new state at once
-		from phamos.web_profile.docs import clear_cache
-	except ImportError:
-		pass
-	else:
-		clear_cache()
+	# The public /de/doku pages (#2005) show the new state once it is committed.
+	frappe.db.after_commit.add(clear_docs_cache)
 	return {"excluded": len(rows), "removed": removed}
 
 
