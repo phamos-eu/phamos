@@ -95,15 +95,6 @@
 						/>
 					</span>
 				</div>
-				<!-- Standing next to someone (#2056): the next key starts the chat. -->
-				<p
-					v-if="chatHint"
-					class="pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-black/75 px-3 py-1 text-xs text-white shadow"
-					:style="chatHint.style"
-					data-testid="chat-hint"
-				>
-					{{ __("Press any key to chat with {0}, Esc to walk on", [chatHint.name]) }}
-				</p>
 				<EncounterBubble
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
@@ -306,9 +297,15 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
-	// Standing (no movement key held) next to someone: any key starts the chat. Whoever is
-	// still walking (keys held, also overlapping ones) walks on (PM, 2026-11-21).
-	if (!held.size && !event.repeat && startChatWithKey(event)) return
+	if (!held.size && !event.repeat) {
+		// Typed while the chat that just opened is still loading: keep it for the chat.
+		if (bufferWhileOpening(event)) return
+		// Esc said "walk on"; Enter brings the chat back while still next to the person.
+		if (event.key === "Enter" && reopenDismissed()) {
+			event.preventDefault()
+			return
+		}
+	}
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
@@ -324,12 +321,13 @@ function onKeydown(event) {
 function onKeyup(event) {
 	shift = event.shiftKey
 	// With Shift held, "w" arrives as "W": lower-case both ways.
+	const wasWalking = held.size > 0
 	held.delete(event.key.toLowerCase())
 	heldCount.value = held.size
+	// Every key let go next to someone: the chat opens and has the keyboard (PM, 2026-11-21).
+	// Whoever keeps a key held walks on, also when changing keys with overlap.
+	if (wasWalking && !held.size) chatOnStop()
 }
-
-// Keys that never start a chat on their own (they come with others, or mean something else).
-const NOT_A_START = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab", "Fn", "Dead"])
 
 /** The nearest chip within the encounter distance, or null. */
 function nearestInRange() {
@@ -341,32 +339,29 @@ function nearestInRange() {
 	return best?.other || null
 }
 
-/**
- * A key pressed while standing. Next to someone it starts (or enters) the chat and is used up;
- * a letter that isn't a movement key becomes the first character. Esc walks on instead.
- */
-function startChatWithKey(event) {
-	if (NOT_A_START.has(event.key)) return false
+/** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
+function chatOnStop() {
 	const other = nearestInRange()
-	if (!other) return false
-	if (event.key === "Escape") {
-		if (bubbles[other.user]) closeBubble(other.user)
-		else if (dismissed.has(other.user)) return false
-		else dismissed.add(other.user)
-		event.preventDefault()
-		return true
-	}
-	if (dismissed.has(other.user)) {
-		// Esc said "walk on"; only Enter brings the chat back while still here.
-		if (event.key !== "Enter") return false
-		dismissed.delete(other.user)
-	}
-	event.preventDefault()
-	const text = event.key.length === 1 && !DIRECTIONS[event.key.toLowerCase()] ? event.key : ""
+	if (!other || dismissed.has(other.user)) return
 	const bubble = bubbles[other.user]
-	if (!bubble) openBubble(other, { focus: true, text })
-	else if (bubble.loading) bubble.pendingText += text
-	else focusBubble(other.user, text)
+	if (!bubble) openBubble(other, { focus: true })
+	else if (!bubble.loading) focusBubble(other.user)
+	else bubble.focusOnOpen = true
+}
+
+function bufferWhileOpening(event) {
+	const bubble = Object.values(bubbles).find((b) => b.loading && b.focusOnOpen)
+	if (!bubble || event.key.length !== 1) return false
+	event.preventDefault()
+	bubble.pendingText += event.key
+	return true
+}
+
+function reopenDismissed() {
+	const other = nearestInRange()
+	if (!other || !dismissed.has(other.user)) return false
+	dismissed.delete(other.user)
+	openBubble(other, { focus: true })
 	return true
 }
 
@@ -485,7 +480,8 @@ function checkEncounters() {
 	if (!me.value) return
 	for (const other of others.value) {
 		const distance = distanceTo(other)
-		// Chats no longer open by walking past: see startChatWithKey and onEncounterStarted.
+		// Chats don't open by walking past: they open when the keys are let go (chatOnStop) or
+		// when the other person starts one (onEncounterStarted).
 		if (distance > PART_DISTANCE) {
 			delete bubbles[other.user]
 			dismissed.delete(other.user)
@@ -501,9 +497,10 @@ function checkEncounters() {
 	}
 }
 
-async function openBubble(other, { focus = false, text = "", fromPeer = false } = {}) {
+async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 	const bubble = reactive({
-		pendingText: text,
+		pendingText: "",
+		focusOnOpen: focus,
 		user: other.user,
 		peer: { user: other.user, full_name: other.full_name, user_image: other.user_image },
 		encounter: null,
@@ -531,7 +528,7 @@ async function openBubble(other, { focus = false, text = "", fromPeer = false } 
 	if (!bubble.encounter || bubbles[other.user] !== bubble) return
 	// Started here with a key: the chat has the keyboard. Started by the other person: only
 	// if I'm standing; whoever is walking walks on.
-	if (focus || (fromPeer && !held.size)) focusBubble(other.user, bubble.pendingText)
+	if (bubble.focusOnOpen || (fromPeer && !held.size)) focusBubble(other.user, bubble.pendingText)
 	bubble.pendingText = ""
 }
 
@@ -550,21 +547,8 @@ function onEncounterStarted(message) {
 	openBubble(other, { fromPeer: true })
 }
 
-// Standing next to someone without a chat: the hint above the two.
+// How many movement keys are held (for templates that care whether the user walks).
 const heldCount = ref(0)
-const chatHint = computed(() => {
-	if (!me.value || heldCount.value) return null
-	const other = nearestInRange()
-	if (!other || bubbles[other.user] || dismissed.has(other.user)) return null
-	const t = tile.value
-	const left = ((me.value.x + other.x) / 2 + 0.5) * t
-	const top = Math.min(me.value.y, other.y) * t - PERIMETER_RADIUS * t + 0.2 * t
-	return {
-		name: (other.full_name || "").split(" ")[0] || other.full_name,
-		style: { left: `${left}px`, top: `${top}px`, transform: "translate(-50%, -100%)" },
-	}
-})
-
 // Esc: the chat closes and the keys move the chip again.
 function closeBubble(user) {
 	delete bubbles[user]
