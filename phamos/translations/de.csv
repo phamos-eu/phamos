@@ -2686,3 +2686,4 @@ L{0} → L{1},L{0} → L{1}
 Slack is how many days a chapter can slip before it delays the end date. Late means it already does.,"Der Puffer sagt, um wie viele Tage sich ein Kapitel verschieben kann, bevor es den Endtermin verzögert. „Zu spät“ heißt, es tut das schon."
 "The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
 "Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
+Target level reached,Ziellevel erreicht

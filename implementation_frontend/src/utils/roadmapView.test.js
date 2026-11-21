@@ -2,6 +2,7 @@
 import {
 	chapterLinks,
 	closesPanel,
+	levelStep,
 	ganttData,
 	loadPrefs,
 	planningRedirect,
@@ -196,3 +197,22 @@ describe("closesPanel", () => {
 		expect(closesPanel(key("Escape", true))).toBe(false)
 	})
 })
+
+describe("levelStep", () => {
+	it("starts at the baseline level and fills up to the current one", () => {
+		expect(levelStep({ start_level: 2, current_level: 3, target_level: 4 })).toEqual({ from: 2, to: 4, current: 3 })
+		const [bar] = ganttData({ modules: [{ module: "M", bars: [{ name: "C", start_level: 2, current_level: 3, target_level: 4 }] }] }).rows[0].bars
+		expect([bar.fromLevel, bar.currentLevel, bar.toLevel]).toEqual([2, 3, 4])
+	})
+
+	it("starts at the current level without a baseline, and draws no step without levels", () => {
+		expect(levelStep({ current_level: 3, target_level: 4 })).toEqual({ from: 3, to: 4, current: 3 })
+		expect(levelStep({ current_level: null, target_level: 4 })).toEqual({ from: null, to: 4, current: null })
+		expect(levelStep({ current_level: 2, target_level: null }).from).toBeNull()
+	})
+
+	it("never starts above the target", () => {
+		expect(levelStep({ start_level: 5, current_level: 5, target_level: 4 }).from).toBe(4)
+	})
+})
+

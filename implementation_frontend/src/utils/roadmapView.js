@@ -59,20 +59,29 @@ function safeUrl(url) {
 	return typeof url === "string" && /^https?:\/\//i.test(url.trim()) ? url.trim() : null
 }
 
+/**
+ * The level step of a chapter: from its level when the plan was agreed (`start_level`, from the
+ * baseline) to its target, filled up to the current level. Without a baseline row the step
+ * starts at the current level (what is still ahead); without either there is no step.
+ */
+export function levelStep(bar) {
+	const target = bar?.target_level || null
+	const current = bar?.current_level || null
+	const start = bar?.start_level || current
+	return { from: target && start ? Math.min(start, target) : null, to: target, current }
+}
+
 function toBar(bar) {
-	const current = bar.current_level ?? null
-	const target = bar.target_level ?? null
+	const step = levelStep(bar)
 	return {
 		name: bar.name,
 		label: bar.title || bar.name,
 		start: bar.planned_start,
 		end: bar.target_date,
-		// The chapter climbs from where it is now to its target: "L2 → L4", full once reached.
-		// get_roadmap has no starting level, so the step shows what is still ahead; without a
-		// current level there is no step to draw.
-		fromLevel: target && current !== null ? Math.min(current, target) : null,
-		toLevel: target,
-		currentLevel: current,
+		fromLevel: step.from,
+		toLevel: step.to,
+		currentLevel: step.current,
+		// a done chapter (target level reached) comes without slack and is never critical
 		critical: Boolean(bar.critical),
 		faded: FADED_STATUSES.includes(bar.status),
 		slackDays: bar.slack_days ?? null,

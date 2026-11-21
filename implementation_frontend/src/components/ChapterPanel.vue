@@ -80,7 +80,7 @@ import dayjs from "dayjs"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import StatusBadge from "./StatusBadge.vue"
-import { proposeDateChangeUrl } from "../utils/roadmapView.js"
+import { levelStep, proposeDateChangeUrl } from "../utils/roadmapView.js"
 
 const props = defineProps({
 	implementation: { type: String, required: true },
@@ -105,6 +105,8 @@ const facts = computed(() => {
 		{ label: __("Target date"), value: date(b.target_date) },
 		{ label: __("Levels"), value: levels(b) },
 	]
+	// with a baseline the step starts at the agreed level, so the current one needs its own line
+	if (b.start_level) out.push({ label: __("Current Level"), value: b.current_level ? `L${b.current_level}` : "—" })
 	if (b.chapter) out.push(slack(b))
 	if (b.baseline) {
 		const shift = b.baseline.shift_days
@@ -127,15 +129,17 @@ const linkGroups = computed(() =>
 )
 
 function levels(b) {
-	// from the current level to the target, as on the bar
-	if (!b.target_level) return b.current_level ? `L${b.current_level}` : "—"
-	// no current level yet: only the target, as the bar draws no step either
-	if (!b.current_level) return `→ L${b.target_level}`
-	return __("L{0} → L{1}", [b.current_level, b.target_level])
+	// the same step as on the bar (levelStep)
+	const step = levelStep(b)
+	if (!step.to) return step.current ? `L${step.current}` : "—"
+	// no level to start from: only the target, as the bar draws no step either
+	if (!step.from) return `→ L${step.to}`
+	return __("L{0} → L{1}", [step.from, step.to])
 }
 
 function slack(b) {
 	const label = __("Slack to the end date")
+	if (b.done) return { label, value: __("Target level reached"), tone: "text-ink-green-3" }
 	if (b.cycle) return { label, value: __("In a dependency loop"), tone: "text-ink-red-4" }
 	if (b.slack_days === null || b.slack_days === undefined) return { label, value: "—" }
 	if (b.slack_days < 0) return { label, value: __("{0} d late", [-b.slack_days]), tone: "text-ink-red-4" }
