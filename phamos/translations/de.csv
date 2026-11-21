@@ -2556,6 +2556,12 @@ Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Bookstack Browser,Bookstack-Browser
+Books,Bücher
+Shelves,Regale
+Chapters,Kapitel
+Bookstack Users,Bookstack-Benutzer
+Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
