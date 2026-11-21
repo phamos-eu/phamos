@@ -94,6 +94,9 @@ function bookstack_step_labels() {
 function bookstack_sync_dialog(frm) {
 	const steps_config = bookstack_sync_steps();
 	let tree = null; // set once the tree has loaded; the selection is only saved then
+	// Everyone who may read the configuration may sync; only those who may edit it change the
+	// selection (save_sync_selection needs write). For the others the tree is shown read-only.
+	const can_save = frappe.model.can_write("Bookstack Configuration");
 	const d = new frappe.ui.Dialog({
 		title: __("Sync from {0}", [frm.doc.title]),
 		size: "large",
@@ -123,7 +126,7 @@ function bookstack_sync_dialog(frm) {
 				frappe.msgprint(__("Choose at least one part to sync."));
 				return;
 			}
-			bookstack_save_selection(frm, tree)
+			(can_save ? bookstack_save_selection(frm, tree) : Promise.resolve())
 				.then(() =>
 					// A background job (#2004): a first copy of a big book takes minutes. The result
 					// arrives as the realtime event "bookstack_sync_done" (see onload).
@@ -142,18 +145,21 @@ function bookstack_sync_dialog(frm) {
 					}, 10);
 				});
 		},
-		secondary_action_label: __("Save selection"),
-		secondary_action() {
-			if (!tree) return;
-			bookstack_save_selection(frm, tree).then((r) => {
-				d.hide();
-				frappe.show_alert({
-					message: __("Selection saved; {0} records removed from ERPNext.", [r.removed]),
-					indicator: "green",
+		// Only for those who may change the selection; Frappe would show a default button otherwise.
+		...(can_save && {
+			secondary_action_label: __("Save selection"),
+			secondary_action() {
+				if (!tree) return;
+				bookstack_save_selection(frm, tree).then((r) => {
+					d.hide();
+					frappe.show_alert({
+						message: __("Selection saved; {0} records removed from ERPNext.", [r.removed]),
+						indicator: "green",
+					});
+					frm.reload_doc();
 				});
-				frm.reload_doc();
-			});
-		},
+			},
+		}),
 	});
 	d.show();
 
@@ -162,7 +168,7 @@ function bookstack_sync_dialog(frm) {
 	frappe
 		.xcall("phamos.bookstack_integration.selection.get_sync_tree", { instance: frm.doc.name })
 		.then((books) => {
-			tree = bookstack_render_tree($area, books);
+			tree = bookstack_render_tree($area, books, !can_save);
 		})
 		.catch(() => {
 			$area.html(
@@ -176,13 +182,13 @@ function bookstack_sync_dialog(frm) {
 
 // Checkbox tree (#2029): a parent's box sets everything under it; an unticked book or chapter
 // greys out its contents, a parent with some unticked children shows a mixed state.
-function bookstack_render_tree($area, books) {
+function bookstack_render_tree($area, books, readonly = false) {
 	const esc = frappe.utils.escape_html;
 	// Under a left-out book or chapter everything shows unticked: the parent stands for all of it.
 	const item = (n, parent_on = true) => {
 		const on = n.included && parent_on;
 		const box = `<input type="checkbox" class="bs-tree-box" data-type="${n.type}" data-id="${n.id}"
-			data-title="${esc(n.title)}" ${on ? "checked" : ""}>`;
+			data-title="${esc(n.title)}" ${on ? "checked" : ""}${readonly ? " disabled" : ""}>`;
 		const label = `<label class="bs-tree-label">${box}<span>${esc(n.title)}</span>
 			<span class="text-muted small">${__(n.type)}</span></label>`;
 		if (!n.children.length) return `<li class="bs-tree-item">${label}</li>`;
@@ -211,7 +217,7 @@ function bookstack_render_tree($area, books) {
 		</div>
 		<div class="text-muted small" style="margin-bottom:6px">${__(
 			"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced."
-		)}</div>
+		)}${readonly ? " " + __("Only users who may edit this configuration change the selection.") : ""}</div>
 		<div class="bs-tree"><ul class="bs-tree-list">${books.map((b) => item(b)).join("")}</ul></div>`);
 
 	const $boxes = () => $area.find(".bs-tree-box");
@@ -230,6 +236,16 @@ function bookstack_render_tree($area, books) {
 	$area.on("click", ".bs-tree-label", (e) => e.stopPropagation()); // ticking does not fold
 	$area.on("change", ".bs-tree-box", function () {
 		$(this).closest(".bs-tree-item").find("ul .bs-tree-box").prop("checked", this.checked);
+		if (this.checked) {
+			// A page ticked under an unticked chapter or book ticks them too (they show as partly
+			// ticked); otherwise the left-out parent would still leave the page out.
+			$(this)
+				.parents(".bs-tree-item")
+				.slice(1)
+				.each(function () {
+					$(this).find("> label > .bs-tree-box, > details > summary .bs-tree-box").prop("checked", true);
+				});
+		}
 		refresh();
 	});
 	$area.find(".bs-tree-all, .bs-tree-none").on("click", function () {

@@ -311,6 +311,7 @@ class TestChooseWhatToSync(_BookstackSyncCase):
 		with patch.object(sync, "_run_steps") as run:
 			self.assertRaises(frappe.ValidationError, self._choose, ["pages", "everything"])
 			self.assertRaises(frappe.ValidationError, self._choose, "[]")
+			self.assertRaises(frappe.ValidationError, self._choose, [])  # only None means "everything"
 			run.assert_not_called()
 
 	def test_steps_arrive_as_json_from_the_dialog(self):

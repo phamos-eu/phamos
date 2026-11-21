@@ -488,8 +488,10 @@ SYNC_STEPS = {
 
 
 def _chosen_steps(steps) -> list[str]:
-	"""``steps`` as the dialog sends it (list or JSON), checked; None means every step."""
-	chosen = frappe.parse_json(steps) if steps else list(SYNC_STEPS)
+	"""``steps`` as the dialog sends it (list or JSON), checked; only None means every step."""
+	if steps is None:
+		return list(SYNC_STEPS)
+	chosen = frappe.parse_json(steps) if isinstance(steps, str) else list(steps)
 	unknown = set(chosen) - set(SYNC_STEPS)
 	if unknown:
 		frappe.throw(_("Unknown sync step: {0}").format(", ".join(sorted(unknown))))
