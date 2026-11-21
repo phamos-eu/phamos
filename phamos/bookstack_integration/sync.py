@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
+from frappe import _
 from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
@@ -341,21 +342,43 @@ def _run_steps(instance: str, steps: list) -> dict[str, Any]:
 _TRACKED_STEPS = {"shelves", "books", "chapters", "pages"}
 
 
+# Every step of a full sync, in the order it must run: users link roles, shelves and chapters link
+# books, pages link books and chapters, the website copy reads pages (#2029).
+SYNC_STEPS = {
+	"roles": sync_roles,
+	"users": sync_users,
+	"books": sync_books,
+	"shelves": sync_shelves,
+	"chapters": sync_chapters,
+	"pages": sync_pages,
+	"content": sync_page_content,
+}
+
+
 @frappe.whitelist()
-def sync_instance(instance: str) -> dict[str, Any]:
-	"""Full sync for a single Bookstack Configuration."""
+def sync_instance(instance: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
+	"""Sync one Bookstack Configuration: every step, or only ``steps`` (names from SYNC_STEPS).
+
+	The chosen steps always run in SYNC_STEPS order. ``remove_deleted_records`` deletes the shelves,
+	books, chapters and pages BookStack no longer returns, for the chosen ones of those only; it runs
+	after them and before the website copy, so a deleted page is not copied.
+	"""
 	# Whitelisted for the "Sync" buttons; the sync deletes records, so not for every logged-in user.
 	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
-	stats = _run_steps(instance, [
-		("roles", sync_roles),
-		("users", sync_users),
-		("books", sync_books),
-		("shelves", sync_shelves),
-		("chapters", sync_chapters),
-		("pages", sync_pages),
-		("removed", remove_deleted),
-		("content", sync_page_content),
-	])
+
+	chosen = frappe.parse_json(steps) if steps else list(SYNC_STEPS)
+	unknown = set(chosen) - set(SYNC_STEPS)
+	if unknown:
+		frappe.throw(_("Unknown sync step: {0}").format(", ".join(sorted(unknown))))
+	if not chosen:
+		frappe.throw(_("Choose at least one part to sync."))
+
+	plan = [(name, fn) for name, fn in SYNC_STEPS.items() if name in chosen]
+	if frappe.utils.cint(remove_deleted_records) and _TRACKED_STEPS & set(chosen):
+		at = next((i for i, (name, _fn) in enumerate(plan) if name == "content"), len(plan))
+		plan.insert(at, ("removed", remove_deleted))
+
+	stats = _run_steps(instance, plan)
 	frappe.db.set_value("Bookstack Configuration", instance, {
 		"last_synced": now_datetime(),
 		"sync_error_count": stats["errors"],

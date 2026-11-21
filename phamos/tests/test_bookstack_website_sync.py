@@ -81,7 +81,9 @@ def _page(bookstack_id, field="html"):
 	return frappe.db.get_value("Bookstack Page", f"{INSTANCE}-BSP-{bookstack_id}", field)
 
 
-class TestBookstackWebsiteSync(FrappeTestCase):
+class _BookstackSyncCase(FrappeTestCase):
+	"""Fake BookStack, a test configuration and a rollback; no tests of its own."""
+
 	def setUp(self):
 		frappe.db.savepoint("bookstack_website_sync")
 		if not frappe.db.exists("Bookstack Configuration", INSTANCE):
@@ -111,6 +113,8 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		book.publish_on_website = value
 		book.save(ignore_permissions=True)
 
+
+class TestBookstackWebsiteSync(_BookstackSyncCase):
 	def test_only_pages_of_published_books_get_content(self):
 		self._sync()
 		self.assertEqual(FakeBookstack.fetched, [])
@@ -243,3 +247,54 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		FakeBookstack.data["pages"] = []
 		self._sync()
 		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+
+class TestChooseWhatToSync(_BookstackSyncCase):
+	"""The "Sync…" dialog on Bookstack Configuration (phamos/phamos#2029)."""
+
+	def _choose(self, steps, remove=1):
+		return sync.sync_instance(INSTANCE, steps=steps, remove_deleted_records=remove)
+
+	def _calls(self, steps, remove=1):
+		"""Names of the steps sync_instance plans, without running them."""
+		order = []
+
+		def run(instance, plan):
+			order.extend(name for name, _fn in plan)
+			return {"errors": 0}
+
+		with patch.object(sync, "_run_steps", side_effect=run):
+			self._choose(steps, remove)
+		return order
+
+	def test_only_chosen_steps_run_in_fixed_order(self):
+		self.assertEqual(self._calls(["content", "pages", "books"]), ["books", "pages", "removed", "content"])
+		self.assertEqual(self._calls(["roles", "users"]), ["roles", "users"], "no removal without shelves/books/chapters/pages")
+		self.assertEqual(self._calls(None), ["roles", "users", "books", "shelves", "chapters", "pages", "removed", "content"])
+
+	def test_removal_can_be_switched_off(self):
+		self._sync()
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["id"] != 102]
+
+		self._choose(["books", "chapters", "pages"], remove=0)
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+		self._choose(["books", "chapters", "pages"], remove=1)
+		self.assertFalse(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+	def test_pages_only_leaves_users_alone(self):
+		FakeBookstack.data["users"] = [{"id": 7, "name": "Neu", "email": "neu@example.test"}]
+
+		self._choose(["books", "pages"])
+
+		self.assertFalse(frappe.db.exists("Bookstack User", {"instance": INSTANCE, "bookstack_id": 7}))
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-100"))
+
+	def test_unknown_or_empty_choice_runs_nothing(self):
+		with patch.object(sync, "_run_steps") as run:
+			self.assertRaises(frappe.ValidationError, self._choose, ["pages", "everything"])
+			self.assertRaises(frappe.ValidationError, self._choose, "[]")
+			run.assert_not_called()
+
+	def test_steps_arrive_as_json_from_the_dialog(self):
+		self.assertEqual(self._calls('["pages"]', remove=0), ["pages"])

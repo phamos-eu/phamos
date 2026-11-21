@@ -2542,3 +2542,18 @@ Content Updated At,Inhalt aktualisiert am
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Sync…,Synchronisieren…
+Sync from {0},Synchronisieren von {0}
+What to sync,Was synchronisiert wird
+Links each user to the roles synced before.,Verknüpft jeden Benutzer mit den zuvor synchronisierten Rollen.
+One call per shelf; links the books.,Ein Aufruf pro Regal; verknüpft die Bücher.
+Website content,Website-Inhalte
+Copies the pages of books published on the website.,Kopiert die Seiten der auf der Webseite veröffentlichten Bücher.
+Removed (deleted in BookStack),Entfernt (in BookStack gelöscht)
+Remove records deleted in BookStack,In BookStack gelöschte Einträge entfernen
+"Only for the ticked shelves, books, chapters and pages.","Nur für die angehakten Regale, Bücher, Kapitel und Seiten."
+Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchronisieren.
+Sync finished with errors,Synchronisierung mit Fehlern beendet
+Sync complete,Synchronisierung abgeschlossen
+Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
+Syncing Bookstack...,Bookstack wird synchronisiert...
