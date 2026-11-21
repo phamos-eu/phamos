@@ -4,11 +4,17 @@
 import frappe
 from frappe.model.document import Document
 
+from phamos.web_profile.docs import clear_cache as clear_docs_cache
+
 
 class BookstackBook(Document):
 	def on_update(self):
 		if self.has_value_changed("publish_on_website"):
 			self.refresh_website_copies()
+		clear_docs_cache()
+
+	def on_trash(self):
+		clear_docs_cache()
 
 	def refresh_website_copies(self):
 		"""Make the next content sync pick up a changed "Publish on website" (#2004).
