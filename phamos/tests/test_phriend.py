@@ -415,6 +415,7 @@ class TestPhriend(FrappeTestCase):
 
 	def test_one_voice_counts_each_users_bubbles_per_day(self, _enqueue):
 		# #2011: at most "Bubbles per Day" unprompted bubbles per user and (the browser's) day
+		frappe.defaults.clear_user_default(phriend_voice.DAY_DEFAULT)  # a count from using the dev site
 		self.addCleanup(frappe.defaults.clear_user_default, phriend_voice.DAY_DEFAULT)
 		with self.assertRaises(frappe.PermissionError):
 			api.claim_my_bubble("2026-11-21")  # off by default
