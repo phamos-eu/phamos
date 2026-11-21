@@ -18,6 +18,7 @@ from frappe.utils.password import get_decrypted_password
 
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
+from phamos.phriend import voice as phriend_voice
 from phamos.phriend.boot import is_for_user
 from phamos.phriend.gitlab_issues import link_created
 
@@ -296,6 +297,16 @@ def set_my_warning_mute(minutes=0):
 	"""Mute Phriend's red warnings for 30, 60 or 90 minutes (#2010); 0 to hear them again."""
 	_check_quiet_allowed()
 	return phriend_quiet.set_warning_mute(minutes)
+
+
+@frappe.whitelist(methods=["POST"])
+def claim_my_bubble(day=None):
+	"""One voice (#2011): may Phriend open a bubble by itself now? Uses one of the current user's
+	bubbles for today (day: the browser's local date). Returns the day's count and "granted"."""
+	settings = _check_allowed()
+	if not cint(settings.get("one_voice")):
+		frappe.throw(_("One voice is switched off in Phriend Settings"), frappe.PermissionError)
+	return phriend_voice.claim(settings, day)
 
 
 def _open_report_filters(route, ref_doctype, ref_docname):

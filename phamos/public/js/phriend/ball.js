@@ -209,6 +209,12 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .pending { position: absolute; left: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%;
 	background: #e8a23a; box-shadow: 0 0 0 2px var(--ph-bg); display: none; }
 .ball.has-pending .pending { display: block; }
+/* One voice (#2011): something waits for the user. Click: the oldest one, in a bubble. */
+.waiting { position: absolute; left: 12px; top: -5px; min-width: 14px; height: 14px; padding: 0 3px; border: 0;
+	border-radius: 7px; background: #2f6fdb; color: #fff; font: 600 9px/14px var(--ph-font); text-align: center;
+	cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg); }
+.waiting:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 2px; }
+.ball.resting .waiting { opacity: 0.7; }
 .bubble {
 	position: absolute; bottom: calc(100% + 8px); right: 0; width: max-content; max-width: 260px;
 	padding: 8px 12px; border-radius: 12px; background: var(--ph-bg); color: var(--ph-text);
@@ -249,6 +255,7 @@ export class Ball {
 	// options: { label, on_click, on_badge_click, on_first_interest, start, hands, menu }
 	// hands: false when "Hands and reactions" is off in Phriend Settings (#2009)
 	// menu: optional () => entries for the menu (#2010), see open_menu(); none = no menu
+	// on_waiting_click, waiting_label(count): the blue dot of things waiting (#2011)
 	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
 	// of their own buttons in the corner)
 	constructor(options) {
@@ -264,6 +271,7 @@ export class Ball {
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="hand" aria-hidden="true"></span>
 				<span class="pending"></span>
+				<button type="button" class="waiting" hidden></button>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
 			</div>
@@ -276,6 +284,7 @@ export class Ball {
 		this.menu = this.shadow.querySelector(".menu");
 		this.hand = this.shadow.querySelector(".hand");
 		this.badge = this.shadow.querySelector(".badge");
+		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
@@ -299,6 +308,11 @@ export class Ball {
 			options.on_badge_click && options.on_badge_click();
 		});
 		this.bubble.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.waiting.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.waiting.addEventListener("click", (e) => {
+			e.stopPropagation();
+			options.on_waiting_click && options.on_waiting_click();
+		});
 		this.hit.addEventListener("keydown", (e) => {
 			if (e.key === "Enter" || e.key === " ") {
 				e.preventDefault();
@@ -479,6 +493,15 @@ export class Ball {
 		this.root.classList.toggle("away", !!away);
 	}
 
+	// One voice (#2011): how many things wait behind the dot; 0 hides it.
+	set_waiting(count) {
+		this.waiting.hidden = !count;
+		this.waiting.textContent = count > 1 ? String(count) : "";
+		const label = this.options.waiting_label ? this.options.waiting_label(count) : "";
+		this.waiting.title = label;
+		this.waiting.setAttribute("aria-label", label);
+	}
+
 	set_pending(pending) {
 		this.root.classList.toggle("has-pending", !!pending);
 	}
@@ -629,10 +652,14 @@ export class Ball {
 
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
-		clearTimeout(this._react_timer);
+		const was_showing = this.bubble_showing();
 		this.bubble.classList.remove("show");
 		this._bubble_gesture = null;
-		this.set_hand(null);
+		// a reaction of its own keeps running (AI review of !1269)
+		if (was_showing) {
+			clearTimeout(this._react_timer);
+			this.set_hand(null);
+		}
 	}
 
 	bubble_showing() {
