@@ -133,7 +133,11 @@ def _footer_items(items, lang):
 		if label in DOCS_GROUPS and not parent:
 			from phamos.web_profile.docs import published_books
 
-			copy.child_items = [frappe._dict(label=b.title, url=b.url, parent_label=label) for b in published_books()]
+			# Frappe's footer template prints labels unescaped; book titles come from BookStack (review B1).
+			copy.child_items = [
+				frappe._dict(label=frappe.utils.escape_html(b.title), url=b.url, parent_label=label)
+				for b in published_books()
+			]
 		elif section and not parent:
 			profiles = sorted(get_items(section, lang), key=lambda i: i.sort["manual"])
 			copy.child_items = [frappe._dict(label=p.title, url=p.url, parent_label=label) for p in profiles]

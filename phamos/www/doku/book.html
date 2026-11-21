@@ -33,7 +33,7 @@
 	{%- endif %}
 
 	{%- if book.source_url %}
-	<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on doku.phamos.eu") }} <span aria-hidden="true">↗</span></a></p>
+	<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a></p>
 	{%- endif %}
 </main>
 {% endblock %}

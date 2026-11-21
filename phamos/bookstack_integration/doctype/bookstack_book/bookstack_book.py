@@ -8,12 +8,31 @@ from phamos.web_profile.docs import clear_cache as clear_docs_cache
 
 
 class BookstackBook(Document):
+	def validate(self):
+		self.validate_unique_web_address()
+
+	def validate_unique_web_address(self):
+		"""Two published books with one slug would share /de/doku/<slug>; only one could be shown,
+		and links of the other instance would lead to the wrong book (review S9)."""
+		if not (self.publish_on_website and self.slug):
+			return
+		if frappe.db.exists("Bookstack Book", {"publish_on_website": 1, "slug": self.slug, "name": ["!=", self.name]}):
+			frappe.throw(frappe._("Another published book already uses the web address /de/doku/{0}.").format(self.slug))
+
 	def on_update(self):
-		if self.has_value_changed("publish_on_website"):
+		# A new book has no earlier version; unpublished, it changes no links. (is_new() is already
+		# False in on_update after an insert, so the earlier version is checked instead.)
+		before = self.get_doc_before_save()
+		was_published = before.publish_on_website if before else 0
+		if bool(was_published) != bool(self.publish_on_website):
 			self.refresh_website_copies()
 		clear_docs_cache()
 
 	def on_trash(self):
+		# The sync deletes with force=True, which skips link checks: module profiles would keep a row
+		# pointing to the missing book and fail on their next save (review S4, #2006).
+		frappe.db.delete("Web Profile Book", {"book": self.name})
+		frappe.cache.delete_value("web_profile_items")
 		clear_docs_cache()
 
 	def refresh_website_copies(self):

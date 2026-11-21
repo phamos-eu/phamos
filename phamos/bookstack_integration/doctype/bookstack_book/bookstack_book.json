@@ -210,7 +210,8 @@
   {
    "read": 1,
    "report": 1,
-   "role": "Website Manager"
+   "role": "Website Manager",
+   "write": 1
   },
   {
    "permlevel": 1,
