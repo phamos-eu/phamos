@@ -90,7 +90,7 @@
   },
   {
    "default": "0",
-   "description": "A menu on the phriend (right-click): \"Leave me in peace\" for an hour, for today or until woken, and \"Mute warnings\" for up to 90 minutes. Each user decides for themselves.",
+   "description": "A menu on the phriend (right-click): \"Leave me in peace\" for an hour, for today or until called back, and \"Mute warnings\" for up to 90 minutes. Each user decides for themselves.",
    "fieldname": "quiet_mode",
    "fieldtype": "Check",
    "label": "Leave Me in Peace"

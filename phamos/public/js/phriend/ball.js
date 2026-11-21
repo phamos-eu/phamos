@@ -33,7 +33,7 @@ export const SVG = `
 			<circle class="pupil" cx="24" cy="31" r="2.8" fill="#111"/>
 			<circle class="pupil" cx="40" cy="31" r="2.8" fill="#111"/>
 		</g>
-		<path d="M27 42 Q32 46.5 37 42" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.85"/>
+		<path class="mouth" d="M27 42 Q32 46.5 37 42" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.85"/>
 	</g>
 </svg>`;
 
@@ -111,14 +111,15 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .ball:hover .leg-r { animation: wiggle-r 0.35s ease-in-out infinite alternate; }
 .ball.hop .body { animation: hop 0.45s ease-out 1; }
 .ball.busy .eyes { animation: squint 0.6s ease-in-out infinite alternate; }
-/* Leave me in peace (#2010): eyes closed, slow breathing, a "z" rising now and then. */
-.ball.dozing .eyes { animation: none; transform: scaleY(0.12); }
-.ball.dozing .body { animation-duration: 32s; }
-.zzz { position: absolute; right: 4px; top: -6px; display: none; pointer-events: none;
-	font-size: 13px; font-weight: 600; font-style: italic; color: var(--ph-muted); }
-.ball.dozing .zzz { display: block; animation: zzz 3.5s ease-out infinite; }
-@keyframes zzz { 0% { opacity: 0; transform: translate(0, 6px) scale(0.7); } 30% { opacity: 1; }
-	100% { opacity: 0; transform: translate(8px, -12px) scale(1.15); } }
+/* Leave me in peace (#2010): Phriend steps back but stays there, ready. Never asleep ("sleeping
+   on the job" is not the message, PM 2026-11-21): smaller, a little faded, without face and
+   legs; still breathing. Full strength again while the pointer is on it. */
+.ball svg { transition: transform 0.4s ease, opacity 0.4s ease; transform-origin: 50% 60%; }
+.eyes, .mouth, .leg { transition: opacity 0.3s ease; }
+.ball.resting svg { transform: translateY(10px) scale(0.6); opacity: 0.55; }
+.ball.resting .eyes, .ball.resting .mouth, .ball.resting .leg { opacity: 0; }
+.ball.resting .shadow { opacity: 0; animation: none; }
+.ball.resting:hover svg, .ball.resting .hit:focus-visible svg { opacity: 0.9; }
 :host([data-paused]) * { animation-play-state: paused !important; }
 /* "hidden" always hides, whatever display a class sets (AI review of !1162) */
 [hidden] { display: none !important; }
@@ -126,7 +127,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
 	.hand.show { animation: none !important; }
-	.ball.dozing .zzz { animation: none; }
+	.ball svg, .eyes, .mouth, .leg { transition: none; }
 }
 /* The phriend's menu (#2010): right-click, long press or the context-menu key. Where the
    bubble would be; the bubble steps aside while it is open. */
@@ -252,7 +253,6 @@ export class Ball {
 				<div class="menu" role="menu" hidden></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="hand" aria-hidden="true"></span>
-				<span class="zzz" aria-hidden="true">z</span>
 				<span class="pending"></span>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
@@ -451,9 +451,9 @@ export class Ball {
 		this.root.classList.toggle("has-pending", !!pending);
 	}
 
-	// Leave me in peace (#2010): eyes closed, slow breathing, a rising "z".
-	set_dozing(dozing) {
-		this.root.classList.toggle("dozing", !!dozing);
+	// Leave me in peace (#2010): smaller, faded, no face and legs, but there and ready.
+	set_resting(resting) {
+		this.root.classList.toggle("resting", !!resting);
 	}
 
 	// ---- the menu (#2010)

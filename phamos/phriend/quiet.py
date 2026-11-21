@@ -6,7 +6,7 @@ red warnings for up to 90 minutes. Stored per user as user defaults (no field on
 holds on Desk, in every cockpit and on other devices.
 
 Times are epoch milliseconds (UTC), as the browser counts them: "for today" ends at the user's
-local midnight, which only the browser knows. "forever" means until the user wakes Phriend.
+local midnight, which only the browser knows. "forever" means until the user calls Phriend back.
 """
 
 import time
@@ -46,7 +46,7 @@ def state(now=None):
 
 
 def set_quiet(until, now=None):
-	"""until: "forever", a time in ms within the next 25 hours, or empty to wake Phriend."""
+	"""until: "forever", a time in ms within the next 25 hours, or empty to call Phriend back."""
 	now = now or now_ms()
 	value = cstr(until).strip()
 	if not value:
@@ -56,7 +56,7 @@ def set_quiet(until, now=None):
 	else:
 		ms = cint(value)
 		if not now < ms <= now + MAX_QUIET_MS:
-			frappe.throw(_("Phriend can be quiet for today at most, or until you wake it."))
+			frappe.throw(_("Phriend can be quiet for today at most, or until you call it back."))
 		frappe.defaults.set_user_default(QUIET_DEFAULT, str(ms))
 	return state(now)
 

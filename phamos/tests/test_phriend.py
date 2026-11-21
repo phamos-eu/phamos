@@ -383,7 +383,7 @@ class TestPhriend(FrappeTestCase):
 		for refused in (now - 1000, now + 26 * 60 * 60 * 1000, "soon"):
 			with self.subTest(until=refused), self.assertRaises(frappe.ValidationError):
 				api.set_my_quiet(refused)
-		self.assertIsNone(api.set_my_quiet("")["quiet_until"])  # awake
+		self.assertIsNone(api.set_my_quiet("")["quiet_until"])  # back
 
 		muted = api.set_my_warning_mute(90)["warnings_muted_until"]
 		self.assertAlmostEqual(muted, now + 90 * 60 * 1000, delta=60 * 1000)
@@ -391,7 +391,7 @@ class TestPhriend(FrappeTestCase):
 			api.set_my_warning_mute(120)  # 90 minutes at most
 		self.assertIsNone(api.set_my_warning_mute(0)["warnings_muted_until"])
 
-		# a time that has passed reads as awake
+		# a time that has passed reads as not quiet
 		frappe.defaults.set_user_default(phriend_quiet.QUIET_DEFAULT, str(now - 1))
 		self.assertIsNone(phriend_quiet.state()["quiet_until"])
 

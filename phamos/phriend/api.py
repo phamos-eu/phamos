@@ -285,7 +285,7 @@ def _check_quiet_allowed():
 @frappe.whitelist(methods=["POST"])
 def set_my_quiet(until=None):
 	"""Leave me in peace (#2010) for the current user: "forever", a time in epoch ms (at most
-	the rest of today), or empty to wake Phriend. Returns the user's quiet state."""
+	the rest of today), or empty to call Phriend back. Returns the user's quiet state."""
 	_check_quiet_allowed()
 	return phriend_quiet.set_quiet(until)
 

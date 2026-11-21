@@ -30,8 +30,8 @@ export function end_of_today(now) {
 	return d.getTime();
 }
 
-// When to wake up by itself: ms from now, or null (not quiet, or until woken).
-export function wake_in(state, now) {
+// When to come back by itself: ms from now, or null (not quiet, or until called back).
+export function back_in(state, now) {
 	const until = state && state.quiet_until;
 	return typeof until === "number" && until > now ? until - now : null;
 }

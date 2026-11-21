@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { FOREVER, HOUR_MS, end_of_today, is_quiet, may_react, wake_in, warnings_muted } from "./quiet.js"
+import { FOREVER, HOUR_MS, end_of_today, is_quiet, may_react, back_in, warnings_muted } from "./quiet.js"
 
 const now = new Date(2026, 10, 21, 14, 30).getTime()
 
 describe("leave me in peace (#2010)", () => {
-	it("is quiet until the time stored, or until woken", () => {
+	it("is quiet until the time stored, or until called back", () => {
 		expect(is_quiet(null, now)).toBe(false)
 		expect(is_quiet({ quiet_until: now + HOUR_MS }, now)).toBe(true)
 		expect(is_quiet({ quiet_until: now - 1 }, now)).toBe(false)
@@ -22,9 +22,9 @@ describe("leave me in peace (#2010)", () => {
 	it("ends 'for today' at local midnight", () => {
 		expect(end_of_today(now)).toBe(new Date(2026, 10, 22, 0, 0).getTime())
 	})
-	it("wakes by itself only from a timed quiet", () => {
-		expect(wake_in({ quiet_until: now + 5000 }, now)).toBe(5000)
-		expect(wake_in({ quiet_until: FOREVER }, now)).toBe(null)
-		expect(wake_in({ quiet_until: now - 5 }, now)).toBe(null)
+	it("comes back by itself only from a timed quiet", () => {
+		expect(back_in({ quiet_until: now + 5000 }, now)).toBe(5000)
+		expect(back_in({ quiet_until: FOREVER }, now)).toBe(null)
+		expect(back_in({ quiet_until: now - 5 }, now)).toBe(null)
 	})
 })

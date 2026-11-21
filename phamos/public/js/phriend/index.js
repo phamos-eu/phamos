@@ -73,15 +73,15 @@ class Phriend {
 			const until = this.quiet.quiet_until;
 			entries.push(
 				{ heading: __("Leave me in peace") },
-				{ note: until === quiet.FOREVER ? __("Quiet until you wake me") : __("Quiet until {0}", [this.time_label(until)]) },
-				{ label: __("Wake up"), action: () => this.set_quiet("") }
+				{ note: until === quiet.FOREVER ? __("Quiet until you call me back") : __("Quiet until {0}", [this.time_label(until)]) },
+				{ label: __("Come back"), action: () => this.set_quiet("") }
 			);
 		} else {
 			entries.push(
 				{ heading: __("Leave me in peace") },
 				{ label: __("For 1 hour"), action: () => this.set_quiet(now + quiet.HOUR_MS) },
 				{ label: __("For today"), action: () => this.set_quiet(quiet.end_of_today(Date.now())) },
-				{ label: __("Until I wake you"), action: () => this.set_quiet(quiet.FOREVER) }
+				{ label: __("Until I call you back"), action: () => this.set_quiet(quiet.FOREVER) }
 			);
 		}
 		entries.push({ heading: __("Mute warnings") });
@@ -108,7 +108,7 @@ class Phriend {
 	async set_quiet(until) {
 		if (!(await this.save_quiet("phamos.phriend.api.set_my_quiet", { until }))) return;
 		if (this.is_quiet()) this.ball.hide_bubble();
-		else this.ball.react("wave"); // awake again
+		else this.ball.react("wave"); // back
 	}
 
 	async set_warning_mute(minutes) {
@@ -128,14 +128,14 @@ class Phriend {
 		}
 	}
 
-	// Doze while quiet, and wake by itself when the time is up.
+	// Step back while quiet (smaller, faded, still there), and come back when the time is up.
 	apply_quiet() {
 		if (!this.ball) return;
-		this.ball.set_dozing(this.is_quiet());
-		clearTimeout(this._wake_timer);
-		const wake = quiet.wake_in(this.quiet, Date.now());
+		this.ball.set_resting(this.is_quiet());
+		clearTimeout(this._back_timer);
+		const back = quiet.back_in(this.quiet, Date.now());
 		// a quiet time is at most a day; setTimeout can't wait much longer than 24 days anyway
-		if (wake !== null) this._wake_timer = setTimeout(() => this.apply_quiet(), wake + 500);
+		if (back !== null) this._back_timer = setTimeout(() => this.apply_quiet(), back + 500);
 	}
 
 	// A switch of Phriend Settings → Features. Missing means on: a host that doesn't send the
