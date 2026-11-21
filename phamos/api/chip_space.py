@@ -3,11 +3,19 @@
 
 """Chip Space (#2053): colleagues as avatar chips on a grid.
 
-Slice 1 (#2054) keeps only the user's own chip: where it stands, saved as a user default so it
-is back in the same spot after a reload, in any browser. No DocType, nothing to migrate.
+Slice 1 (#2054) keeps the user's own chip: where it stands, saved as a user default so it is
+back in the same spot after a reload, in any browser. No DocType, nothing to migrate.
+
+Positions are in tile units but not whole tiles: the grid is drawn, movement is free.
+
+Dummy chips for testing (until presence, #2055, shows the real people online) come from the
+site config, so they never appear on a site that does not set them:
+
+	"chip_space_dummies": [{"user": "chip-buddy@example.com", "x": 24, "y": 12}]
 """
 
 import json
+import math
 
 import frappe
 from frappe import _
@@ -16,6 +24,8 @@ from frappe import _
 COLS = 40
 ROWS = 25
 POSITION_KEY = "phamos_chip_space_position"
+DUMMIES_CONF_KEY = "chip_space_dummies"
+MAX_DUMMIES = 10
 
 
 def _require_user():
@@ -23,17 +33,19 @@ def _require_user():
 		frappe.throw(_("Please log in to use the Space."), frappe.PermissionError)
 
 
-def _clamp(value, upper):
-	"""An int inside 0..upper-1; anything that is not a number counts as 0."""
+def _clamp(value, cells):
+	"""A float inside 0..cells-1, two decimals; anything that is not a finite number counts as 0."""
 	try:
-		value = int(value)
+		value = float(value)
 	except (TypeError, ValueError):
-		value = 0
-	return max(0, min(upper - 1, value))
+		value = 0.0
+	if not math.isfinite(value):
+		value = 0.0
+	return round(max(0.0, min(cells - 1.0, value)), 2)
 
 
 def _spawn():
-	return {"x": COLS // 2, "y": ROWS // 2}
+	return {"x": float(COLS // 2), "y": float(ROWS // 2)}
 
 
 def _stored_position():
@@ -49,19 +61,37 @@ def _stored_position():
 	return {"x": _clamp(data.get("x"), COLS), "y": _clamp(data.get("y"), ROWS)}
 
 
+def _chip(user, position):
+	full_name, user_image = frappe.db.get_value("User", user, ["full_name", "user_image"]) or ("", "")
+	return {**position, "user": user, "full_name": full_name or user, "user_image": user_image or ""}
+
+
+def _dummies(me):
+	"""Test chips from the site config: existing, enabled users other than me."""
+	entries = frappe.conf.get(DUMMIES_CONF_KEY) or []
+	if not isinstance(entries, list):
+		return []
+	chips = []
+	for entry in entries[:MAX_DUMMIES]:
+		if not isinstance(entry, dict):
+			continue
+		user = entry.get("user")
+		if not isinstance(user, str) or user == me or not frappe.db.get_value("User", user, "enabled"):
+			continue
+		chips.append(_chip(user, {"x": _clamp(entry.get("x"), COLS), "y": _clamp(entry.get("y"), ROWS), "dummy": True}))
+	return chips
+
+
 @frappe.whitelist()
-def get_my_position():
-	"""My chip: where it stands (or the spawn tile), the grid size and how it looks."""
+def get_space():
+	"""The grid size, my chip (where it stands, or the spawn) and the other chips."""
 	_require_user()
 	user = frappe.session.user
-	full_name, user_image = frappe.db.get_value("User", user, ["full_name", "user_image"]) or ("", "")
 	return {
-		**(_stored_position() or _spawn()),
 		"cols": COLS,
 		"rows": ROWS,
-		"user": user,
-		"full_name": full_name or user,
-		"user_image": user_image or "",
+		"me": {**_chip(user, _stored_position() or _spawn()), "cols": COLS, "rows": ROWS},
+		"others": _dummies(user),
 	}
 
 
