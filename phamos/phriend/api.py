@@ -17,6 +17,7 @@ from frappe.utils import cint, cstr, escape_html, get_url, pretty_date, to_markd
 from frappe.utils.password import get_decrypted_password
 
 from phamos.phriend import events as phriend_events
+from phamos.phriend import feedback as phriend_feedback
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend import voice as phriend_voice
@@ -312,6 +313,55 @@ def claim_my_bubble(day=None):
 	if not cint(settings.get("one_voice")):
 		frappe.throw(_("One voice is switched off in Phriend Settings"), frappe.PermissionError)
 	return phriend_voice.claim(settings, day)
+
+
+def _check_feedback_allowed():
+	settings = _check_allowed()
+	if not phriend_feedback.is_on(settings):
+		frappe.throw(_("Rating questions are switched off in Phriend Settings"), frappe.PermissionError)
+	return settings
+
+
+@frappe.whitelist(methods=["POST"])
+def get_my_feedback_requests():
+	"""The current user's open rating questions (#2014). Fetched after the page loads, not in the
+	boot: Desk caches the boot per user, and a new question would not show until that cache is
+	cleared."""
+	_check_feedback_allowed()
+	return phriend_feedback.open_requests()
+
+
+@frappe.whitelist(methods=["POST"])
+def answer_feedback(name=None, rating=None, comment=None):
+	"""Rating a fix (#2014): the current user's answer to one of their questions."""
+	_check_feedback_allowed()
+	return phriend_feedback.answer(cstr(name), rating, comment)
+
+
+@frappe.whitelist(methods=["POST"])
+def defer_feedback(name=None):
+	"""The question was closed without an answer: ask again another day (at most 3 times)."""
+	_check_feedback_allowed()
+	return phriend_feedback.defer(cstr(name))
+
+
+@frappe.whitelist(methods=["POST"])
+def decline_feedback(name=None):
+	"""'No thanks': never ask this question again."""
+	_check_feedback_allowed()
+	return phriend_feedback.decline(cstr(name))
+
+
+@frappe.whitelist(methods=["POST"])
+def ask_feedback_now(issue=None, round=None):
+	"""Debug (phriend.ask_rating): ask the rating question for one report now, whether or not it
+	is live. For those who may change Phriend Settings."""
+	_check_feedback_allowed()
+	frappe.has_permission("Phriend Settings", "write", throw=True)
+	round_ = cstr(round) or phriend_feedback.FIRST
+	if round_ not in (phriend_feedback.FIRST, phriend_feedback.LATER):
+		frappe.throw(_("Round is First impression or Battle tested."))
+	return phriend_feedback.ask(cstr(issue), round_, phriend_feedback.live_since(cstr(issue)))
 
 
 @frappe.whitelist(methods=["POST"])

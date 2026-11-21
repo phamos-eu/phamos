@@ -142,7 +142,7 @@ export class Voice {
 	show(item) {
 		const ball = this.phriend.ball;
 		if (!ball) return false;
-		ball.say(item.html, item.ms ?? BUBBLE_MS, item.gesture || null);
+		ball.say(item.html, item.ms ?? BUBBLE_MS, item.gesture || null, { on_close: item.on_close || null });
 		if (item.bind) item.bind(ball.bubble);
 		return true;
 	}

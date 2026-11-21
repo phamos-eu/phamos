@@ -22,6 +22,9 @@
   "warn_email_failed",
   "warn_gitlab_sync_failed",
   "easter_eggs",
+  "rate_fixes",
+  "battle_tested_weeks",
+  "anonymous_feedback",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -165,6 +168,30 @@
    "label": "Easter Eggs"
   },
   {
+   "default": "0",
+   "description": "When a Phriend report has gone live on production, Phriend asks the person who reported it how it turned out: right after, and again once it has been in daily use. Bugs get thumbs up or down, improvements 1 to 5 stars.",
+   "fieldname": "rate_fixes",
+   "fieldtype": "Check",
+   "label": "Rating Questions"
+  },
+  {
+   "default": "6",
+   "depends_on": "eval:doc.rate_fixes",
+   "description": "The second question, \"Still good in daily use?\", this many weeks after going live.",
+   "fieldname": "battle_tested_weeks",
+   "fieldtype": "Int",
+   "label": "Battle-tested After (Weeks)",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.rate_fixes",
+   "description": "Answers are shown without the name of the person who gave them.",
+   "fieldname": "anonymous_feedback",
+   "fieldtype": "Check",
+   "label": "Anonymous Feedback"
+  },
+  {
    "fieldname": "gitlab_section",
    "fieldtype": "Section Break",
    "label": "GitLab"
@@ -240,7 +267,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-21 12:00:00.000000",
+ "modified": "2026-11-21 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",

@@ -245,8 +245,9 @@ def link_index() -> dict:
 	- hosts: BookStack hosts of the published books
 	- books: published book slugs, in title order
 	- pages / chapters: {slug: [book slugs]} of what the published books show
-	- page_ids: {BookStack page id: (book slug, page slug)} of every page, published or not, so a
-	  permalink to an unpublished copy can still be matched by its slug
+	- page_ids: {(BookStack host, page id): (book slug, page slug)} of every page, published or not,
+	  so a permalink to an unpublished copy can still be matched by its slug. Ids are per instance,
+	  hence the host.
 	- titles: {title key: [(book slug, page slug)]} of the shown pages, and page_titles:
 	  {(book slug, page slug): title key} of every page, for copies whose page has another slug
 	"""
@@ -280,10 +281,14 @@ def _load_link_index():
 
 	all_books = dict(frappe.get_all("Bookstack Book", fields=["name", "slug"], as_list=True))
 	all_pages = [
-		p for p in frappe.get_all("Bookstack Page", fields=["bookstack_id", "book", "slug", "title"])
+		p for p in frappe.get_all("Bookstack Page", fields=["instance", "bookstack_id", "book", "slug", "title"])
 		if p.slug and all_books.get(p.book)
 	]
-	page_ids = {p.bookstack_id: (all_books[p.book], p.slug) for p in all_pages}
+	host_of = {
+		c.name: urlsplit(c.instance_url or "").netloc
+		for c in frappe.get_all("Bookstack Configuration", fields=["name", "instance_url"])
+	}
+	page_ids = {(host_of.get(p.instance), p.bookstack_id): (all_books[p.book], p.slug) for p in all_pages}
 	page_titles = {(all_books[p.book], p.slug): _title_key(p.title) for p in all_pages}
 	return {
 		"hosts": sorted({b["source_host"] for b in books if b["source_host"]}),
@@ -334,7 +339,7 @@ def website_href(href, index, lang=DEFAULT_LANGUAGE):
 
 	permalink = _PERMALINK_PATH.match(parts.path)
 	if permalink:
-		book_slug, page_slug = index["page_ids"].get(int(permalink["id"]), (None, None))
+		book_slug, page_slug = index["page_ids"].get((parts.netloc, int(permalink["id"])), (None, None))
 		target = page_slug and _page_target(book_slug, page_slug, index)
 		return docs_url(lang, *target, fragment) if target else None
 
