@@ -1,8 +1,8 @@
 # Mailcow / SOGo calendar in the Personal Cockpit (milestone 68)
 
 Plan of 2026-10-23 for https://git.phamos.eu/phamos/phamos/-/milestones/68
-"Mailcow User Calendar from Wolfram". Kept in the repo like `personal-cockpit-draft.md`;
-the status table is updated as phases ship.
+"Mailcow User Calendar from Wolfram". Kept in the repo; the status table is updated as
+phases ship.
 
 ## Direction
 

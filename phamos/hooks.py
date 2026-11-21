@@ -80,8 +80,9 @@ add_to_apps_screen = [
 		"route": "/implementation-cockpit",
 		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
 	},
-	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher and "Open in Cockpit"
-	# skip it (no route in spa_boot.COCKPITS, no phamos.api.bookstack module).
+	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher only offers routes in
+	# spa_boot.COCKPITS; "Open in Cockpit" only takes tiles whose phamos.api.<name> module has a
+	# CockpitConfig. Neither applies to this tile.
 	{
 		"name": "bookstack",
 		"logo": "/assets/phamos/manifest/bookstack-icon-192.png",

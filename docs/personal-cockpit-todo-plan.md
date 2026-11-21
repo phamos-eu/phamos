@@ -1,4 +1,4 @@
-<!-- Approved plan of 2026-10-15 for the ToDo part of the Personal Cockpit (#1535, #1553–#1562). Kept verbatim; update the status in docs/personal-cockpit-draft.md. -->
+<!-- Approved plan of 2026-10-15 for the ToDo part of the Personal Cockpit (#1535, #1553–#1562). Kept verbatim; the status lives in the #1535 issues (the former docs/personal-cockpit-draft.md was removed in #2030). -->
 
 # Personal Cockpit ToDos: dashboard, targets, focus mode, day planning, Eisenhower, checklists
 
@@ -324,8 +324,8 @@ few, start the day, shut down the day" (8); "… Place ToDos in the calendar (Ma
 "… planned vs spontaneous closures" (10); "… opt-in pilot and evaluation (8–12 weeks)".
 Updates: #1541 (route move), #1542 (re-scope), #1545 and #290 (VEVENT, not VTODO; linked to 7/9),
 #477 (breaks become a Day Plan block type after 9), #1376 (MR 5 creates the module), #1211/#1309
-(future work-window source), #1535 umbrella paragraph; `docs/personal-cockpit-draft.md` gets this
-plan's status table and a Privacy section.
+(future work-window source), #1535 umbrella paragraph with this plan's status table and a
+Privacy section.
 
 ## 11. Verification
 
