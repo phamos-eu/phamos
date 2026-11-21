@@ -230,8 +230,64 @@
 		});
 	}
 
+	// Wide tables (#2045): like the cockpits' "More below" (spa_shared ScrollHint, #1922), turned
+	// sideways: a fade at each clipped edge and a "More to the right" pill that scrolls on.
+	function setupTables() {
+		const content = document.querySelector("[data-wp-docs-content]");
+		const boxes = [...document.querySelectorAll("[data-wp-docs-table]")];
+		if (!content || !boxes.length) return;
+		const label = content.dataset.labelMoreRight || "More to the right";
+		const title = content.dataset.labelScrollRest || label;
+		const tolerance = 2; // as spa_shared/utils/scrollOverflow.js: rounding leaves no hint at the end
+
+		for (const box of boxes) {
+			const scroller = box.querySelector(".wp-docs-table-scroll");
+			if (!scroller) continue;
+			const left = document.createElement("div");
+			left.className = "wp-docs-table-fade wp-docs-table-fade-left";
+			left.setAttribute("aria-hidden", "true");
+			const right = document.createElement("div");
+			right.className = "wp-docs-table-fade wp-docs-table-fade-right";
+			const pill = document.createElement("button");
+			pill.type = "button";
+			pill.className = "wp-docs-table-more";
+			pill.title = title;
+			pill.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
+			pill.prepend(document.createTextNode(label));
+			pill.addEventListener("mousedown", (event) => event.preventDefault());
+			pill.addEventListener("click", () =>
+				scroller.scrollBy({ left: Math.round(scroller.clientWidth * 0.8), behavior: smooth() })
+			);
+			right.append(pill);
+			box.append(left, right);
+
+			let frame = 0;
+			const measure = () => {
+				frame = 0;
+				const { scrollLeft, clientWidth, scrollWidth } = scroller;
+				box.classList.toggle("is-clipped-left", scrollLeft > tolerance);
+				box.classList.toggle("is-clipped-right", scrollLeft + clientWidth < scrollWidth - tolerance);
+			};
+			const measureSoon = () => {
+				if (!frame) frame = requestAnimationFrame(measure);
+			};
+			scroller.addEventListener("scroll", measureSoon, { passive: true });
+			if ("ResizeObserver" in window) {
+				// the box narrows with the window or the folded contents; images in cells load late
+				const observer = new ResizeObserver(measureSoon);
+				observer.observe(scroller);
+				const table = scroller.querySelector("table");
+				if (table) observer.observe(table);
+			} else {
+				window.addEventListener("resize", measureSoon);
+			}
+			measure();
+		}
+	}
+
 	function init() {
 		document.querySelectorAll("[data-wp-docs-search]").forEach(setupSearch);
+		setupTables();
 		setupNav();
 		setupOnThisPage();
 		setupChapters();
