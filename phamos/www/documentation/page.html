@@ -1,7 +1,8 @@
-{#- /de/dokumentation/<book>/<page> (and English). Context: page.py. -#}
+{#- /de/dokumentation/<book>/<page> (and English). Context: page.py.
+    Three columns (#2045): book contents (collapsible, remembered) · text · "On this page". -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
-{% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import nav_contents, jump_buttons with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -10,14 +11,20 @@
 <main class="wp-page wp-docs wp-docs-page">
 	<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
 
-	<div class="wp-docs-layout">
-		{#- Phones: the contents fold away above the text; desktop: a sidebar that stays in view. -#}
-		<details class="wp-docs-nav" open>
-			<summary><a href="{{ book.url | e }}">{{ book.title | e }}</a></summary>
-			<nav aria-label="{{ _('Contents') }}">{{ toc(contents, current=page.slug) }}</nav>
-		</details>
-		{#- Open without JavaScript; folded on phones so the text comes first. -#}
-		<script>document.currentScript.previousElementSibling.open = !matchMedia("(max-width: 860px)").matches;</script>
+	<div class="wp-docs-layout{% if page.headings | length > 1 %} wp-docs-has-onpage{% endif %}" data-wp-docs-layout>
+		{#- Collapsed before the first paint when the visitor folded it away last time (no jump). -#}
+		<script>try{if(localStorage.getItem("wp-docs-nav")==="closed"&&!matchMedia("(max-width: 860px)").matches)document.currentScript.parentElement.classList.add("wp-docs-nav-closed")}catch(e){}</script>
+		<aside class="wp-docs-nav" aria-label="{{ _('Contents') }}">
+			<div class="wp-docs-nav-head">
+				<a class="wp-docs-nav-book" href="{{ book.url | e }}">{{ book.title | e }}</a>
+				<button type="button" class="wp-docs-nav-toggle" data-wp-docs-nav-toggle hidden aria-controls="wp-docs-nav-body"
+					aria-expanded="true" data-label-hide="{{ _('Hide contents') }}" data-label-show="{{ _('Show contents') }}" title="{{ _('Hide contents') }}">
+					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6"/></svg>
+					<span class="wp-docs-nav-toggle-label">{{ _("Contents") }}</span>
+				</button>
+			</div>
+			<nav id="wp-docs-nav-body" class="wp-docs-nav-body">{{ nav_contents(contents, current=page.slug) }}</nav>
+		</aside>
 
 		<article class="wp-docs-article">
 			<header>
@@ -26,7 +33,7 @@
 				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</header>
 			{#- Sanitised by the BookStack sync (content.clean_page_html); links pointed at the website by docs.render_html. -#}
-			<div class="wp-body wp-docs-content" lang="de">{{ page.html }}</div>
+			<div class="wp-body wp-docs-content" lang="de" data-wp-docs-content>{{ page.html }}</div>
 
 			<nav class="wp-docs-pager" aria-label="{{ _('Pages') }}">
 				{%- if page.previous %}<a class="wp-link-card" href="{{ page.previous.url | e }}" rel="prev"><span class="wp-docs-pager-label">{{ _("Previous") }}</span><span>{{ page.previous.title | e }}</span></a>{% else %}<span></span>{% endif %}
@@ -38,6 +45,18 @@
 				{%- if page.url %}<a href="{{ page.url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a>{% endif %}
 			</p>
 		</article>
+
+		{%- if page.headings | length > 1 %}
+		<aside class="wp-docs-onpage" aria-labelledby="wp-docs-onpage-title">
+			<h2 id="wp-docs-onpage-title">{{ _("On this page") }}</h2>
+			<ol>
+				{%- for h in page.headings %}<li class="wp-docs-onpage-h{{ h.level }}"><a href="#{{ h.id | e }}" data-wp-docs-onpage="{{ h.id | e }}">{{ h.text | e }}</a></li>{% endfor %}
+			</ol>
+		</aside>
+		{%- endif %}
 	</div>
+	{{ jump_buttons(_("Next heading"), "h2, h3") }}
 </main>
 {% endblock %}
+
+{% block script %}{{ super() }}{{ include_script("web_docs.bundle.js") }}{% endblock %}

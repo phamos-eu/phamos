@@ -676,34 +676,54 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-edit-page:hover { background: var(--wp-surface-2); color: var(--wp-ink); text-decoration: none; }
 .wp-edit-page:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
 
-/* --- documentation (/de/dokumentation, phamos/phamos#2005) ----------------------------------------------- */
-/* Book contents beside the text on desktop; on phones they fold away above it. The text column is
-   capped for reading, the page itself stays full width like every other Web Profile page. */
-.wp-docs-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); column-gap: 48px; align-items: start; padding-bottom: 64px; }
-.wp-docs-nav { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; margin-top: 12px; padding-right: 8px; }
-.wp-docs-nav summary { list-style: none; margin-bottom: 10px; font-size: 15px; font-weight: 600; cursor: default; pointer-events: none; }
-.wp-docs-nav summary a { pointer-events: auto; }
-.wp-docs-nav summary::-webkit-details-marker { display: none; }
+/* --- documentation (/de/dokumentation, /en/documentation, phamos/phamos#2005, #2045) ----------------- */
+/* Full width (Wolfram, 2026-11-21): no 1680px cap, the columns share the window. */
+.wp-docs { max-width: none; }
+
+/* Page view: book contents · text · "On this page". */
+.wp-docs-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); column-gap: 40px; align-items: start; padding-bottom: 96px; }
+.wp-docs-layout.wp-docs-has-onpage { grid-template-columns: 280px minmax(0, 1fr) 240px; }
+.wp-docs-layout.wp-docs-nav-closed { grid-template-columns: 44px minmax(0, 1fr); }
+.wp-docs-layout.wp-docs-nav-closed.wp-docs-has-onpage { grid-template-columns: 44px minmax(0, 1fr) 240px; }
+
+.wp-docs-nav, .wp-docs-onpage, .wp-docs-chapter-index { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; overscroll-behavior: contain; }
+.wp-docs-nav { margin-top: 12px; padding-right: 6px; }
+.wp-docs-nav-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.wp-docs-nav-book { font-size: 15px; font-weight: 600; color: var(--wp-ink) !important; line-height: 1.3; }
+.wp-docs-nav-toggle { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 28px; padding: 0 6px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background: var(--wp-surface); color: var(--wp-muted); cursor: pointer; }
+.wp-docs-nav-toggle:hover { color: var(--wp-ink); border-color: #cfcfcf; }
+.wp-docs-nav-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+.wp-docs-nav-toggle-label { display: none; font-size: 13px; }
+.wp-docs-nav-closed .wp-docs-nav { overflow: visible; }
+.wp-docs-nav-closed .wp-docs-nav-book, .wp-docs-nav-closed .wp-docs-nav-body { display: none; }
+.wp-docs-nav-closed .wp-docs-nav-toggle svg { transform: rotate(180deg); }
+
 .wp-docs-toc, .wp-docs-toc ol { list-style: none; margin: 0; padding: 0; }
-.wp-docs-toc a { display: block; padding: 4px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink-2); line-height: 1.4; }
+.wp-docs-toc a { display: block; padding: 4px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink-2); font-weight: 400; line-height: 1.4; }
 .wp-docs-toc a:hover { background: var(--wp-surface-2); color: var(--wp-ink); }
 .wp-docs-toc a[aria-current="page"] { background: var(--wp-surface-3); color: var(--wp-ink); font-weight: 600; }
-.wp-docs-toc-chapter { margin-top: 12px; }
-/* Chapter pages indented, so a loose page after a chapter is not read as part of it. */
-.wp-docs-nav .wp-docs-toc-chapter ol { margin-left: 10px; padding-left: 4px; border-left: 1px solid var(--wp-line-soft); }
-.wp-docs-nav .wp-docs-toc-chapter + li:not(.wp-docs-toc-chapter) { margin-top: 12px; }
-.wp-docs-toc-label { display: block; padding: 4px 8px; color: var(--wp-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+/* Chapters bolder than pages; their pages indented below a thin line. */
+.wp-docs-toc-chapter { margin: 6px 0; }
+.wp-docs-toc-chapter summary { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink); font-weight: 600; line-height: 1.35; list-style: none; cursor: pointer; }
+.wp-docs-toc-chapter summary::-webkit-details-marker { display: none; }
+.wp-docs-toc-chapter summary::before { content: ""; flex: none; width: 6px; height: 6px; border-right: 1.5px solid var(--wp-muted); border-bottom: 1.5px solid var(--wp-muted); transform: rotate(-45deg); transition: transform 0.15s; }
+.wp-docs-toc-chapter details[open] > summary::before { transform: rotate(45deg); }
+.wp-docs-toc-chapter summary:hover { background: var(--wp-surface-2); }
+.wp-docs-toc-chapter ol { margin: 2px 0 4px 13px; padding-left: 4px; border-left: 1px solid var(--wp-line-soft); }
 
-/* Book page: the contents are the page. */
-.wp-docs-contents { max-width: 760px; padding-bottom: 32px; }
-.wp-docs-contents .wp-docs-toc { font-size: 15px; }
-.wp-docs-contents .wp-docs-toc-chapter { margin-top: 28px; }
-.wp-docs-contents .wp-docs-toc-chapter h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; scroll-margin-top: 24px; }
-.wp-docs-contents .wp-docs-toc-chapter ol { padding-left: 0; }
-
-.wp-docs-article { max-width: 780px; min-width: 0; }
+.wp-docs-article { min-width: 0; }
 .wp-docs-article > header { margin: 12px 0 20px; }
 .wp-docs-article h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; line-height: 1.15; margin-top: 6px; }
+.wp-docs-language { margin: 8px 0 0; }
+
+/* "On this page" */
+.wp-docs-onpage { margin-top: 12px; padding-left: 16px; border-left: 1px solid var(--wp-line-soft); }
+.wp-docs-onpage h2 { margin: 0 0 8px; color: var(--wp-muted); font-size: 12px !important; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.wp-docs-onpage ol { list-style: none; margin: 0; padding: 0; }
+.wp-docs-onpage a { display: block; padding: 3px 0; color: var(--wp-muted); font-size: 13px; line-height: 1.4; }
+.wp-docs-onpage a:hover, .wp-docs-onpage a.is-current { color: var(--wp-ink); }
+.wp-docs-onpage a.is-current { font-weight: 600; }
+.wp-docs-onpage-h3 a { padding-left: 12px; }
 
 /* Long-form content from BookStack: headings, lists, tables, code, images, callouts. */
 .wp-docs-content { font-size: 16px; line-height: 1.7; overflow-wrap: break-word; }
@@ -727,6 +747,8 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-docs-content .callout.warning { border-color: #e8a317; background: #fdf6e7; }
 .wp-docs-content .callout.danger { border-color: #e03131; background: #fdeeee; }
 
+.wp-docs-content h1, .wp-docs-content h2, .wp-docs-content h3, .wp-docs-content h4 { scroll-margin-top: 24px; }
+
 .wp-docs-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 40px; }
 .wp-docs-pager .wp-link-card { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; }
 .wp-docs-pager-next { grid-column: 2; align-items: flex-end !important; text-align: right; }
@@ -734,11 +756,69 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-docs-source { margin: 24px 0 0; color: var(--wp-muted); font-size: 13px; }
 .wp-docs-source a { color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 3px; }
 
+/* Book view: chapter index · numbered folding chapters. */
+.wp-docs-book-layout { padding-bottom: 96px; }
+.wp-docs-book-layout.wp-docs-has-index { display: grid; grid-template-columns: 280px minmax(0, 1fr); column-gap: 40px; align-items: start; }
+.wp-docs-chapter-index h2 { margin: 4px 0 8px; color: var(--wp-muted); font-size: 12px !important; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.wp-docs-chapter-index ol { list-style: none; margin: 0; padding: 0; }
+.wp-docs-chapter-index a { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink-2); line-height: 1.35; }
+.wp-docs-chapter-index a:hover { background: var(--wp-surface-2); color: var(--wp-ink); }
+.wp-docs-chapter-index a.is-current { background: var(--wp-surface-3); color: var(--wp-ink); font-weight: 600; }
+.wp-docs-chapter-num { flex: none; min-width: 22px; color: var(--wp-muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.wp-docs-toolbar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+.wp-docs-chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.wp-docs-chapter { border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); scroll-margin-top: 24px; }
+.wp-docs-chapter > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 14px 16px; list-style: none; cursor: pointer; }
+.wp-docs-chapter > summary::-webkit-details-marker { display: none; }
+.wp-docs-chapter > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--wp-muted); border-bottom: 2px solid var(--wp-muted); transform: rotate(45deg); transition: transform 0.15s; margin: 0 4px 4px; }
+.wp-docs-chapter[open] > summary::after { transform: rotate(-135deg); margin-bottom: -4px; }
+.wp-docs-chapter > summary:hover { background: var(--wp-surface-2); border-radius: var(--wp-radius); }
+.wp-docs-chapter > summary .wp-docs-chapter-num { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--wp-surface-3); color: var(--wp-ink); font-size: 13px; }
+.wp-docs-chapter-title h2 { margin: 0; font-size: 17px !important; font-weight: 600; line-height: 1.3; }
+.wp-docs-chapter-desc { display: block; margin-top: 2px; color: var(--wp-muted); font-size: 13px; line-height: 1.45; }
+.wp-docs-chapter-count { color: var(--wp-muted); font-size: 13px; white-space: nowrap; }
+/* Folded chapters show two lines of their description; open ones all of it. */
+.wp-docs-chapter:not([open]) .wp-docs-chapter-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.wp-docs .wp-intro { max-width: 960px; overflow-wrap: anywhere; }
+/* Pages of an open chapter in columns, so the width is used and long chapters stay short. */
+.wp-docs-chapter-pages { list-style: none; margin: 0; padding: 4px 16px 16px 60px; columns: 280px; column-gap: 32px; }
+.wp-docs-chapter-pages li { break-inside: avoid; }
+.wp-docs-chapter-pages a, .wp-docs-loose a { display: block; padding: 4px 8px; border-radius: var(--wp-radius-sm); color: var(--wp-ink-2); line-height: 1.4; }
+.wp-docs-chapter-pages a:hover, .wp-docs-loose a:hover { background: var(--wp-surface-2); color: var(--wp-ink); }
+.wp-docs-loose a { padding: 10px 16px 10px 60px; border: 1px dashed var(--wp-line); border-radius: var(--wp-radius); }
+.wp-docs-book-main > .wp-related { margin-top: 40px; }
+
+/* Floating buttons */
+.wp-docs-jump { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 20; display: flex; flex-direction: column; gap: 8px; }
+.wp-docs-jump-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--wp-line); border-radius: 50%; background: var(--wp-surface); color: var(--wp-ink); box-shadow: var(--wp-shadow-md); cursor: pointer; transition: opacity 0.15s, transform 0.15s; }
+.wp-docs-jump-btn:hover { border-color: #cfcfcf; transform: translateY(-1px); }
+.wp-docs-jump-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wp-docs-jump-btn.is-hidden { opacity: 0; pointer-events: none; }
+
+@media (max-width: 1200px) {
+	.wp-docs-layout.wp-docs-has-onpage { grid-template-columns: 260px minmax(0, 1fr); }
+	.wp-docs-layout.wp-docs-nav-closed.wp-docs-has-onpage { grid-template-columns: 44px minmax(0, 1fr); }
+	.wp-docs-onpage { display: none; }
+}
 @media (max-width: 860px) {
-	.wp-docs-layout { grid-template-columns: minmax(0, 1fr); }
+	.wp-docs-layout, .wp-docs-layout.wp-docs-has-onpage, .wp-docs-layout.wp-docs-nav-closed,
+	.wp-docs-layout.wp-docs-nav-closed.wp-docs-has-onpage, .wp-docs-book-layout.wp-docs-has-index { grid-template-columns: minmax(0, 1fr); }
 	.wp-docs-nav { position: static; max-height: none; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); }
-	.wp-docs-nav summary { margin: 0; cursor: pointer; pointer-events: auto; }
-	.wp-docs-nav[open] summary { margin-bottom: 8px; }
+	.wp-docs-nav-closed .wp-docs-nav-book { display: block; }
+	.wp-docs-nav-head { margin-bottom: 0; }
+	.wp-docs-nav-body { margin-top: 10px; }
+	.wp-docs-nav-toggle-label { display: inline; }
+	/* the chevron points up while the contents are open, down while folded */
+	.wp-docs-nav-toggle svg { transform: rotate(90deg); }
+	.wp-docs-nav-closed .wp-docs-nav-toggle svg { transform: rotate(-90deg); }
+	.wp-docs-toolbar { justify-content: flex-start; }  /* clear of the floating buttons on the right */
+	.wp-docs-jump-btn { width: 36px; height: 36px; }
+	.wp-docs-chapter-index { display: none; }
+	.wp-docs-chapter > summary { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 12px; }
+	.wp-docs-chapter-count { display: none; }
+	.wp-docs-chapter-pages { padding: 0 12px 12px 52px; }
+	.wp-docs-loose a { padding-left: 52px; }
 	.wp-docs-pager { grid-template-columns: minmax(0, 1fr); }
 	.wp-docs-pager-next { grid-column: 1; }
 }
