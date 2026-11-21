@@ -25,6 +25,7 @@
   "last_synced",
   "column_break_4",
   "sync_error_count",
+  "website_link_hash",
   "section_sync_selection",
   "sync_exclusions"
  ],
@@ -139,6 +140,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "website_link_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "read_only": 1,
+   "label": "Website Link Hash",
+   "no_copy": 1,
+   "description": "Fingerprint of what is published; when it changes, the website copies are fetched again so their links are right."
+  },
+  {
    "fieldname": "section_sync_selection",
    "fieldtype": "Section Break",
    "label": "Sync Selection",
@@ -150,7 +160,8 @@
    "fieldtype": "Table",
    "label": "Left out of the sync",
    "options": "Bookstack Sync Exclusion",
-   "description": "Books, chapters and pages that no sync mirrors into ERPNext, with everything under them. Set with Actions > Sync…; everything not listed is synced, new items too."
+   "description": "Books, chapters and pages that no sync mirrors into ERPNext, with everything under them. Set with Actions > Sync…; everything not listed is synced, new items too.",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

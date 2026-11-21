@@ -239,7 +239,8 @@ function bookstack_render_tree($area, books) {
 	$area.find(".bs-tree-search").on("input", function () {
 		const q = this.value.trim().toLowerCase();
 		$area.find(".bs-tree > .bs-tree-list > .bs-tree-item").each(function () {
-			const title = $(this).find(".bs-tree-box").first().data("title").toString().toLowerCase();
+			// dataset, not jQuery's .data(): that turns titles like "2024" or "[1]" into numbers/arrays
+			const title = ($(this).find(".bs-tree-box").get(0).dataset.title || "").toLowerCase();
 			$(this).toggle(!q || title.includes(q));
 		});
 	});

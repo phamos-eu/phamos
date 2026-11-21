@@ -46,6 +46,7 @@ def get_sync_tree(instance: str) -> list[dict]:
 	Loaded live, so items that were never synced show too. Drafts and templates are left out:
 	the sync never mirrors them as content.
 	"""
+	# Read is enough (decided 2026-11-21): showing the tree changes nothing; saving needs write.
 	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
 	client = BookstackClient(instance)
 	excluded = exclusions(instance)
@@ -92,8 +93,17 @@ def save_sync_selection(instance: str, excluded) -> dict:
 
 	``excluded``: [{"item_type", "bookstack_id", "title"}], as the dialog sends it (list or JSON).
 	"""
+	from phamos.bookstack_integration.sync import sync_lock
+
 	config = frappe.get_doc("Bookstack Configuration", instance)
 	config.check_permission("write")
+	# Under the sync lock: a sync running meanwhile has read the old selection and would put the
+	# removed records right back (review S8). A running sync makes this fail with SyncRunning.
+	with sync_lock(instance):
+		return _save_sync_selection(instance, config, excluded)
+
+
+def _save_sync_selection(instance: str, config, excluded) -> dict:
 
 	rows = []
 	for row in frappe.parse_json(excluded) or []:
@@ -109,6 +119,12 @@ def save_sync_selection(instance: str, excluded) -> dict:
 	config.save()
 
 	removed = remove_excluded(instance)
+	try:  # the public /de/doku pages (#2005) show the new state at once
+		from phamos.web_profile.docs import clear_cache
+	except ImportError:
+		pass
+	else:
+		clear_cache()
 	return {"excluded": len(rows), "removed": removed}
 
 

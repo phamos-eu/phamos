@@ -35,6 +35,11 @@ PAGE_HTML = f"""
 <a href="{BASE}/books/handbuch/page/entwurf">Entwurf</a>
 <a href="https://frappe.io/erpnext">Extern</a>
 <a href="javascript:alert(1)">Böse</a>
+<!-- interne Notiz: nicht veröffentlichen -->
+<a href="https://frappe.io" ping="https://tracker.test" name="cookie">Ping</a>
+<div class="wp-stretched-link fixed-top" id="frappe">Überdeckt die Seite</div>
+<img src="https://tracker.test/pixel.gif" alt="Fremd">
+<pre><code class="language-python">x = 1</code></pre>
 """
 
 DATA = {
@@ -159,6 +164,13 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 		self.assertIn('class="callout info"', html)
 		self.assertIn(f'src="{BASE}/uploads/images/bild.png"', html)
 		self.assertIn('loading="lazy"', html)
+		# review S6: no comments, ping, name, foreign classes or ids
+		for unsafe in ("interne Notiz", "ping=", 'name="cookie"', "wp-stretched-link", "fixed-top", 'id="frappe"'):
+			self.assertNotIn(unsafe, html)
+		self.assertIn("Überdeckt die Seite", html, "the text stays, only the attributes go")
+		self.assertIn('class="language-python"', html)
+		# images only from the BookStack host (privacy, 2026-11-21)
+		self.assertNotIn("tracker.test", html)
 
 	def test_links_to_published_pages_stay_on_the_website(self):
 		self._sync()
@@ -211,7 +223,7 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 	def test_only_managers_can_publish(self):
 		self._sync()
 		name = f"{INSTANCE}-BSB-1"
-		for role, expected in (("Bookstack User", 0), ("Bookstack Manager", 1)):
+		for role, expected in (("Bookstack User", 0), ("Bookstack Manager", 1), ("Website Manager", 1)):
 			email = f"bs-website-{role.split()[1].lower()}@example.com"
 			if not frappe.db.exists("User", email):
 				frappe.get_doc({
@@ -232,9 +244,13 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 		frappe.set_user("Guest")
 		try:
 			self.assertRaises(frappe.PermissionError, sync.sync_instance, INSTANCE)
-			self.assertRaises(frappe.PermissionError, sync.sync_all_instances)
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_only_the_background_start_is_callable_from_the_browser(self):
+		# The synchronous syncs run for minutes; a web request would be cut off holding the lock (S1).
+		whitelisted = {getattr(f, "__name__", "") for f in frappe.whitelisted if getattr(f, "__module__", "") == sync.__name__}
+		self.assertEqual(whitelisted, {"start_sync"})
 
 	def test_nothing_is_removed_when_bookstack_fails_or_returns_nothing(self):
 		self._sync()
@@ -450,3 +466,110 @@ class TestSyncLockAndBackground(_BookstackSyncCase):
 		with patch.object(sync, "_run_steps", return_value={"errors": 0}) as run, patch.object(sync.frappe, "publish_realtime"):
 			sync.run_sync_job(INSTANCE, "someone@example.com", steps=["pages"], remove_deleted_records=0)
 		self.assertEqual([name for name, _fn in run.call_args.args[1]], ["pages"])
+
+class TestReviewFixes(_BookstackSyncCase):
+	"""Findings of the review of !1270 (2026-11-21)."""
+
+	def test_incomplete_list_from_bookstack_fails_the_step(self):
+		from phamos.bookstack_integration.api_client import BookstackClient
+
+		client = BookstackClient.__new__(BookstackClient)
+		answers = iter([{"data": [{"id": 1}, {"id": 2}], "total": 5}, {"data": [], "total": 5}])
+		with patch.object(BookstackClient, "get", side_effect=lambda *a, **k: next(answers)):
+			got = []
+			with self.assertRaises(BookstackAPIError):
+				for item in client.paginate("books", page_size=2):
+					got.append(item)
+		self.assertEqual(len(got), 2, "items received are still handed on")
+
+		answers = iter([{"data": [{"id": 1}, {"id": 2}], "total": 4}, None])
+		with patch.object(BookstackClient, "get", side_effect=lambda *a, **k: next(answers)):
+			with self.assertRaises(BookstackAPIError):
+				list(client.paginate("books", page_size=2))
+
+	def test_no_removal_after_a_failed_list(self):
+		self._sync()
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["id"] != 102]
+		FakeBookstack.failing = {"chapters"}
+		stats = self._sync()
+		self.assertTrue(str(stats["removed"]).startswith("skipped"))
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+	def test_parent_removed_only_when_its_children_were_listed(self):
+		self._sync()
+		seen = {"Bookstack Book": {2}}  # book 1 missing, but chapters and pages were not listed
+		self.assertEqual(sync.remove_deleted(INSTANCE, seen), 0)
+		self.assertTrue(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-1"))
+
+	def test_mass_removal_is_refused(self):
+		self._sync()
+		with patch.object(sync, "REMOVAL_MIN_ALLOWED", 1):
+			# 3 of 4 pages missing: more than 20 %, so nothing goes
+			removed = sync.remove_deleted(INSTANCE, {"Bookstack Page": {100}})
+		self.assertEqual(removed, 0)
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+	def test_unchanged_records_are_not_saved_again(self):
+		self._sync()
+		before = frappe.db.get_value("Bookstack Page", f"{INSTANCE}-BSP-100", "modified")
+		self._sync()
+		self.assertEqual(frappe.db.get_value("Bookstack Page", f"{INSTANCE}-BSP-100", "modified"), before)
+
+		FakeBookstack.data["pages"][0]["name"] = "Erste (neu)"
+		self._sync()
+		self.assertEqual(frappe.db.get_value("Bookstack Page", f"{INSTANCE}-BSP-100", "title"), "Erste (neu)")
+
+	def test_new_unpublished_book_does_not_refetch_published_pages(self):
+		self._sync()
+		self._publish(1)
+		self._sync()
+		FakeBookstack.fetched = []
+		FakeBookstack.data["books"].append({"id": 3, "name": "Neu", "slug": "neu", "updated_at": "2026-11-01T10:00:00.000000Z"})
+		self._sync()
+		self.assertEqual(FakeBookstack.fetched, [])
+
+	def test_published_page_added_rewrites_links_everywhere(self):
+		self._sync()
+		self._publish(1)
+		self._sync()
+		FakeBookstack.fetched = []
+		FakeBookstack.data["pages"].append({"id": 103, "book_id": 1, "name": "Dritte", "slug": "dritte",
+			"priority": 3, "updated_at": "2026-11-01T10:00:00.000000Z"})
+		self._sync()
+		self.assertCountEqual(FakeBookstack.fetched, [100, 102, 103], "the link map changed, so every copy is refreshed")
+
+	def test_one_broken_page_does_not_stop_the_others(self):
+		self._sync()
+		self._publish(1)
+		real = sync.clean_page_html
+
+		def broken_for_100(html, base, link_map):
+			if FakeBookstack.fetched[-1] == 100:
+				raise ValueError("parser")
+			return real(html, base, link_map)
+
+		with patch.object(sync, "clean_page_html", side_effect=broken_for_100):
+			stats = self._sync()
+		self.assertEqual(stats["errors"], 0)
+		self.assertIsNone(_page(100))
+		self.assertIn("Zelle", _page(102))
+
+	def test_job_timeout_is_not_swallowed(self):
+		self._sync()
+		with patch.object(sync, "sync_pages", side_effect=sync._JOB_TIMEOUT("out of time")):
+			self.assertRaises(sync._JOB_TIMEOUT, self._sync)
+		self.assertFalse(sync.is_running(INSTANCE), "the lock is released")
+
+
+class TestSelectionUnderLock(_BookstackSyncCase):
+	"""Saving the selection deletes records, so it waits for no sync (review S8, #2029)."""
+
+	def test_saving_the_selection_during_a_sync_is_refused(self):
+		from phamos.bookstack_integration.selection import save_sync_selection
+
+		self._sync()
+		with sync.sync_lock(INSTANCE):
+			self.assertRaises(sync.SyncRunning, save_sync_selection, INSTANCE,
+				[{"item_type": "Book", "bookstack_id": 2, "title": "Intern"}])
+		self.assertTrue(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"), "nothing removed")
+		self.assertFalse(sync.is_running(INSTANCE))
