@@ -166,6 +166,8 @@ const desk = {
 	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
 	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
 	user: frappe.session.user,
+	// Phriend Settings → Features (#2009)
+	features: (frappe.boot.phriend && frappe.boot.phriend.features) || {},
 };
 
 frappe.provide("phriend");

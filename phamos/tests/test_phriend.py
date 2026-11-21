@@ -325,7 +325,8 @@ class TestPhriend(FrappeTestCase):
 		# Administrator may open the Implementation Cockpit, so the report flow links to it (#1671)
 		self.assertEqual(
 			phriend_boot(),
-			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1},
+			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
+				"features": {"reactions": 1}},
 		)
 
 		self.assertEqual(api.set_my_shortcut("Off"), "")
@@ -349,6 +350,20 @@ class TestPhriend(FrappeTestCase):
 		frappe.db.set_single_value("Phriend Settings", "shortcut", "")
 		setup.ensure_default_shortcut()
 		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut") or "", "")
+
+	def test_hands_and_reactions_start_on_and_can_be_switched_off(self, _enqueue):
+		# a site that saved Phriend Settings before the switch existed gets it on once (#2009)
+		self.addCleanup(self.set_settings, reactions=1)
+		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "reactions"})
+		setup.ensure_default_features()
+		frappe.clear_document_cache("Phriend Settings", "Phriend Settings")
+		self.assertEqual(phriend_boot()["features"], {"reactions": 1})
+
+		# switched off in the form: Desk and the cockpits get 0, and a migrate keeps it off
+		self.set_settings(reactions=0)
+		setup.ensure_default_features()
+		frappe.clear_document_cache("Phriend Settings", "Phriend Settings")
+		self.assertEqual(phriend_boot()["features"], {"reactions": 0})
 
 	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
 		doc = frappe.get_doc("Phriend Settings")

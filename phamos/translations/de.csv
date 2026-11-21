@@ -2535,3 +2535,6 @@ Drag onto the task that follows,Auf die nachfolgende Aufgabe ziehen
 Dependency,Abhängigkeit
 must finish before,muss fertig sein vor
 "Starts {0}, but {1} ends {2}","Beginnt {0}, aber {1} endet {2}"
+Hands and Reactions,Hände und Reaktionen
+"One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
+"Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
