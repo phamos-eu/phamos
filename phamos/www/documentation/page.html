@@ -2,7 +2,7 @@
     Three columns (#2045): book contents (collapsible, remembered) · text · "On this page". -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
-{% from "phamos/templates/web_profile/docs_macros.html" import nav_contents, jump_buttons with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import nav_contents, jump_buttons, search_box with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -23,7 +23,10 @@
 					<span class="wp-docs-nav-toggle-label">{{ _("Contents") }}</span>
 				</button>
 			</div>
-			<nav id="wp-docs-nav-body" class="wp-docs-nav-body">{{ nav_contents(contents, current=page.slug) }}</nav>
+			<div id="wp-docs-nav-body" class="wp-docs-nav-body">
+				{{ search_box(search_action, lang, book=book) }}
+				<nav aria-label="{{ _('Pages') }}">{{ nav_contents(contents, current=page.slug) }}</nav>
+			</div>
 		</aside>
 
 		<article class="wp-docs-article">

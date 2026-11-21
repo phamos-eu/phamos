@@ -225,6 +225,9 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
 for _lang, _slug in {"de": "dokumentation", "en": "documentation"}.items():
     website_route_rules += [
         {"from_route": f"/{_lang}/{_slug}", "to_route": "documentation/index", "defaults": {"lang": _lang}},
+        # before <book_slug>, which would catch it (#2046)
+        {"from_route": f"/{_lang}/{_slug}/" + {"de": "suche", "en": "search"}[_lang], "to_route": "documentation/search",
+         "defaults": {"lang": _lang}},
         {"from_route": f"/{_lang}/{_slug}/<book_slug>", "to_route": "documentation/book", "defaults": {"lang": _lang}},
         {"from_route": f"/{_lang}/{_slug}/<book_slug>/<page_slug>", "to_route": "documentation/page",
          "defaults": {"lang": _lang}},

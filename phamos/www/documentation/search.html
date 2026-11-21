@@ -1,0 +1,50 @@
+{#- /de/dokumentation/suche, /en/documentation/search. Context: search.py. Snippets are built and
+    escaped in docs_search.snippet (only <mark> is added); everything else goes through `| e`. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import search_box, book_tile with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-docs wp-docs-results">
+	<header class="wp-page-head">
+		<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
+		<h1>{{ _("Search the documentation") }}</h1>
+	</header>
+	<div class="wp-toolbar">
+		{{ search_box(search_action, lang, book=book, query=query) }}
+	</div>
+
+	{%- if query %}
+	<p class="wp-docs-results-count" role="status">
+		{%- if too_short %}{{ _("Please enter at least 2 characters.") }}
+		{%- elif result.total or result.books %}{{ _("{0} results for “{1}”").format((result.total or 0) + (result.books | length), query) | e }}
+		{%- else %}{{ _("No results for “{0}”").format(query) | e }}{% endif %}
+		{%- if book %} · {{ _("in {0}").format(book.title) | e }} · <a href="{{ all_books_url | e }}">{{ _("Search all books") }}</a>{% endif %}
+	</p>
+
+	{%- if result.books %}
+	<section class="wp-related" aria-label="{{ _('Books') }}">
+		<ul class="wp-grid">{% for b in result.books %}{{ book_tile(b) }}{% endfor %}</ul>
+	</section>
+	{%- endif %}
+
+	{%- if result.pages %}
+	<ol class="wp-docs-hits">
+		{%- for p in result.pages %}
+		<li class="wp-docs-hit">
+			<a class="wp-docs-hit-title" href="{{ p.url | e }}">{{ p.title | e }}</a>
+			<span class="wp-docs-hit-where">{{ p.book_title | e }}{% if p.chapter_title %} · {{ p.chapter_title | e }}{% endif %}</span>
+			{%- if p.snippet %}<p class="wp-docs-hit-snippet" lang="de">{{ p.snippet }}</p>{% endif %}
+		</li>
+		{%- endfor %}
+	</ol>
+	{%- if result.total > result.pages | length %}<p class="wp-note">{{ _("Showing the first {0} pages. Add words to narrow the search.").format(result.pages | length) }}</p>{% endif %}
+	{%- endif %}
+	{%- endif %}
+</main>
+{% endblock %}
+
+{% block script %}{{ super() }}{{ include_script("web_docs.bundle.js") }}{% endblock %}

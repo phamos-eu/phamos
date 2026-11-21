@@ -74,3 +74,19 @@
 		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></button>
 </div>
 {%- endmacro %}
+
+{#- Search field (#2046), the same element as on the Web Profile listings (/de/module): a plain GET
+    form that works without JavaScript; web_docs.bundle.js adds suggestions while typing. On book
+    and page views it searches that book unless unticked. -#}
+{% macro search_box(action, lang, book=None, query="") -%}
+<form class="wp-searchbar wp-docs-search" role="search" action="{{ action | e }}" method="get" data-wp-docs-search data-lang="{{ lang }}">
+	{%- set placeholder = _("Search in {0}").format(book.title) if book else _("Search the documentation") %}
+	<label class="wp-visually-hidden" for="wp-docs-q-{{ (book.slug if book else 'all') | e }}">{{ placeholder | e }}</label>
+	<input id="wp-docs-q-{{ (book.slug if book else 'all') | e }}" class="wp-search" type="search" name="q" value="{{ query | e }}"
+		minlength="2" maxlength="100" autocomplete="off" placeholder="{{ placeholder | e }}" data-wp-docs-search-input>
+	{%- if book %}
+	<label class="wp-docs-search-scope"><input type="checkbox" name="book" value="{{ book.slug | e }}" checked data-wp-docs-search-book> {{ _("Only this book") }}</label>
+	{%- endif %}
+	<ul class="wp-docs-suggest" role="listbox" hidden data-wp-docs-suggest></ul>
+</form>
+{%- endmacro %}

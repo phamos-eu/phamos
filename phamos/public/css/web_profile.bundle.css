@@ -837,3 +837,25 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 	.wp-docs-pager { grid-template-columns: minmax(0, 1fr); }
 	.wp-docs-pager-next { grid-column: 1; }
 }
+
+/* Search (#2046): the listings' field (.wp-searchbar, .wp-search) in their toolbar row. */
+.wp-docs-search { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.wp-docs-search .wp-search { flex: 1 1 260px; }
+.wp-docs-search-scope { display: inline-flex; align-items: center; gap: 6px; color: var(--wp-muted); font-size: 13px; white-space: nowrap; cursor: pointer; }
+.wp-docs-nav .wp-docs-search { margin-bottom: 12px; }
+.wp-docs-nav .wp-search { height: 34px; font-size: 13px; }
+.wp-docs-book-main > .wp-toolbar .wp-docs-toolbar { margin: 0 0 0 auto; }
+.wp-docs-suggest { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; margin: 4px 0 0; padding: 4px; list-style: none; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background: var(--wp-surface); box-shadow: var(--wp-shadow-md); max-height: 360px; overflow-y: auto; max-width: 560px; }
+.wp-docs-suggest a { display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border-radius: 4px; color: var(--wp-ink) !important; }
+.wp-docs-suggest a:hover, .wp-docs-suggest a[aria-selected="true"] { background: var(--wp-surface-2); }
+.wp-docs-suggest-title { font-weight: 500; line-height: 1.35; }
+.wp-docs-suggest-sub { color: var(--wp-muted); font-size: 12px; }
+.wp-docs-results-count { margin: 0 0 16px; color: var(--wp-muted); }
+.wp-docs-results-count a { color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.wp-docs-hits { list-style: none; margin: 0; padding: 0 0 96px; max-width: 960px; }
+.wp-docs-hit { padding: 14px 0; border-bottom: 1px solid var(--wp-line-soft); }
+.wp-docs-hit-title { font-size: 17px; font-weight: 600; color: var(--wp-ink) !important; }
+.wp-docs-hit-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.wp-docs-hit-where { display: block; margin-top: 2px; color: var(--wp-muted); font-size: 13px; }
+.wp-docs-hit-snippet { margin: 6px 0 0; color: var(--wp-ink-2); font-size: 14px; line-height: 1.55; }
+.wp-docs-hit-snippet mark { padding: 0 2px; border-radius: 3px; background: #fff3bf; color: inherit; }

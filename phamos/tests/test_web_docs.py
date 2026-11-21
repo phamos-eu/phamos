@@ -11,6 +11,8 @@ Run with
 import json
 import re
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import set_request
@@ -378,3 +380,129 @@ class TestDocsLayout(DocsFixture):
 
 	def test_other_website_pages_do_not_load_the_docs_script(self):
 		self.assertNotRegex(_render("de/module"), r'<script[^>]+src="[^"]*web_docs\.bundle')
+
+
+class TestDocsSearch(DocsFixture):
+	"""Search in published books and pages only (phamos/phamos#2046). The site may publish real books
+	too, so results are checked within this test's books."""
+
+	def setUp(self):
+		super().setUp()
+		from phamos.bookstack_integration.content import plain_text
+
+		for name in frappe.get_all("Bookstack Page", filters={"instance": INSTANCE, "html": ["is", "set"]}, pluck="name"):
+			html = frappe.db.get_value("Bookstack Page", name, "html")
+			frappe.db.set_value("Bookstack Page", name, "search_text", plain_text(html))
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", {"html": "<p>Die Umsatzsteuer & mehr</p>",
+			"search_text": "Die Umsatzsteuer & mehr wird am Xqzmonatsende gebucht"})
+		docs.clear_cache()
+
+	def _search(self, q, book_slug="handbuch-test"):
+		from phamos.web_profile.docs_search import search
+
+		return search(q, "de", book_slug=book_slug)
+
+	def _render_query(self, path, **query):
+		"""The results page as a visitor gets it: the query in the query string, not the path."""
+		from urllib.parse import urlencode
+
+		frappe.set_user("Guest")
+		set_request(method="GET", path=path, query_string=urlencode(query))
+		frappe.local.form_dict = frappe._dict(query)
+		try:
+			return get_response_content(path)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_a_word_inside_the_text_finds_the_page(self):
+		pages = self._search("Xqzmonatsende", book_slug=None)["pages"]
+		self.assertEqual([p["title"] for p in pages], ["Erste Schritte"])
+		self.assertIn("<mark>Xqzmonatsende</mark>", pages[0]["snippet"])
+
+	def test_unpublished_books_never_appear(self):
+		urls = [p["url"] for p in self._search("Geheim", book_slug=None)["pages"]]
+		self.assertFalse([u for u in urls if "intern-test" in u])
+		self.assertEqual(self._search("Geheim", book_slug="intern-test")["pages"], [])
+
+	def test_all_words_must_match_and_titles_come_first(self):
+		self.assertEqual(self._search("Umsatzsteuer nirgends")["pages"], [])
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", "search_text", "Hier geht es um Konten")
+		titles = [p["title"] for p in self._search("Konten")["pages"]]
+		self.assertEqual(titles, ["Konten", "Erste Schritte"])
+
+	def test_snippet_is_escaped(self):
+		self.assertIn("&amp;", self._search("Umsatzsteuer")["pages"][0]["snippet"])
+		snippet = self._search("am Xqzmonatsende")["pages"][0]["snippet"]
+		self.assertIn("&amp;", snippet, "a match never splits an entity")
+		self.assertIn(" <mark>am</mark> ", snippet)
+
+	def test_wildcards_are_literal(self):
+		self.assertEqual(self._search("%%")["pages"], [])
+		self.assertEqual(self._search("__")["pages"], [])
+
+	def test_scope_by_book(self):
+		self.assertEqual(len(self._search("Xqzmonatsende")["pages"]), 1)
+		self.assertEqual(self._search("Xqzmonatsende", book_slug="intern-test")["pages"], [])
+
+	def test_books_are_found_by_title(self):
+		slugs = [b.slug for b in self._search("Handbuch", book_slug=None)["books"]]
+		self.assertIn("handbuch-test", slugs)
+		self.assertNotIn("intern-test", slugs)
+
+	def test_results_page(self):
+		html = self._render_query("de/dokumentation/suche", q="Xqzmonatsende")
+		self.assertIn('href="/de/dokumentation/handbuch-test/erste-schritte"', html)
+		self.assertIn("1 Treffer für „Xqzmonatsende“", html)
+		self.assertIn('content="noindex, follow"', html)
+		self.assertIn("Bitte mindestens 2 Zeichen", self._render_query("de/dokumentation/suche", q="a"))
+		self.assertIn("Keine Treffer", self._render_query("de/dokumentation/suche", q="Nichtsdergleichenxq"))
+		english = self._render_query("en/documentation/search", q="Xqzmonatsende")
+		self.assertIn('href="/en/documentation/handbuch-test/erste-schritte"', english)
+		scoped = self._render_query("de/dokumentation/suche", q="Xqzmonatsende", book="handbuch-test")
+		self.assertIn("In allen Büchern suchen", scoped)
+
+	def test_search_boxes_on_the_pages(self):
+		self.assertIn('action="/de/dokumentation/suche"', _render("de/dokumentation"))
+		self.assertIn('name="book" value="handbuch-test" checked', _render("de/dokumentation/handbuch-test"))
+		self.assertIn('name="book" value="handbuch-test" checked', _render("de/dokumentation/handbuch-test/konten"))
+
+	def test_suggestions_for_guests(self):
+		from phamos.web_profile.docs_search import suggest
+
+		frappe.local.request = None  # called directly, not over HTTP: no rate limit
+		frappe.set_user("Guest")
+		try:
+			rows = suggest(q="Xqzmonatsende", lang="de")
+			self.assertEqual(suggest(q="a"), [])
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(rows[0]["url"], "/de/dokumentation/handbuch-test/erste-schritte")
+		self.assertNotIn("snippet", rows[0])
+
+	def test_suggestions_are_rate_limited(self):
+		from phamos.web_profile import docs_search
+
+		self.assertTrue(hasattr(docs_search.suggest, "__wrapped__"), "rate_limit wraps the method")
+
+	def test_count_and_title_hits_do_not_depend_on_the_row_limit(self):
+		from phamos.web_profile import docs_search
+
+		# "Konten" gets the word in its title; "Erste Schritte" (alphabetically first) only in its text
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzmonatsende im Text")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "title", "Zum Xqzmonatsende")
+		docs.clear_cache()
+		with patch.object(docs_search, "ROW_LIMIT", 1):
+			result = self._search("Xqzmonatsende")
+		self.assertEqual(result["total"], 2, "counted, not the rows read")
+		self.assertEqual([p["title"] for p in result["pages"]], ["Zum Xqzmonatsende"], "the title hit is the row read")
+
+	def test_a_book_named_like_the_search_page_cannot_be_published(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, "slug", "suche")
+		book = frappe.get_doc("Bookstack Book", self.hidden)
+		book.publish_on_website = 1
+		self.assertRaises(frappe.ValidationError, book.save, ignore_permissions=True)
+
+	def test_plain_text_for_the_search(self):
+		from phamos.bookstack_integration.content import plain_text
+
+		self.assertEqual(plain_text("<h2>Konten</h2><p>1200 <b>Bank</b></p>"), "Konten 1200 Bank")
