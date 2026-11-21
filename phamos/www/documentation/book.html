@@ -16,7 +16,6 @@
 				{%- if book.summary %}<p class="wp-intro" lang="de">{{ book.summary | e }}</p>{% endif %}
 				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</div>
-			{%- if first_page %}<a class="wp-button wp-button-primary" href="{{ first_page.url | e }}">{{ _("Start reading") }}</a>{% endif %}
 		</div>
 	</header>
 

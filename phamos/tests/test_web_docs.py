@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Public documentation pages under /de/dokumentationmentation and /en/documentation (phamos/phamos#2005, #2044).
+"""Public documentation pages under /de/dokumentation and /en/documentation (phamos/phamos#2005, #2044).
 
 Pages are rendered as a crawler gets them: as Guest, from the content the BookStack sync copied.
 Run with
@@ -292,6 +292,13 @@ class TestDocsEnglishAndLinks(TestWebDocs):
 		self.assertIn('href="https://frappe.io" rel="noopener"', html)
 		self.assertIn('href="/de/dokumentation/handbuch-test/konten">titel', html, "other slug, same title")
 		self.assertIn('href="/de/dokumentation/handbuch-test">kaputt', html, "broken chapter link opens the book")
+
+	def test_permalink_ids_belong_to_their_instance(self):
+		from phamos.web_profile.docs import link_index, website_href
+
+		index = link_index()
+		self.assertEqual(website_href("https://doku.example.test/link/330", index), "/de/dokumentation/handbuch-test/konten")
+		self.assertIsNone(website_href("https://andere-doku.example.test/link/330", index), "another host's page 330")
 
 	def test_english_page_links_stay_english(self):
 		html = _render("en/documentation/handbuch-test/erste-schritte")
