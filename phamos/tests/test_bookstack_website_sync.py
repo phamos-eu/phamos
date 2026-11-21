@@ -81,7 +81,9 @@ def _page(bookstack_id, field="html"):
 	return frappe.db.get_value("Bookstack Page", f"{INSTANCE}-BSP-{bookstack_id}", field)
 
 
-class TestBookstackWebsiteSync(FrappeTestCase):
+class _BookstackSyncCase(FrappeTestCase):
+	"""Fake BookStack, a test configuration and a rollback; no tests of its own."""
+
 	def setUp(self):
 		frappe.db.savepoint("bookstack_website_sync")
 		if not frappe.db.exists("Bookstack Configuration", INSTANCE):
@@ -111,6 +113,8 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		book.publish_on_website = value
 		book.save(ignore_permissions=True)
 
+
+class TestBookstackWebsiteSync(_BookstackSyncCase):
 	def test_only_pages_of_published_books_get_content(self):
 		self._sync()
 		self.assertEqual(FakeBookstack.fetched, [])
@@ -243,3 +247,74 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		FakeBookstack.data["pages"] = []
 		self._sync()
 		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+
+class TestSyncLockAndBackground(_BookstackSyncCase):
+	"""One sync per instance at a time; "Sync All" runs as a background job (#2004)."""
+
+	def test_second_sync_is_refused_while_one_runs(self):
+		with sync.sync_lock(INSTANCE):
+			self.assertTrue(sync.is_running(INSTANCE))
+			self.assertRaises(sync.SyncRunning, self._sync)
+		self.assertFalse(sync.is_running(INSTANCE))
+		self._sync()  # free again
+
+	def test_hourly_job_skips_a_busy_instance_quietly(self):
+		self._sync()
+		self._publish(1)
+		errors_before = frappe.db.count("Error Log")
+		real = sync.sync_published_instance
+
+		def only_this_test(name):
+			# Other configurations on the site (real BookStack instances) are not touched.
+			return real(name) if name == INSTANCE else {"instance": name}
+
+		with patch.object(sync, "sync_published_instance", side_effect=only_this_test), sync.sync_lock(INSTANCE):
+			results = sync.sync_published_content()
+		self.assertNotIn(INSTANCE, [r["instance"] for r in results])
+		self.assertEqual(frappe.db.count("Error Log"), errors_before)
+
+	def test_lock_is_freed_when_a_sync_fails(self):
+		with patch.object(sync, "BookstackClient", side_effect=RuntimeError("no connection")):
+			self.assertRaises(RuntimeError, self._sync)
+		self.assertFalse(sync.is_running(INSTANCE))
+
+	def test_sync_all_queues_one_background_job(self):
+		with patch.object(sync.frappe, "enqueue") as enqueue:
+			self.assertEqual(sync.start_sync(INSTANCE), {"queued": True})
+			kwargs = enqueue.call_args.kwargs
+			self.assertEqual(enqueue.call_args.args[0], "phamos.bookstack_integration.sync.run_sync_job")
+			self.assertEqual((kwargs["queue"], kwargs["job_id"], kwargs["deduplicate"]),
+				("long", f"bookstack_sync::{INSTANCE}", True))
+			self.assertEqual(kwargs["instance"], INSTANCE)
+
+			enqueue.reset_mock()
+			with sync.sync_lock(INSTANCE):
+				self.assertRaises(sync.SyncRunning, sync.start_sync, INSTANCE)
+			enqueue.assert_not_called()
+
+	def test_sync_all_needs_access_to_the_configuration(self):
+		frappe.set_user("Guest")
+		try:
+			with patch.object(sync.frappe, "enqueue") as enqueue:
+				self.assertRaises(frappe.PermissionError, sync.start_sync, INSTANCE)
+				enqueue.assert_not_called()
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_job_reports_the_result_to_the_user_who_started_it(self):
+		def sync_events(publish):
+			# Frappe also publishes ordinary list updates while records are saved.
+			return [c for c in publish.call_args_list if c.args and c.args[0] == sync.REALTIME_EVENT]
+
+		with patch.object(sync.frappe, "publish_realtime") as publish:
+			stats = sync.run_sync_job(INSTANCE, "someone@example.com")
+		self.assertEqual(stats["errors"], 0)
+		[event] = sync_events(publish)
+		self.assertEqual(event.args[1], stats)
+		self.assertEqual(event.kwargs["user"], "someone@example.com")
+
+		with patch.object(sync.frappe, "publish_realtime") as publish, sync.sync_lock(INSTANCE):
+			stats = sync.run_sync_job(INSTANCE, "someone@example.com")
+		self.assertIn("already running", stats["failed"])
+		self.assertEqual(len(sync_events(publish)), 1)
