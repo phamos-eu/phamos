@@ -362,10 +362,13 @@ let resizeObserver = null
 
 onMounted(() => {
 	chartWidth.value = chartViewportWidth()
-	resizeObserver = new ResizeObserver(() => {
-		chartWidth.value = chartViewportWidth()
-	})
-	resizeObserver.observe(scroller.value)
+	// Test DOMs (jsdom, happy-dom) have no ResizeObserver; the width then stays as measured here.
+	if (typeof ResizeObserver !== "undefined" && scroller.value) {
+		resizeObserver = new ResizeObserver(() => {
+			chartWidth.value = chartViewportWidth()
+		})
+		resizeObserver.observe(scroller.value)
+	}
 	nextTick(scrollToToday)
 })
 
