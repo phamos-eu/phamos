@@ -52,8 +52,11 @@ export function nextListIndex(current, count, direction) {
 }
 
 // Ctrl/Cmd+S: "save" in Frappe Desk, here the primary action of the open dialog (#2032).
+// event.key follows the layout; on a non-Latin one (Cyrillic, Greek) the physical S key counts.
 export function isSaveKey(event) {
-	return Boolean(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && String(event.key).toLowerCase() === "s"
+	if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return false
+	const key = String(event.key).toLowerCase()
+	return key === "s" || (!/^[a-z]$/.test(key) && event.code === "KeyS")
 }
 
 // The frappe-ui dialog on top: Headless UI appends each new one to the body, so the last wins.
@@ -65,10 +68,15 @@ export function topDialog(root = typeof document !== "undefined" ? document : nu
 	return dialogs?.length ? dialogs[dialogs.length - 1] : null
 }
 
-// frappe-ui solid buttons are the only ones with white text; red ones are destructive.
+// A frappe-ui solid Button, told by the pressed colour only its solid variant has (Button.vue);
+// white-text toggles like the appointment weekday chips are not. Red ones are destructive.
 // A disabled or loading frappe-ui button loses these classes and looks like any other
 // disabled button, so its variant can't be told from the DOM.
-const isWhite = (button) => button.classList.contains("text-ink-white")
+const SOLID_ACTIVE = ["active:bg-surface-gray-5", "active:bg-blue-700", "active:bg-green-800"]
+const isWhite = (button) =>
+	button.classList.contains("text-ink-white") &&
+	SOLID_ACTIVE.some((name) => button.classList.contains(name)) &&
+	!button.hasAttribute?.("aria-pressed")
 const isRed = (button) => button.classList.contains("bg-surface-red-5")
 
 // What Ctrl/Cmd+S runs in a dialog: a button to click, a form to submit, or null.
@@ -87,4 +95,17 @@ export function dialogPrimaryAction(dialog) {
 	if (buttons.some((b) => b.disabled || isRed(b))) return null
 	const forms = dialog.querySelectorAll("form")
 	return forms.length === 1 ? forms[0] : null
+}
+
+// The Ctrl/Cmd+S handler CockpitShell listens with (capture phase, so a field or editor inside
+// the dialog cannot swallow it). While a dialog is open the browser's "Save page" never opens.
+export function onDialogSaveKey(event, root = typeof document !== "undefined" ? document : null) {
+	if (!isSaveKey(event)) return
+	const dialog = topDialog(root)
+	if (!dialog) return
+	event.preventDefault()
+	if (event.repeat || event.isComposing) return
+	const action = dialogPrimaryAction(dialog)
+	if (action?.tagName === "FORM") action.requestSubmit()
+	else action?.click()
 }
