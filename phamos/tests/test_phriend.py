@@ -12,6 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from PIL import Image
 
 from phamos.phriend import api, setup, shortcut
+from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend.boot import boot_session, phriend_boot
 from phamos.www.spa_boot import get_spa_boot
 
@@ -43,7 +44,7 @@ class TestPhriend(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("phriend_test")
-		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None,
+		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0,
 			gitlab_url="https://git.example.com", gitlab_project="phamos/phamos", gitlab_labels="phriend")
 
 	def tearDown(self):
@@ -326,7 +327,7 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
-				"features": {"reactions": 1}},
+				"features": {"reactions": 1, "quiet_mode": 0}, "quiet": None, "can_configure": 1},
 		)
 
 		self.assertEqual(api.set_my_shortcut("Off"), "")
@@ -357,13 +358,42 @@ class TestPhriend(FrappeTestCase):
 		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "reactions"})
 		setup.ensure_default_features()
 		frappe.clear_document_cache("Phriend Settings", "Phriend Settings")
-		self.assertEqual(phriend_boot()["features"], {"reactions": 1})
+		self.assertEqual(phriend_boot()["features"]["reactions"], 1)
 
 		# switched off in the form: Desk and the cockpits get 0, and a migrate keeps it off
 		self.set_settings(reactions=0)
 		setup.ensure_default_features()
 		frappe.clear_document_cache("Phriend Settings", "Phriend Settings")
-		self.assertEqual(phriend_boot()["features"], {"reactions": 0})
+		self.assertEqual(phriend_boot()["features"]["reactions"], 0)
+
+	def test_leave_me_in_peace_needs_its_switch_and_keeps_to_its_limits(self, _enqueue):
+		# #2010: each user's quiet time and warning mute, as user defaults
+		for key in (phriend_quiet.QUIET_DEFAULT, phriend_quiet.MUTE_DEFAULT):
+			self.addCleanup(frappe.defaults.clear_user_default, key)
+		with self.assertRaises(frappe.PermissionError):
+			api.set_my_quiet("forever")  # off by default
+		self.assertIsNone(phriend_boot()["quiet"])
+
+		self.set_settings(quiet_mode=1)
+		now = phriend_quiet.now_ms()
+		hour = now + 60 * 60 * 1000
+		self.assertEqual(api.set_my_quiet(str(hour))["quiet_until"], hour)
+		self.assertEqual(phriend_boot()["quiet"]["quiet_until"], hour)
+		self.assertEqual(api.set_my_quiet("forever")["quiet_until"], "forever")
+		for refused in (now - 1000, now + 26 * 60 * 60 * 1000, "soon"):
+			with self.subTest(until=refused), self.assertRaises(frappe.ValidationError):
+				api.set_my_quiet(refused)
+		self.assertIsNone(api.set_my_quiet("")["quiet_until"])  # awake
+
+		muted = api.set_my_warning_mute(90)["warnings_muted_until"]
+		self.assertAlmostEqual(muted, now + 90 * 60 * 1000, delta=60 * 1000)
+		with self.assertRaises(frappe.ValidationError):
+			api.set_my_warning_mute(120)  # 90 minutes at most
+		self.assertIsNone(api.set_my_warning_mute(0)["warnings_muted_until"])
+
+		# a time that has passed reads as awake
+		frappe.defaults.set_user_default(phriend_quiet.QUIET_DEFAULT, str(now - 1))
+		self.assertIsNone(phriend_quiet.state()["quiet_until"])
 
 	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
 		doc = frappe.get_doc("Phriend Settings")

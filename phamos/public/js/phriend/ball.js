@@ -59,6 +59,7 @@ export const GESTURES = {
 };
 
 const REACT_MS = 1600; // how long a reaction without words shows
+const LONG_PRESS_MS = 550; // touch: a press this long opens the menu (#2010)
 
 // Colours and type for everything inside the Shadow DOM (the flow adds its own rules).
 const BASE_CSS = `
@@ -110,6 +111,14 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .ball:hover .leg-r { animation: wiggle-r 0.35s ease-in-out infinite alternate; }
 .ball.hop .body { animation: hop 0.45s ease-out 1; }
 .ball.busy .eyes { animation: squint 0.6s ease-in-out infinite alternate; }
+/* Leave me in peace (#2010): eyes closed, slow breathing, a "z" rising now and then. */
+.ball.dozing .eyes { animation: none; transform: scaleY(0.12); }
+.ball.dozing .body { animation-duration: 32s; }
+.zzz { position: absolute; right: 4px; top: -6px; display: none; pointer-events: none;
+	font-size: 13px; font-weight: 600; font-style: italic; color: var(--ph-muted); }
+.ball.dozing .zzz { display: block; animation: zzz 3.5s ease-out infinite; }
+@keyframes zzz { 0% { opacity: 0; transform: translate(0, 6px) scale(0.7); } 30% { opacity: 1; }
+	100% { opacity: 0; transform: translate(8px, -12px) scale(1.15); } }
 :host([data-paused]) * { animation-play-state: paused !important; }
 /* "hidden" always hides, whatever display a class sets (AI review of !1162) */
 [hidden] { display: none !important; }
@@ -117,7 +126,25 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
 	.hand.show { animation: none !important; }
+	.ball.dozing .zzz { animation: none; }
 }
+/* The phriend's menu (#2010): right-click, long press or the context-menu key. Where the
+   bubble would be; the bubble steps aside while it is open. */
+.menu {
+	position: absolute; bottom: calc(100% + 8px); right: 0; min-width: 220px; max-width: 280px; padding: 6px;
+	border-radius: 12px; background: var(--ph-bg); color: var(--ph-text); border: 1px solid var(--ph-border);
+	box-shadow: var(--ph-shadow); font-size: 13px; line-height: 1.35; cursor: auto;
+}
+.ball.flip .menu { right: auto; left: 0; }
+.menu-heading { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ph-muted); }
+.menu-note { padding: 2px 8px 6px; font-size: 12px; color: var(--ph-muted); }
+.menu-sep { height: 1px; margin: 4px 2px; background: var(--ph-border); }
+.menu-row { display: flex; gap: 4px; padding: 2px 4px 4px; }
+.menu button { display: block; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent;
+	color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.menu-row button { flex: 1; padding: 5px 4px; text-align: center; border: 1px solid var(--ph-border); }
+.menu button:hover, .menu button:focus-visible { background: var(--ph-surface); outline: none; }
+.menu button:focus-visible { box-shadow: 0 0 0 2px var(--ph-focus); }
 /* The hand beside the ball, at the side away from the badge (top right). Near the left edge
    (flip) it moves to the right side, mirrored, so it stays on screen and still faces Phriend. */
 .hand {
@@ -206,8 +233,9 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 `;
 
 export class Ball {
-	// options: { label, on_click, on_badge_click, on_first_interest, start, hands }
+	// options: { label, on_click, on_badge_click, on_first_interest, start, hands, menu }
 	// hands: false when "Hands and reactions" is off in Phriend Settings (#2009)
+	// menu: optional () => entries for the menu (#2010), see open_menu(); none = no menu
 	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
 	// of their own buttons in the corner)
 	constructor(options) {
@@ -219,8 +247,10 @@ export class Ball {
 			<style>${BASE_CSS}</style>
 			<div class="ball">
 				<div class="bubble" role="status" aria-live="polite"></div>
+				<div class="menu" role="menu" hidden></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="hand" aria-hidden="true"></span>
+				<span class="zzz" aria-hidden="true">z</span>
 				<span class="pending"></span>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
@@ -231,6 +261,7 @@ export class Ball {
 		this.root = this.shadow.querySelector(".ball");
 		this.hit = this.shadow.querySelector(".hit"); // the ball itself: drag, click, keyboard
 		this.bubble = this.shadow.querySelector(".bubble");
+		this.menu = this.shadow.querySelector(".menu");
 		this.hand = this.shadow.querySelector(".hand");
 		this.badge = this.shadow.querySelector(".badge");
 		this.keys = this.shadow.querySelector(".keys");
@@ -247,6 +278,7 @@ export class Ball {
 		this.setup_eyes();
 		this.setup_interest();
 		this.setup_pause();
+		this.setup_menu();
 
 		this.badge.addEventListener("pointerdown", (e) => e.stopPropagation());
 		this.badge.addEventListener("click", (e) => {
@@ -319,29 +351,45 @@ export class Ball {
 	setup_drag() {
 		let start = null;
 		let dragging = false;
+		let pressed = false; // a long press opened the menu: no click when the finger lifts
+		let press_timer = null;
 
 		this.hit.addEventListener("pointerdown", (e) => {
 			if (e.button !== 0) return;
 			const rect = this.root.getBoundingClientRect();
 			start = { x: e.clientX, y: e.clientY, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
 			dragging = false;
+			pressed = false;
 			this.hit.setPointerCapture(e.pointerId);
+			// touch and pen have no right click: a long press opens the menu (#2010)
+			clearTimeout(press_timer);
+			if (e.pointerType !== "mouse" && this.options.menu) {
+				press_timer = setTimeout(() => {
+					if (!start || dragging) return;
+					pressed = true;
+					this.open_menu();
+				}, LONG_PRESS_MS);
+			}
 		});
 
 		this.hit.addEventListener("pointermove", (e) => {
 			if (!start) return;
-			if (!dragging && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
+			if (!dragging && !pressed && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
 				dragging = true;
+				clearTimeout(press_timer);
 				this.root.classList.add("dragging");
 			}
 			if (dragging) this.set_position(e.clientX - start.dx, e.clientY - start.dy);
 		});
 
 		const end = (e, cancelled) => {
+			clearTimeout(press_timer);
 			if (!start) return;
 			this.hit.releasePointerCapture(e.pointerId);
 			start = null;
-			if (dragging) {
+			if (pressed) {
+				pressed = false;
+			} else if (dragging) {
 				this.root.classList.remove("dragging");
 				storage_set(
 					POS_KEY,
@@ -401,10 +449,109 @@ export class Ball {
 		this.root.classList.toggle("has-pending", !!pending);
 	}
 
+	// Leave me in peace (#2010): eyes closed, slow breathing, a rising "z".
+	set_dozing(dozing) {
+		this.root.classList.toggle("dozing", !!dozing);
+	}
+
+	// ---- the menu (#2010)
+
+	setup_menu() {
+		if (!this.options.menu) return;
+		this.hit.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.open_menu();
+		});
+		this.hit.addEventListener("keydown", (e) => {
+			if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+				e.preventDefault();
+				this.open_menu();
+			}
+		});
+		this.menu.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.menu.addEventListener("keydown", (e) => this.on_menu_key(e));
+		// a click anywhere else closes it; inside the shadow root the path tells where it was
+		document.addEventListener(
+			"pointerdown",
+			(e) => this.menu_open() && !e.composedPath().includes(this.root) && this.close_menu(false),
+			true
+		);
+	}
+
+	menu_open() {
+		return !this.menu.hidden;
+	}
+
+	// entries from options.menu(): { heading }, { note }, { separator: true },
+	// { label, action }, or { row: [{ label, action, title }] } for buttons side by side.
+	// Labels and notes are plain text.
+	open_menu() {
+		const entries = (this.options.menu && this.options.menu()) || [];
+		if (!entries.length) return;
+		this.hide_bubble();
+		this.menu.replaceChildren(...entries.map((entry) => this.menu_entry(entry)));
+		this.menu.hidden = false;
+		const first = this.menu.querySelector("button");
+		if (first) first.focus();
+	}
+
+	menu_entry(entry) {
+		const div = (cls, text) => {
+			const el = document.createElement("div");
+			el.className = cls;
+			if (text) el.textContent = text;
+			return el;
+		};
+		const button = (item) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.setAttribute("role", "menuitem");
+			b.textContent = item.label;
+			if (item.title) b.title = item.title;
+			b.addEventListener("click", () => {
+				this.close_menu(false);
+				item.action();
+			});
+			return b;
+		};
+		if (entry.separator) return div("menu-sep");
+		if (entry.heading) return div("menu-heading", entry.heading);
+		if (entry.note) return div("menu-note", entry.note);
+		if (entry.row) {
+			const row = div("menu-row");
+			row.setAttribute("role", "group");
+			row.append(...entry.row.map(button));
+			return row;
+		}
+		return button(entry);
+	}
+
+	close_menu(focus_ball = true) {
+		if (!this.menu_open()) return;
+		this.menu.hidden = true;
+		this.menu.replaceChildren();
+		if (focus_ball) this.hit.focus();
+	}
+
+	on_menu_key(e) {
+		if (e.key === "Escape" || e.key === "Tab") {
+			e.preventDefault();
+			this.close_menu(true);
+			return;
+		}
+		if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+		e.preventDefault();
+		const buttons = [...this.menu.querySelectorAll("button")];
+		const i = buttons.indexOf(this.shadow.activeElement);
+		const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
+		buttons[(i + step + buttons.length) % buttons.length].focus();
+	}
+
 	// html: trusted markup built by Phriend itself (user text is escaped by the caller).
 	// ms = 0 keeps the bubble until the next say() or hide_bubble().
 	// gesture: a key of GESTURES; the hand shows while this bubble shows.
 	say(html, ms = 4000, gesture = null) {
+		this.close_menu(false); // the bubble sits where the menu is
 		clearTimeout(this._bubble_timer);
 		clearTimeout(this._react_timer);
 		this.bubble.innerHTML = html;

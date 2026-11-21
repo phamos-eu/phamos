@@ -13,6 +13,7 @@
   "shortcut",
   "features_section",
   "reactions",
+  "quiet_mode",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -86,6 +87,13 @@
    "fieldname": "reactions",
    "fieldtype": "Check",
    "label": "Hands and Reactions"
+  },
+  {
+   "default": "0",
+   "description": "A menu on the phriend (right-click): \"Leave me in peace\" for an hour, for today or until woken, and \"Mute warnings\" for up to 90 minutes. Each user decides for themselves.",
+   "fieldname": "quiet_mode",
+   "fieldtype": "Check",
+   "label": "Leave Me in Peace"
   },
   {
    "fieldname": "gitlab_section",
@@ -163,7 +171,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-21 08:00:00.000000",
+ "modified": "2026-11-21 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",

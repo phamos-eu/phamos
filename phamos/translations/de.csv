@@ -2538,3 +2538,23 @@ must finish before,muss fertig sein vor
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Leave me in peace,Lass mich in Ruhe
+Quiet until you wake me,"Ruhig, bis Sie mich wecken"
+Quiet until {0},Ruhig bis {0}
+Wake up,Aufwachen
+For 1 hour,Für 1 Stunde
+For today,Für heute
+Until I wake you,Bis ich dich wecke
+Mute warnings,Warnungen stummschalten
+Muted until {0},Stumm bis {0}
+Hear warnings again,Warnungen wieder zeigen
+Mute warnings for {0} minutes,Warnungen für {0} Minuten stummschalten
+Report a problem,Ein Problem melden
+Phriend Settings,Phriend-Einstellungen
+That didn't work. Please try again.,Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.
+right-click for options,Rechtsklick für Optionen
+Leave Me in Peace,Lass mich in Ruhe
+"A menu on the phriend (right-click): ""Leave me in peace"" for an hour, for today or until woken, and ""Mute warnings"" for up to 90 minutes. Each user decides for themselves.","Ein Menü am Phriend (Rechtsklick): „Lass mich in Ruhe“ für eine Stunde, für heute oder bis zum Wecken, und „Warnungen stummschalten“ für bis zu 90 Minuten. Jeder Nutzer entscheidet selbst."
+Leave me in peace is switched off in Phriend Settings,„Lass mich in Ruhe“ ist in den Phriend-Einstellungen ausgeschaltet
+"Phriend can be quiet for today at most, or until you wake it.","Phriend kann höchstens für heute ruhig sein, oder bis Sie ihn wecken."
+"Warnings can be muted for 30, 60 or 90 minutes.","Warnungen können für 30, 60 oder 90 Minuten stummgeschaltet werden."
