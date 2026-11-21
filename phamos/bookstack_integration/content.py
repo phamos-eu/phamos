@@ -120,7 +120,10 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 			rel = a.get("rel") or []
 			a["rel"] = sorted({*(rel if isinstance(rel, list) else rel.split()), "noopener"})
 	for img in soup.find_all("img"):
-		src = urljoin(base, img.get("src") or "")
+		if not (img.get("src") or "").strip():
+			img.decompose()  # urljoin would turn an empty src into the BookStack start page
+			continue
+		src = urljoin(base, img["src"].strip())
 		# Only images from the BookStack host: any other host would learn every visitor's IP
 		# address (privacy, decided 2026-11-21). Copying images to phamos.eu comes later.
 		if urlsplit(src).netloc != instance_host or urlsplit(src).scheme not in ("http", "https"):
