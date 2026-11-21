@@ -56,13 +56,14 @@
 </template>
 
 <script setup>
-import { getCurrentInstance, onMounted } from "vue"
+import { getCurrentInstance, onBeforeUnmount, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 import InstallAppDialog from "@spa/components/InstallAppDialog.vue"
 import { mountPhriend } from "@spa/phriend.js"
 import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
+import { onDialogSaveKey } from "@spa/utils/shortcuts.js"
 
 const props = defineProps({
 	title: { type: String, default: "" },
@@ -76,4 +77,8 @@ const glow = useCockpitGlow()
 // the cockpit's realtime socket, so Phriend hears its events (#2012)
 const socket = getCurrentInstance()?.appContext.config.globalProperties.$socket
 onMounted(() => mountPhriend(router, () => props.title, socket))
+
+// Ctrl/Cmd+S runs the open dialog's primary action, as in Frappe Desk (#2032).
+onMounted(() => document.addEventListener("keydown", onDialogSaveKey, true))
+onBeforeUnmount(() => document.removeEventListener("keydown", onDialogSaveKey, true))
 </script>

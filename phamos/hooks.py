@@ -211,6 +211,12 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
+# Documentation from BookStack (phamos/phamos#2005), German only: the content is German.
+website_route_rules += [
+    {"from_route": "/de/doku", "to_route": "doku/index", "defaults": {"lang": "de"}},
+    {"from_route": "/de/doku/<book_slug>", "to_route": "doku/book", "defaults": {"lang": "de"}},
+    {"from_route": "/de/doku/<book_slug>/<page_slug>", "to_route": "doku/page", "defaults": {"lang": "de"}},
+]
 # Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
 SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
 for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
@@ -222,15 +228,9 @@ for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
-# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
-# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
-# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
-    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
-    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
-    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 
@@ -600,6 +600,14 @@ fixtures = [
 ]
 
 scheduler_events = {
+    # BookStack (#2004): on the long queue, a first copy of a big book takes minutes
+    "hourly_long": [
+        # keep the website copy of published books fresh
+        "phamos.bookstack_integration.sync.sync_published_content",
+    ],
+    "daily_long": [
+        "phamos.bookstack_integration.sync.sync_all_instances",
+    ],
     "daily": [
         # Implementation Release: capacity shrinks every day, leave changes (#1986)
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
@@ -608,7 +616,6 @@ scheduler_events = {
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
-        "phamos.bookstack_integration.sync.sync_all_instances",
         # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)

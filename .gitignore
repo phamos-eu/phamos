@@ -8,7 +8,7 @@ phamos/docs/current
 node_modules/*
 !node_modules/.gitkeep
 **/node_modules/
-phamos/public/dist/js
+phamos/public/dist/
 phamos/public/node_modules
 
 # SPA Vite build output (built via yarn build / postinstall)
