@@ -70,6 +70,8 @@ export function mountPhriend(router, heading) {
 		shortcut: boot().phriend.shortcut || "",
 		default_shortcut: boot().phriend.default_shortcut || "",
 		user: boot().user?.name || "",
+		// Phriend Settings → Features (#2009)
+		features: boot().phriend.features || {},
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})
