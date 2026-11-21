@@ -169,8 +169,10 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 	).run(as_dict=True)
 
 	every_variant = [v for w in words for v in variants[w]]
+	# Rows come ordered from the database (exact words first, then title hits, then by title); a
+	# snippet is built only for the rows that are shown, not for every row read (review of !1291).
 	pages = []
-	for r in rows:
+	for r in rows[:limit]:
 		book = by_name[r.book]
 		pages.append({
 			"title": r.title or r.slug,
@@ -179,10 +181,8 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 			"chapter_title": r.chapter_title,
 			"snippet": snippet(r.search_text, every_variant),
 			"in_title": matches(r.title),
-			"exact": matches(f"{r.title} {r.search_text}", strict=True),
 		})
-	pages.sort(key=lambda p: (not p["exact"], not p["in_title"], p["title"].lower()))
-	return {"books": book_hits, "pages": pages[:limit], "total": total, "words": words, "corrected": corrected}
+	return {"books": book_hits, "pages": pages, "total": total, "words": words, "corrected": corrected}
 
 
 def corrected_query(query, corrected) -> str:

@@ -164,6 +164,8 @@
 
 		const items = () => [...list.querySelectorAll("a")];
 		const close = () => {
+			request++; // an answer still on its way must not reopen the list (Escape, query cleared)
+			clearTimeout(timer);
 			list.hidden = true;
 			list.replaceChildren();
 			active = -1;

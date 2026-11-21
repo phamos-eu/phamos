@@ -496,6 +496,12 @@ class TestDocsSearch(DocsFixture):
 		self.assertEqual(result["total"], 2, "counted, not the rows read")
 		self.assertEqual([p["title"] for p in result["pages"]], ["Zum Xqzmonatsende"], "the title hit is the row read")
 
+	def test_a_book_named_like_the_search_page_cannot_be_published(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, "slug", "suche")
+		book = frappe.get_doc("Bookstack Book", self.hidden)
+		book.publish_on_website = 1
+		self.assertRaises(frappe.ValidationError, book.save, ignore_permissions=True)
+
 	def test_plain_text_for_the_search(self):
 		from phamos.bookstack_integration.content import plain_text
 
