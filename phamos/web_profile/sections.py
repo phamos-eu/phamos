@@ -550,6 +550,7 @@ def load_teams(lang):
 def load_modules(lang):
 	industries = _profile_map("Industry Web Profile", "industry", "industry")
 	industry_titles = _industry_titles(lang)
+	module_books = _children("Web Profile Book", "Module Web Profile", "book")
 	module_industries = {}
 	for industry, modules in _children("Web Profile Module", "Industry Web Profile", "module").items():
 		for module in modules:
@@ -571,7 +572,8 @@ def load_modules(lang):
 		item["search"] = item["title"].lower()
 		item["summary"] = localized(r, "summary", lang)
 		item["body"] = localized(r, "content", lang)
-		item["data"] = {"complexity": r.complexity, "duration": _duration(r.typical_duration), "key_person": r.key_person}
+		item["data"] = {"complexity": r.complexity, "duration": _duration(r.typical_duration), "key_person": r.key_person,
+			"books": module_books.get(r.name, [])}  # Bookstack Book names, shown when published (#2006)
 		items.append(item)
 	return items
 
@@ -998,7 +1000,14 @@ def build_profile(item, lang):
 		if item.data.get("duration"):
 			facts.append({"label": _("Typical duration"), "value": item.data["duration"]})
 		overview = [_("{0} is an ERPNext module that phamos introduces step by step, together with the people who will use it.").format(item.title)]
-		# Content first (projects, industries), the people afterwards; the sidebar keeps the key person.
+		# Content first (guides, projects, industries), the people afterwards; the sidebar keeps the key person.
+		book_tiles = documentation_tiles(item.data.get("books"), lang)
+		if book_tiles:
+			intro = _("Guides for {0} from our documentation.").format(item.title)
+			if lang != "de":
+				intro += " " + _("The documentation is in German.")
+			sections.append({"title": _("Documentation"), "intro": intro, "tiles": book_tiles,
+				"count": len(book_tiles), "see_all": None})
 		add_related(_("Implementations"), _("Projects in which {0} was introduced.").format(item.title),
 			"implementations", facet="module", values=[item.slug])
 		add_related(_("Industries"), _("Industries where {0} plays a central role.").format(item.title),
@@ -1100,6 +1109,27 @@ def build_profile(item, lang):
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)
+
+
+def documentation_tiles(book_names, lang):
+	"""Tiles for the BookStack books a profile links, in table order; unpublished books are left out
+	(phamos/phamos#2006). The books are German, so English pages say so on every tile."""
+	from phamos.web_profile.docs import published_books
+	from phamos.web_profile.icons import module_icon
+
+	if not book_names:
+		return []
+	books = {b.name: b for b in published_books()}
+	return [
+		frappe._dict(section="docs", name=n, url=books[n].url, title=books[n].title, subtitle=books[n].summary,
+			icon=module_icon("file"), initials=books[n].title[:1], chips=[] if lang == "de" else [_("in German")])
+		for n in book_names if n in books
+	]
+
+
+def modules_for_book(book_name, lang):
+	"""Published module profiles that link a book, for the book's own page."""
+	return [m for m in get_items("modules", lang) if book_name in (m.data.get("books") or [])]
 
 
 def faqs(item, lang):

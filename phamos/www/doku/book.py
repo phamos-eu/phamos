@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 
 from phamos.web_profile import docs
+from phamos.web_profile.sections import modules_for_book
 
 
 def get_context(context):
@@ -18,6 +19,7 @@ def get_context(context):
 	context.contents = docs.book_contents(book)
 	first = docs.reading_order(context.contents)
 	context.first_page = first[0] if first else None
+	context.modules = modules_for_book(book.name, "de")  # module pages that link this book (#2006)
 	docs.set_page_seo(
 		context,
 		title=f"{book.title} · {_('Documentation')}",

@@ -127,3 +127,55 @@ class TestWebDocs(FrappeTestCase):
 		items = _footer_items([frappe._dict(label="Dokumentation")], "de")
 		self.assertEqual([(c.label, c.url) for c in items[0].child_items],
 			[("Handbuch & Test", "/de/doku/handbuch-test")])
+
+
+MODULE = "WP Docs Test Module"
+
+
+class TestModuleDocumentationLinks(TestWebDocs):
+	"""Module pages link their books, the book page links back (phamos/phamos#2006)."""
+
+	def setUp(self):
+		super().setUp()
+		from phamos.web_profile.sections import clear_items
+
+		if not frappe.db.exists("Implementation Module", MODULE):
+			frappe.get_doc({"doctype": "Implementation Module", "module_name": MODULE}).insert(ignore_permissions=True)
+		self.profile = frappe.get_doc({
+			"doctype": "Module Web Profile", "module": MODULE, "published": 1, "route": "docs-test-modul",
+			"documentation": [{"book": self.book}, {"book": self.hidden}],
+		}).insert(ignore_permissions=True)
+		clear_items()
+
+	def tearDown(self):
+		super().tearDown()
+		from phamos.web_profile.sections import clear_items
+
+		clear_items()
+
+	def test_module_page_shows_published_books(self):
+		html = _render("de/module/docs-test-modul")
+
+		self.assertIn("Dokumentation", html)
+		self.assertIn('href="/de/doku/handbuch-test"', html)
+		self.assertNotIn("intern-test", html, "unpublished books are left out")
+		self.assertNotIn("auf Deutsch", html)
+
+	def test_english_module_page_says_the_books_are_german(self):
+		html = _render("en/modules/docs-test-modul")
+
+		self.assertIn('href="/de/doku/handbuch-test"', html)
+		self.assertIn("in German", html)
+
+	def test_unpublishing_removes_the_tile(self):
+		book = frappe.get_doc("Bookstack Book", self.book)
+		book.publish_on_website = 0
+		book.save(ignore_permissions=True)
+
+		self.assertNotIn('href="/de/doku/handbuch-test"', _render("de/module/docs-test-modul"))
+
+	def test_book_page_links_back_to_the_module(self):
+		html = _render("de/doku/handbuch-test")
+
+		self.assertIn("Passendes Modul", html)
+		self.assertIn('href="/de/module/docs-test-modul"', html)
