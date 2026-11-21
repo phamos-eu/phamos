@@ -150,15 +150,18 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .menu-row button { flex: 1; padding: 5px 4px; text-align: center; border: 1px solid var(--ph-border); }
 .menu button:hover, .menu button:focus-visible { background: var(--ph-surface); outline: none; }
 .menu button:focus-visible { box-shadow: 0 0 0 2px var(--ph-focus); }
-/* The hand beside the ball, at the side away from the badge (top right). Near the left edge
-   (flip) it moves to the right side, mirrored, so it stays on screen and still faces Phriend. */
+/* The hand at "heart" height (PM, 2026-11-21): on the lower edge of the sphere, a little in
+   front of it, on the side that faces into the screen, and gesturing into the screen, never at
+   the edge. Phriend in the right half: hand on its left, mirrored so it points left; in the
+   left half (hand-right): hand on its right, as the emoji are drawn. */
 .hand {
-	position: absolute; left: -16px; top: 20px; font-size: 22px; line-height: 1; pointer-events: none;
+	position: absolute; left: -5px; top: 33px; font-size: 22px; line-height: 1; pointer-events: none;
 	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-	opacity: 0; transform: scale(0.4); transform-origin: 70% 90%; transition: opacity 0.2s, transform 0.2s;
+	scale: -1 1;
+	opacity: 0; transform: scale(0.4); transform-origin: 50% 85%; transition: opacity 0.2s, transform 0.2s;
 }
 .hand.show { opacity: 1; transform: none; }
-.ball.flip .hand { left: auto; right: -10px; scale: -1 1; }
+.ball.hand-right .hand { left: auto; right: -5px; scale: none; }
 .hand.show[data-motion="wave"] { animation: hand-wave 0.5s ease-in-out infinite alternate; }
 .hand.show[data-motion="bounce"] { animation: hand-bounce 0.6s ease-out 1; }
 .hand.show[data-motion="sway"] { animation: hand-sway 1.2s ease-in-out infinite alternate; }
@@ -282,6 +285,7 @@ export class Ball {
 			this.root.style.bottom = `${options.start.bottom}px`;
 		}
 		this.restore_position();
+		this.update_hand_side();
 		this.setup_drag();
 		this.setup_eyes();
 		this.setup_interest();
@@ -349,10 +353,18 @@ export class Ball {
 		top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
 		Object.assign(this.root.style, { left: `${left}px`, top: `${top}px`, right: "auto", bottom: "auto" });
 		this.root.classList.toggle("flip", left < 260); // keep the speech bubble on screen
+		this.update_hand_side();
+	}
+
+	// The hand goes on the side that faces into the screen (PM, 2026-11-21).
+	update_hand_side() {
+		const rect = this.root.getBoundingClientRect();
+		const centre = rect.width ? rect.left + rect.width / 2 : window.innerWidth; // not laid out: right corner
+		this.root.classList.toggle("hand-right", centre < window.innerWidth / 2);
 	}
 
 	clamp_into_view() {
-		if (!this.root.style.left) return;
+		if (!this.root.style.left) return this.update_hand_side();
 		this.set_position(parseFloat(this.root.style.left), parseFloat(this.root.style.top));
 	}
 
