@@ -2543,7 +2543,7 @@ Content Updated At,Inhalt aktualisiert am
 No documentation is published yet.,Es ist noch keine Dokumentation veröffentlicht.
 {0} pages,{0} Seiten
 Start reading,Lesen beginnen
-Open on doku.phamos.eu,Auf doku.phamos.eu öffnen
+Open on {0},Auf {0} öffnen
 Updated on {0},Aktualisiert am {0}
 Previous,Zurück
 1 page,1 Seite
@@ -2555,3 +2555,4 @@ Sync started in the background. The tree reloads when it is done.,"Synchronisier
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.

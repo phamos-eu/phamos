@@ -10,6 +10,8 @@ URLs use BookStack's slugs: /de/doku/<book>/<page>.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import frappe
 from bs4 import BeautifulSoup
 
@@ -83,6 +85,7 @@ def _load_books():
 			"summary": (r.website_summary or r.description or "").strip(),
 			"shelf": r.shelf,
 			"source_url": r.url,
+			"source_host": urlsplit(r.url).netloc if r.url else "",
 			"url": book_url(r.slug),
 			"page_count": page_count[r.name],
 		})

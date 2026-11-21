@@ -8,6 +8,17 @@ from phamos.web_profile.docs import clear_cache as clear_docs_cache
 
 
 class BookstackBook(Document):
+	def validate(self):
+		self.validate_unique_web_address()
+
+	def validate_unique_web_address(self):
+		"""Two published books with one slug would share /de/doku/<slug>; only one could be shown,
+		and links of the other instance would lead to the wrong book (review S9)."""
+		if not (self.publish_on_website and self.slug):
+			return
+		if frappe.db.exists("Bookstack Book", {"publish_on_website": 1, "slug": self.slug, "name": ["!=", self.name]}):
+			frappe.throw(frappe._("Another published book already uses the web address /de/doku/{0}.").format(self.slug))
+
 	def on_update(self):
 		# A new book has no earlier version; unpublished, it changes no links. (is_new() is already
 		# False in on_update after an insert, so the earlier version is checked instead.)

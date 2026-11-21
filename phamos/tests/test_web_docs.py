@@ -127,5 +127,22 @@ class TestWebDocs(FrappeTestCase):
 		items = _footer_items([frappe._dict(label="Dokumentation")], "de")
 		links = [(c.label, c.url) for c in items[0].child_items]
 		# The site may publish real books too; only this test's books are checked.
-		self.assertIn(("Handbuch & Test", "/de/doku/handbuch-test"), links)
+		self.assertIn(("Handbuch &amp; Test", "/de/doku/handbuch-test"), links)  # escaped for the footer
 		self.assertNotIn("/de/doku/intern-test", [url for _, url in links])
+
+	def test_book_titles_in_the_footer_are_escaped(self):
+		from phamos.web_profile.chrome import _footer_items
+
+		# Frappe stores "<" of a Data field escaped already; a raw one must still come out escaped.
+		frappe.db.set_value("Bookstack Book", self.book, "title", "<img src=x onerror=alert(1)>")
+		docs.clear_cache()
+		items = _footer_items([frappe._dict(label="Dokumentation")], "de")
+		labels = [c.label for c in items[0].child_items]
+		self.assertIn("&lt;img src=x onerror=alert(1)&gt;", labels)
+		self.assertNotIn("<img", " ".join(labels))
+
+	def test_two_published_books_cannot_share_a_web_address(self):
+		other = frappe.get_doc({"doctype": "Bookstack Book", "instance": INSTANCE, "bookstack_id": 3,
+			"title": "Kopie", "slug": "handbuch-test"}).insert(ignore_permissions=True)
+		other.publish_on_website = 1
+		self.assertRaises(frappe.ValidationError, other.save, ignore_permissions=True)
