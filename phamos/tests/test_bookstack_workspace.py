@@ -41,12 +41,11 @@ class TestBookstackWorkspace(FrappeTestCase):
 				frappe.set_user("Administrator")
 
 	def test_tile_is_on_the_apps_screen_but_no_cockpit(self):
+		# version-15 has no cockpit switcher (spa_boot.user_cockpits) yet; "Open in Cockpit" is checked.
 		from phamos.api.issue_cockpits import _cockpit_modules
-		from phamos.www.spa_boot import user_cockpits
 
 		tiles = {t["name"]: t for t in frappe.get_hooks("add_to_apps_screen", app_name="phamos")}
 		self.assertEqual(tiles["bookstack"]["route"], "/app/bookstack")
-		self.assertNotIn("/app/bookstack", [c["route"] for c in user_cockpits()])
 		self.assertNotIn("/app/bookstack", [route for _, route in _cockpit_modules()])
 
 	def test_workspace_links_resolve(self):
