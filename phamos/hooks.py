@@ -222,15 +222,9 @@ for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
-# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
-# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
-# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
-    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
-    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
-    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 
