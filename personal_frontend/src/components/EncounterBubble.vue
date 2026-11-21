@@ -5,7 +5,7 @@
 		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="video ? 'w-80' : 'w-72'"
+		:class="video ? 'w-96' : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"

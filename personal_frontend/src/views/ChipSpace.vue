@@ -152,7 +152,7 @@ const API = "phamos.api.chip_space"
 const ENCOUNTER_DISTANCE = 1.2
 const PART_DISTANCE = 1.5
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 320
+const BUBBLE_WIDTH_VIDEO = 384
 
 // The cockpit's realtime socket (as in useUserRealtime); without it the Space still works alone.
 const instance = getCurrentInstance()
@@ -377,7 +377,7 @@ function bubbleStyle(bubble) {
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 470 : 270)) {
+	if (top * t < (withVideo ? 520 : 270)) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }

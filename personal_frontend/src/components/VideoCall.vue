@@ -9,6 +9,17 @@
 		>
 			{{ state === "failed" ? __("The video call could not be started.") : __("Joining the call…") }}
 		</p>
+		<!-- Browsers play the other person's audio only after a click inside the Jitsi frame
+		     (autoplay rule; keys pressed in the Space don't count for that frame). -->
+		<!-- Clicks pass through to the video below, which is exactly the click the browser wants. -->
+		<p
+			v-if="ready && !frameClicked"
+			class="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-xs text-white"
+			data-testid="sound-hint"
+		>
+			<FeatherIcon name="volume-2" class="h-3.5 w-3.5" />
+			{{ __("No sound? Click once into the video.") }}
+		</p>
 		<!-- Our own switches: Jitsi hides its toolbar in a frame this small. They drive Jitsi
 		     through its API and show the state Jitsi reports. -->
 		<div v-if="ready" class="absolute left-2 top-2 flex gap-1.5" data-testid="call-controls">
@@ -60,6 +71,13 @@ let api = null
 let disposed = false
 // Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
 const ready = ref(false)
+// A click into Jitsi's frame moves the focus there: the page's window loses it (blur).
+const frameClicked = ref(false)
+function onWindowBlur() {
+	setTimeout(() => {
+		if (host.value && host.value.contains(document.activeElement)) frameClicked.value = true
+	})
+}
 const audioMuted = ref(true)
 const videoMuted = ref(true)
 
@@ -113,6 +131,7 @@ onMounted(async () => {
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
 	})
 	ready.value = true
+	window.addEventListener("blur", onWindowBlur)
 	api.addListener("videoConferenceJoined", () => {
 		state.value = "joined"
 		emit("joined")
@@ -139,6 +158,7 @@ function dispose() {
 
 // Walking away or Esc unmounts the bubble: leave the call.
 onBeforeUnmount(() => {
+	window.removeEventListener("blur", onWindowBlur)
 	clearTimeout(quietTimer)
 	dispose()
 })
