@@ -80,6 +80,15 @@ add_to_apps_screen = [
 		"route": "/implementation-cockpit",
 		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
 	},
+	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher and "Open in Cockpit"
+	# skip it (no route in spa_boot.COCKPITS, no phamos.api.bookstack module).
+	{
+		"name": "bookstack",
+		"logo": "/assets/phamos/manifest/bookstack-icon-192.png",
+		"title": "Bookstack",
+		"route": "/app/bookstack",
+		"has_permission": "phamos.bookstack_integration.api.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -211,6 +220,12 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
+# Documentation from BookStack (phamos/phamos#2005), German only: the content is German.
+website_route_rules += [
+    {"from_route": "/de/doku", "to_route": "doku/index", "defaults": {"lang": "de"}},
+    {"from_route": "/de/doku/<book_slug>", "to_route": "doku/book", "defaults": {"lang": "de"}},
+    {"from_route": "/de/doku/<book_slug>/<page_slug>", "to_route": "doku/page", "defaults": {"lang": "de"}},
+]
 # Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
 SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
 for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
@@ -222,15 +237,9 @@ for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
-# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
-# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
-# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
-    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
-    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
-    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 

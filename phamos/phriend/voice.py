@@ -41,11 +41,17 @@ def claim(settings, day):
 	day = cstr(day).strip()
 	if not _DAY.match(day):
 		frappe.throw(_("A day looks like 2026-11-21."))
-	stored_day, used = _read()
-	if stored_day != day:
-		used = 0
-	granted = used < limit(settings)
-	if granted:
-		used += 1
-		frappe.defaults.set_user_default(DAY_DEFAULT, f"{day}:{used}")
+	# one claim per user at a time, committed before the next may read: two tabs asking at the
+	# same moment can't both get the last bubble (AI review of !1276)
+	key = f"phriend_voice_claim:{frappe.local.site}:{frappe.session.user}"
+	with frappe.cache.lock(key, timeout=10, blocking_timeout=5):
+		stored_day, used = _read()
+		if stored_day != day:
+			used = 0
+		granted = used < limit(settings)
+		if granted:
+			used += 1
+			frappe.defaults.set_user_default(DAY_DEFAULT, f"{day}:{used}")
+			if not frappe.flags.in_test:  # tests roll back to a savepoint
+				frappe.db.commit()
 	return {"day": day, "used": used, "limit": limit(settings), "granted": 1 if granted else 0}

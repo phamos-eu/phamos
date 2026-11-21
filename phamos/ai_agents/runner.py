@@ -120,6 +120,10 @@ def execute(run_name, commit=True):
 				"duration": round(time.monotonic() - started, 2),
 			}
 		)
+		# a warning on the Phriend of whoever started the run (#2012)
+		from phamos.phriend import events as phriend_events
+
+		phriend_events.ai_run_failed(run)
 	finally:
 		frappe.set_user(previous_user)
 		locks.release(run.reference_doctype, run.reference_name)

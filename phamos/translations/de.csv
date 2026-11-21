@@ -2539,14 +2539,35 @@ Publish on website,Auf Webseite veröffentlichen
 Website summary,Kurzbeschreibung für die Webseite
 Content (HTML),Inhalt (HTML)
 Content Updated At,Inhalt aktualisiert am
+"Guides for ERPNext and the Frappe Framework, written by our team.",Anleitungen zu ERPNext und dem Frappe Framework von unserem Team.
+No documentation is published yet.,Es ist noch keine Dokumentation veröffentlicht.
+{0} pages,{0} Seiten
+Start reading,Lesen beginnen
+Open on {0},Auf {0} öffnen
+Updated on {0},Aktualisiert am {0}
+Previous,Zurück
+1 page,1 Seite
+Guides for {0} from our documentation.,Anleitungen zu {0} aus unserer Dokumentation.
+The documentation is in German.,Die Dokumentation ist auf Deutsch.
+in German,auf Deutsch
+Matching module,Passendes Modul
+Matching modules,Passende Module
+Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Bookstack Browser,Bookstack-Browser
+Books,Bücher
+Shelves,Regale
+Chapters,Kapitel
+Bookstack Users,Bookstack-Benutzer
+Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Leave me in peace,Lass mich in Ruhe
 Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
 Quiet until {0},Ruhig bis {0}
@@ -2586,3 +2607,19 @@ Against the baseline,Gegenüber der Planungsbasis
 {0} d,{0} T
 {0} d late,{0} T zu spät
 {0} d slack,{0} T Puffer
+Warnings Go To,Warnungen gehen an
+Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
+Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
+Warn: GitLab Sync Failed,Warnen: GitLab-Abgleich fehlgeschlagen
+"Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.","Phriend erfährt, was passiert: Ihre Meldung wurde ein GitLab-Issue, jemand hat für Ihre Idee gestimmt, ein KI-Agent-Lauf ist fehlgeschlagen, Beleg-E-Mails konnten nicht gelesen werden, der GitLab-Abgleich ist fehlgeschlagen."
+"Who gets warnings about the whole system, such as a failed GitLab sync.","Wer Warnungen zum ganzen System bekommt, zum Beispiel einen fehlgeschlagenen GitLab-Abgleich."
+Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.,Angehakt: eine rote ‼️-Warnung. Nicht angehakt: eine Notiz hinter dem blauen Punkt.
+Your report is now a GitLab issue: {0},Ihre Meldung ist jetzt ein GitLab-Issue: {0}
+Someone voted for your idea: {0},Jemand hat für Ihre Idee gestimmt: {0}
+The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht abschließen.
+The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
+Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
+Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Easter Eggs,Easter Eggs
+"Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."

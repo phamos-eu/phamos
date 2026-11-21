@@ -16,6 +16,12 @@
   "quiet_mode",
   "one_voice",
   "bubbles_per_day",
+  "events",
+  "warning_role",
+  "warn_ai_run_failed",
+  "warn_email_failed",
+  "warn_gitlab_sync_failed",
+  "easter_eggs",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -85,7 +91,7 @@
   },
   {
    "default": "1",
-   "description": "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).",
+   "description": "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).",
    "fieldname": "reactions",
    "fieldtype": "Check",
    "label": "Hands and Reactions"
@@ -112,6 +118,51 @@
    "fieldtype": "Int",
    "label": "Bubbles per Day",
    "non_negative": 1
+  },
+  {
+   "default": "0",
+   "description": "Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.",
+   "fieldname": "events",
+   "fieldtype": "Check",
+   "label": "Events"
+  },
+  {
+   "default": "System Manager",
+   "depends_on": "eval:doc.events",
+   "description": "Who gets warnings about the whole system, such as a failed GitLab sync.",
+   "fieldname": "warning_role",
+   "fieldtype": "Link",
+   "label": "Warnings Go To",
+   "options": "Role"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.events",
+   "description": "Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.",
+   "fieldname": "warn_ai_run_failed",
+   "fieldtype": "Check",
+   "label": "Warn: AI Agent Run Failed"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.events",
+   "fieldname": "warn_email_failed",
+   "fieldtype": "Check",
+   "label": "Warn: Receipt E-Mails Not Read"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.events",
+   "fieldname": "warn_gitlab_sync_failed",
+   "fieldtype": "Check",
+   "label": "Warn: GitLab Sync Failed"
+  },
+  {
+   "default": "0",
+   "description": "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.",
+   "fieldname": "easter_eggs",
+   "fieldtype": "Check",
+   "label": "Easter Eggs"
   },
   {
    "fieldname": "gitlab_section",
@@ -189,7 +240,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-21 10:00:00.000000",
+ "modified": "2026-11-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",
