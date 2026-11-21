@@ -9,7 +9,11 @@ from phamos.web_profile.docs import clear_cache as clear_docs_cache
 
 class BookstackBook(Document):
 	def on_update(self):
-		if self.has_value_changed("publish_on_website"):
+		# A new book has no earlier version; unpublished, it changes no links. (is_new() is already
+		# False in on_update after an insert, so the earlier version is checked instead.)
+		before = self.get_doc_before_save()
+		was_published = before.publish_on_website if before else 0
+		if bool(was_published) != bool(self.publish_on_website):
 			self.refresh_website_copies()
 		clear_docs_cache()
 
