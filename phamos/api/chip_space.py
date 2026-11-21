@@ -324,9 +324,10 @@ def _pair_key(user_a, user_b):
 	return "|".join(sorted((user_a, user_b)))
 
 
-def _open_encounter_name(pair_key):
-	# Open or Parting: the record exists only until it is saved or burned.
-	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key}, "name")
+def _open_encounter_name(pair_key, for_update=False):
+	# Open or Parting: the record exists only until it is saved or burned. `for_update` is a
+	# locking read: it sees a row another request committed after this transaction began.
+	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key}, "name", for_update=for_update)
 
 
 ENCOUNTER_FIELDS = ["name", "user_a", "user_b", "status", "raven_channel", "burn_at", "saved_by_a", "saved_by_b"]
@@ -468,12 +469,16 @@ def open_encounter(with_user):
 				"jitsi_room": _new_jitsi_room(),
 			}
 		)
+		# Both pages notice the meeting and call this at the same moment; the pair key's unique
+		# index lets one insert win. The other undoes only its insert and takes the winner's.
+		frappe.db.savepoint("chip_space_encounter")
 		try:
 			doc.insert(ignore_permissions=True)
-		except frappe.DuplicateEntryError:
-			# The other page was a moment faster.
-			frappe.db.rollback()
-			name = _open_encounter_name(pair_key)
+		except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
+			frappe.db.rollback(save_point="chip_space_encounter")
+			name = _open_encounter_name(pair_key, for_update=True)
+			if not name:
+				frappe.throw(_("The chat is just being opened. Please try again."))
 		else:
 			doc.db_set("raven_channel", _create_channel(user_a, user_b), update_modified=False)
 			name = doc.name

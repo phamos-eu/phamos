@@ -190,6 +190,18 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {"chip_space_jitsi_domain": "evil.example/x?y", "chip_space_video": None}):
 			self.assertIsNone(self._open(self.A, self.B)["video"])
 
+	def test_both_pages_opening_at_once_get_the_same_encounter(self):
+		"""The page that loses the race to insert takes the winner's encounter (Pair Key unique)."""
+		first = self._open(self.A, self.B)
+		real = chip_space._open_encounter_name
+		# B's request did not see A's row yet when it looked, so it tries to insert too.
+		with patch.object(chip_space, "_open_encounter_name", side_effect=[None, real(chip_space._pair_key(self.A, self.B))]):
+			second = self._open(self.B, self.A)
+		self.assertEqual(second["encounter"], first["encounter"])
+		self.assertEqual(frappe.db.count("Chip Space Encounter", {"pair_key": chip_space._pair_key(self.A, self.B)}), 1)
+		# The users and the first encounter of this test survived: only the failed insert was undone.
+		self.assertTrue(frappe.db.exists("User", self.A))
+
 	def test_too_far_apart(self):
 		with self.assertRaises(frappe.ValidationError):
 			self._open(self.A, self.C)
