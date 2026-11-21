@@ -5,6 +5,7 @@ import frappe
 from frappe.model.document import Document
 
 from phamos.web_profile.docs import clear_cache as clear_docs_cache
+from phamos.web_profile.sections import clear_items as clear_profile_items
 
 
 class BookstackBook(Document):
@@ -35,7 +36,7 @@ class BookstackBook(Document):
 		# The sync deletes with force=True, which skips link checks: module profiles would keep a row
 		# pointing to the missing book and fail on their next save (review S4, #2006).
 		frappe.db.delete("Web Profile Book", {"book": self.name})
-		frappe.db.after_commit.add(lambda: frappe.cache.delete_value("web_profile_items"))
+		frappe.db.after_commit.add(clear_profile_items)
 		frappe.db.after_commit.add(clear_docs_cache)
 
 	def refresh_website_copies(self):

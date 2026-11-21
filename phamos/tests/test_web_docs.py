@@ -222,3 +222,12 @@ class TestModuleDocumentationLinks(TestWebDocs):
 		self.profile.reload()
 		self.profile.save(ignore_permissions=True)  # failed with "Could not find Bookstack Book" before
 		self.assertEqual([r.book for r in self.profile.documentation], [self.book])
+
+	def test_deleting_a_book_clears_the_module_items_after_the_commit(self):
+		from phamos.web_profile.sections import get_items
+
+		get_items("modules", "de")  # fills the request copy and the Redis cache
+		frappe.delete_doc("Bookstack Book", self.hidden, ignore_permissions=True, force=True)
+		frappe.db.after_commit.run()  # what a commit does; the tests never commit
+		self.assertIsNone(frappe.local.web_profile_items, "the request copy is cleared too")
+		self.assertIsNone(frappe.cache.hget("web_profile_items", "modules:de"))
