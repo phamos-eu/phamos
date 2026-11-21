@@ -124,3 +124,83 @@ class ChipSpacePresenceTestCase(FrappeTestCase):
 		frappe.set_user(email)
 		with self.assertRaises(frappe.PermissionError):
 			chip_space.heartbeat(1, 1)
+
+
+class ChipSpaceEncounterTestCase(FrappeTestCase):
+	"""Slice 3 (#2056): two chips that meet get a temporary private Raven channel."""
+
+	A = "chip-space-a@example.com"
+	B = "chip-space-b@example.com"
+	C = "chip-space-c@example.com"
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		for email in (self.A, self.B, self.C):
+			if not frappe.db.exists("User", email):
+				user = frappe.get_doc(
+					{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+				).insert(ignore_permissions=True)
+				user.add_roles("Raven User")
+		if not frappe.get_all("Raven Workspace", limit=1):
+			frappe.get_doc({"doctype": "Raven Workspace", "workspace_name": "Chip Space Test", "type": "Public"}).insert(
+				ignore_permissions=True
+			)
+		frappe.cache.delete_value(chip_space.PRESENCE_CACHE_KEY)
+		self._put(self.A, 5, 5)
+		self._put(self.B, 6, 5)
+		self._put(self.C, 30, 20)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.cache.delete_value(chip_space.PRESENCE_CACHE_KEY)
+		frappe.db.rollback()
+
+	def _put(self, user, x, y):
+		frappe.cache.hset(
+			chip_space.PRESENCE_CACHE_KEY, user, {"user": user, "x": x, "y": y, "ts": chip_space.time.time()}
+		)
+
+	def _open(self, as_user, with_user):
+		frappe.set_user(as_user)
+		with patch.dict(frappe.conf, {chip_space.DUMMIES_CONF_KEY: None}):
+			return chip_space.open_encounter(with_user)
+
+	def test_meeting_opens_one_private_channel_for_both(self):
+		first = self._open(self.A, self.B)
+		second = self._open(self.B, self.A)
+		self.assertEqual(first["encounter"], second["encounter"])
+		self.assertEqual((first["with"], second["with"]), (self.B, self.A))
+		channel = frappe.get_doc("Raven Channel", first["channel"])
+		self.assertEqual(channel.type, "Private")
+		members = set(frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id"))
+		self.assertEqual(members, {self.A, self.B})
+		self.assertEqual(
+			frappe.db.count("Chip Space Encounter", {"pair_key": chip_space._pair_key(self.A, self.B)}), 1
+		)
+
+	def test_too_far_apart(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._open(self.A, self.C)
+
+	def test_messages_reach_both_and_stay_private(self):
+		encounter = self._open(self.A, self.B)["encounter"]
+		with patch.object(chip_space.frappe, "publish_realtime") as publish:
+			row = chip_space.send_encounter_message(encounter, "Hi <b>there</b>\nline 2")
+		mine = [c for c in publish.call_args_list if c.args[0] == chip_space.EVENT_MESSAGE]
+		self.assertEqual({c.kwargs["user"] for c in mine}, {self.A, self.B})
+		self.assertEqual(row["owner"], self.A)
+		frappe.set_user(self.B)
+		messages = chip_space.get_encounter(encounter)["messages"]
+		self.assertEqual([m["owner"] for m in messages], [self.A])
+		# shown as text: the tags the user typed come back as text, not markup
+		self.assertEqual(messages[0]["text"], "Hi <b>there</b>\nline 2")
+		frappe.set_user(self.C)
+		with self.assertRaises(frappe.PermissionError):
+			chip_space.get_encounter(encounter)
+		with self.assertRaises(frappe.PermissionError):
+			chip_space.send_encounter_message(encounter, "let me in")
+
+	def test_empty_message_refused(self):
+		encounter = self._open(self.A, self.B)["encounter"]
+		with self.assertRaises(frappe.ValidationError):
+			chip_space.send_encounter_message(encounter, "   ")

@@ -38,6 +38,19 @@
 						/>
 					</span>
 				</div>
+				<EncounterBubble
+					v-for="bubble in bubbleList"
+					:key="bubble.user"
+					:ref="(el) => setBubbleRef(bubble.user, el)"
+					:peer="bubble.peer"
+					:me="me.user"
+					:messages="bubble.messages"
+					:loading="bubble.loading"
+					:error="bubble.error"
+					:sending="bubble.sending"
+					:style="bubbleStyle(bubble)"
+					@send="(text, done) => sendMessage(bubble, text, done)"
+				/>
 				<div
 					class="chip-space-chip absolute flex items-center justify-center"
 					:style="chipStyle(me)"
@@ -58,6 +71,7 @@
 import { computed, getCurrentInstance, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { call, FeatherIcon } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
+import EncounterBubble from "../components/EncounterBubble.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
@@ -86,6 +100,11 @@ const SEND_MOVE_EVERY_MS = 120
 // Another chip's legs kick until this long after its last move arrived.
 const REMOTE_MOVING_MS = 250
 const API = "phamos.api.chip_space"
+// Encounters (#2056): closer than this (centres, tiles) opens the chat; farther than the second
+// closes it again, so standing right at the edge does not flicker.
+const ENCOUNTER_DISTANCE = 1.2
+const PART_DISTANCE = 1.5
+const BUBBLE_WIDTH = 288
 
 // The cockpit's realtime socket (as in useUserRealtime); without it the Space still works alone.
 const instance = getCurrentInstance()
@@ -138,6 +157,10 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
+	if (event.key === "Enter" && focusNearestBubble()) {
+		event.preventDefault()
+		return
+	}
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
@@ -184,6 +207,7 @@ function onRemoteMove(message) {
 	other.x = message.x
 	other.y = message.y
 	other.moving = true
+	checkEncounters()
 	clearTimeout(movingTimers.get(other.user))
 	movingTimers.set(
 		other.user,
@@ -194,12 +218,14 @@ function onRemoteMove(message) {
 function onRemoteLeave(message) {
 	others.value = others.value.filter((o) => o.dummy || o.user !== message?.user)
 	lastSeen.delete(message?.user)
+	checkEncounters()
 }
 
 // Chips whose heartbeat stopped (tab killed, network gone) fade out after the presence TTL.
 function pruneOthers() {
 	const now = Date.now()
 	others.value = others.value.filter((o) => o.dummy || now - (lastSeen.get(o.user) || 0) < presenceTtlMs)
+	checkEncounters()
 }
 
 async function refreshOthers() {
@@ -209,6 +235,116 @@ async function refreshOthers() {
 	} catch {
 		// The next heartbeat or event tries again.
 	}
+}
+
+// --- Encounters (#2056): one bubble per chip I am standing next to.
+
+const bubbles = reactive({})
+const bubbleRefs = {}
+const bubbleList = computed(() => Object.values(bubbles))
+
+function setBubbleRef(user, el) {
+	if (el) bubbleRefs[user] = el
+	else delete bubbleRefs[user]
+}
+
+function bubbleStyle(bubble) {
+	const other = others.value.find((o) => o.user === bubble.user)
+	if (!other || !me.value) return { display: "none" }
+	const t = tile.value
+	const gridWidth = t * me.value.cols
+	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
+	const left = Math.max(BUBBLE_WIDTH / 2 + 4, Math.min(gridWidth - BUBBLE_WIDTH / 2 - 4, centreX))
+	const top = Math.min(me.value.y, other.y)
+	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
+	if (top < 6) {
+		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
+	}
+	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
+}
+
+function distanceTo(other) {
+	return Math.hypot(other.x - me.value.x, other.y - me.value.y)
+}
+
+function checkEncounters() {
+	if (!me.value) return
+	for (const other of others.value) {
+		const distance = distanceTo(other)
+		if (distance < ENCOUNTER_DISTANCE && !bubbles[other.user]) openBubble(other)
+		else if (distance > PART_DISTANCE && bubbles[other.user]) delete bubbles[other.user]
+	}
+	// Someone who left the page also leaves the chat.
+	for (const user of Object.keys(bubbles)) {
+		if (!others.value.some((o) => o.user === user)) delete bubbles[user]
+	}
+}
+
+async function openBubble(other) {
+	const bubble = reactive({
+		user: other.user,
+		peer: { user: other.user, full_name: other.full_name, user_image: other.user_image },
+		encounter: null,
+		messages: [],
+		loading: true,
+		error: "",
+		sending: false,
+	})
+	bubbles[other.user] = bubble
+	try {
+		// The server checks that we really stand together: my latest spot goes first.
+		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
+		const data = await call(`${API}.open_encounter`, { with_user: other.user })
+		bubble.encounter = data.encounter
+		bubble.messages = data.messages || []
+	} catch (e) {
+		bubble.error = errorText(e) || __("The chat could not be opened.")
+	} finally {
+		bubble.loading = false
+	}
+}
+
+async function sendMessage(bubble, text, done) {
+	if (!bubble.encounter) return
+	bubble.sending = true
+	try {
+		addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
+		done()
+	} catch (e) {
+		bubble.error = errorText(e) || __("The message could not be sent.")
+	} finally {
+		bubble.sending = false
+		bubbleRefs[bubble.user]?.focus()
+	}
+}
+
+function addMessage(bubble, message) {
+	if (message && !bubble.messages.some((m) => m.name === message.name)) bubble.messages.push(message)
+}
+
+function onEncounterMessage(payload) {
+	const bubble = Object.values(bubbles).find((b) => b.encounter && b.encounter === payload?.encounter)
+	if (bubble) addMessage(bubble, payload.message)
+}
+
+// frappe-ui's call() puts the server's frappe.throw texts into error.messages.
+function errorText(e) {
+	const first = Array.isArray(e?.messages) ? e.messages[0] : ""
+	if (!first || typeof first !== "string") return ""
+	return new DOMParser().parseFromString(first, "text/html").body.textContent || ""
+}
+
+// Enter (while not typing) jumps into the chat of the nearest chip.
+function focusNearestBubble() {
+	const open = Object.values(bubbles).filter((b) => b.encounter)
+	if (!open.length) return false
+	const nearest = open
+		.map((b) => [b, others.value.find((o) => o.user === b.user)])
+		.filter(([, o]) => o)
+		.sort((a, b) => distanceTo(a[1]) - distanceTo(b[1]))[0]
+	if (!nearest) return false
+	bubbleRefs[nearest[0].user]?.focus()
+	return true
 }
 
 // --- My presence.
@@ -256,6 +392,7 @@ const SOCKET_EVENTS = [
 	["chip_space_presence", upsertOther],
 	["chip_space_move", onRemoteMove],
 	["chip_space_leave", onRemoteLeave],
+	["chip_space_message", onEncounterMessage],
 	// Rejoin after a lost connection: the others may have moved meanwhile.
 	["connect", () => (heartbeat(), refreshOthers())],
 ]
@@ -297,6 +434,7 @@ function tick(now) {
 		if (!blocked(me.value.x, y)) me.value.y = y
 		scheduleSave()
 		queueMove()
+		checkEncounters()
 	}
 	frame = requestAnimationFrame(tick)
 }
@@ -347,6 +485,7 @@ onMounted(async () => {
 		error.value = __("The Space could not be loaded.")
 		return
 	}
+	checkEncounters()
 	for (const [event, handler] of SOCKET_EVENTS) socket?.on?.(event, handler)
 	heartbeat()
 	heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS)

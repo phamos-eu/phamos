@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-21 18:00:00.000000",
+ "description": "A Chip Space encounter (#2053, #2056): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.chip_space; no history kept (no Version rows), since an encounter chat may be burned later (#2057).",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user_a",
+  "user_b",
+  "status",
+  "column_break_main",
+  "raven_channel",
+  "opened_at",
+  "pair_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "user_a",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User A",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "user_b",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User B",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nClosed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "raven_channel",
+   "fieldtype": "Link",
+   "label": "Raven Channel",
+   "options": "Raven Channel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "opened_at",
+   "fieldtype": "Datetime",
+   "label": "Opened At",
+   "read_only": 1
+  },
+  {
+   "description": "\"user_a|user_b\" (sorted) while the encounter is open, empty afterwards: at most one open encounter per pair, guarded by the unique index.",
+   "fieldname": "pair_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Pair Key",
+   "read_only": 1,
+   "unique": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-21 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Chip Space Encounter",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "user_a"
+}

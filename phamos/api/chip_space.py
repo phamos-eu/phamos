@@ -20,12 +20,15 @@ not set them:
 	"chip_space_dummies": [{"user": "chip-buddy@example.com", "x": 24, "y": 12}]
 """
 
+import html
 import json
 import math
+import re
 import time
 
 import frappe
 from frappe import _
+from frappe.utils import escape_html, now_datetime, strip_html
 
 # One shared world for everyone; the frontend draws exactly this grid.
 COLS = 40
@@ -44,6 +47,15 @@ MOVE_WINDOW = 5
 EVENT_PRESENCE = "chip_space_presence"
 EVENT_MOVE = "chip_space_move"
 EVENT_LEAVE = "chip_space_leave"
+EVENT_MESSAGE = "chip_space_message"
+
+# Encounters (#2056): two chips closer than ENCOUNTER_DISTANCE (centres, in tiles) meet. The
+# server allows some slack, since positions it knows may be a few hundred ms old.
+ENCOUNTER_DISTANCE = 1.2
+SERVER_DISTANCE_SLACK = 1.5
+ENCOUNTER_DOCTYPE = "Chip Space Encounter"
+MAX_MESSAGE_LENGTH = 2000
+MESSAGES_SHOWN = 100
 
 
 def _require_user():
@@ -190,3 +202,177 @@ def save_my_position(x, y):
 	position = {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)}
 	frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	return position
+
+
+# --- Encounters (#2056): a temporary private Raven channel for two chips that meet.
+
+
+def _position_of(user):
+	"""Where the server last saw a user's chip: presence first, then a dummy from the site config."""
+	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
+	if isinstance(entry, dict) and time.time() - entry.get("ts", 0) <= PRESENCE_TTL:
+		return entry["x"], entry["y"]
+	for dummy in _dummies(None):
+		if dummy["user"] == user:
+			return dummy["x"], dummy["y"]
+	return None
+
+
+def _pair_key(user_a, user_b):
+	return "|".join(sorted((user_a, user_b)))
+
+
+def _open_encounter_name(pair_key):
+	return frappe.db.get_value(ENCOUNTER_DOCTYPE, {"pair_key": pair_key, "status": "Open"}, "name")
+
+
+def _require_party(encounter):
+	"""The encounter, if the session user is one of its two people and it is still open."""
+	doc = frappe.db.get_value(
+		ENCOUNTER_DOCTYPE, encounter, ["name", "user_a", "user_b", "status", "raven_channel"], as_dict=True
+	)
+	if not doc or frappe.session.user not in (doc.user_a, doc.user_b):
+		frappe.throw(_("This chat is not yours."), frappe.PermissionError)
+	if doc.status != "Open":
+		frappe.throw(_("This chat has ended."))
+	return doc
+
+
+def _peer(doc):
+	return doc.user_b if frappe.session.user == doc.user_a else doc.user_a
+
+
+def _create_channel(user_a, user_b):
+	from phamos.api.issue_chat import _ensure_members, _resolve_workspace
+
+	channel = frappe.get_doc(
+		{
+			"doctype": "Raven Channel",
+			# Raven needs a unique, readable name; the time keeps re-meetings apart.
+			"channel_name": f"encounter-{frappe.generate_hash(length=10)}",
+			"channel_description": _("Chip Space encounter, {0}").format(now_datetime().strftime("%Y-%m-%d %H:%M")),
+			"type": "Private",
+			"workspace": _resolve_workspace(),
+		}
+	)
+	channel.flags.do_not_add_member = True
+	channel.insert(ignore_permissions=True)
+	skipped = _ensure_members(channel, [user_a, user_b], admin=user_a, silent=True)
+	if skipped:
+		frappe.throw(
+			_("{0} can't chat: no Raven access.").format(
+				", ".join(frappe.utils.get_fullname(u) for u in skipped)
+			)
+		)
+	return channel.name
+
+
+def _plain_text(markup):
+	"""Raven's HTML as the text the person typed: line breaks kept, tags dropped, entities decoded."""
+	text = re.sub(r"(?i)<br\s*/?>|</p>\s*<p[^>]*>", "\n", markup or "")
+	return html.unescape(strip_html(text)).strip()
+
+
+def _message_row(row):
+	return {
+		"name": row.name,
+		"owner": row.owner,
+		# Raven stores HTML; the bubble shows plain text (and Vue escapes it again).
+		"text": _plain_text(row.text),
+		"creation": str(row.creation),
+	}
+
+
+def _messages(channel):
+	rows = frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": channel, "message_type": ("!=", "System"), "is_thread": 0},
+		fields=["name", "owner", "text", "creation"],
+		order_by="creation desc",
+		limit=MESSAGES_SHOWN,
+	)
+	return [_message_row(r) for r in reversed(rows)]
+
+
+def _encounter_payload(doc):
+	return {
+		"encounter": doc.name,
+		"with": _peer(doc),
+		"channel": doc.raven_channel,
+		"messages": _messages(doc.raven_channel),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def open_encounter(with_user):
+	"""Two chips met: get or start the encounter chat of the pair and return it with its messages.
+
+	Both pages notice the meeting and both call this; the pair key's unique index makes sure
+	only one encounter is created.
+	"""
+	_require_user()
+	me = frappe.session.user
+	if not isinstance(with_user, str) or with_user == me or not frappe.db.get_value("User", with_user, "enabled"):
+		frappe.throw(_("Nobody to chat with here."))
+	mine, theirs = _position_of(me), _position_of(with_user)
+	if not mine or not theirs or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
+		frappe.throw(_("Move closer to chat."))
+
+	pair_key = _pair_key(me, with_user)
+	name = _open_encounter_name(pair_key)
+	if not name:
+		user_a, user_b = sorted((me, with_user))
+		doc = frappe.get_doc(
+			{
+				"doctype": ENCOUNTER_DOCTYPE,
+				"user_a": user_a,
+				"user_b": user_b,
+				"status": "Open",
+				"opened_at": now_datetime(),
+				"pair_key": pair_key,
+			}
+		)
+		try:
+			doc.insert(ignore_permissions=True)
+		except frappe.DuplicateEntryError:
+			# The other page was a moment faster.
+			frappe.db.rollback()
+			name = _open_encounter_name(pair_key)
+		else:
+			doc.db_set("raven_channel", _create_channel(user_a, user_b), update_modified=False)
+			name = doc.name
+	return _encounter_payload(_require_party(name))
+
+
+@frappe.whitelist()
+def get_encounter(encounter):
+	"""An open encounter of mine, with its latest messages."""
+	_require_user()
+	return _encounter_payload(_require_party(encounter))
+
+
+@frappe.whitelist(methods=["POST"])
+def send_encounter_message(encounter, text):
+	"""Post a message into the encounter's Raven channel and tell both people right away."""
+	_require_user()
+	doc = _require_party(encounter)
+	text = (text or "").strip()
+	if not text:
+		frappe.throw(_("Write something first."))
+	if len(text) > MAX_MESSAGE_LENGTH:
+		frappe.throw(_("A message can be at most {0} characters.").format(MAX_MESSAGE_LENGTH))
+	# The party check above is the permission: the sender is a member of this private channel.
+	message = frappe.get_doc(
+		{
+			"doctype": "Raven Message",
+			"channel_id": doc.raven_channel,
+			"message_type": "Text",
+			"text": "<p>{}</p>".format(escape_html(text).replace("\n", "<br>")),
+		}
+	).insert(ignore_permissions=True)
+	row = _message_row(message)
+	payload = {"encounter": doc.name, "message": row}
+	# Raven's own events differ between Raven 2 and 3; the bubble listens to this one only.
+	for user in (doc.user_a, doc.user_b):
+		frappe.publish_realtime(EVENT_MESSAGE, payload, user=user, after_commit=True)
+	return row

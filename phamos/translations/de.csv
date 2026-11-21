@@ -2682,3 +2682,17 @@ Back to cockpit,Zurück zum Cockpit
 The Space could not be loaded.,Der Space konnte nicht geladen werden.
 Please log in to use the Space.,"Bitte melden Sie sich an, um den Space zu nutzen."
 The Space is only available to System Users.,Der Space steht nur Systembenutzern zur Verfügung.
+Chat with {0},Chat mit {0}
+Opening the chat…,Chat wird geöffnet…
+Say hello to {0}.,Sagen Sie {0} Hallo.
+"Write to {0}, Enter to send","An {0} schreiben, Enter zum Senden"
+The chat could not be opened.,Der Chat konnte nicht geöffnet werden.
+The message could not be sent.,Die Nachricht konnte nicht gesendet werden.
+This chat is not yours.,Dieser Chat gehört nicht Ihnen.
+This chat has ended.,Dieser Chat ist beendet.
+"Chip Space encounter, {0}","Chip-Space-Begegnung, {0}"
+{0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
+Nobody to chat with here.,Hier ist niemand zum Chatten.
+Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
+Write something first.,Schreiben Sie zuerst etwas.
+A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
