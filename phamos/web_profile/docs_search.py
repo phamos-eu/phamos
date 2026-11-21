@@ -14,6 +14,7 @@ documentation ("artikle" → "artikel"); exact hits rank first. ``exact=True`` s
 from __future__ import annotations
 
 import re
+import string
 
 import frappe
 from frappe.query_builder import Case, Criterion
@@ -41,10 +42,16 @@ def search_url(lang, query="", book_slug=None, exact=False):
 	return docs.search_path(lang) + (f"?{urlencode(params)}" if params else "")
 
 
+# Stripped from both ends of a word: "Artikel," is "Artikel", not a typo of it (review of !1295).
+_PUNCTUATION = "".join(sorted(set(string.punctuation + "„“”‚‘’«»‹›…–—·")))
+
+
 def words_of(query) -> list[str]:
-	"""The query's words, at most MAX_WORDS, each at least MIN_LENGTH characters."""
+	"""The query's words without surrounding punctuation, at most MAX_WORDS, each at least
+	MIN_LENGTH characters."""
 	query = (query or "").strip()[:MAX_LENGTH]
-	return [w for w in query.split() if len(w) >= MIN_LENGTH][:MAX_WORDS]
+	words = (w.strip(_PUNCTUATION) for w in query.split())
+	return [w for w in words if len(w) >= MIN_LENGTH][:MAX_WORDS]
 
 
 def _like(word):
@@ -63,13 +70,15 @@ def _norm(word):
 	return word.lower().translate(_UMLAUTS)
 
 
-def vocabulary() -> dict:
-	"""{normalised word: (word, number of pages)} of the published documentation (cached)."""
-	return docs._cached("vocabulary", _load_vocabulary)
+def vocabulary(book=None) -> dict:
+	"""{normalised word: (most used spelling, number of pages, all spellings)} of the published
+	documentation, or of one book for a search limited to it (cached)."""
+	if book:
+		return docs._cached(f"vocabulary:{book.name}", lambda: _load_vocabulary([book]))
+	return docs._cached("vocabulary", lambda: _load_vocabulary(docs.published_books()))
 
 
-def _load_vocabulary():
-	books = docs.published_books()
+def _load_vocabulary(books):
 	counts: dict = {}
 	rows = frappe.get_all(
 		"Bookstack Page",
@@ -80,12 +89,15 @@ def _load_vocabulary():
 	for text in texts:
 		for word in set(w.lower() for w in _WORD.findall(text)):
 			counts[word] = counts.get(word, 0) + 1
-	vocab: dict = {}
+	# "masse" and "maße" share the key "masse"; both stay known spellings, so neither is "corrected"
+	# into the other (review of !1295).
+	spellings: dict = {}
 	for word, n in counts.items():
-		key = _norm(word)
-		if key not in vocab or n > vocab[key][1]:
-			vocab[key] = (word, n)
-	return vocab
+		spellings.setdefault(_norm(word), []).append((n, word))
+	return {
+		key: (max(found)[1], max(found)[0], tuple(sorted(w for _, w in found)))
+		for key, found in spellings.items()
+	}
 
 
 def corrections(word, vocab=None) -> list[str]:
@@ -94,15 +106,21 @@ def corrections(word, vocab=None) -> list[str]:
 	A word that appears (also inside a longer word, as the search matches) is not corrected.
 	Distance: 1 mistake for words of up to 5 letters, 2 for longer ones; swapped letters count once.
 	"""
-	from rapidfuzz import process
-	from rapidfuzz.distance import DamerauLevenshtein
+	try:
+		from rapidfuzz import process
+		from rapidfuzz.distance import DamerauLevenshtein
+	except ImportError:
+		# installed with ERPNext (rapidfuzz~=3.12), not a phamos dependency: without it the search
+		# still works, just without typo tolerance (review of !1295)
+		return []
 
 	vocab = vocabulary() if vocab is None else vocab
 	key = _norm(word)
 	if len(key) < 3:
 		return []
-	if key in vocab and vocab[key][0] != word.lower():
-		return [vocab[key][0]]  # another spelling of the same word: "aenderung" → "änderung"
+	if key in vocab:
+		# a known spelling stays as typed; a spelt-out umlaut gets the real one: "aenderung" → "änderung"
+		return [] if word.lower() in vocab[key][2] else [vocab[key][0]]
 	if any(key in candidate for candidate in vocab):
 		return []
 	allowed = 1 if len(key) <= 5 else 2
@@ -121,7 +139,8 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 	if not words or not books:
 		return {"books": [], "pages": [], "words": words, "corrected": {}}
 
-	vocab = None if exact else vocabulary()
+	# a search in one book corrects with that book's words: another book's word would give no hits
+	vocab = None if exact else vocabulary(books[0] if book_slug else None)
 	corrected = {}
 	if not exact:
 		for w in words:
@@ -130,10 +149,8 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 				corrected[w] = found
 	variants = {w: [w, *corrected.get(w, [])] for w in words}
 
-	def matches(text, strict=False):
+	def matches(text):
 		text = (text or "").lower()
-		if strict:
-			return all(w.lower() in text for w in words)
 		return all(any(v.lower() in text for v in variants[w]) for w in words)
 
 	book_hits = [] if book_slug else [b for b in books if matches(f"{b.title} {b.summary}")]
@@ -187,7 +204,7 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=Fa
 
 def corrected_query(query, corrected) -> str:
 	"""The query with every corrected word replaced by its best correction, for the note."""
-	return " ".join(corrected[w][0] if w in corrected else w for w in (query or "").split())
+	return " ".join(corrected[w][0] if w in corrected else w for w in words_of(query))
 
 
 def snippet(text, words) -> str:

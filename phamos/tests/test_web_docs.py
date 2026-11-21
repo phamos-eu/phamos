@@ -523,7 +523,8 @@ class TestDocsSearchTypos(DocsFixture):
 	def _search(self, q, **kw):
 		from phamos.web_profile.docs_search import search
 
-		return search(q, "de", book_slug="handbuch-test", **kw)
+		kw.setdefault("book_slug", "handbuch-test")
+		return search(q, "de", **kw)
 
 	def test_swapped_letters_find_the_word(self):
 		result = self._search("Xqzartikle")
@@ -559,6 +560,37 @@ class TestDocsSearchTypos(DocsFixture):
 		from phamos.web_profile.docs_search import vocabulary
 
 		self.assertNotIn("xqzgeheimwort", vocabulary())
+
+	def test_punctuation_around_a_word_is_no_typo(self):
+		from phamos.web_profile.docs_search import words_of
+
+		self.assertEqual(words_of('„Xqzartikel“, (Bank)!'), ["Xqzartikel", "Bank"])
+		result = self._search("Xqzartikel,")
+		self.assertEqual(result["corrected"], {}, "a correct word with a comma is not corrected")
+		self.assertEqual(len(result["pages"]), 2)
+
+	def test_both_spellings_of_one_key_stay_as_typed(self):
+		# "masse" and "maße" share a key; the more used one must not "correct" the other
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzmaße Xqzmaße Xqzmasse")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", "search_text", "Xqzmaße")
+		docs.clear_cache()
+		self.assertEqual(self._search("Xqzmasse")["corrected"], {})
+		self.assertEqual(self._search("Xqzmaße")["corrected"], {})
+
+	def test_a_search_in_one_book_corrects_with_that_books_words(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, "publish_on_website", 1)
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-200", "search_text", "Xqzgeheimwort")
+		docs.clear_cache()
+		self.assertEqual(self._search("Xqzgeheimwrot", book_slug=None)["corrected"], {"Xqzgeheimwrot": ["xqzgeheimwort"]})
+		self.assertEqual(self._search("Xqzgeheimwrot")["corrected"], {}, "only in another book: no correction here")
+
+	def test_search_works_without_rapidfuzz(self):
+		import sys
+
+		with patch.dict(sys.modules, {"rapidfuzz": None, "rapidfuzz.distance": None}):
+			result = self._search("Xqzartikle")
+		self.assertEqual((result["corrected"], result["pages"]), ({}, []))
+		self.assertEqual(len(self._search("Xqzartikel")["pages"]), 2)
 
 	def test_results_page_says_what_it_searched(self):
 		from urllib.parse import urlencode
