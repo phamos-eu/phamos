@@ -13,6 +13,9 @@
   "shortcut",
   "features_section",
   "reactions",
+  "quiet_mode",
+  "one_voice",
+  "bubbles_per_day",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -86,6 +89,29 @@
    "fieldname": "reactions",
    "fieldtype": "Check",
    "label": "Hands and Reactions"
+  },
+  {
+   "default": "0",
+   "description": "A menu on the phriend (right-click): \"Leave me in peace\" for an hour, for today or until called back, and \"Mute warnings\" for up to 90 minutes. Each user decides for themselves.",
+   "fieldname": "quiet_mode",
+   "fieldtype": "Check",
+   "label": "Leave Me in Peace"
+  },
+  {
+   "default": "0",
+   "description": "Everything Phriend says by itself goes through one queue: at most the bubbles per day below, never while someone types; the rest waits behind a small blue dot on Phriend.",
+   "fieldname": "one_voice",
+   "fieldtype": "Check",
+   "label": "One Voice"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.one_voice",
+   "description": "How many bubbles Phriend may open by itself per person and day. Reactions, warnings and the person's own reports don't count.",
+   "fieldname": "bubbles_per_day",
+   "fieldtype": "Int",
+   "label": "Bubbles per Day",
+   "non_negative": 1
   },
   {
    "fieldname": "gitlab_section",
@@ -163,7 +189,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-21 08:00:00.000000",
+ "modified": "2026-11-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",

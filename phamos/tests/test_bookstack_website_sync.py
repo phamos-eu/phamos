@@ -428,3 +428,67 @@ class TestReviewFixes(_BookstackSyncCase):
 		with patch.object(sync, "sync_pages", side_effect=sync._JOB_TIMEOUT("out of time")):
 			self.assertRaises(sync._JOB_TIMEOUT, self._sync)
 		self.assertFalse(sync.is_running(INSTANCE), "the lock is released")
+
+	def test_image_without_source_is_removed(self):
+		from phamos.bookstack_integration.content import clean_page_html
+
+		html = clean_page_html('<p>a</p><img alt="leer"><img src="  "><img src="/uploads/x.png">', BASE,
+			{"books": set(), "pages": set(), "page_ids": {}})
+		self.assertEqual(html.count("<img"), 1)
+		self.assertIn(f'src="{BASE}/uploads/x.png"', html)
+
+	def test_books_are_removed_in_a_wiki_without_chapters(self):
+		FakeBookstack.data["chapters"] = []
+		for p in FakeBookstack.data["pages"]:
+			p.pop("chapter_id", None)
+		self._sync()
+		self.assertTrue(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"))
+
+		FakeBookstack.data["books"] = [b for b in FakeBookstack.data["books"] if b["id"] != 2]
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["book_id"] != 2]
+		self._sync()
+		self.assertFalse(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"))
+
+	def test_interrupted_link_refresh_resumes_where_it_stopped(self):
+		from rq.timeouts import JobTimeoutException
+
+		self._sync()
+		self._publish(1)
+		self._sync()
+		self._publish(2)  # links to book 2 change: every copy needs new links
+		FakeBookstack.fetched = []
+		real_get = FakeBookstack.get
+
+		def stop_after_first(client, path, params=None):
+			if FakeBookstack.fetched:
+				raise JobTimeoutException("stopped")
+			return real_get(client, path, params)
+
+		with patch.object(FakeBookstack, "get", stop_after_first):
+			self.assertRaises(JobTimeoutException, self._sync)
+		first = list(FakeBookstack.fetched)
+		self.assertEqual(len(first), 1)
+
+		FakeBookstack.fetched = []
+		self._sync()
+		self.assertEqual(sorted(FakeBookstack.fetched + first), [100, 102, 200], "each page once, none twice")
+
+
+	def test_no_media_from_other_hosts(self):
+		from phamos.bookstack_integration.content import clean_page_html
+
+		html = clean_page_html(
+			'<video poster="https://tracker.test/p" src="https://tracker.test/v"></video>'
+			'<video src="/uploads/clip.mp4" poster="/uploads/still.png"></video>'
+			'<video><source src="https://tracker.test/s"></video>'
+			'<audio src="https://tracker.test/a"></audio>'
+			'<img srcset="https://tracker.test/x 2x" src="/uploads/x.png">'
+			'<table background="https://tracker.test/b"><tr><td>Zelle</td></tr></table>'
+			'<video><track src="https://tracker.test/t"></video><picture><source srcset="https://tracker.test/p2"></picture>',
+			BASE, {"books": set(), "pages": set(), "page_ids": {}},
+		)
+		self.assertNotIn("tracker.test", html)
+		self.assertNotIn("&lt;", html, "no tag shows up as text")
+		self.assertIn(f'<video poster="{BASE}/uploads/still.png" src="{BASE}/uploads/clip.mp4"></video>', html)
+		self.assertIn(f'src="{BASE}/uploads/x.png"', html)
+		self.assertIn("<td>Zelle</td>", html)

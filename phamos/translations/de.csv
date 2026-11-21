@@ -2556,3 +2556,33 @@ A sync of {0} is already running. Try again when it has finished.,"Eine Synchron
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
+Leave me in peace,Lass mich in Ruhe
+Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
+Quiet until {0},Ruhig bis {0}
+Come back,Zurückkommen
+For 1 hour,Für 1 Stunde
+For today,Für heute
+Until I call you back,Bis ich dich zurückhole
+Mute warnings,Warnungen stummschalten
+Muted until {0},Stumm bis {0}
+Hear warnings again,Warnungen wieder zeigen
+Mute warnings for {0} minutes,Warnungen für {0} Minuten stummschalten
+Report a problem,Ein Problem melden
+Phriend Settings,Phriend-Einstellungen
+That didn't work. Please try again.,Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.
+right-click for options,Rechtsklick für Optionen
+Leave Me in Peace,Lass mich in Ruhe
+"A menu on the phriend (right-click): ""Leave me in peace"" for an hour, for today or until called back, and ""Mute warnings"" for up to 90 minutes. Each user decides for themselves.","Ein Menü am Phriend (Rechtsklick): „Lass mich in Ruhe“ für eine Stunde, für heute oder bis zum Zurückholen, und „Warnungen stummschalten“ für bis zu 90 Minuten. Jeder Nutzer entscheidet selbst."
+Leave me in peace is switched off in Phriend Settings,„Lass mich in Ruhe“ ist in den Phriend-Einstellungen ausgeschaltet
+"Phriend can be quiet for today at most, or until you call it back.","Phriend kann höchstens für heute ruhig sein, oder bis Sie ihn zurückholen."
+"Warnings can be muted for 30, 60 or 90 minutes.","Warnungen können für 30, 60 oder 90 Minuten stummgeschaltet werden."
+That time has already passed. Is your computer's clock right?,Diese Zeit ist schon vorbei. Geht die Uhr Ihres Computers richtig?
+Phriend has {0} things for you,Phriend hat {0} Dinge für Sie
+Phriend has something for you,Phriend hat etwas für Sie
+One Voice,Eine Stimme
+Bubbles per Day,Sprechblasen pro Tag
+"Everything Phriend says by itself goes through one queue: at most the bubbles per day below, never while someone types; the rest waits behind a small blue dot on Phriend.","Alles, was Phriend von sich aus sagt, läuft durch eine Warteschlange: höchstens die Sprechblasen pro Tag unten, nie während jemand tippt; der Rest wartet hinter einem kleinen blauen Punkt am Phriend."
+"How many bubbles Phriend may open by itself per person and day. Reactions, warnings and the person's own reports don't count.","Wie viele Sprechblasen Phriend pro Person und Tag von sich aus öffnen darf. Reaktionen, Warnungen und eigene Meldungen zählen nicht."
+One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
+A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
+"Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
