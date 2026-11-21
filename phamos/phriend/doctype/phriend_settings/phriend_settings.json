@@ -90,7 +90,7 @@
   },
   {
    "default": "1",
-   "description": "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).",
+   "description": "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).",
    "fieldname": "reactions",
    "fieldtype": "Check",
    "label": "Hands and Reactions"

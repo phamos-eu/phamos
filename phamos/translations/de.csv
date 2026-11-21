@@ -2581,3 +2581,4 @@ The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht absch
 The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
 Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
 Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
