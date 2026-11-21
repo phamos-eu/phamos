@@ -93,8 +93,11 @@ def translate_url(url, lang):
 	parts = url.strip("/").split("/")
 	if len(parts) < 2 or parts[0] not in LANGUAGES or parts[0] == lang:
 		return url
+	from phamos.web_profile.docs import DOCS_ROUTES
 	from phamos.web_profile.sections import SECTIONS
 
+	if f"/{parts[0]}/{parts[1]}" == DOCS_ROUTES.get(parts[0]):  # documentation (#2044)
+		return DOCS_ROUTES[lang] + "".join(f"/{p}" for p in parts[2:])
 	for config in SECTIONS.values():
 		if config["slugs"].get(parts[0]) == parts[1]:
 			return "/" + "/".join([lang, config["slugs"][lang], *parts[2:]])
@@ -136,7 +139,7 @@ def _footer_items(items, lang):
 			# Frappe's footer template prints labels unescaped; book titles come from BookStack (review B1).
 			copy.child_items = [
 				frappe._dict(label=frappe.utils.escape_html(b.title), url=b.url, parent_label=label)
-				for b in published_books()
+				for b in published_books(lang)
 			]
 		elif section and not parent:
 			profiles = sorted(get_items(section, lang), key=lambda i: i.sort["manual"])

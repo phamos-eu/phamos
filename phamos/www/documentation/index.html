@@ -1,4 +1,4 @@
-{#- /de/doku. Context: index.py. Frappe's Jinja does not autoescape: database values go through `| e`. -#}
+{#- /de/dokumentation, /en/documentation. Context: index.py. Frappe's Jinja does not autoescape: database values go through `| e`. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
 {% from "phamos/templates/web_profile/docs_macros.html" import book_tile with context %}
@@ -14,6 +14,7 @@
 			<div>
 				<h1>{{ _("Documentation") }}</h1>
 				<p class="wp-intro">{{ intro | e }}</p>
+				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</div>
 		</div>
 	</header>
