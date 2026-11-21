@@ -71,10 +71,13 @@ function bookstack_sync_steps() {
 }
 
 function bookstack_step_labels() {
-	return {
-		...Object.fromEntries(bookstack_sync_steps().map((s) => [s.step, s.label])),
-		removed: __("Removed (deleted in BookStack)"),
-	};
+	// Same order as the server runs them: the removal comes right before the website copy.
+	const labels = {};
+	for (const s of bookstack_sync_steps()) {
+		if (s.step === "content") labels.removed = __("Removed (deleted in BookStack)");
+		labels[s.step] = s.label;
+	}
+	return labels;
 }
 
 function bookstack_sync_dialog(frm) {
