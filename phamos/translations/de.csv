@@ -2567,7 +2567,7 @@ Sync started in the background. The tree reloads when it is done.,"Synchronisier
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
-Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
+Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
 Leave me in peace,Lass mich in Ruhe
 Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
 Quiet until {0},Ruhig bis {0}
@@ -2614,3 +2614,4 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+This documentation is in German.,Diese Dokumentation ist auf Deutsch.

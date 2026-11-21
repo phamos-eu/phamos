@@ -1,4 +1,4 @@
-{#- /de/doku/<book>. Context: book.py. -#}
+{#- /de/dokumentation/<book> (and English). Context: book.py. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, tile with context %}
 {% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
@@ -13,7 +13,8 @@
 		<div class="wp-page-head-main">
 			<div>
 				<h1>{{ book.title | e }}</h1>
-				{%- if book.summary %}<p class="wp-intro">{{ book.summary | e }}</p>{% endif %}
+				{%- if book.summary %}<p class="wp-intro" lang="de">{{ book.summary | e }}</p>{% endif %}
+				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</div>
 			{%- if first_page %}<a class="wp-button wp-button-primary" href="{{ first_page.url | e }}">{{ _("Start reading") }}</a>{% endif %}
 		</div>

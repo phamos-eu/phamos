@@ -11,7 +11,7 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
-from phamos.bookstack_integration.content import clean_page_html, link_map_hash, published_link_map
+from phamos.bookstack_integration.content import clean_page_html
 
 
 LOG_TITLE = "Bookstack Sync"
@@ -264,23 +264,7 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 	reports a newer version than the stored copy. Content of every other page is cleared,
 	so a page that left a published book, or became a draft, is not shown any more.
 	"""
-	link_map = published_link_map(instance)
-	# What is published changed (a book or page added, removed, renamed): every copy's links may
-	# point to the wrong place, so all of them are fetched again (review S5).
-	link_hash = link_map_hash(link_map)
-	links_changed = frappe.db.get_value("Bookstack Configuration", instance, "website_link_hash") != link_hash
-	if links_changed:
-		# Marked for refetch before the loop and the new state stored at once, so a run stopped
-		# halfway (timeout, restart) resumes with the pages not yet fetched instead of starting over.
-		page_table = frappe.qb.DocType("Bookstack Page")
-		(
-			frappe.qb.update(page_table)
-			.set(page_table.content_updated_at, None)
-			.where(page_table.instance == instance)
-			.where(page_table.html.isnotnull())
-		).run()
-		frappe.db.set_value("Bookstack Configuration", instance, "website_link_hash", link_hash, update_modified=False)
-		frappe.db.commit()
+	# Links stay absolute here; the website points them at its own pages when it shows a page (#2044).
 	books = frappe.get_all(
 		"Bookstack Book", filters={"instance": instance, "publish_on_website": 1}, pluck="name"
 	)
@@ -315,7 +299,7 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 				"Bookstack Page",
 				p.name,
 				{
-					"html": clean_page_html((data or {}).get("html") or "", client.base_url, link_map),
+					"html": clean_page_html((data or {}).get("html") or "", client.base_url),
 					"content_updated_at": p.updated_at,
 				},
 				update_modified=False,
@@ -329,7 +313,7 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 		count += 1
 		if count % 25 == 0:
 			frappe.db.commit()  # a first copy takes minutes: keep the progress if the job is stopped
-	# A failed page keeps its old stamp (or none after a link change), so the next run fetches it again.
+	# A failed page keeps its old stamp, so the next run fetches it again.
 	return count
 
 
@@ -453,7 +437,7 @@ def _run_steps(instance: str, steps: list) -> dict[str, Any]:
 
 		from phamos.web_profile.docs import clear_cache
 
-		# the /de/doku pages show the new state at once (#2005); after the commit, see BookstackBook
+		# the documentation pages show the new state at once (#2005); after the commit, see BookstackBook
 		frappe.db.after_commit.add(clear_cache)
 		stats["errors"] = errors
 		return stats
