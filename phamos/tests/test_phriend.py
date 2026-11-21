@@ -13,6 +13,7 @@ from PIL import Image
 
 from phamos.phriend import api, setup, shortcut
 from phamos.phriend import quiet as phriend_quiet
+from phamos.phriend import voice as phriend_voice
 from phamos.phriend.boot import boot_session, phriend_boot
 from phamos.www.spa_boot import get_spa_boot
 
@@ -44,7 +45,7 @@ class TestPhriend(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("phriend_test")
-		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0,
+		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1,
 			gitlab_url="https://git.example.com", gitlab_project="phamos/phamos", gitlab_labels="phriend")
 
 	def tearDown(self):
@@ -323,7 +324,8 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
-				"features": {"reactions": 1, "quiet_mode": 0}, "quiet": None, "can_configure": 1},
+				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0}, "quiet": None, "can_configure": 1,
+				"voice": None},
 		)
 
 		self.assertEqual(api.set_my_shortcut("Off"), "")
@@ -384,6 +386,11 @@ class TestPhriend(FrappeTestCase):
 				api.set_my_quiet(refused)
 		self.assertIsNone(api.set_my_quiet("")["quiet_until"])  # back
 
+		# a malformed or non-positive number of minutes is refused, not taken as "come back"
+		for refused in ("abc", "0", "-5"):
+			with self.subTest(minutes=refused), self.assertRaises(frappe.ValidationError):
+				api.set_my_quiet(minutes=refused)
+
 		# a migrate doesn't switch the new feature on (only the ones that start on)
 		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "quiet_mode"})
 		setup.ensure_default_features()
@@ -399,6 +406,37 @@ class TestPhriend(FrappeTestCase):
 		# a time that has passed reads as not quiet
 		frappe.defaults.set_user_default(phriend_quiet.QUIET_DEFAULT, str(now - 1))
 		self.assertIsNone(phriend_quiet.state()["quiet_until"])
+
+	def test_one_voice_counts_each_users_bubbles_per_day(self, _enqueue):
+		# #2011: at most "Bubbles per Day" unprompted bubbles per user and (the browser's) day
+		self.addCleanup(frappe.defaults.clear_user_default, phriend_voice.DAY_DEFAULT)
+		with self.assertRaises(frappe.PermissionError):
+			api.claim_my_bubble("2026-11-21")  # off by default
+		self.assertIsNone(phriend_boot()["voice"])
+
+		self.set_settings(one_voice=1, bubbles_per_day=2)
+		self.assertEqual(phriend_boot()["voice"], {"day": "", "used": 0, "limit": 2})
+		self.assertEqual(api.claim_my_bubble("2026-11-21")["granted"], 1)
+		self.assertEqual(api.claim_my_bubble("2026-11-21")["granted"], 1)
+		third = api.claim_my_bubble("2026-11-21")
+		self.assertEqual((third["granted"], third["used"]), (0, 2))
+		self.assertEqual(phriend_boot()["voice"], {"day": "2026-11-21", "used": 2, "limit": 2})
+		self.assertEqual(api.claim_my_bubble("2026-11-22")["granted"], 1)  # a new day
+		with self.assertRaises(frappe.ValidationError):
+			api.claim_my_bubble("tomorrow")
+
+		self.set_settings(bubbles_per_day=0)  # never by itself
+		self.assertEqual(api.claim_my_bubble("2026-11-23")["granted"], 0)
+
+		# sites that saved Phriend Settings before the field existed get 1, once
+		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": ["in", ["bubbles_per_day", "one_voice"]]})
+		setup.ensure_default_features()
+		def stored(field):
+			rows = frappe.db.sql("select value from `tabSingles` where doctype='Phriend Settings' and field=%s", field)
+			return rows[0][0] if rows else None
+
+		self.assertEqual(int(stored("bubbles_per_day")), 1)
+		self.assertFalse(int(stored("one_voice") or 0))
 
 	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
 		doc = frappe.get_doc("Phriend Settings")

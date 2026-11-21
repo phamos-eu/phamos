@@ -53,7 +53,10 @@ def set_quiet(until=None, minutes=None, now=None):
 	"forever", a time in ms within the next 25 hours ("for today", the browser's midnight), or
 	empty to call Phriend back."""
 	now = now or now_ms()
-	if cint(minutes):
+	if cstr(minutes).strip():
+		# a malformed or non-positive value is refused, not taken as "come back" (AI review of !1273)
+		if not cstr(minutes).strip().isdigit() or cint(minutes) <= 0:
+			frappe.throw(_("Phriend can be quiet for a number of minutes, like 60."))
 		until = now + cint(minutes) * 60 * 1000
 	value = cstr(until).strip()
 	if not value:

@@ -18,6 +18,7 @@
 //   quiet                     optional: the user's quiet state from the boot, see quiet.js (#2010)
 //   can_configure             optional: the user may change Phriend Settings (the menu links there)
 //   open_settings()           optional: open Phriend Settings
+//   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
@@ -25,6 +26,7 @@ import { open_hands_panel } from "./hands_panel";
 import * as nudge from "./nudge";
 import * as quiet from "./quiet";
 import { call } from "./request";
+import { Voice } from "./voice";
 import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
 
@@ -70,6 +72,10 @@ class Phriend {
 
 	is_quiet() {
 		return this.has_menu() && quiet.is_quiet(this.quiet, this.now());
+	}
+
+	warnings_muted() {
+		return this.has_menu() && quiet.warnings_muted(this.quiet, this.now());
 	}
 
 	time_label(ms) {
@@ -194,6 +200,11 @@ class Phriend {
 		api.reactions = Object.keys(GESTURES);
 		// which side each emoji is attached (#2010): a panel to look and try
 		api.hands = () => this.ball && open_hands_panel(this.ball, (name) => this.ball.react(name, 2500));
+		// one voice (#2011): try the queue
+		const item = (text) => ({ html: escape_html(text || "Hello from the queue") });
+		api.note = (text) => this.voice.note(item(text));
+		api.ask = (text) => this.voice.ask(item(text));
+		api.warn = (text) => this.voice.warn(item(text));
 	}
 
 	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
@@ -248,7 +259,11 @@ class Phriend {
 			close_label: __("Close"),
 			hands: this.feature("reactions"),
 			menu: this.has_menu() ? () => this.menu_entries() : null,
+			on_waiting_click: () => this.voice.open_next(),
+			waiting_label: (count) =>
+				count > 1 ? __("Phriend has {0} things for you", [count]) : __("Phriend has something for you"),
 		});
+		this.voice = new Voice(this); // one voice (#2011)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
@@ -265,9 +280,19 @@ class Phriend {
 			);
 			this.bind_bubble_link("[data-open]", () => this.report(this.saved_draft()));
 		} else if (!storage_get(GREETED_KEY) && !this.is_quiet()) {
-			this.ball.say(escape_html(__("Hi, I'm Phriend! Click me when something looks wrong.")), NUDGE_MS, "wave");
-			storage_set(GREETED_KEY, "1");
-			nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())); // the first nudge
+			// a question to the voice (#2011): only if one of today's bubbles is left, else another day
+			this._asking = true;
+			this.voice
+				.ask(
+					{ html: escape_html(__("Hi, I'm Phriend! Click me when something looks wrong.")), ms: NUDGE_MS, gesture: "wave" },
+					{ drop: true }
+				)
+				.then((shown) => {
+					if (!shown) return;
+					storage_set(GREETED_KEY, "1");
+					nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())); // the first nudge
+				})
+				.finally(() => (this._asking = false));
 		}
 		this.refresh_badge();
 		this.start_nudging();
@@ -290,17 +315,26 @@ class Phriend {
 		// never in the way: not over another bubble, an open flow or a report still to send
 		if (!this.ball || this.open || document.hidden || this.ball.bubble_showing()) return;
 		if ((this.sender && this.sender.busy()) || this.saved_draft()) return;
-		if (this.is_quiet() || this.ball.menu_open()) return; // leave me in peace (#2010)
+		if (this.is_quiet() || this.ball.menu_open() || this._asking) return; // leave me in peace (#2010)
 		const state = nudge.read(this.host.user);
-		const now = Date.now();
-		if (!nudge.is_due(state, now)) return;
-		this.ball.say(
-			`<button type="button" class="link" data-nudge>${escape_html(this.__("Click me!"))}</button>`,
-			NUDGE_MS,
-			"wave"
-		);
-		this.bind_bubble_link("[data-nudge]", () => this.report());
-		nudge.write(nudge.after_nudge(state, now));
+		if (!nudge.is_due(state, Date.now())) return;
+		// a question to the voice (#2011): once today's bubbles are used, "Click me!" waits for another day
+		this._asking = true;
+		this.voice
+			.ask(
+				{
+					html: `<button type="button" class="link" data-nudge>${escape_html(this.__("Click me!"))}</button>`,
+					ms: NUDGE_MS,
+					gesture: "wave",
+					bind: (bubble) => {
+						const link = bubble.querySelector("[data-nudge]");
+						if (link) link.addEventListener("click", () => this.report());
+					},
+				},
+				{ drop: true }
+			)
+			.then((shown) => shown && nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())))
+			.finally(() => (this._asking = false));
 	}
 
 	bind_bubble_link(selector, callback) {
