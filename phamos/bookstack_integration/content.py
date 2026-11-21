@@ -22,9 +22,15 @@ from frappe.utils.html_utils import sanitize_html
 DOCS_ROUTE = "/de/doku"
 
 # Removed together with their content. bleach would turn them into visible text instead.
+# Attributes that make the browser fetch something; checked against the BookStack host.
+_URL_ATTRS = ("src", "poster", "background", "href", "xlink:href", "data")
+_MEDIA_TAGS = ("img", "video", "audio", "source")
+
 _DROP_TAGS = (
 	"script", "style", "link", "meta", "iframe", "frame", "object", "embed", "noscript",
 	"form", "input", "button", "select", "textarea", "template", "base", "html", "head", "body",
+	# bleach would print these as visible "<track …>" text; none has a use on the website
+	"track", "picture", "image", "applet", "portal",
 )
 
 # Inline styles BookStack's editor writes (alignment, colours, table sizes). Frappe's own list also
@@ -119,17 +125,35 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 		if not a["href"].startswith(("/", "#")):
 			rel = a.get("rel") or []
 			a["rel"] = sorted({*(rel if isinstance(rel, list) else rel.split()), "noopener"})
+	# Only media from the BookStack host: any other host would learn every visitor's IP address
+	# (privacy, decided 2026-11-21). This covers every URL attribute the cleaning keeps, not only
+	# <img src>: <video src/poster>, <audio>, <source>, <table background>. Copying media to
+	# phamos.eu comes later.
+	def own_host(value):
+		url = urljoin(base, value.strip())
+		parts = urlsplit(url)
+		return url if parts.netloc == instance_host and parts.scheme in ("http", "https") else None
+
+	for tag in soup.find_all(True):
+		if tag.name == "a" or tag.decomposed:
+			continue
+		tag.attrs.pop("srcset", None)  # several URLs in one value; the plain src is enough
+		for attr in _URL_ATTRS:
+			if attr not in tag.attrs:
+				continue
+			value = tag[attr] if isinstance(tag[attr], str) else " ".join(tag[attr])
+			url = own_host(value) if value.strip() else None  # urljoin turns "" into the start page
+			if url:
+				tag[attr] = url
+			elif tag.name in _MEDIA_TAGS and attr == "src":
+				tag.decompose()  # nothing to show without its source
+				break
+			else:
+				del tag[attr]
+	for media in soup.find_all(_MEDIA_TAGS):
+		if not media.decomposed and not media.get("src") and not media.find("source"):
+			media.decompose()  # an <img> or <video> left without any source
 	for img in soup.find_all("img"):
-		if not (img.get("src") or "").strip():
-			img.decompose()  # urljoin would turn an empty src into the BookStack start page
-			continue
-		src = urljoin(base, img["src"].strip())
-		# Only images from the BookStack host: any other host would learn every visitor's IP
-		# address (privacy, decided 2026-11-21). Copying images to phamos.eu comes later.
-		if urlsplit(src).netloc != instance_host or urlsplit(src).scheme not in ("http", "https"):
-			img.decompose()
-			continue
-		img["src"] = src
 		img["loading"] = "lazy"
 	return str(soup)
 

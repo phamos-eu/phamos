@@ -473,3 +473,22 @@ class TestReviewFixes(_BookstackSyncCase):
 		self._sync()
 		self.assertEqual(sorted(FakeBookstack.fetched + first), [100, 102, 200], "each page once, none twice")
 
+
+	def test_no_media_from_other_hosts(self):
+		from phamos.bookstack_integration.content import clean_page_html
+
+		html = clean_page_html(
+			'<video poster="https://tracker.test/p" src="https://tracker.test/v"></video>'
+			'<video src="/uploads/clip.mp4" poster="/uploads/still.png"></video>'
+			'<video><source src="https://tracker.test/s"></video>'
+			'<audio src="https://tracker.test/a"></audio>'
+			'<img srcset="https://tracker.test/x 2x" src="/uploads/x.png">'
+			'<table background="https://tracker.test/b"><tr><td>Zelle</td></tr></table>'
+			'<video><track src="https://tracker.test/t"></video><picture><source srcset="https://tracker.test/p2"></picture>',
+			BASE, {"books": set(), "pages": set(), "page_ids": {}},
+		)
+		self.assertNotIn("tracker.test", html)
+		self.assertNotIn("&lt;", html, "no tag shows up as text")
+		self.assertIn(f'<video poster="{BASE}/uploads/still.png" src="{BASE}/uploads/clip.mp4"></video>', html)
+		self.assertIn(f'src="{BASE}/uploads/x.png"', html)
+		self.assertIn("<td>Zelle</td>", html)
