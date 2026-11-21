@@ -19,10 +19,3 @@ class BookstackConfiguration(Document):
 		# Cheap call: list a single user
 		client.get("users", params={"count": 1})
 		return _("Connection OK")
-
-	@frappe.whitelist()
-	def sync_all(self, steps=None, remove_deleted_records=1):
-		"""The form's "Sync…" dialog: every step, or the ticked ones (#2029)."""
-		from phamos.bookstack_integration import sync
-
-		return sync.sync_instance(self.name, steps=steps, remove_deleted_records=remove_deleted_records)

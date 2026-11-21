@@ -13,7 +13,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from phamos.bookstack_integration import sync
+from phamos.bookstack_integration import selection, sync
 from phamos.bookstack_integration.api_client import BookstackAPIError
 
 INSTANCE = "BS Website Test"
@@ -96,6 +96,7 @@ class _BookstackSyncCase(FrappeTestCase):
 		FakeBookstack.failing = set()
 		patches = [
 			patch.object(sync, "BookstackClient", FakeBookstack),
+			patch.object(selection, "BookstackClient", FakeBookstack),
 			patch.object(frappe.db, "commit"),
 		]
 		for p in patches:
@@ -298,3 +299,69 @@ class TestChooseWhatToSync(_BookstackSyncCase):
 
 	def test_steps_arrive_as_json_from_the_dialog(self):
 		self.assertEqual(self._calls('["pages"]', remove=0), ["pages"])
+
+
+class TestSyncSelection(_BookstackSyncCase):
+	"""Books, chapters and pages left out on the configuration (phamos/phamos#2029)."""
+
+	def _exclude(self, *items):
+		from phamos.bookstack_integration.selection import save_sync_selection
+
+		return save_sync_selection(INSTANCE, [
+			{"item_type": t, "bookstack_id": i, "title": f"{t} {i}"} for t, i in items
+		])
+
+	def _exists(self, doctype, bookstack_id):
+		return frappe.db.exists(doctype, {"instance": INSTANCE, "bookstack_id": bookstack_id})
+
+	def test_left_out_items_are_not_synced(self):
+		self._exclude(("Book", 2), ("Chapter", 10), ("Page", 102))
+		self._sync()
+
+		self.assertFalse(self._exists("Bookstack Book", 2))
+		self.assertFalse(self._exists("Bookstack Page", 200), "page of a left-out book")
+		self.assertFalse(self._exists("Bookstack Chapter", 10))
+		self.assertFalse(self._exists("Bookstack Page", 100), "page of a left-out chapter")
+		self.assertFalse(self._exists("Bookstack Page", 102))
+		self.assertTrue(self._exists("Bookstack Book", 1))
+		self.assertTrue(self._exists("Bookstack Page", 101))
+
+	def test_saving_removes_existing_copies(self):
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Page", 100))
+
+		result = self._exclude(("Chapter", 10), ("Book", 2))
+
+		self.assertEqual(result, {"excluded": 2, "removed": 4})  # book 2, its page 200, chapter 10, its page 100
+		self.assertFalse(self._exists("Bookstack Page", 100))
+		self.assertFalse(self._exists("Bookstack Book", 2))
+		self.assertTrue(self._exists("Bookstack Page", 102))
+
+	def test_ticking_again_brings_items_back(self):
+		self._exclude(("Book", 2))
+		self._sync()
+		self._exclude()
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Page", 200))
+
+	def test_tree_marks_left_out_items(self):
+		from phamos.bookstack_integration.selection import get_sync_tree
+
+		self._exclude(("Page", 102))
+		tree = get_sync_tree(INSTANCE)
+
+		self.assertEqual([b["title"] for b in tree], ["Handbuch", "Intern"])
+		handbuch = tree[0]
+		self.assertEqual([(c["type"], c["title"]) for c in handbuch["children"]],
+			[("Chapter", "Start"), ("Page", "Zweite")], "chapters and loose pages by priority; drafts left out")
+		self.assertEqual([p["title"] for p in handbuch["children"][0]["children"]], ["Erste"])
+		self.assertFalse(handbuch["children"][1]["included"])
+		self.assertTrue(handbuch["included"])
+
+	def test_unknown_type_or_no_write_access_is_refused(self):
+		self.assertRaises(frappe.ValidationError, self._exclude, ("Shelf", 1))
+		frappe.set_user("Guest")
+		try:
+			self.assertRaises(frappe.PermissionError, self._exclude, ("Book", 2))
+		finally:
+			frappe.set_user("Administrator")

@@ -24,7 +24,9 @@
   "section_sync",
   "last_synced",
   "column_break_4",
-  "sync_error_count"
+  "sync_error_count",
+  "section_sync_selection",
+  "sync_exclusions"
  ],
  "fields": [
   {
@@ -135,6 +137,20 @@
    "fieldtype": "Int",
    "label": "Sync Errors (last run)",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_sync_selection",
+   "fieldtype": "Section Break",
+   "label": "Sync Selection",
+   "collapsible": 1,
+   "collapsible_depends_on": "sync_exclusions"
+  },
+  {
+   "fieldname": "sync_exclusions",
+   "fieldtype": "Table",
+   "label": "Left out of the sync",
+   "options": "Bookstack Sync Exclusion",
+   "description": "Books, chapters and pages that no sync mirrors into ERPNext, with everything under them. Set with Actions > Sync…; everything not listed is synced, new items too."
   }
  ],
  "grid_page_length": 50,

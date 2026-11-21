@@ -2557,3 +2557,15 @@ Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
 Syncing Bookstack...,Bookstack wird synchronisiert...
+"Books, chapters and pages","Bücher, Kapitel und Seiten"
+Save selection,Auswahl speichern
+Selection saved; {0} records removed from ERPNext.,Auswahl gespeichert; {0} Einträge aus ERPNext entfernt.
+Loading books from BookStack…,Bücher werden aus BookStack geladen…
+BookStack could not be reached. The saved selection stays as it is.,BookStack ist nicht erreichbar. Die gespeicherte Auswahl bleibt unverändert.
+Filter books…,Bücher filtern…
+{0} of {1} books,{0} von {1} Büchern
+"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced.","Nicht angehakte Bücher, Kapitel und Seiten übernimmt keine Synchronisierung nach ERPNext; vorhandene Kopien werden beim Speichern entfernt. Neue Einträge in BookStack werden synchronisiert."
+Sync Selection,Auswahl für die Synchronisierung
+Left out of the sync,Von der Synchronisierung ausgenommen
+Book,Buch
+Unknown item type: {0},Unbekannter Typ: {0}

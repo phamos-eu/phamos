@@ -82,18 +82,19 @@ function bookstack_step_labels() {
 
 function bookstack_sync_dialog(frm) {
 	const steps_config = bookstack_sync_steps();
+	let tree = null; // set once the tree has loaded; the selection is only saved then
 	const d = new frappe.ui.Dialog({
 		title: __("Sync from {0}", [frm.doc.title]),
+		size: "large",
 		fields: [
 			{ fieldtype: "Heading", label: __("What to sync") },
-			...steps_config.map((s) => ({
+			...steps_config.map((s, i) => ({
 				fieldname: s.step,
 				fieldtype: "Check",
 				label: s.label,
 				description: s.description,
 				default: 1,
 			})),
-			{ fieldtype: "Section Break" },
 			{
 				fieldname: "remove_deleted_records",
 				fieldtype: "Check",
@@ -101,6 +102,8 @@ function bookstack_sync_dialog(frm) {
 				description: __("Only for the ticked shelves, books, chapters and pages."),
 				default: 1,
 			},
+			{ fieldtype: "Section Break", label: __("Books, chapters and pages") },
+			{ fieldname: "tree_html", fieldtype: "HTML" },
 		],
 		primary_action_label: __("Sync"),
 		primary_action(values) {
@@ -109,20 +112,153 @@ function bookstack_sync_dialog(frm) {
 				frappe.msgprint(__("Choose at least one part to sync."));
 				return;
 			}
-			d.hide();
-			frm.call({
-				doc: frm.doc,
-				method: "sync_all",
-				args: { steps, remove_deleted_records: values.remove_deleted_records ? 1 : 0 },
-				freeze: true,
-				freeze_message: __("Syncing Bookstack..."),
+			bookstack_save_selection(frm, tree).then(() => {
+				d.hide();
+				// By name, not frm.call on the form: saving the selection has just changed the document.
+				return frappe.call({
+					method: "phamos.bookstack_integration.sync.sync_instance",
+					args: {
+						instance: frm.doc.name,
+						steps,
+						remove_deleted_records: values.remove_deleted_records ? 1 : 0,
+					},
+					freeze: true,
+					freeze_message: __("Syncing Bookstack..."),
+				});
 			}).then((r) => {
-				if (r.message) bookstack_show_sync_result(r.message);
+				if (r && r.message) bookstack_show_sync_result(r.message);
+				frm.reload_doc();
+			});
+		},
+		secondary_action_label: __("Save selection"),
+		secondary_action() {
+			if (!tree) return;
+			bookstack_save_selection(frm, tree).then((r) => {
+				d.hide();
+				frappe.show_alert({
+					message: __("Selection saved; {0} records removed from ERPNext.", [r.removed]),
+					indicator: "green",
+				});
 				frm.reload_doc();
 			});
 		},
 	});
 	d.show();
+
+	const $area = d.fields_dict.tree_html.$wrapper;
+	$area.html(`<div class="text-muted small">${__("Loading books from BookStack…")}</div>`);
+	frappe
+		.xcall("phamos.bookstack_integration.selection.get_sync_tree", { instance: frm.doc.name })
+		.then((books) => {
+			tree = bookstack_render_tree($area, books);
+		})
+		.catch(() => {
+			$area.html(
+				`<div class="text-danger small">${__(
+					"BookStack could not be reached. The saved selection stays as it is."
+				)}</div>`
+			);
+			d.get_secondary_btn().prop("disabled", true);
+		});
+}
+
+// Checkbox tree (#2029): a parent's box sets everything under it; an unticked book or chapter
+// greys out its contents, a parent with some unticked children shows a mixed state.
+function bookstack_render_tree($area, books) {
+	const esc = frappe.utils.escape_html;
+	// Under a left-out book or chapter everything shows unticked: the parent stands for all of it.
+	const item = (n, parent_on = true) => {
+		const on = n.included && parent_on;
+		const box = `<input type="checkbox" class="bs-tree-box" data-type="${n.type}" data-id="${n.id}"
+			data-title="${esc(n.title)}" ${on ? "checked" : ""}>`;
+		const label = `<label class="bs-tree-label">${box}<span>${esc(n.title)}</span>
+			<span class="text-muted small">${__(n.type)}</span></label>`;
+		if (!n.children.length) return `<li class="bs-tree-item">${label}</li>`;
+		return `<li class="bs-tree-item"><details${n.type === "Chapter" ? " open" : ""}><summary>${label}
+			<span class="text-muted small">(${n.children.length})</span></summary>
+			<ul class="bs-tree-list">${n.children.map((c) => item(c, on)).join("")}</ul></details></li>`;
+	};
+	$area.html(`
+		<style>
+			.bs-tree-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+			.bs-tree-tools input { max-width: 260px; }
+			.bs-tree { max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 6px 10px; }
+			.bs-tree-list { list-style: none; margin: 0; padding-left: 22px; }
+			.bs-tree > .bs-tree-list { padding-left: 14px; }
+			.bs-tree summary { list-style-position: outside; }
+			.bs-tree-label { display: inline-flex; gap: 6px; align-items: center; margin: 2px 0; font-weight: normal; cursor: pointer; }
+			/* Desk's checkbox style draws no mixed state; a dash on the ticked colour marks "partly". */
+			.bs-tree-box:indeterminate { background: var(--gray-600) linear-gradient(#fff, #fff) center / 8px 2px no-repeat; border-color: var(--gray-600); }
+			.bs-tree-item.bs-off > details > summary ~ *, .bs-tree-item.bs-off > details > summary ~ * label { opacity: 0.45; }
+		</style>
+		<div class="bs-tree-tools">
+			<input type="search" class="form-control input-xs bs-tree-search" placeholder="${__("Filter books…")}">
+			<button class="btn btn-xs btn-default bs-tree-all">${__("All")}</button>
+			<button class="btn btn-xs btn-default bs-tree-none">${__("None")}</button>
+			<span class="text-muted small bs-tree-count"></span>
+		</div>
+		<div class="text-muted small" style="margin-bottom:6px">${__(
+			"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced."
+		)}</div>
+		<div class="bs-tree"><ul class="bs-tree-list">${books.map((b) => item(b)).join("")}</ul></div>`);
+
+	const $boxes = () => $area.find(".bs-tree-box");
+	const refresh = () => {
+		$area.find(".bs-tree-item").each(function () {
+			const $li = $(this);
+			const box = $li.find("> label > .bs-tree-box, > details > summary .bs-tree-box").get(0);
+			const below = $li.find("ul .bs-tree-box").toArray();
+			$li.toggleClass("bs-off", !box.checked);
+			box.indeterminate = box.checked && below.some((b) => !b.checked);
+		});
+		const roots = $area.find(".bs-tree > .bs-tree-list > .bs-tree-item");
+		const on = roots.filter((_, li) => !$(li).hasClass("bs-off")).length;
+		$area.find(".bs-tree-count").text(__("{0} of {1} books", [on, roots.length]));
+	};
+	$area.on("click", ".bs-tree-label", (e) => e.stopPropagation()); // ticking does not fold
+	$area.on("change", ".bs-tree-box", function () {
+		$(this).closest(".bs-tree-item").find("ul .bs-tree-box").prop("checked", this.checked);
+		refresh();
+	});
+	$area.find(".bs-tree-all, .bs-tree-none").on("click", function () {
+		$boxes().prop("checked", $(this).hasClass("bs-tree-all"));
+		refresh();
+	});
+	$area.find(".bs-tree-search").on("input", function () {
+		const q = this.value.trim().toLowerCase();
+		$area.find(".bs-tree > .bs-tree-list > .bs-tree-item").each(function () {
+			const title = $(this).find(".bs-tree-box").first().data("title").toString().toLowerCase();
+			$(this).toggle(!q || title.includes(q));
+		});
+	});
+	refresh();
+	return $area;
+}
+
+// Left-out items, as few as possible: an unticked book or chapter stands for everything under it.
+function bookstack_collect_exclusions($area) {
+	const out = [];
+	const walk = ($list) => {
+		$list.children(".bs-tree-item").each(function () {
+			const $li = $(this);
+			const box = $li.find("> label > .bs-tree-box, > details > summary .bs-tree-box").get(0);
+			if (!box.checked) {
+				out.push({ item_type: box.dataset.type, bookstack_id: Number(box.dataset.id), title: box.dataset.title });
+			} else {
+				walk($li.find("> details > .bs-tree-list"));
+			}
+		});
+	};
+	walk($area.find(".bs-tree > .bs-tree-list"));
+	return out;
+}
+
+function bookstack_save_selection(frm, $tree) {
+	if (!$tree) return Promise.resolve({ removed: 0 }); // tree not loaded: keep the saved selection
+	return frappe.xcall("phamos.bookstack_integration.selection.save_sync_selection", {
+		instance: frm.doc.name,
+		excluded: bookstack_collect_exclusions($tree),
+	});
 }
 
 function bookstack_show_sync_result(stats) {

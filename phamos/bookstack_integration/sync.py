@@ -11,6 +11,7 @@ from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
 from phamos.bookstack_integration.content import clean_page_html, published_link_map
+from phamos.bookstack_integration.selection import exclusions, is_excluded
 
 
 LOG_TITLE = "Bookstack Sync"
@@ -143,7 +144,10 @@ def sync_shelves(client: BookstackClient, instance: str, seen: dict | None = Non
 def sync_books(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	for book in client.paginate("books"):
+		if is_excluded(excluded, "Book", book):
+			continue  # left out on the configuration (#2029)
 		ids.add(book["id"])
 		_upsert("Bookstack Book", instance, book["id"], {
 			"title": book.get("name"),
@@ -164,7 +168,10 @@ def sync_books(client: BookstackClient, instance: str, seen: dict | None = None)
 def sync_chapters(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	for chapter in client.paginate("chapters"):
+		if is_excluded(excluded, "Chapter", chapter):
+			continue  # left out on the configuration (#2029)
 		ids.add(chapter["id"])
 		book_name = _lookup_name("Bookstack Book", instance, chapter.get("book_id"))
 		_upsert("Bookstack Chapter", instance, chapter["id"], {
@@ -197,7 +204,10 @@ def _chapter_url(client: BookstackClient, chapter: dict, book_name: str | None, 
 def sync_pages(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	for page in client.paginate("pages"):
+		if is_excluded(excluded, "Page", page):
+			continue  # left out on the configuration (#2029)
 		ids.add(page["id"])
 		book_name = _lookup_name("Bookstack Book", instance, page.get("book_id"))
 		chapter_name = _lookup_name("Bookstack Chapter", instance, page.get("chapter_id"))
