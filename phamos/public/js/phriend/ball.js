@@ -136,6 +136,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	box-shadow: var(--ph-shadow); font-size: 13px; line-height: 1.35; cursor: auto;
 }
 .ball.flip .menu { right: auto; left: 0; }
+.menu.below { bottom: auto; top: calc(100% + 8px); }
+.menu.scroll { overflow-y: auto; }
 .menu-heading { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ph-muted); }
 .menu-note { padding: 2px 8px 6px; font-size: 12px; color: var(--ph-muted); }
 .menu-sep { height: 1px; margin: 4px 2px; background: var(--ph-border); }
@@ -491,6 +493,7 @@ export class Ball {
 		this.hide_bubble();
 		this.menu.replaceChildren(...entries.map((entry) => this.menu_entry(entry)));
 		this.menu.hidden = false;
+		this.fit_menu();
 		const first = this.menu.querySelector("button");
 		if (first) first.focus();
 	}
@@ -524,6 +527,24 @@ export class Ball {
 			return row;
 		}
 		return button(entry);
+	}
+
+	// Above the ball if it fits, else below when there is more room there; scroll if neither fits.
+	fit_menu() {
+		const GAP = 8 + 4; // the gap to the ball and a margin to the window edge
+		this.menu.classList.remove("below", "scroll");
+		this.menu.style.maxHeight = "";
+		const ball = this.root.getBoundingClientRect();
+		const height = this.menu.offsetHeight;
+		const above = ball.top - GAP;
+		const below = window.innerHeight - ball.bottom - GAP;
+		if (height <= above) return;
+		const room = Math.max(above, below);
+		this.menu.classList.toggle("below", below > above);
+		if (height > room) {
+			this.menu.classList.add("scroll");
+			this.menu.style.maxHeight = `${Math.max(room, 120)}px`;
+		}
 	}
 
 	close_menu(focus_ball = true) {
