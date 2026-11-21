@@ -125,5 +125,7 @@ class TestWebDocs(FrappeTestCase):
 		from phamos.web_profile.chrome import _footer_items
 
 		items = _footer_items([frappe._dict(label="Dokumentation")], "de")
-		self.assertEqual([(c.label, c.url) for c in items[0].child_items],
-			[("Handbuch & Test", "/de/doku/handbuch-test")])
+		links = [(c.label, c.url) for c in items[0].child_items]
+		# The site may publish real books too; only this test's books are checked.
+		self.assertIn(("Handbuch & Test", "/de/doku/handbuch-test"), links)
+		self.assertNotIn("/de/doku/intern-test", [url for _, url in links])
