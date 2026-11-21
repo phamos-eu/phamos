@@ -178,6 +178,18 @@ class ChipSpaceEncounterTestCase(FrappeTestCase):
 			frappe.db.count("Chip Space Encounter", {"pair_key": chip_space._pair_key(self.A, self.B)}), 1
 		)
 
+	def test_video_room_per_encounter(self):
+		with patch.dict(frappe.conf, {"chip_space_jitsi_domain": None, "chip_space_video": None}):
+			first = self._open(self.A, self.B)
+			again = self._open(self.B, self.A)
+			self.assertEqual(first["video"]["domain"], "meet.jit.si")
+			self.assertRegex(first["video"]["room"], r"^phamos-chip-[0-9a-f]{24}$")
+			self.assertEqual(again["video"], first["video"])
+		with patch.dict(frappe.conf, {"chip_space_video": 0}):
+			self.assertIsNone(self._open(self.A, self.B)["video"])
+		with patch.dict(frappe.conf, {"chip_space_jitsi_domain": "evil.example/x?y", "chip_space_video": None}):
+			self.assertIsNone(self._open(self.A, self.B)["video"])
+
 	def test_too_far_apart(self):
 		with self.assertRaises(frappe.ValidationError):
 			self._open(self.A, self.C)

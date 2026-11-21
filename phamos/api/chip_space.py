@@ -74,6 +74,10 @@ EVENT_SAVE_VOTE = "chip_space_save_vote"
 EVENT_SAVED = "chip_space_saved"
 EVENT_BURNED = "chip_space_burned"
 
+# Video call on encounter (#2059): a Jitsi room per encounter, joined muted with the camera off.
+# Site config: "chip_space_jitsi_domain" (default meet.jit.si), "chip_space_video": 0 turns it off.
+JITSI_DEFAULT_DOMAIN = "meet.jit.si"
+
 
 def _require_user():
 	if frappe.session.user == "Guest":
@@ -399,8 +403,31 @@ def _messages(channel):
 	return [_message_row(r) for r in reversed(rows)]
 
 
+def _video(doc):
+	"""Where the two meet on video, or None when video is off for this site."""
+	switch = frappe.conf.get("chip_space_video")
+	if switch is not None and not frappe.utils.cint(switch):
+		return None
+	domain = str(frappe.conf.get("chip_space_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/")
+	# A bare host name: the page loads https://<domain>/external_api.js from it.
+	if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", domain):
+		return None
+	room = frappe.db.get_value(ENCOUNTER_DOCTYPE, doc.name, "jitsi_room")
+	if not room:
+		# Encounters from before #2059 get their room on first use.
+		room = _new_jitsi_room()
+		frappe.db.set_value(ENCOUNTER_DOCTYPE, doc.name, "jitsi_room", room, update_modified=False)
+	return {"domain": domain, "room": room}
+
+
+def _new_jitsi_room():
+	# Unguessable: on a public Jitsi server, whoever knows the name can walk in.
+	return f"phamos-chip-{frappe.generate_hash(length=24)}"
+
+
 def _encounter_payload(doc):
 	return {
+		"video": _video(doc),
 		"encounter": doc.name,
 		"with": _peer(doc),
 		"channel": doc.raven_channel,
@@ -438,6 +465,7 @@ def open_encounter(with_user):
 				"status": "Open",
 				"opened_at": now_datetime(),
 				"pair_key": pair_key,
+				"jitsi_room": _new_jitsi_room(),
 			}
 		)
 		try:

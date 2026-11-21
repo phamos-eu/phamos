@@ -2,9 +2,10 @@
 	<!-- The encounter chat of two chips that met (#2056), above (or below) the two of them; the
 	     parent places it through the style attribute. -->
 	<div
-		class="encounter-bubble absolute z-20 flex w-72 flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
+		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
+		:class="video ? 'w-80' : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
@@ -21,6 +22,15 @@
 				{{ __("Esc to close") }}
 			</button>
 		</header>
+
+		<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
+		<VideoCall
+			v-if="video"
+			:domain="video.domain"
+			:room="video.room"
+			:display-name="displayName"
+			@joined="keepChatFocus"
+		/>
 
 		<div ref="list" class="max-h-48 min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm">
 			<p v-if="loading" class="text-ink-gray-5">{{ __("Opening the chat…") }}</p>
@@ -57,6 +67,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import VideoCall from "./VideoCall.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -68,6 +79,10 @@ const props = defineProps({
 	loading: { type: Boolean, default: false },
 	error: { type: String, default: "" },
 	sending: { type: Boolean, default: false },
+	/** { domain, room } of the call, or null */
+	video: { type: Object, default: null },
+	/** My name in the call */
+	displayName: { type: String, default: "" },
 })
 const emit = defineEmits(["send", "close"])
 
@@ -100,6 +115,11 @@ watch(
 	},
 	{ immediate: true }
 )
+
+// Jitsi's frame may take the focus when it joins: give it back to the chat.
+function keepChatFocus() {
+	if (document.activeElement?.tagName === "IFRAME") input.value?.focus()
+}
 
 defineExpose({ focus: () => input.value?.focus() })
 </script>

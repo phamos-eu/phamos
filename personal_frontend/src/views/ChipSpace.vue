@@ -91,6 +91,8 @@
 					:loading="bubble.loading"
 					:error="bubble.error"
 					:sending="bubble.sending"
+					:video="bubble.user === videoUser ? bubble.video : null"
+					:display-name="me.full_name"
 					:style="bubbleStyle(bubble)"
 					@send="(text, done) => sendMessage(bubble, text, done)"
 					@close="closeBubble(bubble.user)"
@@ -150,6 +152,7 @@ const API = "phamos.api.chip_space"
 const ENCOUNTER_DISTANCE = 1.2
 const PART_DISTANCE = 1.5
 const BUBBLE_WIDTH = 288
+const BUBBLE_WIDTH_VIDEO = 320
 
 // The cockpit's realtime socket (as in useUserRealtime); without it the Space still works alone.
 const instance = getCurrentInstance()
@@ -343,6 +346,20 @@ const dismissed = new Set()
 const encounterByUser = new Map()
 const bubbleList = computed(() => Object.values(bubbles))
 
+// Video (#2059): one call at a time, with the nearest person whose chat is open.
+const videoUser = computed(() => {
+	if (!me.value) return null
+	let best = null
+	for (const bubble of Object.values(bubbles)) {
+		if (!bubble.video) continue
+		const other = others.value.find((o) => o.user === bubble.user)
+		if (!other) continue
+		const distance = Math.hypot(other.x - me.value.x, other.y - me.value.y)
+		if (!best || distance < best.distance) best = { user: bubble.user, distance }
+	}
+	return best?.user || null
+})
+
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el
 	else delete bubbleRefs[user]
@@ -354,10 +371,13 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	const left = Math.max(BUBBLE_WIDTH / 2 + 4, Math.min(gridWidth - BUBBLE_WIDTH / 2 - 4, centreX))
+	// With the video call the bubble is wider and about 200px taller (#2059).
+	const withVideo = bubble.user === videoUser.value
+	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top < 6) {
+	if (top * t < (withVideo ? 470 : 270)) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
@@ -404,6 +424,7 @@ async function openBubble(other) {
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
 		bubble.encounter = data.encounter
 		bubble.messages = data.messages || []
+		bubble.video = data.video || null
 		encounterByUser.set(other.user, data.encounter)
 		// Met again before the chat burned: it goes on.
 		delete notices[data.encounter]

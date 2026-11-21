@@ -12,6 +12,7 @@
   "burn_at",
   "column_break_main",
   "raven_channel",
+  "jitsi_room",
   "opened_at",
   "saved_by_a",
   "saved_by_b",
@@ -66,6 +67,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "jitsi_room",
+   "fieldtype": "Data",
+   "label": "Jitsi Room",
+   "read_only": 1,
+   "description": "The video call room of this encounter (#2059): random, so only these two find it."
+  },
+  {
    "fieldname": "opened_at",
    "fieldtype": "Datetime",
    "label": "Opened At",
@@ -97,7 +105,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-21 20:00:00.000000",
+ "modified": "2026-11-21 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Chip Space Encounter",
