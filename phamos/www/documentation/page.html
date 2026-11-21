@@ -1,4 +1,4 @@
-{#- /de/doku/<book>/<page>. Context: page.py. -#}
+{#- /de/dokumentation/<book>/<page> (and English). Context: page.py. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
 {% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
@@ -22,10 +22,11 @@
 		<article class="wp-docs-article">
 			<header>
 				{%- if page.chapter_title %}<span class="wp-badge">{{ page.chapter_title | e }}</span>{% endif %}
-				<h1>{{ page.title | e }}</h1>
+				<h1 lang="de">{{ page.title | e }}</h1>
+				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</header>
-			{#- Sanitised by the BookStack sync (phamos.bookstack_integration.content.clean_page_html). -#}
-			<div class="wp-body wp-docs-content">{{ page.html }}</div>
+			{#- Sanitised by the BookStack sync (content.clean_page_html); links pointed at the website by docs.render_html. -#}
+			<div class="wp-body wp-docs-content" lang="de">{{ page.html }}</div>
 
 			<nav class="wp-docs-pager" aria-label="{{ _('Pages') }}">
 				{%- if page.previous %}<a class="wp-link-card" href="{{ page.previous.url | e }}" rel="prev"><span class="wp-docs-pager-label">{{ _("Previous") }}</span><span>{{ page.previous.title | e }}</span></a>{% else %}<span></span>{% endif %}

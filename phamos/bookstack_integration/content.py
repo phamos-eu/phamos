@@ -10,7 +10,6 @@ is removed here, before it is stored.
 
 from __future__ import annotations
 
-import hashlib
 import re
 from urllib.parse import urljoin, urlsplit
 
@@ -18,8 +17,6 @@ import frappe
 from bleach.css_sanitizer import CSSSanitizer
 from bs4 import BeautifulSoup, Comment
 from frappe.utils.html_utils import sanitize_html
-
-DOCS_ROUTE = "/de/doku"
 
 # Attributes that make the browser fetch something; checked against the BookStack host.
 _URL_ATTRS = ("src", "poster", "background", "href", "xlink:href", "data")
@@ -53,41 +50,13 @@ _SAFE_ID = re.compile(r"^bkmrk-[\w-]*$")
 # post to any host on click, "name" clobbers DOM globals.
 _DROP_ATTRS = ("ping", "name")
 
-_PAGE_PATH = re.compile(r"^/books/(?P<book>[^/]+)(?:/(?P<kind>page|chapter)/(?P<slug>[^/]+))?/?$")
-_PERMALINK_PATH = re.compile(r"^/link/(?P<id>\d+)/?$")
+def clean_page_html(html: str, base_url: str) -> str:
+	"""Return BookStack page HTML that is safe to print on phamos.eu.
 
-
-def published_link_map(instance: str) -> dict:
-	"""Slugs and ids of everything that is shown on the website for one instance."""
-	books = frappe.get_all(
-		"Bookstack Book",
-		filters={"instance": instance, "publish_on_website": 1},
-		fields=["name", "slug"],
-	)
-	slug_by_book = {b.name: b.slug for b in books if b.slug}
-	pages = []
-	if slug_by_book:
-		pages = frappe.get_all(
-			"Bookstack Page",
-			filters={"instance": instance, "book": ["in", list(slug_by_book)], "draft": 0, "template": 0},
-			fields=["bookstack_id", "slug", "book"],
-		)
-	return {
-		"books": set(slug_by_book.values()),
-		"pages": {(slug_by_book[p.book], p.slug) for p in pages if p.slug},
-		"page_ids": {p.bookstack_id: (slug_by_book[p.book], p.slug) for p in pages if p.slug},
-	}
-
-
-def link_map_hash(link_map: dict) -> str:
-	"""Fingerprint of what is published: when it changes, every copy's links must be rewritten (S5)."""
-	parts = sorted(link_map["books"]) + sorted("/".join(p) for p in link_map["pages"])
-	parts += sorted(f"{i}:{'/'.join(p)}" for i, p in link_map["page_ids"].items())
-	return hashlib.sha1("\n".join(parts).encode()).hexdigest()
-
-
-def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
-	"""Return BookStack page HTML that is safe to print on phamos.eu."""
+	Links are made absolute but stay on BookStack: the website points them at its own pages when it
+	shows the page (phamos.web_profile.docs.render_html, #2044), so publishing a book changes links
+	without fetching every page again.
+	"""
 	if not html:
 		return ""
 
@@ -121,7 +90,7 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 	base = base_url.rstrip("/") + "/"
 	instance_host = urlsplit(base).netloc
 	for a in soup.find_all("a", href=True):
-		a["href"] = _rewrite_href(a["href"], base, link_map)
+		a["href"] = _absolute_href(a["href"], base)
 		if not a["href"].startswith(("/", "#")):
 			rel = a.get("rel") or []
 			a["rel"] = sorted({*(rel if isinstance(rel, list) else rel.split()), "noopener"})
@@ -158,32 +127,9 @@ def clean_page_html(html: str, base_url: str, link_map: dict) -> str:
 	return str(soup)
 
 
-def _rewrite_href(href: str, base: str, link_map: dict) -> str:
-	"""Point links to published pages at phamos.eu; make the rest absolute."""
+def _absolute_href(href: str, base: str) -> str:
+	"""Anchors and mail links as they are; everything else absolute to the BookStack instance."""
 	href = href.strip()
 	if href.startswith("#") or href.startswith("mailto:"):
 		return href
-
-	absolute = urljoin(base, href)
-	parts = urlsplit(absolute)
-	instance = urlsplit(base)
-	if (parts.scheme, parts.netloc) != (instance.scheme, instance.netloc):
-		return absolute
-
-	fragment = f"#{parts.fragment}" if parts.fragment else ""
-	permalink = _PERMALINK_PATH.match(parts.path)
-	if permalink:
-		target = link_map["page_ids"].get(int(permalink["id"]))
-		return f"{DOCS_ROUTE}/{target[0]}/{target[1]}{fragment}" if target else absolute
-
-	match = _PAGE_PATH.match(parts.path)
-	if not match or match["book"] not in link_map["books"]:
-		return absolute
-	book = match["book"]
-	if match["kind"] == "page":
-		if (book, match["slug"]) in link_map["pages"]:
-			return f"{DOCS_ROUTE}/{book}/{match['slug']}{fragment}"
-		return absolute
-	if match["kind"] == "chapter":
-		return f"{DOCS_ROUTE}/{book}#{match['slug']}"
-	return f"{DOCS_ROUTE}/{book}{fragment}"
+	return urljoin(base, href)

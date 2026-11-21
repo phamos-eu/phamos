@@ -220,12 +220,15 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
-# Documentation from BookStack (phamos/phamos#2005), German only: the content is German.
-website_route_rules += [
-    {"from_route": "/de/doku", "to_route": "doku/index", "defaults": {"lang": "de"}},
-    {"from_route": "/de/doku/<book_slug>", "to_route": "doku/book", "defaults": {"lang": "de"}},
-    {"from_route": "/de/doku/<book_slug>/<page_slug>", "to_route": "doku/page", "defaults": {"lang": "de"}},
-]
+# Documentation from BookStack (phamos/phamos#2005, #2044). The text is German; the English pages
+# show it with English navigation until it is translated. Keep in sync with web_profile/docs.py.
+for _lang, _slug in {"de": "dokumentation", "en": "documentation"}.items():
+    website_route_rules += [
+        {"from_route": f"/{_lang}/{_slug}", "to_route": "documentation/index", "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>", "to_route": "documentation/book", "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>/<page_slug>", "to_route": "documentation/page",
+         "defaults": {"lang": _lang}},
+    ]
 # Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
 SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
 for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():

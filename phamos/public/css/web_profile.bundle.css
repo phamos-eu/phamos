@@ -676,7 +676,7 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-edit-page:hover { background: var(--wp-surface-2); color: var(--wp-ink); text-decoration: none; }
 .wp-edit-page:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
 
-/* --- documentation (/de/doku, phamos/phamos#2005) ----------------------------------------------- */
+/* --- documentation (/de/dokumentation, phamos/phamos#2005) ----------------------------------------------- */
 /* Book contents beside the text on desktop; on phones they fold away above it. The text column is
    capped for reading, the page itself stays full width like every other Web Profile page. */
 .wp-docs-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); column-gap: 48px; align-items: start; padding-bottom: 64px; }
