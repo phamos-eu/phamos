@@ -21,6 +21,7 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
 from frappe.utils.html_utils import sanitize_html
 
+from phamos.phamos.doctype.implementation_chapter.critical_path import critical_path, dependency_conflict
 from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
 
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
@@ -1021,7 +1022,7 @@ def _can_propose_dates():
 
 
 def _baseline_rows(implementation):
-	"""The current baseline and its chapter dates by chapter, and the features it holds.
+	"""The current baseline and its chapter dates and levels by chapter, and the features it holds.
 
 	Read here rather than through `get_baseline_variance`: that one checks Desk read permission on
 	Implementation, which customers (website users) don't have, and reads every chapter again.
@@ -1039,7 +1040,7 @@ def _baseline_rows(implementation):
 		for row in frappe.get_all(
 			"Implementation Baseline Chapter",
 			filters={"parent": baseline.name, "parenttype": "Implementation Baseline"},
-			fields=["chapter", "planned_start", "target_date"],
+			fields=["chapter", "planned_start", "target_date", "current_level"],
 		)
 	}
 	features = set(
@@ -1050,6 +1051,16 @@ def _baseline_rows(implementation):
 		)
 	)
 	return baseline, chapters, features
+
+
+def _target_reached(row):
+	"""A chapter (or module row) is done when it has reached its target level.
+
+	Chapters have no Done status; their level says how far they are (#2033 decision 7). Done
+	work has no slack and doesn't decide the end date any more.
+	"""
+	target = cint(row.target_level)
+	return bool(target) and cint(row.current_level) >= target
 
 
 def _days_between(then, now):
@@ -1156,7 +1167,6 @@ def get_roadmap(implementation):
 	both see the same slack.
 	"""
 	_require_implementation(implementation)
-	from phamos.phamos.doctype.implementation_chapter.critical_path import critical_path, dependency_conflict
 
 	internal = is_internal_user()
 	chapters = frappe.get_all(
@@ -1186,7 +1196,7 @@ def get_roadmap(implementation):
 				"depends_on": depends_on.get(c.name, []),
 			}
 			for c in chapters
-			if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH
+			if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH and not _target_reached(c)
 		]
 	)["items"]
 
@@ -1195,6 +1205,7 @@ def get_roadmap(implementation):
 	def chapter_bar(chapter):
 		then = baseline_chapters.get(chapter.name)
 		on_path = path.get(chapter.name, {})
+		done = _target_reached(chapter)
 		return {
 			"name": chapter.name,
 			"chapter": chapter.name,
@@ -1202,10 +1213,13 @@ def get_roadmap(implementation):
 			"status": chapter.status,
 			"planned_start": chapter.planned_start,
 			"target_date": chapter.target_date,
+			# the level when the plan was agreed: where the level step starts (None without baseline)
+			"start_level": (cint(then.current_level) or None) if then else None,
 			"current_level": cint(chapter.current_level) or None,
 			"target_level": cint(chapter.target_level) or None,
-			"critical": on_path.get("critical"),
-			"slack_days": on_path.get("slack_days"),
+			"done": done,
+			"critical": False if done else on_path.get("critical"),
+			"slack_days": None if done else on_path.get("slack_days"),
 			"cycle": bool(on_path.get("cycle")),
 			"baseline": {
 				"planned_start": then.planned_start,
@@ -1274,8 +1288,10 @@ def get_roadmap(implementation):
 					"status": None,
 					"planned_start": item.planned_start,
 					"target_date": item.target_date,
+					"start_level": None,
 					"current_level": cint(item.current_level) or None,
 					"target_level": cint(item.target_level) or None,
+					"done": _target_reached(item),
 					"critical": None,
 					"slack_days": None,
 					"cycle": False,
