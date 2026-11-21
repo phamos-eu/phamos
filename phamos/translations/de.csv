@@ -2657,3 +2657,31 @@ Times Put Off,Mal verschoben
 Live Since,Live seit
 Phriend Feedback,Phriend-Rückmeldung
 No module,Kein Modul
+Roadmap,Roadmap
+Weeks,Wochen
+Quarters,Quartale
+Compare with baseline,Mit Baseline vergleichen
+A baseline is set when the Planning meeting is submitted.,"Eine Baseline entsteht, wenn das Planungsmeeting gebucht wird."
+Propose a date change,Terminänderung vorschlagen
+{0} features,{0} Features
+"Nothing planned yet. Chapters and modules are planned in Desk, on the Implementation.","Noch nichts geplant. Kapitel und Module werden im Desk geplant, an der Implementation."
+1 chapter,1 Kapitel
+{0} chapters,{0} Kapitel
+Planned start,Geplanter Start
+Target date,Zieldatum
+Levels,Level
+Slack to the end date,Puffer bis zum Endtermin
+In a dependency loop,In einer Abhängigkeitsschleife
+On plan,Im Plan
+Added after the baseline,Nach der Baseline hinzugekommen
+Needed by,Gebraucht von
+This module is planned without a chapter. A chapter makes it plannable with dependencies and the critical path.,Dieses Modul ist ohne Kapitel geplant. Mit einem Kapitel wird es mit Abhängigkeiten und kritischem Pfad planbar.
+Late: {0},Verspätet: {0}
+Could not load the roadmap,Die Roadmap konnte nicht geladen werden
+L{0} → L{1},L{0} → L{1}
+"The roadmap shows when each module reaches which depth level, and which chapters decide the end date.","Die Roadmap zeigt, wann jedes Modul welches Tiefenlevel erreicht und welche Kapitel über den Endtermin entscheiden."
+"Each row is a module. A bar is a chapter: the work that takes the module from one level to the next. Levels 1 to 6 say how deep the module is in use, from first steps to fully running.","Jede Zeile ist ein Modul. Ein Balken ist ein Kapitel: die Arbeit, die das Modul von einem Level zum nächsten bringt. Die Level 1 bis 6 sagen, wie tief das Modul genutzt wird, von den ersten Schritten bis zum vollen Betrieb."
+"The critical path is the chain of chapters that decides the end date. Its bars have a red border: if one of them is late, the end date moves.","Der kritische Pfad ist die Kette von Kapiteln, die über den Endtermin entscheidet. Ihre Balken haben einen roten Rand: Verspätet sich eines davon, verschiebt sich der Endtermin."
+Slack is how many days a chapter can slip before it delays the end date. Late means it already does.,"Der Puffer sagt, um wie viele Tage sich ein Kapitel verschieben kann, bevor es den Endtermin verzögert. „Zu spät“ heißt, es tut das schon."
+"The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
+"Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
