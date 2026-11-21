@@ -356,7 +356,8 @@ def render_html(page, lang=DEFAULT_LANGUAGE) -> dict:
 	the website, every h2 / h3 with an id, and those headings for "On this page" (#2045)."""
 	lang = _lang(lang)  # runs before init_page checks the route's language: no cache entry for "?lang=xx" (review)
 	stamp = page.get("content_updated_at") or page.get("updated_at") or ""
-	return _cached(f"html:{lang}:{page.name}:{stamp}", lambda: _render(page.html or "", lang))
+	# "html2": the value became {"html", "headings"} (#2045); an entry of the older shape must never be read
+	return _cached(f"html2:{lang}:{page.name}:{stamp}", lambda: _render(page.html or "", lang))
 
 
 def _render(html, lang):
