@@ -2580,7 +2580,6 @@ Filter books…,Bücher filtern…
 "Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced.","Nicht angehakte Bücher, Kapitel und Seiten übernimmt keine Synchronisierung nach ERPNext; vorhandene Kopien werden beim Speichern entfernt. Neue Einträge in BookStack werden synchronisiert."
 Sync Selection,Auswahl für die Synchronisierung
 Left out of the sync,Von der Synchronisierung ausgenommen
-Book,Buch
 Unknown item type: {0},Unbekannter Typ: {0}
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
