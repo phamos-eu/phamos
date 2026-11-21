@@ -72,6 +72,12 @@ export function mountPhriend(router, heading) {
 		user: boot().user?.name || "",
 		// Phriend Settings → Features (#2009)
 		features: boot().phriend.features || {},
+		// leave me in peace (#2010)
+		quiet: boot().phriend.quiet || null,
+		can_configure: !!boot().phriend.can_configure,
+		open_settings: () => window.open("/app/phriend-settings", "_blank", "noopener"),
+		// one voice (#2011)
+		voice: boot().phriend.voice || null,
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})

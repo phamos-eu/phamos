@@ -269,6 +269,18 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 	# point to the wrong place, so all of them are fetched again (review S5).
 	link_hash = link_map_hash(link_map)
 	links_changed = frappe.db.get_value("Bookstack Configuration", instance, "website_link_hash") != link_hash
+	if links_changed:
+		# Marked for refetch before the loop and the new state stored at once, so a run stopped
+		# halfway (timeout, restart) resumes with the pages not yet fetched instead of starting over.
+		page_table = frappe.qb.DocType("Bookstack Page")
+		(
+			frappe.qb.update(page_table)
+			.set(page_table.content_updated_at, None)
+			.where(page_table.instance == instance)
+			.where(page_table.html.isnotnull())
+		).run()
+		frappe.db.set_value("Bookstack Configuration", instance, "website_link_hash", link_hash, update_modified=False)
+		frappe.db.commit()
 	books = frappe.get_all(
 		"Bookstack Book", filters={"instance": instance, "publish_on_website": 1}, pluck="name"
 	)
@@ -293,9 +305,9 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 		clear = clear.where(page.name.notin(shown))
 	clear.run()
 
-	count = failed = 0
+	count = 0
 	for p in pages:
-		if not links_changed and p.content_updated_at and p.content_updated_at == p.updated_at:
+		if p.content_updated_at and p.content_updated_at == p.updated_at:
 			continue
 		try:
 			data = client.get(f"pages/{p.bookstack_id}")
@@ -312,15 +324,12 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 			raise
 		except Exception:
 			# One broken page must not stop the others; it is fetched again next time.
-			failed += 1
 			frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance} :: page {p.name}")
 			continue
 		count += 1
 		if count % 25 == 0:
 			frappe.db.commit()  # a first copy takes minutes: keep the progress if the job is stopped
-	if not failed:
-		# Only now: a page that failed keeps the old links and must be rewritten next run too.
-		frappe.db.set_value("Bookstack Configuration", instance, "website_link_hash", link_hash, update_modified=False)
+	# A failed page keeps its old stamp (or none after a link change), so the next run fetches it again.
 	return count
 
 
@@ -350,7 +359,9 @@ def remove_deleted(instance: str, seen: dict) -> int:
 	removed = 0
 	for doctype in _REMOVAL_ORDER:
 		ids = seen.get(doctype)
-		if not ids or any(not seen.get(child) for child in _CHILDREN.get(doctype, ())):
+		# Its own list must have entries (an empty answer deletes nothing); the lists of its children
+		# must have come in complete, which they may do empty (a wiki without chapters).
+		if not ids or any(child not in seen for child in _CHILDREN.get(doctype, ())):
 			continue
 		stale = frappe.get_all(
 			doctype,
@@ -442,7 +453,8 @@ def _run_steps(instance: str, steps: list) -> dict[str, Any]:
 
 		from phamos.web_profile.docs import clear_cache
 
-		clear_cache()  # the /de/doku pages show the new state at once (#2005)
+		# the /de/doku pages show the new state at once (#2005); after the commit, see BookstackBook
+		frappe.db.after_commit.add(clear_cache)
 		stats["errors"] = errors
 		return stats
 

@@ -189,7 +189,10 @@ def init_page(context, crumbs=()):
 	from phamos.web_profile.i18n import set_request_language
 	from phamos.web_profile.page import home_crumb
 
-	if frappe.form_dict.get("lang") != "de":
+	# Frappe would also serve www/doku/* at /doku/... with ?lang=de: duplicate pages for search engines.
+	request = getattr(frappe.local, "request", None)
+	path = "/" + (request.path if request else "").lstrip("/")
+	if frappe.form_dict.get("lang") != "de" or not path.startswith(DOCS_ROUTE):
 		raise frappe.PageDoesNotExistError
 	context.lang = set_request_language("de", context)
 	context.wp_docs = 1  # chrome.py: page language for navbar and footer
