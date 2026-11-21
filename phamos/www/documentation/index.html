@@ -1,7 +1,7 @@
 {#- /de/dokumentation, /en/documentation. Context: index.py. Frappe's Jinja does not autoescape: database values go through `| e`. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
-{% from "phamos/templates/web_profile/docs_macros.html" import book_tile with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import book_tile, search_box with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -18,6 +18,7 @@
 			</div>
 		</div>
 	</header>
+	{{ search_box(search_action, lang, size="lg") }}
 
 	{%- for group in groups %}
 	<section class="wp-related" {% if group.shelf %}aria-labelledby="wp-docs-shelf-{{ loop.index }}"{% else %}aria-label="{{ _('Documentation') }}"{% endif %}>
@@ -33,3 +34,5 @@
 	{%- endfor %}
 </main>
 {% endblock %}
+
+{% block script %}{{ super() }}{{ include_script("web_docs.bundle.js") }}{% endblock %}

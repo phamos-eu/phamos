@@ -4,6 +4,7 @@
 //   - "On this page": the heading being read is highlighted
 //   - floating buttons: back to the top, next heading / chapter below the current position
 //   - book view: expand / collapse all chapters; a #chapter link opens its chapter
+//   - search fields: suggestions while typing (phamos/phamos#2046); the form works without them
 
 (() => {
 	const NAV_KEY = "wp-docs-nav";
@@ -142,7 +143,95 @@
 		}
 	}
 
+	function setupSearch(form) {
+		const input = form.querySelector("[data-wp-docs-search-input]");
+		const list = form.querySelector("[data-wp-docs-suggest]");
+		const book = form.querySelector("[data-wp-docs-search-book]");
+		if (!input || !list) return;
+		let timer = null;
+		let request = 0;
+		let active = -1;
+
+		const items = () => [...list.querySelectorAll("a")];
+		const close = () => {
+			list.hidden = true;
+			list.replaceChildren();
+			active = -1;
+			input.setAttribute("aria-expanded", "false");
+		};
+		const highlight = (i) => {
+			const links = items();
+			active = (i + links.length) % links.length;
+			links.forEach((a, n) => a.setAttribute("aria-selected", String(n === active)));
+		};
+		const render = (rows) => {
+			list.replaceChildren();
+			for (const row of rows) {
+				// textContent only: titles come from BookStack
+				const li = document.createElement("li");
+				const a = document.createElement("a");
+				a.href = row.url;
+				a.setAttribute("role", "option");
+				const title = document.createElement("span");
+				title.className = "wp-docs-suggest-title";
+				title.textContent = row.title;
+				const sub = document.createElement("span");
+				sub.className = "wp-docs-suggest-sub";
+				sub.textContent = row.subtitle || "";
+				a.append(title, sub);
+				li.append(a);
+				list.append(li);
+			}
+			list.hidden = !rows.length;
+			input.setAttribute("aria-expanded", String(!!rows.length));
+			active = -1;
+		};
+		const load = async () => {
+			const q = input.value.trim();
+			if (q.length < 2) return close();
+			const params = new URLSearchParams({ q, lang: form.dataset.lang || "de" });
+			if (book && book.checked) params.set("book", book.value);
+			const mine = ++request;
+			try {
+				const response = await fetch(`/api/method/phamos.web_profile.docs_search.suggest?${params}`, {
+					headers: { Accept: "application/json" },
+				});
+				if (!response.ok || mine !== request) return;
+				render((await response.json()).message || []);
+			} catch (e) {
+				// offline or rate limited: the form still submits to the results page
+			}
+		};
+
+		input.setAttribute("aria-autocomplete", "list");
+		input.setAttribute("aria-expanded", "false");
+		input.addEventListener("input", () => {
+			clearTimeout(timer);
+			timer = setTimeout(load, 200);
+		});
+		if (book) book.addEventListener("change", load);
+		input.addEventListener("keydown", (event) => {
+			const links = items();
+			if (event.key === "ArrowDown" && links.length) {
+				event.preventDefault();
+				highlight(active + 1);
+			} else if (event.key === "ArrowUp" && links.length) {
+				event.preventDefault();
+				highlight(active - 1);
+			} else if (event.key === "Enter" && active >= 0 && links[active]) {
+				event.preventDefault();
+				window.location.href = links[active].href;
+			} else if (event.key === "Escape") {
+				close();
+			}
+		});
+		document.addEventListener("click", (event) => {
+			if (!form.contains(event.target)) close();
+		});
+	}
+
 	function init() {
+		document.querySelectorAll("[data-wp-docs-search]").forEach(setupSearch);
 		setupNav();
 		setupOnThisPage();
 		setupChapters();

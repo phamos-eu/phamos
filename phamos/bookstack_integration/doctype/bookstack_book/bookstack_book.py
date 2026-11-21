@@ -51,6 +51,7 @@ class BookstackBook(Document):
 		(
 			frappe.qb.update(page)
 			.set(page.html, None)
+			.set(page.search_text, None)
 			.set(page.content_updated_at, None)
 			.where(page.book == self.name)
 		).run()

@@ -56,6 +56,14 @@ def docs_url(lang, book_slug=None, page_slug=None, anchor=None):
 	return f"{url}#{anchor}" if anchor else url
 
 
+SEARCH_SLUGS = {"de": "suche", "en": "search"}
+
+
+def search_path(lang):
+	"""/de/dokumentation/suche, /en/documentation/search (#2046)."""
+	return f"{docs_url(lang)}/{SEARCH_SLUGS[_lang(lang)]}"
+
+
 def book_url(book_slug, lang=DEFAULT_LANGUAGE):
 	return docs_url(lang, book_slug)
 
@@ -402,6 +410,7 @@ def init_page(context, crumbs=()):
 	context.no_cache = 1
 	context.no_breadcrumbs = 1
 	context.docs_home = docs_url(lang)
+	context.search_action = search_path(lang)
 	context.content_in_other_language = lang != DEFAULT_LANGUAGE
 	context.crumbs = [home_crumb(), {"label": frappe._("Documentation"), "url": docs_url(lang)}, *crumbs]
 	return lang

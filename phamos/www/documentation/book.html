@@ -2,7 +2,7 @@
     Full width (#2045): chapter index on the left, numbered folding chapters on the right. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, tile with context %}
-{% from "phamos/templates/web_profile/docs_macros.html" import book_chapters, jump_buttons, page_count with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import book_chapters, jump_buttons, page_count, search_box with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -33,6 +33,7 @@
 		{%- endif %}
 
 		<div class="wp-docs-book-main">
+			{{ search_box(search_action, lang, book=book) }}
 			<nav aria-label="{{ _('Contents') }}">
 				{%- if chapters %}
 				<div class="wp-docs-toolbar" data-wp-docs-toolbar hidden>

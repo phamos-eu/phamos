@@ -133,3 +133,8 @@ def _absolute_href(href: str, base: str) -> str:
 	if href.startswith("#") or href.startswith("mailto:"):
 		return href
 	return urljoin(base, href)
+
+
+def plain_text(html: str) -> str:
+	"""The words of a page, one space apart, for the documentation search (#2046)."""
+	return " ".join(BeautifulSoup(html or "", "html.parser").get_text(" ").split())
