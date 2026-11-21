@@ -195,3 +195,30 @@ class TestCockpitRoadmap(FrappeTestCase):
 		self.assertIsNone(chapter_bars[added]["baseline"])
 		self.assertTrue(next(e for e in row_of(data, self.warehouse)["events"] if e["name"] == feature.name)["is_new"])
 		self.assertIsNotNone(data["baseline"])
+
+	def test_the_baseline_level_is_where_the_level_step_starts(self):
+		# make_chapter plans at L2 → L4; the chapter has reached L3 since the baseline
+		agreed = make_chapter(self.implementation, "Agreed", "2026-01-01", "2026-01-10", self.warehouse)
+		create_baseline(self.implementation)
+		frappe.db.set_value("Implementation Chapter", agreed, "current_level", 3)
+		added = make_chapter(self.implementation, "Added", "2026-02-01", "2026-02-10", self.warehouse)
+
+		chapter_bars = bars(get_roadmap(self.implementation))
+		self.assertEqual(
+			[chapter_bars[agreed][key] for key in ("start_level", "current_level", "target_level")], [2, 3, 4]
+		)
+		# no baseline row: no start level, the page falls back to the current level
+		self.assertIsNone(chapter_bars[added]["start_level"])
+
+	def test_a_chapter_at_its_target_level_is_done_and_off_the_critical_path(self):
+		done = make_chapter(self.implementation, "Done", "2026-01-01", "2026-01-10", self.warehouse)
+		later = make_chapter(self.implementation, "Later", "2026-01-11", "2026-01-20", self.warehouse, [done])
+		side = make_chapter(self.implementation, "Side", "2026-01-01", "2026-03-31", self.sales)
+		frappe.db.set_value("Implementation Chapter", done, "current_level", 4)
+
+		data = bars(get_roadmap(self.implementation))
+		# finished work shows neither slack nor a critical border, however early it ended
+		self.assertEqual((data[done]["done"], data[done]["critical"], data[done]["slack_days"]), (True, False, None))
+		# and it no longer holds up the chapter after it: only the open chapters decide the end date
+		self.assertEqual((data[later]["done"], data[later]["critical"], data[later]["slack_days"]), (False, False, 70))
+		self.assertEqual((data[side]["critical"], data[side]["slack_days"]), (True, 0))
