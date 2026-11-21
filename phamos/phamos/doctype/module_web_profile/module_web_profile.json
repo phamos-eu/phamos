@@ -26,6 +26,7 @@
   "content_section",
   "translations",
   "faqs",
+  "documentation",
   "mirrored_values"
  ],
  "fields": [
@@ -142,6 +143,13 @@
    "fieldtype": "Table",
    "label": "FAQ",
    "options": "Web Profile FAQ"
+  },
+  {
+   "description": "BookStack books shown as \"Documentation\" on the module page, in this order. Only books published on the website appear; the book page links back to this module.",
+   "fieldname": "documentation",
+   "fieldtype": "Table",
+   "label": "Documentation",
+   "options": "Web Profile Book"
   },
   {
    "fieldname": "mirrored_values",
