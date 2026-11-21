@@ -29,7 +29,7 @@ def _cockpit_modules():
 		try:
 			module = frappe.get_module(module_name)
 		except ModuleNotFoundError as error:
-			# An Apps-screen entry without an API module (none today) is no cockpit; a cockpit
+			# An Apps-screen entry without an API module (Bookstack, #2028) is no cockpit; a cockpit
 			# module that fails to import must still raise, not vanish from the menu.
 			if error.name != module_name:
 				raise
