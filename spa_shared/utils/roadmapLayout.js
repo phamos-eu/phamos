@@ -54,6 +54,23 @@ export function roadmapTimeline(range, zoom = "month") {
 	return buildTimeline(toDay(range?.start), toDay(range?.end), width, width)
 }
 
+/**
+ * The range, with its end moved later when the range is too short to fill `widthPx` at this zoom,
+ * so a short plan doesn't leave the right part of the chart empty. A longer range stays as it is.
+ */
+export function fillRange(range, zoom, widthPx) {
+	const start = toDay(range?.start)
+	const end = toDay(range?.end)
+	if (!start || !end || !(widthPx > 0)) return range
+	const dayWidth = ZOOM_DAY_WIDTH[zoom] || ZOOM_DAY_WIDTH.month
+	const neededDays = Math.ceil(widthPx / dayWidth)
+	const shownDays = dayDiff(start, end) + 1
+	if (shownDays >= neededDays) return range
+	const filledEnd = new Date(start)
+	filledEnd.setDate(filledEnd.getDate() + neededDays - 1)
+	return { start, end: filledEnd }
+}
+
 /** Left edge in px of the day `date` on the timeline; null without a date. Not clipped to the range. */
 export function dateToX(timeline, date) {
 	const day = toDay(date)

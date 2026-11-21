@@ -3,6 +3,8 @@ import {
 	barRect,
 	dateToX,
 	dependencyPaths,
+	fillRange,
+	isoDay,
 	EVENT_STRIP,
 	LANE_HEIGHT,
 	levelFill,
@@ -34,6 +36,22 @@ describe("positions on the timeline", () => {
 
 	it("draws swapped dates as the same span", () => {
 		expect(barRect(timeline, "2026-11-20", "2026-11-11")).toMatchObject({ left: 60, width: 60 })
+	})
+})
+
+describe("fillRange", () => {
+	const range = { start: "2026-11-01", end: "2026-11-30" }
+
+	it("moves the end later so a short range fills the width", () => {
+		// 30 days at 6 px = 180 px; 600 px need 100 days.
+		const filled = fillRange(range, "month", 600)
+		expect(isoDay(filled.start)).toBe("2026-11-01")
+		expect(isoDay(filled.end)).toBe("2027-02-08")
+	})
+
+	it("keeps a range that is already wide enough", () => {
+		expect(fillRange(range, "week", 600)).toBe(range)
+		expect(fillRange(range, "month", 0)).toBe(range)
 	})
 })
 

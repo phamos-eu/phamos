@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import { __ } from "@spa/utils/i18n.js"
 import { todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { defaultFrameRange, scrollLeftForDate, todayStripRect } from "@spa/utils/ganttTimeline.js"
@@ -118,6 +118,7 @@ import {
 	barRect,
 	dependencyPaths,
 	EVENT_STRIP,
+	fillRange,
 	LANE_HEIGHT,
 	roadmapTimeline,
 	ROW_PADDING,
@@ -172,10 +173,12 @@ const SLACK_ROOM = 72
 const EMPTY_HEIGHT = 80
 
 const scroller = ref(null)
+// Width of the chart area (scroll box minus the label column), kept up to date on resize.
+const chartWidth = ref(0)
 
 const timeline = computed(() => {
 	const range = props.range?.start && props.range?.end ? props.range : defaultFrameRange()
-	return roadmapTimeline(range, props.zoom)
+	return roadmapTimeline(fillRange(range, props.zoom, chartWidth.value), props.zoom)
 })
 
 const today = computed(() => todayStripRect(timeline.value))
@@ -355,7 +358,21 @@ function scrollToToday() {
 	if (day && tl.rangeStart && day >= tl.rangeStart && day < tl.rangeEnd) scrollToDate(day)
 }
 
-onMounted(() => nextTick(scrollToToday))
+let resizeObserver = null
+
+onMounted(() => {
+	chartWidth.value = chartViewportWidth()
+	resizeObserver = new ResizeObserver(() => {
+		chartWidth.value = chartViewportWidth()
+	})
+	resizeObserver.observe(scroller.value)
+	nextTick(scrollToToday)
+})
+
+onUnmounted(() => {
+	resizeObserver?.disconnect()
+	resizeObserver = null
+})
 
 // Keep the date in the middle of the view when the zoom changes.
 watch(
