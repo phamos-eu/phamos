@@ -107,13 +107,20 @@ def save_sync_selection(instance: str, excluded) -> dict:
 def _save_sync_selection(instance: str, config, excluded) -> dict:
 
 	rows = []
+	seen = set()
 	for row in frappe.parse_json(excluded) or []:
 		item_type = row.get("item_type")
 		if item_type not in ITEM_TYPES:
 			frappe.throw(_("Unknown item type: {0}").format(item_type))
+		bookstack_id = frappe.utils.cint(row.get("bookstack_id"))
+		if bookstack_id <= 0:  # cint turns anything malformed into 0, which would match nothing
+			frappe.throw(_("Invalid BookStack ID: {0}").format(row.get("bookstack_id")))
+		if (item_type, bookstack_id) in seen:
+			continue
+		seen.add((item_type, bookstack_id))
 		rows.append({
 			"item_type": item_type,
-			"bookstack_id": frappe.utils.cint(row.get("bookstack_id")),
+			"bookstack_id": bookstack_id,
 			"title": (row.get("title") or "")[:140],
 		})
 	config.set("sync_exclusions", rows)

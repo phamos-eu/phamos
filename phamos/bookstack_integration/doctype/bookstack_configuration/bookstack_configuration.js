@@ -167,17 +167,22 @@ function bookstack_sync_dialog(frm) {
 	$area.html(`<div class="text-muted small">${__("Loading books from BookStack…")}</div>`);
 	frappe
 		.xcall("phamos.bookstack_integration.selection.get_sync_tree", { instance: frm.doc.name })
-		.then((books) => {
-			tree = bookstack_render_tree($area, books, !can_save);
-		})
-		.catch(() => {
-			$area.html(
-				`<div class="text-danger small">${__(
-					"BookStack could not be reached. The saved selection stays as it is."
-				)}</div>`
-			);
-			d.get_secondary_btn().prop("disabled", true);
-		});
+		// Only a failed request means BookStack is unreachable; an error while drawing the tree
+		// is a bug and shows up in the console as one.
+		.then(
+			(books) => {
+				tree = bookstack_render_tree($area, books, !can_save);
+			},
+			(error) => {
+				console.error(error);
+				$area.html(
+					`<div class="text-danger small">${__(
+						"BookStack could not be reached. The saved selection stays as it is, and Sync uses it."
+					)}</div>`
+				);
+				d.get_secondary_btn().prop("disabled", true);
+			}
+		);
 }
 
 // Checkbox tree (#2029): a parent's box sets everything under it; an unticked book or chapter

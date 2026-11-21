@@ -312,6 +312,8 @@ class TestChooseWhatToSync(_BookstackSyncCase):
 			self.assertRaises(frappe.ValidationError, self._choose, ["pages", "everything"])
 			self.assertRaises(frappe.ValidationError, self._choose, "[]")
 			self.assertRaises(frappe.ValidationError, self._choose, [])  # only None means "everything"
+			for odd in ("null", "5", '"pages"', [5]):
+				self.assertRaises(frappe.ValidationError, self._choose, odd)
 			run.assert_not_called()
 
 	def test_steps_arrive_as_json_from_the_dialog(self):
@@ -377,6 +379,9 @@ class TestSyncSelection(_BookstackSyncCase):
 
 	def test_unknown_type_or_no_write_access_is_refused(self):
 		self.assertRaises(frappe.ValidationError, self._exclude, ("Shelf", 1))
+		self.assertRaises(frappe.ValidationError, self._exclude, ("Book", 0))
+		self._exclude(("Book", 2), ("Book", 2))
+		self.assertEqual(len(frappe.get_doc("Bookstack Configuration", INSTANCE).sync_exclusions), 1, "no duplicates")
 		frappe.set_user("Guest")
 		try:
 			self.assertRaises(frappe.PermissionError, self._exclude, ("Book", 2))
