@@ -107,8 +107,10 @@ const title = computed(() => {
 	font-weight: 600;
 }
 
+/* Width and colour only, so the dashed edge of a clipped bar survives. */
 .roadmap-level-bar--critical {
-	border: 2px solid var(--ink-red-3);
+	border-width: 2px;
+	border-color: var(--ink-red-3);
 }
 
 .roadmap-level-bar--faded {
