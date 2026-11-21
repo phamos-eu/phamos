@@ -108,6 +108,18 @@ class TestCockpitRoadmap(FrappeTestCase):
 		# a release planned against a Draft chapter stays hidden with it
 		self.assertEqual(customer["markers"], [])
 
+	def test_a_module_with_only_a_draft_chapter_has_no_row_for_customers(self):
+		# Saving the chapter adds its row to the Implementation's Modules table; someone sets the
+		# module there in Desk. For customers that row must not show up as an empty module row,
+		# which would give the Draft chapter away.
+		make_chapter(self.implementation, "Agreed", "2026-01-01", "2026-01-10", self.warehouse)
+		secret = make_chapter(self.implementation, "Secret", "2026-01-11", "2026-01-20", plan=False)
+		row = frappe.db.get_value("Implementation Item", {"parent": self.implementation, "implementation_chapter": secret})
+		frappe.db.set_value("Implementation Item", row, "module", self.sales)
+		self.assertIn(self.sales, [row["module"] for row in get_roadmap(self.implementation)["modules"]])
+		frappe.set_user(CUSTOMER_USER)
+		self.assertEqual([row["module"] for row in get_roadmap(self.implementation)["modules"]], [self.warehouse])
+
 	def test_critical_path_and_slack_run_through_agreed_chapters_only(self):
 		first = make_chapter(self.implementation, "First", "2026-01-01", "2026-01-10", self.warehouse)
 		second = make_chapter(self.implementation, "Second", "2026-01-11", "2026-01-20", self.warehouse, [first])
