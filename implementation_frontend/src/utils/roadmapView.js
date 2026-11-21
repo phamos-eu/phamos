@@ -156,3 +156,12 @@ export function stackFeatures(roadmap, names) {
 		return { name, title: shown.title || name, kind: finished ? "finished" : "planned", date: shown.date || null }
 	})
 }
+
+/**
+ * Whether a key press closes the side panel: Esc, unless a popover is open (it closes first) or
+ * the key went to a field, where Esc means "leave the field" and must not discard what was typed.
+ */
+export function closesPanel(event, dialogOpen = false) {
+	if (event?.key !== "Escape" || dialogOpen) return false
+	return !event.target?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+}

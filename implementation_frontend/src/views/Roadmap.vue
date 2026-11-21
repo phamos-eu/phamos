@@ -84,7 +84,7 @@ import FeaturePanel from "../components/FeaturePanel.vue"
 import FeatureStackPanel from "../components/FeatureStackPanel.vue"
 import MethodNote from "../components/MethodNote.vue"
 import spaConfig from "../config"
-import { barsByName, chapterLinks, ganttData, loadPrefs, savePrefs, stackFeatures } from "../utils/roadmapView.js"
+import { barsByName, chapterLinks, closesPanel, ganttData, loadPrefs, savePrefs, stackFeatures } from "../utils/roadmapView.js"
 
 const props = defineProps({
 	implementation: { type: String, required: true },
@@ -223,9 +223,10 @@ function openFeature(name) {
 	selection.value = { type: "event", name }
 }
 
-// Esc closes the side panel; an open "Learn more" popover closes first (MethodNote).
+// Esc closes the side panel; an open "Learn more" popover closes first (MethodNote), and Esc in
+// a field leaves the field, not the panel.
 function onKey(event) {
-	if (event.key === "Escape" && selection.value && !document.querySelector("[role=dialog]")) selection.value = null
+	if (selection.value && closesPanel(event, Boolean(document.querySelector("[role=dialog]")))) selection.value = null
 }
 onMounted(() => document.addEventListener("keydown", onKey, true))
 onBeforeUnmount(() => document.removeEventListener("keydown", onKey, true))

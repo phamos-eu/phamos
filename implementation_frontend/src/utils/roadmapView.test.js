@@ -1,6 +1,7 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
 import {
 	chapterLinks,
+	closesPanel,
 	ganttData,
 	loadPrefs,
 	planningRedirect,
@@ -179,5 +180,19 @@ describe("side panel helpers", () => {
 			{ name: "F-2", title: "Discounts", kind: "planned", date: "2026-11-06" },
 			{ name: "F-9", title: "Loose", kind: "planned", date: "2026-11-10" },
 		])
+	})
+})
+
+describe("closesPanel", () => {
+	const key = (k, inField = false) => ({ key: k, target: { closest: (selector) => (inField && selector.includes("textarea") ? {} : null) } })
+
+	it("closes on Esc", () => {
+		expect(closesPanel(key("Escape"))).toBe(true)
+	})
+
+	it("leaves the panel open for other keys, an open popover, or Esc in a field", () => {
+		expect(closesPanel(key("Enter"))).toBe(false)
+		expect(closesPanel(key("Escape"), true)).toBe(false)
+		expect(closesPanel(key("Escape", true))).toBe(false)
 	})
 })
