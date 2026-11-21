@@ -203,6 +203,26 @@ class TestBookstackWebsiteSync(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("Bookstack Chapter", f"{INSTANCE}-BSC-10"))
 		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-100"))
 
+	def test_only_managers_can_publish(self):
+		self._sync()
+		name = f"{INSTANCE}-BSB-1"
+		for role, expected in (("Bookstack User", 0), ("Bookstack Manager", 1)):
+			email = f"bs-website-{role.split()[1].lower()}@example.com"
+			if not frappe.db.exists("User", email):
+				frappe.get_doc({
+					"doctype": "User", "email": email, "first_name": role, "send_welcome_email": 0,
+					"roles": [{"role": role}],
+				}).insert(ignore_permissions=True)
+			frappe.db.set_value("Bookstack Book", name, "publish_on_website", 0)
+			frappe.set_user(email)
+			try:
+				book = frappe.get_doc("Bookstack Book", name)
+				book.publish_on_website = 1
+				book.save()
+			finally:
+				frappe.set_user("Administrator")
+			self.assertEqual(frappe.db.get_value("Bookstack Book", name, "publish_on_website"), expected, role)
+
 	def test_sync_needs_access_to_the_configuration(self):
 		frappe.set_user("Guest")
 		try:
