@@ -21,6 +21,7 @@
   "warn_ai_run_failed",
   "warn_email_failed",
   "warn_gitlab_sync_failed",
+  "easter_eggs",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -157,6 +158,13 @@
    "label": "Warn: GitLab Sync Failed"
   },
   {
+   "default": "0",
+   "description": "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.",
+   "fieldname": "easter_eggs",
+   "fieldtype": "Check",
+   "label": "Easter Eggs"
+  },
+  {
    "fieldname": "gitlab_section",
    "fieldtype": "Section Break",
    "label": "GitLab"
@@ -232,7 +240,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-21 11:00:00.000000",
+ "modified": "2026-11-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",
