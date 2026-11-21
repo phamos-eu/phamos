@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue"
+import { getCurrentInstance, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
@@ -73,5 +73,7 @@ const props = defineProps({
 // becomes part of "Reported on"; on record pages the record itself is named instead.
 const router = useRouter()
 const glow = useCockpitGlow()
-onMounted(() => mountPhriend(router, () => props.title))
+// the cockpit's realtime socket, so Phriend hears its events (#2012)
+const socket = getCurrentInstance()?.appContext.config.globalProperties.$socket
+onMounted(() => mountPhriend(router, () => props.title, socket))
 </script>

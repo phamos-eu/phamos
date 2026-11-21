@@ -19,6 +19,7 @@
 //   can_configure             optional: the user may change Phriend Settings (the menu links there)
 //   open_settings()           optional: open Phriend Settings
 //   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
+//   on_event(cb)              optional: call cb(payload) for every "phriend_event" of this user (#2012)
 
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
@@ -205,6 +206,37 @@ class Phriend {
 		api.note = (text) => this.voice.note(item(text));
 		api.ask = (text) => this.voice.ask(item(text));
 		api.warn = (text) => this.voice.warn(item(text));
+		// events (#2012): a sample event from the server to yourself
+		api.emit = (kind) =>
+			call("phamos.phriend.api.send_test_event", { kind }, this.host.csrf_token()).catch((e) => console.warn(e));
+	}
+
+	// ---- events (#2012)
+
+	on_event(payload) {
+		if (!payload || !this.ball) return;
+		if (payload.kind === "quiet") {
+			// leave me in peace changed in another tab
+			this.set_quiet_state(payload.state || null);
+			this.apply_quiet();
+			return;
+		}
+		const item = { html: this.event_html(payload), gesture: payload.gesture };
+		if (payload.level === "reaction") this.react(payload.gesture);
+		else if (payload.level === "note") {
+			this.react(payload.gesture);
+			this.voice.note({ ...item, gesture: null });
+		} else if (payload.level === "question") this.voice.ask(item);
+		else if (payload.level === "warning") this.voice.warn(item);
+	}
+
+	// plain text from the server, escaped; a link on this site or https only (events.py checks too)
+	event_html(payload) {
+		const text = escape_html(payload.text || "");
+		const link = String(payload.link || "");
+		if (!link || !(link.startsWith("/") || link.startsWith("https://"))) return text;
+		const external = link.startsWith("https://");
+		return `${text} <a href="${escape_html(link)}"${external ? ' target="_blank" rel="noopener"' : ""}>${escape_html(this.__("Open"))}</a>`;
 	}
 
 	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
@@ -264,6 +296,7 @@ class Phriend {
 				count > 1 ? __("Phriend has {0} things for you", [count]) : __("Phriend has something for you"),
 		});
 		this.voice = new Voice(this); // one voice (#2011)
+		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
