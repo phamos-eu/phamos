@@ -38,9 +38,14 @@
 			if (!phone()) store(layout.classList.contains("wp-docs-nav-closed") ? "closed" : "open");
 			sync();
 		});
-		// keep the current page in view inside a long contents list
+		// keep the current page in view inside a long contents list; only the list scrolls, never the
+		// window (scrollIntoView would move the page away from a #heading link)
+		const nav = layout.querySelector(".wp-docs-nav");
 		const current = layout.querySelector('.wp-docs-nav [aria-current="page"]');
-		if (current && !phone()) current.scrollIntoView({ block: "center" });
+		if (nav && current && !phone()) {
+			const offset = current.getBoundingClientRect().top - nav.getBoundingClientRect().top;
+			nav.scrollTop += offset - nav.clientHeight / 2;
+		}
 	}
 
 	// Calls ``fn`` at most once per frame while scrolling.
@@ -124,7 +129,12 @@
 			toolbar.querySelector("[data-wp-docs-collapse]").addEventListener("click", () => chapters.forEach((d) => (d.open = false)));
 		}
 		const openHash = () => {
-			const id = decodeURIComponent(location.hash.slice(1));
+			let id = location.hash.slice(1);
+			try {
+				id = decodeURIComponent(id);
+			} catch (e) {
+				// a malformed "#%E0%A4" stays as it is instead of stopping the page's other buttons
+			}
 			const el = id && document.getElementById(id);
 			if (el) {
 				openTarget(el);
