@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Chip Space (#2053): colleagues as avatar chips on a grid.
+"""Ophice (#2053): colleagues as avatar chips on a grid.
 
 Slice 1 (#2054) keeps the user's own chip: where it stands, saved as a user default so it is
 back in the same spot after a reload, in any browser. No DocType, nothing to migrate.
@@ -12,12 +12,12 @@ Slice 2 (#2055), presence: who has the page open lives in the Redis cache only (
 user → position and last heartbeat), never in the database, and no history is kept. A heartbeat
 every few seconds keeps a user online; without one for PRESENCE_TTL seconds, or after leave(),
 the chip is gone. Joins, moves and leaves go out over Frappe realtime to the site room, which
-only System Users join, so only System Users may use the Space.
+only System Users join, so only System Users may use Ophice.
 
 Dummy chips for testing come from the site config, so they never appear on a site that does
 not set them:
 
-	"chip_space_dummies": [{"user": "chip-buddy@example.com", "x": 24, "y": 12}]
+	"ophice_dummies": [{"user": "chip-buddy@example.com", "x": 24, "y": 12}]
 """
 
 import hashlib
@@ -35,28 +35,28 @@ from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, s
 # One shared world for everyone; the frontend draws exactly this grid.
 COLS = 40
 ROWS = 25
-POSITION_KEY = "phamos_chip_space_position"
-DUMMIES_CONF_KEY = "chip_space_dummies"
+POSITION_KEY = "phamos_ophice_position"
+DUMMIES_CONF_KEY = "ophice_dummies"
 MAX_DUMMIES = 10
 
-PRESENCE_CACHE_KEY = "phamos_chip_space_presence"
+PRESENCE_CACHE_KEY = "phamos_ophice_presence"
 # Seconds without a heartbeat after which a chip counts as gone (the page beats every 10 s).
 PRESENCE_TTL = 45
 # Moves per user: at most this many in MOVE_WINDOW seconds (the page sends about 8 a second).
 MOVE_LIMIT = 60
 MOVE_WINDOW = 5
 
-EVENT_PRESENCE = "chip_space_presence"
-EVENT_MOVE = "chip_space_move"
-EVENT_LEAVE = "chip_space_leave"
-EVENT_MESSAGE = "chip_space_message"
+EVENT_PRESENCE = "ophice_presence"
+EVENT_MOVE = "ophice_move"
+EVENT_LEAVE = "ophice_leave"
+EVENT_MESSAGE = "ophice_message"
 # The other person's page opens the chat too when one of the two starts it (#2056).
-EVENT_STARTED = "chip_space_encounter_started"
-EVENT_BACKGROUND = "chip_space_background"
+EVENT_STARTED = "ophice_encounter_started"
+EVENT_BACKGROUND = "ophice_background"
 
-# The Space's background image: one for everyone, any Space user may change it (PM, 2026-11-21).
+# Ophice's background image: one for everyone, any Ophice user may change it (PM, 2026-11-21).
 # Stored as a global default {"url", "file"}; the previous image's File is deleted on change.
-BACKGROUND_KEY = "phamos_chip_space_background"
+BACKGROUND_KEY = "phamos_ophice_background"
 BACKGROUND_MAX_BYTES = 5 * 1024 * 1024
 # Checked by opening the image, not by the file name: no SVG (scripts), no disguised files.
 BACKGROUND_FORMATS = {"PNG": "png", "JPEG": "jpg", "WEBP": "webp", "GIF": "gif"}
@@ -65,35 +65,35 @@ BACKGROUND_FORMATS = {"PNG": "png", "JPEG": "jpg", "WEBP": "webp", "GIF": "gif"}
 # server allows some slack, since positions it knows may be a few hundred ms old.
 ENCOUNTER_DISTANCE = 2.0  # the pages draw a perimeter of radius 1 tile around every chip
 SERVER_DISTANCE_SLACK = 1.5
-ENCOUNTER_DOCTYPE = "Chip Space Encounter"
+ENCOUNTER_DOCTYPE = "Ophice Encounter"
 MAX_MESSAGE_LENGTH = 2000
 MESSAGES_SHOWN = 100
 
 # Burn notice (#2057): after parting, the chat burns this many seconds later unless both save it.
 BURN_SECONDS = 60
-EVENT_BURN_NOTICE = "chip_space_burn_notice"
-EVENT_BURN_CANCEL = "chip_space_burn_cancel"
-EVENT_SAVE_VOTE = "chip_space_save_vote"
-EVENT_SAVED = "chip_space_saved"
-EVENT_BURNED = "chip_space_burned"
+EVENT_BURN_NOTICE = "ophice_burn_notice"
+EVENT_BURN_CANCEL = "ophice_burn_cancel"
+EVENT_SAVE_VOTE = "ophice_save_vote"
+EVENT_SAVED = "ophice_saved"
+EVENT_BURNED = "ophice_burned"
 
 # Video call on encounter (#2059): a Jitsi room per encounter, joined muted with the camera off.
-# Site config: "chip_space_jitsi_domain" (default meet.jit.si), "chip_space_video": 0 turns it off.
+# Site config: "ophice_jitsi_domain" (default meet.jit.si), "ophice_video": 0 turns it off.
 JITSI_DEFAULT_DOMAIN = "meet.jit.si"
 
 # Meeting areas (#2060): rectangles of the grid with a fixed Jitsi meeting.
-AREA_DOCTYPE = "Chip Space Area"
-EVENT_AREAS = "chip_space_areas"
+AREA_DOCTYPE = "Ophice Area"
+EVENT_AREAS = "ophice_areas"
 MAX_AREAS = 50
 AREA_TITLE_LENGTH = 60
 
 
 def _require_user():
 	if frappe.session.user == "Guest":
-		frappe.throw(_("Please log in to use the Space."), frappe.PermissionError)
+		frappe.throw(_("Please log in to use Ophice."), frappe.PermissionError)
 	# Realtime events reach System Users only (the site room), so nobody else could see anyone.
 	if frappe.get_cached_value("User", frappe.session.user, "user_type") != "System User":
-		frappe.throw(_("The Space is only available to System Users."), frappe.PermissionError)
+		frappe.throw(_("Ophice is only available to System Users."), frappe.PermissionError)
 
 
 def _clamp(value, cells):
@@ -167,7 +167,7 @@ def _publish(event, message):
 def _throttled():
 	"""True when this user sent more than MOVE_LIMIT moves in the current window."""
 	# incrby/expire are plain redis calls: the key needs the site prefix itself.
-	key = frappe.cache.make_key(f"phamos_chip_space_moves:{frappe.session.user}")
+	key = frappe.cache.make_key(f"phamos_ophice_moves:{frappe.session.user}")
 	count = frappe.cache.incrby(key, 1)
 	if count == 1:
 		frappe.cache.expire(key, MOVE_WINDOW)
@@ -241,7 +241,7 @@ def save_my_position(x, y):
 	return position
 
 
-# --- Background image of the Space (shared).
+# --- Background image of Ophice (shared).
 
 
 def _background():
@@ -312,17 +312,17 @@ def _store_background(content, filename):
 			image_format = image.format
 			image.verify()
 	except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
-		frappe.throw(_("This file is not an image the Space can show (PNG, JPEG, WebP or GIF)."))
+		frappe.throw(_("This file is not an image Ophice can show (PNG, JPEG, WebP or GIF)."))
 	extension = BACKGROUND_FORMATS.get(image_format)
 	if not extension:
-		frappe.throw(_("This file is not an image the Space can show (PNG, JPEG, WebP or GIF)."))
+		frappe.throw(_("This file is not an image Ophice can show (PNG, JPEG, WebP or GIF)."))
 	stem = re.sub(r"[^A-Za-z0-9_-]+", "-", (filename or "").rsplit(".", 1)[0]).strip("-")[:60] or "background"
 	file_doc = frappe.get_doc(
 		{
 			"doctype": "File",
-			"file_name": f"chip-space-{stem}.{extension}",
+			"file_name": f"ophice-{stem}.{extension}",
 			"content": content,
-			# Public: every Space user loads it as a CSS background (see "Verify before production").
+			# Public: every Ophice user loads it as a CSS background (see "Verify before production").
 			"is_private": 0,
 			"folder": "Home",
 		}
@@ -333,7 +333,7 @@ def _store_background(content, filename):
 
 @frappe.whitelist(methods=["POST"])
 def upload_background():
-	"""Upload an image (multipart field "file") as the Space's background, for everyone."""
+	"""Upload an image (multipart field "file") as Ophice's background, for everyone."""
 	_require_user()
 	upload = frappe.request.files.get("file") if frappe.request else None
 	if not upload:
@@ -370,7 +370,7 @@ PAIR_LOCK_SECONDS = 10
 def _lock_pair(pair_key):
 	"""MariaDB GET_LOCK for this pair, released when this request commits or rolls back."""
 	# Lock names are at most 64 characters.
-	name = "phamos_chip_space_" + hashlib.md5(pair_key.encode()).hexdigest()
+	name = "phamos_ophice_" + hashlib.md5(pair_key.encode()).hexdigest()
 	got = frappe.db.sql("SELECT GET_LOCK(%s, %s)", (name, PAIR_LOCK_SECONDS))[0][0]
 	if not got:
 		frappe.throw(_("The chat is just being opened. Please try again."))
@@ -425,7 +425,7 @@ def _create_channel(user_a, user_b):
 			"doctype": "Raven Channel",
 			# Raven needs a unique, readable name; the time keeps re-meetings apart.
 			"channel_name": f"encounter-{frappe.generate_hash(length=10)}",
-			"channel_description": _("Chip Space encounter, {0}").format(now_datetime().strftime("%Y-%m-%d %H:%M")),
+			"channel_description": _("Ophice encounter, {0}").format(now_datetime().strftime("%Y-%m-%d %H:%M")),
 			"type": "Private",
 			"workspace": _resolve_workspace(),
 		}
@@ -471,10 +471,10 @@ def _messages(channel):
 
 def _video(doc):
 	"""Where the two meet on video, or None when video is off for this site."""
-	switch = frappe.conf.get("chip_space_video")
+	switch = frappe.conf.get("ophice_video")
 	if switch is not None and not frappe.utils.cint(switch):
 		return None
-	domain = str(frappe.conf.get("chip_space_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/")
+	domain = str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/")
 	# A bare host name: the page loads https://<domain>/external_api.js from it.
 	if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", domain):
 		return None
@@ -489,7 +489,7 @@ def _video(doc):
 
 def _new_jitsi_room():
 	# Unguessable: on a public Jitsi server, whoever knows the name can walk in.
-	return f"phamos-chip-{frappe.generate_hash(length=24)}"
+	return f"ophice-{frappe.generate_hash(length=24)}"
 
 
 def _encounter_payload(doc):
@@ -539,11 +539,11 @@ def open_encounter(with_user):
 			}
 		)
 		# The lock keeps the other page out; the unique index stays the last line of defence.
-		frappe.db.savepoint("chip_space_encounter")
+		frappe.db.savepoint("ophice_encounter")
 		try:
 			doc.insert(ignore_permissions=True)
 		except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
-			frappe.db.rollback(save_point="chip_space_encounter")
+			frappe.db.rollback(save_point="ophice_encounter")
 			# Frappe msgprints "Pair Key must be unique" before raising: drop it, or the page
 			# shows an error although the chat opens fine.
 			frappe.clear_last_message()
@@ -595,7 +595,7 @@ def send_encounter_message(encounter, text):
 	peer = _peer(doc)
 	if peer in _dummy_users() and frappe.session.user not in _dummy_users():
 		frappe.enqueue(
-			"phamos.api.chip_space.dummy_reply",
+			"phamos.api.ophice.dummy_reply",
 			queue="short",
 			enqueue_after_commit=True,
 			encounter=doc.name,
@@ -790,7 +790,7 @@ def save_encounter(encounter):
 	if peer in _dummy_users() and frappe.session.user not in _dummy_users():
 		# A test dummy agrees, so the save path can be tried alone.
 		frappe.enqueue(
-			"phamos.api.chip_space.dummy_save", queue="short", enqueue_after_commit=True, encounter=doc.name, dummy=peer
+			"phamos.api.ophice.dummy_save", queue="short", enqueue_after_commit=True, encounter=doc.name, dummy=peer
 		)
 	return {"saved": False}
 
@@ -859,8 +859,8 @@ def _part_all_mine(user):
 def _allowed_jitsi_domains():
 	"""The Jitsi servers areas may point to. The page loads external_api.js from that server, so
 	only servers the site trusts: the configured one plus an optional list."""
-	domains = {str(frappe.conf.get("chip_space_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().lower()}
-	extra = frappe.conf.get("chip_space_jitsi_domains") or []
+	domains = {str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().lower()}
+	extra = frappe.conf.get("ophice_jitsi_domains") or []
 	if isinstance(extra, list):
 		domains |= {str(d).strip().lower() for d in extra if d}
 	return domains
@@ -920,7 +920,7 @@ def _overlaps(name, x, y, width, height):
 
 @frappe.whitelist(methods=["POST"])
 def save_area(title, meeting_url, x, y, width, height, name=None):
-	"""Create or change a meeting area, for everyone (any Space user may, like the background)."""
+	"""Create or change a meeting area, for everyone (any Ophice user may, like the background)."""
 	_require_user()
 	title = (title or "").strip()[:AREA_TITLE_LENGTH]
 	if not title:
@@ -948,7 +948,7 @@ def save_area(title, meeting_url, x, y, width, height, name=None):
 		doc.save(ignore_permissions=True)
 	else:
 		if frappe.db.count(AREA_DOCTYPE) >= MAX_AREAS:
-			frappe.throw(_("The Space has room for at most {0} meeting areas.").format(MAX_AREAS))
+			frappe.throw(_("Ophice has room for at most {0} meeting areas.").format(MAX_AREAS))
 		doc = frappe.get_doc({"doctype": AREA_DOCTYPE, **values}).insert(ignore_permissions=True)
 	_publish(EVENT_AREAS, {"areas": _areas()})
 	return doc.name

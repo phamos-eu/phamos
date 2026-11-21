@@ -40,7 +40,7 @@ defineProps({
 })
 defineEmits(["leave"])
 
-// Jitsi may focus its frame by itself: the keys belong to the Space (walking out leaves).
+// Jitsi may focus its frame by itself: the keys belong to Ophice (walking out leaves).
 function giveKeysBack() {
 	if (document.activeElement?.tagName !== "IFRAME") return
 	document.activeElement.blur()

@@ -15,7 +15,7 @@
 			{{ state === "failed" ? __("The video call could not be started.") : __("Joining the call…") }}
 		</p>
 		<!-- Browsers play the other person's audio only after a click inside the Jitsi frame
-		     (autoplay rule; keys pressed in the Space don't count for that frame). -->
+		     (autoplay rule; keys pressed in Ophice don't count for that frame). -->
 		<!-- Clicks pass through to the video below, which is exactly the click the browser wants. -->
 		<p
 			v-if="ready && !frameClicked"
@@ -78,7 +78,7 @@ let disposed = false
 const ready = ref(false)
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
-// and the keyboard goes back to the Space ("stolen").
+// and the keyboard goes back to Ophice ("stolen").
 const frameClicked = ref(false)
 const pointerOver = ref(false)
 function onWindowBlur() {

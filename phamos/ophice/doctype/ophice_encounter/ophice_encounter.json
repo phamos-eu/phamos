@@ -2,7 +2,7 @@
  "actions": [],
  "autoname": "hash",
  "creation": "2026-11-21 18:00:00.000000",
- "description": "A Chip Space encounter (#2053, #2056, #2057): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.chip_space. When the two part, a burn notice runs; if both save, the messages move into their Raven DM, otherwise they are burned. Either way this record is deleted (no Deleted Document, no Version): no history of who met whom is kept.",
+ "description": "A Ophice encounter (#2053, #2056, #2057): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.ophice. When the two part, a burn notice runs; if both save, the messages move into their Raven DM, otherwise they are burned. Either way this record is deleted (no Deleted Document, no Version): no history of who met whom is kept.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -107,8 +107,8 @@
  "links": [],
  "modified": "2026-11-21 21:00:00.000000",
  "modified_by": "Administrator",
- "module": "Cockpits",
- "name": "Chip Space Encounter",
+ "module": "Ophice",
+ "name": "Ophice Encounter",
  "owner": "Administrator",
  "permissions": [
   {

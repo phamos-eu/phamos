@@ -662,9 +662,9 @@ scheduler_events = {
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
         ],
-        # Chip Space: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
+        # Ophice: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
         "* * * * *": [
-            "phamos.api.chip_space.burn_due_encounters",
+            "phamos.api.ophice.burn_due_encounters",
         ],
         # Personal Cockpit: fix today's day plans that were never started (#1559).
         "0 10 * * *": [

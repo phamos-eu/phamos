@@ -2,7 +2,7 @@
  "actions": [],
  "autoname": "hash",
  "creation": "2026-11-21 22:00:00.000000",
- "description": "A meeting area of the Chip Space (#2060): a rectangle of the grid with a fixed Jitsi meeting. Whoever stops inside joins it. Written only by phamos.api.chip_space.",
+ "description": "A meeting area of the Ophice (#2060): a rectangle of the grid with a fixed Jitsi meeting. Whoever stops inside joins it. Written only by phamos.api.ophice.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -87,8 +87,8 @@
  "links": [],
  "modified": "2026-11-21 22:00:00.000000",
  "modified_by": "Administrator",
- "module": "Cockpits",
- "name": "Chip Space Area",
+ "module": "Ophice",
+ "name": "Ophice Area",
  "owner": "Administrator",
  "permissions": [
   {

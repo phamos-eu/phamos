@@ -2676,12 +2676,12 @@ Times Put Off,Mal verschoben
 Live Since,Live seit
 Phriend Feedback,Phriend-Rückmeldung
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
-Space,Space
+Ophice,Ophice
 Back to cockpit,Zurück zum Cockpit
 "Move with WASD or the arrow keys, hold Shift to go faster","Mit WASD oder den Pfeiltasten bewegen, mit gedrückter Umschalttaste schneller"
-The Space could not be loaded.,Der Space konnte nicht geladen werden.
-Please log in to use the Space.,"Bitte melden Sie sich an, um den Space zu nutzen."
-The Space is only available to System Users.,Der Space steht nur Systembenutzern zur Verfügung.
+Ophice could not be loaded.,Ophice konnte nicht geladen werden.
+Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
+Ophice is only available to System Users.,Ophice steht nur Systembenutzern zur Verfügung.
 Chat with {0},Chat mit {0}
 Opening the chat…,Chat wird geöffnet…
 Say hello to {0}.,Sagen Sie {0} Hallo.
@@ -2690,7 +2690,7 @@ The chat could not be opened.,Der Chat konnte nicht geöffnet werden.
 The message could not be sent.,Die Nachricht konnte nicht gesendet werden.
 This chat is not yours.,Dieser Chat gehört nicht Ihnen.
 This chat has ended.,Dieser Chat ist beendet.
-"Chip Space encounter, {0}","Chip-Space-Begegnung, {0}"
+"Ophice encounter, {0}","Ophice-Begegnung, {0}"
 {0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
 Nobody to chat with here.,Hier ist niemand zum Chatten.
 Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
@@ -2698,13 +2698,13 @@ Write something first.,Schreiben Sie zuerst etwas.
 A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
 Esc to close,Esc zum Schließen
 Close the chat and walk on,Chat schließen und weitergehen
-"Upload an image as the background of the Space, for everyone","Ein Bild als Hintergrund des Space hochladen, für alle"
+"Upload an image as the background of Ophice, for everyone","Ein Bild als Hintergrund von Ophice hochladen, für alle"
 "Remove the background, for everyone","Den Hintergrund entfernen, für alle"
 The image could not be uploaded.,Das Bild konnte nicht hochgeladen werden.
 The background could not be removed.,Der Hintergrund konnte nicht entfernt werden.
 Choose an image first.,Wählen Sie zuerst ein Bild.
 The image can be at most {0} MB.,Das Bild darf höchstens {0} MB groß sein.
-"This file is not an image the Space can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das der Space zeigen kann (PNG, JPEG, WebP oder GIF)."
+"This file is not an image Ophice can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das Ophice zeigen kann (PNG, JPEG, WebP oder GIF)."
 Background,Hintergrund
 Kept,Behalten
 Moved to your Raven chat with {0}.,In Ihren Raven-Chat mit {0} verschoben.
@@ -2744,7 +2744,7 @@ Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} ve
 Give the area a name.,Geben Sie dem Bereich einen Namen.
 This overlaps the area {0}.,Das überschneidet sich mit dem Bereich {0}.
 This area no longer exists.,Diesen Bereich gibt es nicht mehr.
-The Space has room for at most {0} meeting areas.,Der Space hat Platz für höchstens {0} Besprechungsbereiche.
+Ophice has room for at most {0} meeting areas.,Ophice hat Platz für höchstens {0} Besprechungsbereiche.
 "Size and position of the background image on the grid, for everyone","Größe und Lage des Hintergrundbilds auf dem Raster, für alle"
 Adjust,Anpassen
 Background image,Hintergrundbild

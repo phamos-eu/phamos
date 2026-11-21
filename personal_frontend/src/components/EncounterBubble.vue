@@ -120,7 +120,7 @@ watch(
 )
 
 // Jitsi's frame may take the focus by itself (on load, on join). Give it back: to the chat if
-// the user was in it, otherwise to the Space, so the keys move the chip again.
+// the user was in it, otherwise to Ophice, so the keys move the chip again.
 const chatActive = ref(false)
 function keepChatFocus() {
 	if (document.activeElement?.tagName !== "IFRAME") return

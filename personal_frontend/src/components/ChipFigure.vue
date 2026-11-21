@@ -1,6 +1,6 @@
 <template>
 	<!--
-		A Chip Space chip (#2053): the user's avatar with Phriend's dangling legs
+		A Ophice chip (#2053): the user's avatar with Phriend's dangling legs
 		(same leg shapes as phamos/public/js/phriend/ball.js, viewBox 64×76, ball r=24).
 		The root is exactly the avatar (40px), the legs hang outside it, so layout ignores them.
 	-->

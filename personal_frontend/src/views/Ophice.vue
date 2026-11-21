@@ -1,5 +1,5 @@
 <template>
-	<!-- Chip Space (#2053): a full-screen page outside the cockpit shell. -->
+	<!-- Ophice (#2053): a full-screen page outside the cockpit shell. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
 		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
 			<router-link
@@ -9,7 +9,7 @@
 				<FeatherIcon name="arrow-left" class="h-4 w-4" />
 				{{ __("Back to cockpit") }}
 			</router-link>
-			<div class="text-base font-semibold tracking-tight">{{ __("Space") }}</div>
+			<div class="text-base font-semibold tracking-tight">{{ __("Ophice") }}</div>
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, hold Shift to go faster") }}
 			</div>
@@ -24,7 +24,7 @@
 				<template #prefix><FeatherIcon name="video" class="h-4 w-4" /></template>
 				{{ editingAreas ? __("Done") : __("Meeting areas") }}
 			</Button>
-			<!-- The Space's background, one for everyone (#2053). -->
+			<!-- Ophice's background, one for everyone (#2053). -->
 			<input
 				ref="backgroundInput"
 				type="file"
@@ -36,7 +36,7 @@
 				v-if="me"
 				variant="subtle"
 				:loading="backgroundBusy"
-				:title="__('Upload an image as the background of the Space, for everyone')"
+				:title="__('Upload an image as the background of Ophice, for everyone')"
 				@click="backgroundInput?.click()"
 			>
 				<template #prefix><FeatherIcon name="image" class="h-4 w-4" /></template>
@@ -137,8 +137,8 @@
 			</div>
 			<div
 				v-if="me"
-				class="chip-space-grid relative rounded-lg border border-outline-gray-2 bg-surface-white"
-				:class="{ 'chip-space-grid--image': background }"
+				class="ophice-grid relative rounded-lg border border-outline-gray-2 bg-surface-white"
+				:class="{ 'ophice-grid--image': background }"
 				:style="gridStyle"
 			>
 				<AreaLayer
@@ -155,11 +155,11 @@
 				<div
 					v-for="chip in perimeterList"
 					:key="`perimeter-${chip.user}`"
-					class="chip-space-perimeter pointer-events-none absolute rounded-full"
+					class="ophice-perimeter pointer-events-none absolute rounded-full"
 					:class="{
-						'chip-space-perimeter--me': chip.mine,
-						'chip-space-perimeter--contact': chip.contact,
-						'chip-space-chip--remote': !chip.mine,
+						'ophice-perimeter--me': chip.mine,
+						'ophice-perimeter--contact': chip.contact,
+						'ophice-chip--remote': !chip.mine,
 					}"
 					:style="perimeterStyle(chip)"
 					:data-testid="chip.mine ? 'my-perimeter' : 'other-perimeter'"
@@ -168,7 +168,7 @@
 				<div
 					v-for="other in others"
 					:key="other.user"
-					class="chip-space-chip chip-space-chip--remote absolute flex items-center justify-center"
+					class="ophice-chip ophice-chip--remote absolute flex items-center justify-center"
 					:style="chipStyle(other)"
 					:title="other.full_name"
 					data-testid="other-chip"
@@ -199,7 +199,7 @@
 					@close="closeBubble(bubble.user)"
 				/>
 				<div
-					class="chip-space-chip absolute flex items-center justify-center"
+					class="ophice-chip absolute flex items-center justify-center"
 					:style="chipStyle(me)"
 					:title="me.full_name"
 					data-testid="my-chip"
@@ -250,7 +250,7 @@ const HEARTBEAT_MS = 10000
 const SEND_MOVE_EVERY_MS = 120
 // Another chip's legs kick until this long after its last move arrived.
 const REMOTE_MOVING_MS = 250
-const API = "phamos.api.chip_space"
+const API = "phamos.api.ophice"
 // Encounters (#2056): closer than this (centres, tiles) opens the chat; farther than the second
 // closes it again, so standing right at the edge does not flicker.
 // Each chip's perimeter has half the encounter distance as radius: two touching circles = in range.
@@ -260,7 +260,7 @@ const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
 const BUBBLE_WIDTH_VIDEO = 384
 
-// The cockpit's realtime socket (as in useUserRealtime); without it the Space still works alone.
+// The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
 const socket = instance?.appContext.config.globalProperties.$socket || inject("$socket", null)
 
@@ -284,7 +284,7 @@ const gridStyle = computed(() => ({
 	width: `${tile.value * me.value.cols}px`,
 	height: `${tile.value * me.value.rows}px`,
 	"--tile": `${tile.value}px`,
-	// The grid lines stay on top of the image (see .chip-space-grid--image).
+	// The grid lines stay on top of the image (see .ophice-grid--image).
 	"--background-image": background.value ? `url("${encodeURI(background.value)}")` : "none",
 	// Size in % of the grid width, position in %: the map can be spaced against the grid.
 	"--background-size": backgroundLayout.value.fit ? "cover" : `${backgroundLayout.value.scale}% auto`,
@@ -853,11 +853,11 @@ function startClock() {
 }
 
 const NOTICE_EVENTS = [
-	["chip_space_burn_notice", upsertNotice],
-	["chip_space_save_vote", upsertNotice],
-	["chip_space_burn_cancel", (m) => delete notices[m?.encounter]],
-	["chip_space_saved", (m) => finishNotice(m?.encounter, "saved")],
-	["chip_space_burned", (m) => finishNotice(m?.encounter, "burned")],
+	["ophice_burn_notice", upsertNotice],
+	["ophice_save_vote", upsertNotice],
+	["ophice_burn_cancel", (m) => delete notices[m?.encounter]],
+	["ophice_saved", (m) => finishNotice(m?.encounter, "saved")],
+	["ophice_burned", (m) => finishNotice(m?.encounter, "burned")],
 ]
 
 // --- My presence.
@@ -902,14 +902,14 @@ function leaveOnPagehide() {
 const round = (value) => Math.round(value * 100) / 100
 
 const SOCKET_EVENTS = [
-	["chip_space_presence", upsertOther],
-	["chip_space_move", onRemoteMove],
-	["chip_space_leave", onRemoteLeave],
-	["chip_space_message", onEncounterMessage],
-	["chip_space_encounter_started", onEncounterStarted],
-	["chip_space_areas", (message) => setAreas(message?.areas)],
+	["ophice_presence", upsertOther],
+	["ophice_move", onRemoteMove],
+	["ophice_leave", onRemoteLeave],
+	["ophice_message", onEncounterMessage],
+	["ophice_encounter_started", onEncounterStarted],
+	["ophice_areas", (message) => setAreas(message?.areas)],
 	[
-		"chip_space_background",
+		"ophice_background",
 		(message) => {
 			background.value = message?.url || ""
 			// Not while I'm dragging the sliders myself (my own echo would jump back).
@@ -1012,7 +1012,7 @@ onMounted(async () => {
 		for (const notice of data.notices || []) upsertNotice(notice)
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
-		error.value = __("The Space could not be loaded.")
+		error.value = __("Ophice could not be loaded.")
 		return
 	}
 	checkEncounters()
@@ -1043,27 +1043,27 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Grid lines from the theme's outline token, so they follow light and dark mode. */
-.chip-space-grid {
+.ophice-grid {
 	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px);
 	background-size: var(--tile) var(--tile);
 }
 /* An uploaded image fills the grid; the lines stay on top of it. */
-.chip-space-grid--image {
+.ophice-grid--image {
 	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px), var(--background-image);
 	background-size: var(--tile) var(--tile), var(--tile) var(--tile), var(--background-size, cover);
 	background-position: 0 0, 0 0, var(--background-position, center);
 	background-repeat: repeat, repeat, no-repeat;
 }
-.chip-space-chip {
+.ophice-chip {
 	top: 0;
 	left: 0;
 	will-change: transform;
 }
 /* Perimeters: a circle per chip, stronger for my own, green when touching another. A light edge
    with a thin dark outline keeps it visible on any background image, light or dark. */
-.chip-space-perimeter {
+.ophice-perimeter {
 	top: 0;
 	left: 0;
 	border: 2px dashed rgba(255, 255, 255, 0.85);
@@ -1072,21 +1072,21 @@ onBeforeUnmount(() => {
 	transition: background-color 150ms, border-color 150ms;
 	will-change: transform;
 }
-.chip-space-perimeter--me {
+.ophice-perimeter--me {
 	border-color: rgba(96, 165, 250, 0.95);
 	background: rgba(59, 130, 246, 0.18);
 }
-.chip-space-perimeter--contact {
+.ophice-perimeter--contact {
 	border-style: solid;
 	border-color: rgba(74, 222, 128, 0.95);
 	background: rgba(34, 197, 94, 0.24);
 }
 /* Other chips arrive about 8 times a second: glide between the updates. */
-.chip-space-chip--remote {
+.ophice-chip--remote {
 	transition: transform 130ms linear;
 }
 @media (prefers-reduced-motion: reduce) {
-	.chip-space-chip--remote {
+	.ophice-chip--remote {
 		transition: none;
 	}
 }
