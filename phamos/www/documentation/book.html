@@ -33,14 +33,16 @@
 		{%- endif %}
 
 		<div class="wp-docs-book-main">
-			{{ search_box(search_action, lang, book=book) }}
-			<nav aria-label="{{ _('Contents') }}">
+			<div class="wp-toolbar">
+				{{ search_box(search_action, lang, book=book) }}
 				{%- if chapters %}
 				<div class="wp-docs-toolbar" data-wp-docs-toolbar hidden>
 					<button type="button" class="wp-button wp-button-sm" data-wp-docs-expand>{{ _("Expand all") }}</button>
 					<button type="button" class="wp-button wp-button-sm" data-wp-docs-collapse>{{ _("Collapse all") }}</button>
 				</div>
 				{%- endif %}
+			</div>
+			<nav aria-label="{{ _('Contents') }}">
 				{{ book_chapters(contents) }}
 			</nav>
 

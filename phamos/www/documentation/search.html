@@ -13,7 +13,9 @@
 		<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
 		<h1>{{ _("Search the documentation") }}</h1>
 	</header>
-	{{ search_box(search_action, lang, book=book, query=query, size="lg") }}
+	<div class="wp-toolbar">
+		{{ search_box(search_action, lang, book=book, query=query) }}
+	</div>
 
 	{%- if query %}
 	<p class="wp-docs-results-count" role="status">

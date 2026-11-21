@@ -75,16 +75,15 @@
 </div>
 {%- endmacro %}
 
-{#- Search field (#2046): a plain GET form that works without JavaScript; web_docs.bundle.js adds
-    suggestions while typing. On book and page views it searches that book unless unticked. -#}
-{% macro search_box(action, lang, book=None, query="", size="md") -%}
-<form class="wp-docs-search wp-docs-search-{{ size }}" role="search" action="{{ action | e }}" method="get" data-wp-docs-search data-lang="{{ lang }}">
-	<div class="wp-docs-search-field">
-		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-		<input type="search" name="q" value="{{ query | e }}" minlength="2" maxlength="100" autocomplete="off"
-			placeholder="{{ _('Search in {0}').format(book.title) | e if book else _('Search the documentation') }}"
-			aria-label="{{ _('Search the documentation') }}" data-wp-docs-search-input>
-	</div>
+{#- Search field (#2046), the same element as on the Web Profile listings (/de/module): a plain GET
+    form that works without JavaScript; web_docs.bundle.js adds suggestions while typing. On book
+    and page views it searches that book unless unticked. -#}
+{% macro search_box(action, lang, book=None, query="") -%}
+<form class="wp-searchbar wp-docs-search" role="search" action="{{ action | e }}" method="get" data-wp-docs-search data-lang="{{ lang }}">
+	{%- set placeholder = _("Search in {0}").format(book.title) if book else _("Search the documentation") %}
+	<label class="wp-visually-hidden" for="wp-docs-q-{{ book.slug if book else 'all' }}">{{ placeholder | e }}</label>
+	<input id="wp-docs-q-{{ book.slug if book else 'all' }}" class="wp-search" type="search" name="q" value="{{ query | e }}"
+		minlength="2" maxlength="100" autocomplete="off" placeholder="{{ placeholder | e }}" data-wp-docs-search-input>
 	{%- if book %}
 	<label class="wp-docs-search-scope"><input type="checkbox" name="book" value="{{ book.slug | e }}" checked data-wp-docs-search-book> {{ _("Only this book") }}</label>
 	{%- endif %}

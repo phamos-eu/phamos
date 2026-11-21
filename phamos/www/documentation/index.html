@@ -18,7 +18,7 @@
 			</div>
 		</div>
 	</header>
-	{{ search_box(search_action, lang, size="lg") }}
+	<div class="wp-toolbar">{{ search_box(search_action, lang) }}</div>
 
 	{%- for group in groups %}
 	<section class="wp-related" {% if group.shelf %}aria-labelledby="wp-docs-shelf-{{ loop.index }}"{% else %}aria-label="{{ _('Documentation') }}"{% endif %}>
