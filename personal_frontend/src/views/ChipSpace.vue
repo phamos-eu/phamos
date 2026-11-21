@@ -66,8 +66,8 @@ const DIRECTIONS = {
 	arrowright: [1, 0],
 	d: [1, 0],
 }
-const SPEED = 6 // tiles per second
-const SHIFT_SPEED = 15
+const SPEED = 6.6 // tiles per second (10% up on 6, PM 2026-11-21)
+const SHIFT_SPEED = 16.5
 // Two chips can't overlap: centres stay at least this far apart (one chip is 0.8 tiles wide).
 const MIN_DISTANCE = 0.8
 const SAVE_AFTER_MS = 400

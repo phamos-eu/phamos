@@ -56,17 +56,17 @@ defineProps({
 .chip-figure__leg {
 	transform-box: fill-box;
 	transform-origin: 50% 0%;
-	animation: chip-dangle-l 2.4s ease-in-out infinite alternate;
+	animation: chip-dangle-l 2.18s ease-in-out infinite alternate;
 }
 .chip-figure__leg--r {
 	animation-name: chip-dangle-r;
-	animation-delay: -1.2s;
+	animation-delay: -1.09s;
 }
 .is-moving .chip-figure__leg--l {
-	animation: chip-wiggle-l 0.2s ease-in-out infinite alternate;
+	animation: chip-wiggle-l 0.18s ease-in-out infinite alternate;
 }
 .is-moving .chip-figure__leg--r {
-	animation: chip-wiggle-r 0.2s ease-in-out infinite alternate;
+	animation: chip-wiggle-r 0.18s ease-in-out infinite alternate;
 }
 .chip-figure__ring {
 	box-shadow: 0 0 0 3px var(--surface-white), 0 0 0 5px var(--ink-blue-3, #3b82f6);
