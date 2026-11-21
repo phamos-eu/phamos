@@ -312,7 +312,7 @@ class TestChooseWhatToSync(_BookstackSyncCase):
 			self.assertRaises(frappe.ValidationError, self._choose, ["pages", "everything"])
 			self.assertRaises(frappe.ValidationError, self._choose, "[]")
 			self.assertRaises(frappe.ValidationError, self._choose, [])  # only None means "everything"
-			for odd in ("null", "5", '"pages"', [5]):
+			for odd in ("null", "5", '"pages"', [5], "pages"):
 				self.assertRaises(frappe.ValidationError, self._choose, odd)
 			run.assert_not_called()
 
@@ -668,3 +668,16 @@ class TestSelectionUnderLock(_BookstackSyncCase):
 				[{"item_type": "Book", "bookstack_id": 2, "title": "Intern"}])
 		self.assertTrue(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"), "nothing removed")
 		self.assertFalse(sync.is_running(INSTANCE))
+
+	def test_only_a_full_sync_stamps_the_configuration(self):
+		stamp = "2026-01-01 00:00:00"
+		frappe.db.set_value("Bookstack Configuration", INSTANCE, {"last_synced": stamp, "sync_error_count": 7})
+
+		sync.sync_instance(INSTANCE, steps=["roles"])
+		self.assertEqual(str(frappe.db.get_value("Bookstack Configuration", INSTANCE, "last_synced")), stamp)
+		self.assertEqual(frappe.db.get_value("Bookstack Configuration", INSTANCE, "sync_error_count"), 7)
+
+		sync.sync_instance(INSTANCE)
+		self.assertNotEqual(str(frappe.db.get_value("Bookstack Configuration", INSTANCE, "last_synced")), stamp)
+		self.assertEqual(frappe.db.get_value("Bookstack Configuration", INSTANCE, "sync_error_count"), 0)
+

@@ -498,7 +498,10 @@ def _chosen_steps(steps) -> list[str]:
 	"""``steps`` as the dialog sends it (list or JSON), checked; only None means every step."""
 	if steps is None:
 		return list(SYNC_STEPS)
-	chosen = frappe.parse_json(steps) if isinstance(steps, str) else steps
+	try:
+		chosen = frappe.parse_json(steps) if isinstance(steps, str) else steps
+	except ValueError:  # not JSON at all, e.g. "pages"
+		chosen = None
 	if not isinstance(chosen, (list, tuple)) or not all(isinstance(step, str) for step in chosen):
 		frappe.throw(_("Unknown sync step: {0}").format(steps))  # e.g. "null" or "5"
 	unknown = set(chosen) - set(SYNC_STEPS)
@@ -528,10 +531,13 @@ def sync_instance(instance: str, steps=None, remove_deleted_records=1) -> dict[s
 		plan.insert(at, ("removed", remove_deleted))
 
 	stats = _run_steps(instance, plan)
-	frappe.db.set_value("Bookstack Configuration", instance, {
-		"last_synced": now_datetime(),
-		"sync_error_count": stats["errors"],
-	})
+	if set(chosen) == set(SYNC_STEPS):
+		# Only a sync of every part says how complete the copy is; a partial one (e.g. roles only)
+		# would otherwise look like a full sync and hide the errors of the parts it skipped.
+		frappe.db.set_value("Bookstack Configuration", instance, {
+			"last_synced": now_datetime(),
+			"sync_error_count": stats["errors"],
+		})
 	frappe.db.commit()
 	return stats
 

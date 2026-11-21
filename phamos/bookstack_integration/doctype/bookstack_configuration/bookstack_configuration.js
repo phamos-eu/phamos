@@ -113,7 +113,7 @@ function bookstack_sync_dialog(frm) {
 				fieldname: "remove_deleted_records",
 				fieldtype: "Check",
 				label: __("Remove records deleted in BookStack"),
-				description: __("Only for the ticked shelves, books, chapters and pages."),
+				description: __("Removes what BookStack no longer has. Books and chapters only when their pages are synced too."),
 				default: 1,
 			},
 			{ fieldtype: "Section Break", label: __("Books, chapters and pages") },

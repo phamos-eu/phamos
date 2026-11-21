@@ -2565,7 +2565,6 @@ Website content,Website-Inhalte
 Copies the pages of books published on the website.,Kopiert die Seiten der auf der Webseite veröffentlichten Bücher.
 Removed (deleted in BookStack),Entfernt (in BookStack gelöscht)
 Remove records deleted in BookStack,In BookStack gelöschte Einträge entfernen
-"Only for the ticked shelves, books, chapters and pages.","Nur für die angehakten Regale, Bücher, Kapitel und Seiten."
 Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchronisieren.
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
@@ -2640,3 +2639,7 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
 "This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"
+Removes what BookStack no longer has. Books and chapters only when their pages are synced too.,"Entfernt, was es in BookStack nicht mehr gibt. Bücher und Kapitel nur, wenn auch ihre Seiten synchronisiert werden."
+Last Full Sync,Letzte vollständige Synchronisierung
+"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.",Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog.
+Sync Errors (last full sync),Synchronisierungsfehler (letzte vollständige Synchronisierung)

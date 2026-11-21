@@ -126,8 +126,9 @@
   {
    "fieldname": "last_synced",
    "fieldtype": "Datetime",
-   "label": "Last Synced",
-   "read_only": 1
+   "label": "Last Full Sync",
+   "read_only": 1,
+   "description": "Set by syncs that run every part. A partial sync shows its result in the Sync dialog only."
   },
   {
    "fieldname": "column_break_4",
@@ -136,7 +137,7 @@
   {
    "fieldname": "sync_error_count",
    "fieldtype": "Int",
-   "label": "Sync Errors (last run)",
+   "label": "Sync Errors (last full sync)",
    "read_only": 1
   },
   {
