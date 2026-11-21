@@ -2616,6 +2616,15 @@ Bubbles per Day,Sprechblasen pro Tag
 One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Nothing planned yet,Noch nichts geplant
+On the critical path,Auf dem kritischen Pfad
+Baseline: {0} – {1},Planungsbasis: {0} – {1}
+GitLab milestone,GitLab-Meilenstein
+Against the baseline,Gegenüber der Planungsbasis
++{0} d,+{0} T
+{0} d,{0} T
+{0} d late,{0} T zu spät
+{0} d slack,{0} T Puffer
 Warnings Go To,Warnungen gehen an
 Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
 Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
