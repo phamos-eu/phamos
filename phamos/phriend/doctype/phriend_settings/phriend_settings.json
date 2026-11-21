@@ -11,6 +11,8 @@
   "default_project",
   "system_implementation",
   "shortcut",
+  "features_section",
+  "reactions",
   "gitlab_section",
   "gitlab_url",
   "gitlab_project",
@@ -70,6 +72,20 @@
    "fieldname": "shortcut",
    "fieldtype": "Data",
    "label": "Keyboard Shortcut"
+  },
+  {
+   "collapsible": 0,
+   "description": "One switch per Phriend feature. A feature that is off shows nowhere.",
+   "fieldname": "features_section",
+   "fieldtype": "Section Break",
+   "label": "Features"
+  },
+  {
+   "default": "1",
+   "description": "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).",
+   "fieldname": "reactions",
+   "fieldtype": "Check",
+   "label": "Hands and Reactions"
   },
   {
    "fieldname": "gitlab_section",
@@ -147,7 +163,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 07:43:12.890923",
+ "modified": "2026-11-21 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phriend",
  "name": "Phriend Settings",
