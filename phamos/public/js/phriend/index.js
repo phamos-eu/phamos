@@ -24,6 +24,7 @@
 import { Ball, GESTURES } from "./ball";
 import { ErrorLog } from "./errors";
 import * as nudge from "./nudge";
+import * as play from "./play";
 import * as quiet from "./quiet";
 import { call } from "./request";
 import { Voice } from "./voice";
@@ -206,6 +207,68 @@ class Phriend {
 		// events (#2012): a sample event from the server to yourself
 		api.emit = (kind) =>
 			call("phamos.phriend.api.send_test_event", { kind }, this.host.csrf_token()).catch((e) => console.warn(e));
+		// easter eggs (#2013): a move by name, or a random one
+		api.play = (name) => (name ? this.play_move(name) : this.play_from("debug", play.HOVER_MOVES, true));
+		api.moves = Object.keys(play.MOVES);
+	}
+
+	// ---- easter eggs (#2013)
+
+	setup_play() {
+		const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		this.play_on = this.feature("easter_eggs") && "easter_eggs" in (this.host.features || {}) && !reduced;
+		if (!this.play_on) return;
+		this._play_last = {};
+		// the pointer rests on Phriend for 10 s
+		let hover_timer = null;
+		const stop_hover = () => clearTimeout(hover_timer);
+		this.ball.hit.addEventListener("pointerenter", () => {
+			stop_hover();
+			hover_timer = setTimeout(() => this.play_from("hover", play.HOVER_MOVES), play.HOVER_MS);
+		});
+		this.ball.hit.addEventListener("pointerleave", stop_hover);
+		this.ball.hit.addEventListener("pointerdown", stop_hover);
+		// no mouse or keyboard for 5 minutes: one sign of life, then nothing until active again
+		let last_active = Date.now();
+		let played_this_spell = false;
+		const active = () => {
+			last_active = Date.now();
+			played_this_spell = false;
+		};
+		for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"])
+			document.addEventListener(event, active, { passive: true, capture: true });
+		setInterval(() => {
+			if (played_this_spell || document.hidden || Date.now() - last_active < play.IDLE_MS) return;
+			played_this_spell = true;
+			this.play_from("idle", play.IDLE_MOVES);
+		}, 30 * 1000);
+	}
+
+	// dragged fast: dizzy
+	on_drag_end(samples) {
+		if (this.play_on && play.top_speed(samples) >= play.FAST_DRAG) this.play_from("drag", ["dizzy"]);
+	}
+
+	may_play() {
+		return !!this.ball && !this.is_quiet() && !this.open && !this.ball.menu_open() && !document.hidden;
+	}
+
+	// a move from `moves`, if this trigger hasn't played for a while (force: the debug call)
+	play_from(trigger, moves, force = false) {
+		const now = Date.now();
+		if (!force && (!this.may_play() || !play.cooled_down(this._play_last && this._play_last[trigger], now))) return false;
+		const move = play.pick(moves, this._last_move);
+		if (!this.play_move(move)) return false;
+		if (this._play_last) this._play_last[trigger] = now;
+		this._last_move = move;
+		return true;
+	}
+
+	play_move(name) {
+		const move = play.MOVES[name];
+		if (!move || !this.ball || !this.ball.play(name, move.ms)) return false;
+		if (move.emoji) this.react(move.emoji); // alone in a small bubble, never counted
+		return true;
 	}
 
 	// ---- events (#2012)
@@ -231,7 +294,8 @@ class Phriend {
 	event_html(payload) {
 		const text = escape_html(payload.text || "");
 		const link = String(payload.link || "");
-		// this site ("/app/…", not "//host" or "/\\host") or https only (AI review of !1279)
+		// this site ("/app/…", not "//host" or "/\\host") or https only (AI review of !1279);
+		// the same rule as phamos/phriend/events.py safe_link(): change both together
 		const local = link.startsWith("/") && !link.startsWith("//") && !link.startsWith("/\\");
 		if (!link || !(local || link.startsWith("https://"))) return text;
 		const external = link.startsWith("https://");
@@ -291,11 +355,13 @@ class Phriend {
 			hands: this.feature("reactions"),
 			menu: this.has_menu() ? () => this.menu_entries() : null,
 			on_waiting_click: () => this.voice.open_next(),
+			on_drag_end: (samples) => this.on_drag_end(samples),
 			waiting_label: (count) =>
 				count > 1 ? __("Phriend has {0} things for you", [count]) : __("Phriend has something for you"),
 		});
 		this.voice = new Voice(this); // one voice (#2011)
 		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
+		this.setup_play(); // easter eggs (#2013)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
