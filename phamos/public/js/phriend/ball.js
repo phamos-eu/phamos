@@ -346,7 +346,9 @@ export class Ball {
 			this.root.style.right = `${options.start.right}px`;
 			this.root.style.bottom = `${options.start.bottom}px`;
 		}
-		this.restore_position();
+		// Pinned (Ophice's map, #2053): the host places the ball; it is not dragged and does not
+		// remember a position (that one belongs to the floating ball of Desk and the cockpits).
+		if (!options.pinned) this.restore_position();
 		this.setup_drag();
 		this.setup_eyes();
 		this.setup_interest();
@@ -421,6 +423,26 @@ export class Ball {
 		this.root.classList.toggle("flip", left < 260); // keep the speech bubble on screen
 	}
 
+	/**
+	 * Pinned mode: stand on a spot of the host's page, `size` px wide (the height follows the
+	 * ball's 64:76 shape), or hide while the spot is not on screen.
+	 * @param {{left: number, top: number, size: number} | null} spot
+	 */
+	pin(spot) {
+		this.host.style.display = spot ? "" : "none";
+		if (!spot) return;
+		const width = Math.round(spot.size);
+		Object.assign(this.root.style, {
+			width: `${width}px`,
+			height: `${Math.round((width * 76) / 64)}px`,
+			left: `${Math.round(spot.left)}px`,
+			top: `${Math.round(spot.top)}px`,
+			right: "auto",
+			bottom: "auto",
+		});
+		this.root.classList.toggle("flip", spot.left < 260); // keep the speech bubble on screen
+	}
+
 	clamp_into_view() {
 		if (!this.root.style.left) return;
 		this.set_position(parseFloat(this.root.style.left), parseFloat(this.root.style.top));
@@ -454,7 +476,7 @@ export class Ball {
 
 		this.hit.addEventListener("pointermove", (e) => {
 			if (!start) return;
-			if (!dragging && !pressed && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
+			if (!dragging && !pressed && !this.options.pinned && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
 				dragging = true;
 				clearTimeout(press_timer);
 				this.root.classList.add("dragging");

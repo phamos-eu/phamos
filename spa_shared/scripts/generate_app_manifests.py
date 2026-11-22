@@ -42,6 +42,14 @@ LIGHT_BACKGROUND = "#f8f8f8"
 # Lead Scan (#2563eb, phamos/public/manifest/scan.webmanifest) keeps its own blue.
 APPS = [
 	{
+		"slug": "ophice",
+		"name": "Ophice",
+		"description": "Go to work: meet colleagues on the map and open your cockpits",
+		"route": "/ophice",
+		"color": "#4338ca",
+		"symbol": "map",
+	},
+	{
 		"slug": "human-resources",
 		"name": "Human Resources",
 		"description": "Human Resources issues, tasks and checklists",

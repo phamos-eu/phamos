@@ -1,0 +1,161 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-21 22:00:00.000000",
+ "description": "A meeting area of the Ophice (#2060): a rectangle of the grid with a fixed Jitsi meeting. Whoever stops inside joins it. Written only by phamos.api.ophice.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "kind",
+  "cockpit",
+  "meeting_url",
+  "column_break_main",
+  "x",
+  "y",
+  "width",
+  "height",
+  "section_jitsi",
+  "jitsi_domain",
+  "jitsi_room",
+  "color_hue",
+  "section_chat",
+  "chat_mode"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "default": "Meeting",
+   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one. Guest: where external guests arrive and stay (#2080); only one. Customer meeting: where employees meet guests they invited (#2080). Cockpit: stopping inside opens its cockpit (#2076); a meeting is optional. Phriend: where Phriend stands on the map (only one).",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "Meeting\nStart\nGuest\nCustomer meeting\nCockpit\nPhriend"
+  },
+  {
+   "depends_on": "eval:doc.kind == 'Cockpit'",
+   "mandatory_depends_on": "eval:doc.kind == 'Cockpit'",
+   "description": "The cockpit's route, e.g. /human-resources-cockpit.",
+   "fieldname": "cockpit",
+   "fieldtype": "Data",
+   "label": "Cockpit"
+  },
+  {
+   "description": "https://<allowed Jitsi server>/<room>, for example https://meet.jit.si/OurStandup",
+   "fieldname": "meeting_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Meeting URL",
+   "reqd": 0,
+   "mandatory_depends_on": "eval:!['Start', 'Cockpit', 'Phriend'].includes(doc.kind)",
+   "depends_on": "eval:!['Start', 'Phriend'].includes(doc.kind)"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Left edge, in tiles (half steps).",
+   "fieldname": "x",
+   "fieldtype": "Float",
+   "label": "X",
+   "reqd": 1,
+   "precision": "1"
+  },
+  {
+   "description": "Top edge, in tiles (half steps).",
+   "fieldname": "y",
+   "fieldtype": "Float",
+   "label": "Y",
+   "reqd": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width",
+   "reqd": 1,
+   "precision": "1",
+   "description": "In tiles (half steps)."
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Float",
+   "label": "Height",
+   "reqd": 1,
+   "precision": "1",
+   "description": "In tiles (half steps)."
+  },
+  {
+   "fieldname": "section_jitsi",
+   "fieldtype": "Section Break",
+   "label": "Jitsi",
+   "depends_on": "eval:!['Start', 'Phriend'].includes(doc.kind)"
+  },
+  {
+   "description": "From the meeting URL.",
+   "fieldname": "jitsi_domain",
+   "fieldtype": "Data",
+   "label": "Jitsi Domain",
+   "read_only": 1
+  },
+  {
+   "description": "From the meeting URL.",
+   "fieldname": "jitsi_room",
+   "fieldtype": "Data",
+   "label": "Jitsi Room",
+   "read_only": 1
+  },
+  {
+   "description": "The area's color on the grid: a hue 0-359, picked at random when the area is made, apart from the other areas' hues.",
+   "fieldname": "color_hue",
+   "fieldtype": "Int",
+   "label": "Color Hue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_chat",
+   "fieldtype": "Section Break",
+   "label": "Area chat",
+   "depends_on": "eval:doc.kind == 'Meeting'"
+  },
+  {
+   "default": "Saved",
+   "description": "Saved: history kept (can be burned). Not saved: deleted when the last person leaves. Confidential: never stored, only live.",
+   "fieldname": "chat_mode",
+   "fieldtype": "Select",
+   "label": "Chat mode",
+   "options": "Saved\nNot saved\nConfidential",
+   "depends_on": "eval:doc.kind == 'Meeting'"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 21:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Ophice",
+ "name": "Ophice Area",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

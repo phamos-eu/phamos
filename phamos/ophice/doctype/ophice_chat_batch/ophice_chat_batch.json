@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-22 14:00:00.000000",
+ "description": "One meeting's chat in an Ophice area (#2066): from two people in the area until it is empty. Its own private Raven channel. Kept, or deleted for good (no Deleted Document) after the grace time or a Burn vote. Written only by phamos.api.ophice.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "field_order": [
+  "area",
+  "status",
+  "saved",
+  "column_break_main",
+  "raven_channel",
+  "started_at",
+  "grace_until",
+  "vote_until",
+  "section_participants",
+  "participants",
+  "section_events",
+  "events"
+ ],
+ "fields": [
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Area",
+   "options": "Ophice Area",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Open",
+   "description": "Open while people meet; Ending during the grace time after the area emptied; Kept afterwards.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nEnding\nKept",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Someone saved it: kept after the grace time even when the area's chat mode is Not saved.",
+   "fieldname": "saved",
+   "fieldtype": "Check",
+   "label": "Saved",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "raven_channel",
+   "fieldtype": "Link",
+   "label": "Raven Channel",
+   "options": "Raven Channel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "description": "While Ending: when the grace time is over.",
+   "fieldname": "grace_until",
+   "fieldtype": "Datetime",
+   "label": "Grace Until",
+   "read_only": 1
+  },
+  {
+   "description": "While a Keep/Burn vote runs: when it is decided by the votes cast.",
+   "fieldname": "vote_until",
+   "fieldtype": "Datetime",
+   "label": "Vote Until",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_participants",
+   "fieldtype": "Section Break",
+   "label": "Participants"
+  },
+  {
+   "fieldname": "participants",
+   "fieldtype": "Table",
+   "label": "Participants",
+   "options": "Ophice Chat Batch Participant",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_events",
+   "fieldtype": "Section Break",
+   "label": "Timeline"
+  },
+  {
+   "description": "Who joined and left the meeting, and when: shown between the messages.",
+   "fieldname": "events",
+   "fieldtype": "Table",
+   "label": "Events",
+   "options": "Ophice Chat Batch Event",
+   "read_only": 1
+  }
+ ],
+ "modified": "2026-11-22 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Ophice",
+ "name": "Ophice Chat Batch",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "area"
+}
