@@ -42,30 +42,36 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Left edge, in tiles.",
+   "description": "Left edge, in tiles (half steps).",
    "fieldname": "x",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "X",
-   "reqd": 1
+   "reqd": 1,
+   "precision": "1"
   },
   {
-   "description": "Top edge, in tiles.",
+   "description": "Top edge, in tiles (half steps).",
    "fieldname": "y",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "Y",
-   "reqd": 1
+   "reqd": 1,
+   "precision": "1"
   },
   {
    "fieldname": "width",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "Width",
-   "reqd": 1
+   "reqd": 1,
+   "precision": "1",
+   "description": "In tiles (half steps)."
   },
   {
    "fieldname": "height",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "Height",
-   "reqd": 1
+   "reqd": 1,
+   "precision": "1",
+   "description": "In tiles (half steps)."
   },
   {
    "fieldname": "section_jitsi",
@@ -116,7 +122,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 12:00:00.000000",
+ "modified": "2026-11-22 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

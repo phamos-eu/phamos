@@ -95,6 +95,8 @@
 			:me="me.user"
 			:hide-details="hideDetails"
 			:now="clock"
+			:meeting="meetingArea"
+			:area-of="areaOfUser"
 			@pick="(person, event) => openChatWith(person, event)"
 			@hide="setHideDetails"
 		/>
@@ -209,6 +211,7 @@
 				class="ophice-grid rounded-lg border border-outline-gray-2 bg-surface-white"
 				:class="{
 					'ophice-grid--image': background,
+					'ophice-grid--lines': editingAreas || adjustingBackground,
 					relative: !meetingArea,
 					'ophice-grid--mini absolute z-20 shadow-xl': meetingArea,
 				}"
@@ -254,6 +257,7 @@
 							:image="other.user_image"
 							:moving="Boolean(other.moving)"
 							:offline="Boolean(other.offline)"
+							:area-hue="other.offline ? null : areaAt(other)?.color_hue"
 						/>
 					</span>
 				</div>
@@ -285,6 +289,7 @@
 							:user="me.user"
 							:label="me.full_name"
 							:image="me.user_image"
+							:area-hue="areaAt(me)?.color_hue"
 							ring
 							:moving="moving"
 							:jumping="jumping"
@@ -897,6 +902,17 @@ function areaAt(chip) {
 	return areas.value.find((a) => cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height) || null
 }
 
+// Who stands in which area, from the chips on the map (#2067): the sidebar groups and colours by it.
+const areaOfUser = computed(() => {
+	const map = {}
+	for (const chip of [me.value, ...others.value]) {
+		if (!chip || chip.offline) continue
+		const area = areaAt(chip)
+		if (area) map[chip.user] = area
+	}
+	return map
+})
+
 function joinAreaIfInside() {
 	const area = areaAt(me.value)
 	if (!area || meetingArea.value?.name === area.name || meetingLeftHere === area.name) return
@@ -1498,17 +1514,27 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Grid lines from the theme's outline token, so they follow light and dark mode. */
+/* Grid lines from the theme's outline token, so they follow light and dark mode. Only while
+   areas are edited (#2067), in half tiles: the step areas snap to. */
 .ophice-grid {
-	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
+	--grid-cell: calc(var(--tile) / 2);
+	--grid-lines: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px);
-	background-size: var(--tile) var(--tile);
 }
-/* An uploaded image fills the grid; the lines stay on top of it. */
+.ophice-grid--lines {
+	background-image: var(--grid-lines);
+	background-size: var(--grid-cell) var(--grid-cell);
+}
+/* An uploaded image fills the grid; while editing, the lines stay on top of it. */
 .ophice-grid--image {
-	background-image: linear-gradient(to right, var(--outline-gray-2) 1px, transparent 1px),
-		linear-gradient(to bottom, var(--outline-gray-2) 1px, transparent 1px), var(--background-image);
-	background-size: var(--tile) var(--tile), var(--tile) var(--tile), var(--background-size, cover);
+	background-image: var(--background-image);
+	background-size: var(--background-size, cover);
+	background-position: var(--background-position, center);
+	background-repeat: no-repeat;
+}
+.ophice-grid--image.ophice-grid--lines {
+	background-image: var(--grid-lines), var(--background-image);
+	background-size: var(--grid-cell) var(--grid-cell), var(--grid-cell) var(--grid-cell), var(--background-size, cover);
 	background-position: 0 0, 0 0, var(--background-position, center);
 	background-repeat: repeat, repeat, no-repeat;
 }

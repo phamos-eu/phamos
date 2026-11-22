@@ -69,17 +69,21 @@ function rectStyle(rect) {
 	}
 }
 
+// Areas snap to half tiles (#2067): double the resolution of the chips' grid.
+const STEP = 0.5
+
 function tileAt(event) {
 	const box = layer.value.getBoundingClientRect()
-	const x = Math.floor((event.clientX - box.left) / props.tile)
-	const y = Math.floor((event.clientY - box.top) / props.tile)
-	return { x: Math.max(0, Math.min(props.cols - 1, x)), y: Math.max(0, Math.min(props.rows - 1, y)) }
+	const cell = props.tile * STEP
+	const x = Math.floor((event.clientX - box.left) / cell) * STEP
+	const y = Math.floor((event.clientY - box.top) / cell) * STEP
+	return { x: Math.max(0, Math.min(props.cols - STEP, x)), y: Math.max(0, Math.min(props.rows - STEP, y)) }
 }
 
 function rectBetween(a, b) {
 	const x = Math.min(a.x, b.x)
 	const y = Math.min(a.y, b.y)
-	return { x, y, width: Math.abs(a.x - b.x) + 1, height: Math.abs(a.y - b.y) + 1 }
+	return { x, y, width: Math.abs(a.x - b.x) + STEP, height: Math.abs(a.y - b.y) + STEP }
 }
 
 function onDown(event) {

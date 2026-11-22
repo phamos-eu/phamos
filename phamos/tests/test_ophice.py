@@ -490,6 +490,13 @@ class OphiceAreaTestCase(FrappeTestCase):
 		ophice.save_area("Room 1b", "https://meet.jit.si/ColorRoom1", 3, 0, 2, 2, name=first.name)
 		self.assertEqual(frappe.db.get_value("Ophice Area", first.name, "color_hue"), first.color_hue)
 
+	def test_areas_snap_to_half_tiles(self):
+		"""#2067: the grid for areas has double the resolution."""
+		frappe.set_user("Administrator")
+		name = ophice.save_area("Half", "https://jitsi.example.org/Half", 2.3, 4.74, 1.26, 0.1)
+		area = frappe.get_doc(ophice.AREA_DOCTYPE, name)
+		self.assertEqual((area.x, area.y, area.width, area.height), (2.5, 4.5, 1.5, 0.5))
+
 
 class OphiceStatusTestCase(FrappeTestCase):
 	"""Be right back / Away (#2053): a note, and a return time as an instant in UTC."""

@@ -91,6 +91,8 @@ MAX_AREAS = 50
 # Every area gets its own random color (PM, 2026-11-22): a hue, at least this far from the others.
 AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
+# Areas are drawn in half tiles (#2067).
+AREA_STEP = 0.5
 # Area chat (#2062): what happens to what is written in an area.
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
@@ -1090,17 +1092,18 @@ def _random_hue(taken):
 	return random.choice(free or range(360))
 
 
+def _half(value):
+	"""Areas snap to half tiles (#2067): the grid for areas has double the resolution."""
+	return round(frappe.utils.flt(value) / AREA_STEP) * AREA_STEP
+
+
 def _clean_rect(x, y, width, height):
-	"""A rectangle of whole tiles inside the grid, at least 1×1."""
-	x = _clamp_int(x, COLS)
-	y = _clamp_int(y, ROWS)
-	width = max(1, min(COLS - x, frappe.utils.cint(width)))
-	height = max(1, min(ROWS - y, frappe.utils.cint(height)))
+	"""A rectangle in half-tile steps inside the grid, at least half a tile each way."""
+	x = max(0, min(COLS - AREA_STEP, _half(x)))
+	y = max(0, min(ROWS - AREA_STEP, _half(y)))
+	width = max(AREA_STEP, min(COLS - x, _half(width)))
+	height = max(AREA_STEP, min(ROWS - y, _half(height)))
 	return x, y, width, height
-
-
-def _clamp_int(value, cells):
-	return max(0, min(cells - 1, frappe.utils.cint(value)))
 
 
 def _overlaps(name, x, y, width, height):

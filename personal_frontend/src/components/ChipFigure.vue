@@ -33,6 +33,13 @@
 			:style="{ '--ring-h': ringHue }"
 		>
 			<UserAvatar :name="user" :label="label" :image="image" size="lg" />
+			<!-- Standing in a meeting area (#2067): a frame and glow in the area's colour. -->
+			<span
+				v-if="areaHue !== null && areaHue !== undefined && areaHue !== ''"
+				class="chip-figure__area pointer-events-none absolute rounded-full"
+				:style="{ '--area-h': areaHue }"
+				data-testid="chip-area-glow"
+			/>
 		</span>
 	</span>
 </template>
@@ -58,6 +65,8 @@ const props = defineProps({
 	flying: { type: Boolean, default: false },
 	/** Away and the page closed: greyed out. */
 	offline: { type: Boolean, default: false },
+	/** The hue of the meeting area the chip stands in, or null. */
+	areaHue: { type: [Number, String], default: null },
 })
 
 // Every person gets their own ring colour, the same on every screen (PM: easier to tell apart).
@@ -119,6 +128,12 @@ const ringHue = computed(() => hueOf(props.user))
 .chip-figure__ring--mine {
 	box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(37, 99, 235), 0 0 0 7px rgba(0, 0, 0, 0.55),
 		0 0 12px 7px rgba(59, 130, 246, 0.6);
+}
+/* In a meeting area: an outer frame in the area's colour with a soft glow, outside the ring. */
+.chip-figure__area {
+	inset: -10px;
+	border: 3px solid hsl(var(--area-h) 75% 50%);
+	box-shadow: 0 0 12px 4px hsl(var(--area-h) 75% 50% / 0.65), inset 0 0 6px hsl(var(--area-h) 75% 50% / 0.5);
 }
 .is-offline {
 	opacity: 0.55;
