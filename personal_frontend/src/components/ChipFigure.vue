@@ -40,6 +40,7 @@
 <script setup>
 import { computed } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import { ringHue as hueOf } from "../utils/ophiceColor.js"
 
 const props = defineProps({
 	user: { type: String, default: "" },
@@ -60,13 +61,7 @@ const props = defineProps({
 })
 
 // Every person gets their own ring colour, the same on every screen (PM: easier to tell apart).
-// Blues are left out: blue is my own ring.
-const ringHue = computed(() => {
-	let hash = 0
-	for (const char of props.user) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-	const hue = hash % 300
-	return hue >= 190 ? hue + 60 : hue
-})
+const ringHue = computed(() => hueOf(props.user))
 </script>
 
 <style scoped>

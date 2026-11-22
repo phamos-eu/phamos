@@ -13,6 +13,17 @@
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
 			</div>
+			<Button
+				v-if="me"
+				:variant="showPeople ? 'solid' : 'subtle'"
+				:title="__('Show or hide the people list')"
+				:aria-pressed="showPeople"
+				data-testid="people-toggle"
+				@click="togglePeople"
+			>
+				<template #prefix><FeatherIcon name="users" class="h-4 w-4" /></template>
+				{{ __("People") }}
+			</Button>
 			<!-- My status (#2053): be right back / away, shown above my chip. -->
 			<Button
 				v-if="me"
@@ -76,6 +87,17 @@
 			</Button>
 		</header>
 
+		<div class="flex min-h-0 flex-1">
+		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
+		<PeopleSidebar
+			v-if="me && showPeople"
+			:people="people"
+			:me="me.user"
+			:hide-details="hideDetails"
+			:now="clock"
+			@pick="(person, event) => openChatWith(person, event)"
+			@hide="setHideDetails"
+		/>
 		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
 			<!-- Size and position of the background image against the grid (#2058), top left. -->
 			<div
@@ -208,8 +230,9 @@
 				<div
 					v-for="other in others"
 					:key="other.user"
-					class="ophice-chip ophice-chip--remote absolute flex items-center justify-center"
+					class="ophice-chip ophice-chip--remote absolute flex cursor-pointer items-center justify-center"
 					:style="chipStyle(other)"
+					@click="openChatWith(other, $event)"
 					:title="other.offline ? __('{0} (away, page closed)', [other.full_name]) : other.full_name"
 					data-testid="other-chip"
 				>
@@ -270,6 +293,8 @@
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
+		</div>
+		<ChatWithMenu v-if="chatWith" :key="chatWith.person.user" :person="chatWith.person" :at="chatWith.at" @close="chatWith = null" />
 	</div>
 </template>
 
@@ -283,6 +308,8 @@ import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
 import AreaChat from "../components/AreaChat.vue"
+import PeopleSidebar from "../components/PeopleSidebar.vue"
+import ChatWithMenu from "../components/ChatWithMenu.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -888,6 +915,69 @@ const areaChatStyle = computed(() => {
 	}
 })
 
+// --- People list (#2063) and "chat with" (list or map).
+
+const PEOPLE_KEY = "phamos_ophice_people_open"
+const PEOPLE_REFRESH_MS = 15000
+const people = ref([])
+const hideDetails = ref(false)
+const chatWith = ref(null)
+const showPeople = ref(readFlag(PEOPLE_KEY, true))
+let peopleTimer = null
+let peopleSoon = null
+
+function readFlag(key, fallback) {
+	try {
+		const value = localStorage.getItem(key)
+		return value === null ? fallback : value === "1"
+	} catch {
+		return fallback
+	}
+}
+
+function togglePeople() {
+	showPeople.value = !showPeople.value
+	try {
+		localStorage.setItem(PEOPLE_KEY, showPeople.value ? "1" : "0")
+	} catch {
+		// private window: back to the default after a reload
+	}
+	if (showPeople.value) loadPeople()
+}
+
+async function loadPeople() {
+	if (!showPeople.value || !me.value) return
+	try {
+		const data = await call(`${API}.get_people`)
+		people.value = data.people || []
+		hideDetails.value = Boolean(data.hide_details)
+	} catch {
+		// the next round tries again
+	}
+}
+
+/** Someone came, went, moved into an area or set a status: refresh soon, once. */
+function peopleChanged() {
+	clearTimeout(peopleSoon)
+	peopleSoon = setTimeout(loadPeople, 1500)
+}
+
+async function setHideDetails(hide) {
+	hideDetails.value = hide
+	try {
+		await call(`${API}.set_hide_details`, { hide: hide ? 1 : 0 })
+	} catch (e) {
+		hideDetails.value = !hide
+		toast.error(errorText(e) || __("The setting could not be saved."))
+	}
+	loadPeople()
+}
+
+function openChatWith(person, event) {
+	if (!person?.user || person.user === me.value?.user) return
+	chatWith.value = { person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
+}
+
 function nameOf(user) {
 	if (user === me.value?.user) return me.value.full_name
 	return others.value.find((o) => o.user === user)?.full_name || user
@@ -1059,6 +1149,8 @@ function startClock() {
 		if (!Object.keys(notices).length) {
 			clearInterval(nowTimer)
 	clearInterval(clockTimer)
+	clearInterval(peopleTimer)
+	clearTimeout(peopleSoon)
 			nowTimer = null
 		}
 	}, 250)
@@ -1120,7 +1212,9 @@ const SOCKET_EVENTS = [
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
 	["ophice_areas", (message) => setAreas(message?.areas)],
-	["ophice_status", onRemoteStatus],
+	["ophice_status", (message) => (onRemoteStatus(message), peopleChanged())],
+	["ophice_leave", peopleChanged],
+	["ophice_encounter_started", peopleChanged],
 	[
 		"ophice_background",
 		(message) => {
@@ -1307,6 +1401,8 @@ onMounted(async () => {
 	for (const [event, handler] of SOCKET_EVENTS) socket?.on?.(event, handler)
 	heartbeat()
 	heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS)
+	loadPeople()
+	peopleTimer = setInterval(loadPeople, PEOPLE_REFRESH_MS)
 })
 
 onBeforeUnmount(() => {

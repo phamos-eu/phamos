@@ -94,6 +94,9 @@ AREA_TITLE_LENGTH = 60
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
 EVENT_AREA_BURNED = "ophice_area_burned"
+# People list (#2063): everyone sees who is around; each user can hide their details.
+HIDE_KEY = "phamos_ophice_hide_details"
+RECENT_CHATS = 5
 # The server sees moves a moment late: a chip this close to the edge still counts as inside.
 AREA_SLACK = 0.5
 
@@ -1309,3 +1312,147 @@ def _burn_empty_unsaved_areas():
 		doc = _area(name)
 		if not _people_in(doc):
 			_burn_area_messages(doc)
+
+
+# --- People list (#2063): all Raven users, online first, with what they are doing.
+#
+# Live only: presence from the Redis cache, nothing is logged. "Hide my details" leaves only name,
+# picture and online/offline; an encounter shows as "in a chat", never with whom.
+
+
+def _hides_details(user):
+	raw = frappe.db.get_value("DefaultValue", {"parent": user, "defkey": HIDE_KEY}, "defvalue")
+	return raw == "1"
+
+
+def _in_encounter(users):
+	"""The users among `users` who are in an open encounter right now."""
+	if not users:
+		return set()
+	rows = frappe.get_all(
+		ENCOUNTER_DOCTYPE,
+		filters={"status": "Open"},
+		or_filters={"user_a": ("in", list(users)), "user_b": ("in", list(users))},
+		fields=["user_a", "user_b"],
+	)
+	return {u for r in rows for u in (r.user_a, r.user_b)} & set(users)
+
+
+@frappe.whitelist()
+def get_people():
+	"""All Raven users, online in Ophice first, with their status (as far as they show it)."""
+	_require_user()
+	me = frappe.session.user
+	users = frappe.get_all(
+		"Raven User",
+		filters={"type": "User", "enabled": 1},
+		fields=["user", "full_name", "user_image"],
+		limit=500,
+	)
+	online = {c["user"]: c for c in _online()}
+	areas = _areas()
+	chatting = _in_encounter([u.user for u in users if u.user in online])
+	people = []
+	for row in users:
+		if not row.user or row.user == "Guest":
+			continue
+		hidden = _hides_details(row.user)
+		chip = online.get(row.user)
+		person = {
+			"user": row.user,
+			"full_name": row.full_name or row.user,
+			"user_image": row.user_image or "",
+			"online": bool(chip),
+			"hidden": hidden,
+			"status": _status_of(row.user),
+			"area": "",
+			"in_chat": False,
+		}
+		if chip and (not hidden or row.user == me):
+			cx, cy = chip["x"] + 0.5, chip["y"] + 0.5
+			area = next((a for a in areas if a.x <= cx < a.x + a.width and a.y <= cy < a.y + a.height), None)
+			person["area"] = area.title if area else ""
+			person["in_chat"] = row.user in chatting
+		people.append(person)
+	people.sort(key=lambda p: (not p["online"], p["user"] != me, (p["full_name"] or "").lower()))
+	return {"people": people, "hide_details": _hides_details(me)}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_hide_details(hide=0):
+	"""Show or hide what I am doing (place, chat, work, cockpit) in the people list."""
+	_require_user()
+	hide = frappe.utils.cint(hide)
+	if hide:
+		frappe.defaults.set_user_default(HIDE_KEY, "1", frappe.session.user)
+	else:
+		frappe.defaults.clear_user_default(HIDE_KEY, frappe.session.user)
+	return bool(hide)
+
+
+@frappe.whitelist()
+def get_chat_options(user):
+	"""Where I can chat with `user`: our direct message (if any) and our latest shared channels."""
+	from phamos.api.issue_chat import _raven_user, channel_url
+
+	_require_user()
+	me = frappe.session.user
+	if not _raven_user(me):
+		frappe.throw(_("You can't chat: no Raven access."))
+	other = _raven_user(user)
+	if not other or user == me:
+		frappe.throw(_("{0} can't chat: no Raven access.").format(frappe.utils.get_fullname(user)))
+	dm_1, dm_2 = (me, user) if me > user else (user, me)
+	dm = frappe.db.get_value(
+		"Raven Channel",
+		{"is_direct_message": 1, "dm_user_1": dm_1, "dm_user_2": dm_2},
+		["name", "last_message_timestamp"],
+		as_dict=True,
+	)
+	# Channels we are both members of; not threads, not archived, not temporary encounters.
+	member = frappe.qb.DocType("Raven Channel Member")
+	other_member = frappe.qb.DocType("Raven Channel Member").as_("other_member")
+	channel = frappe.qb.DocType("Raven Channel")
+	rows = (
+		frappe.qb.from_(member)
+		.join(other_member)
+		.on(other_member.channel_id == member.channel_id)
+		.join(channel)
+		.on(channel.name == member.channel_id)
+		.select(
+			channel.name, channel.channel_name, channel.channel_description, channel.workspace, channel.type,
+			channel.last_message_timestamp,
+		)
+		.where(member.user_id == _raven_user(me))
+		.where(other_member.user_id == other)
+		.where(channel.is_direct_message == 0)
+		.where(channel.is_thread == 0)
+		.where(channel.is_archived == 0)
+		.where(channel.channel_name.not_like("encounter-%"))
+		.orderby(channel.last_message_timestamp, order=frappe.qb.desc)
+		.limit(RECENT_CHATS)
+		.run(as_dict=True)
+	)
+	chats = [
+		{
+			# Issue and area chats describe themselves ("ISS-…: subject"); others go by their name.
+			"label": (r.channel_description or r.channel_name or "").strip()[:80],
+			"type": r.type,
+			"last_message_at": str(r.last_message_timestamp or ""),
+			"url": channel_url(r.workspace, r.name),
+		}
+		for r in rows
+	]
+	return {
+		"dm": {"url": f"/raven/dm-channel/{dm.name}", "last_message_at": str(dm.last_message_timestamp or "")} if dm else None,
+		"chats": chats,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def start_direct_message(user):
+	"""Our direct message channel (Raven makes it if it does not exist yet), as a link."""
+	from raven.api.raven_channel import create_direct_message_channel
+
+	_require_user()
+	return {"url": f"/raven/dm-channel/{create_direct_message_channel(user)}"}

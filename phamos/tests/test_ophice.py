@@ -550,8 +550,8 @@ class OphiceStatusTestCase(FrappeTestCase):
 		self.assertEqual(chips[0]["status"]["note"], "Lunch")
 
 
-class OphiceAreaChatTestCase(FrappeTestCase):
-	"""Area chat (#2062): Saved, Not saved, Confidential; only for whoever stands in the area."""
+class _OphiceRoomBase(FrappeTestCase):
+	"""Two Raven users on the grid and a test Jitsi server, realtime patched out."""
 
 	A = "ophice-a@example.com"
 	B = "ophice-b@example.com"
@@ -592,6 +592,11 @@ class OphiceAreaChatTestCase(FrappeTestCase):
 
 	def _recipients(self):
 		return {c.kwargs.get("user") for c in self.sent.call_args_list if c.args and c.args[0] == ophice.EVENT_AREA_MESSAGE}
+
+
+
+class OphiceAreaChatTestCase(_OphiceRoomBase):
+	"""Area chat (#2062): Saved, Not saved, Confidential; only for whoever stands in the area."""
 
 	def test_saved_keeps_history_in_raven_and_only_people_inside_may_read(self):
 		area = self._area("Saved")
@@ -634,3 +639,38 @@ class OphiceAreaChatTestCase(FrappeTestCase):
 		self.assertEqual(frappe.db.count("Raven Message"), before)
 		self.assertFalse(frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel"))
 		self.assertEqual(self._recipients(), {self.A})
+
+
+class OphicePeopleTestCase(_OphiceRoomBase):
+	"""People list (#2063): online first, details only for those who show them."""
+
+	def _person(self, people, user):
+		return next(p for p in people if p["user"] == user)
+
+	def test_online_first_with_area_and_hide(self):
+		self._area("Saved")  # A stands at 1,1 inside it
+		frappe.set_user(self.B)
+		people = ophice.get_people()["people"]
+		self.assertTrue(people[0]["online"])
+		self.assertEqual(self._person(people, self.A)["area"], "Chat test")
+		frappe.set_user(self.A)
+		ophice.set_hide_details(1)
+		frappe.set_user(self.B)
+		a = self._person(ophice.get_people()["people"], self.A)
+		self.assertTrue(a["online"])
+		self.assertTrue(a["hidden"])
+		self.assertEqual(a["area"], "")
+
+	def test_chat_options_and_new_dm(self):
+		frappe.set_user(self.A)
+		self.assertIsNone(ophice.get_chat_options(self.B)["dm"])
+		url = ophice.start_direct_message(self.B)["url"]
+		self.assertTrue(url.startswith("/raven/dm-channel/"))
+		self.assertEqual(ophice.get_chat_options(self.B)["dm"]["url"], url)
+		area = self._area("Saved")
+		ophice.send_area_message(area, "x")
+		self._put(self.B, 2, 2)
+		frappe.set_user(self.B)
+		ophice.get_area_chat(area)  # B joins the area's channel
+		frappe.set_user(self.A)
+		self.assertEqual(len(ophice.get_chat_options(self.B)["chats"]), 1)
