@@ -100,6 +100,20 @@
 				<WorkingOnCard v-if="person.working_on" :card="person.working_on" class="mb-1 ml-11 mr-1.5" />
 			</li>
 		</ul>
+		<!-- Cockpit spaces (#2076) -->
+		<label class="flex cursor-pointer items-start gap-2 border-t border-outline-gray-2 px-3 py-2 text-xs text-ink-gray-6">
+			<input
+				type="checkbox"
+				class="mt-0.5 rounded"
+				:checked="autoCockpit"
+				data-testid="auto-cockpit"
+				@change="$emit('auto-cockpit', $event.target.checked)"
+			/>
+			<span>
+				<span class="font-medium text-ink-gray-8">{{ __("Open cockpits in their spaces") }}</span><br />
+				{{ __("Stopping in a cockpit space opens that cockpit.") }}
+			</span>
+		</label>
 		<label class="flex cursor-pointer items-start gap-2 border-t border-outline-gray-2 px-3 py-2 text-xs text-ink-gray-6">
 			<input
 				type="checkbox"
@@ -135,8 +149,10 @@ const props = defineProps({
 	meeting: { type: Object, default: null },
 	/** user → the area their chip stands in, from the map */
 	areaOf: { type: Object, default: () => ({}) },
+	/** Cockpit spaces open their cockpit when I stop inside (#2076). */
+	autoCockpit: { type: Boolean, default: true },
 })
-defineEmits(["pick", "hide"])
+defineEmits(["pick", "hide", "auto-cockpit"])
 
 const query = ref("")
 const onlineCount = computed(() => props.people.filter((p) => p.online).length)

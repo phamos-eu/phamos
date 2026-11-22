@@ -94,10 +94,12 @@ AREA_TITLE_LENGTH = 60
 # Areas are drawn in half tiles (#2067).
 AREA_STEP = 0.5
 # Kinds of space (#2072): a meeting, or the start space where chips are beamed in.
-AREA_KINDS = ("Meeting", "Start", "Guest", "Customer meeting")
+AREA_KINDS = ("Meeting", "Start", "Guest", "Customer meeting", "Cockpit")
 # Kinds with a meeting: whoever stops inside joins it (#2060, #2081). Guest and Customer meeting
 # are also where external guests may be (#2080).
-MEETING_KINDS = ("Meeting", "Guest", "Customer meeting")
+MEETING_KINDS = ("Meeting", "Guest", "Customer meeting", "Cockpit")
+# Spaces whose meeting has the normal area chat (Raven batches); guest kinds have the guest chat.
+AREA_CHAT_KINDS = ("Meeting", "Cockpit")
 # Only one of each of these on the map.
 SINGLE_KINDS = ("Start", "Guest")
 # Coming in (#2072): first visit of the day, or back after this long. Last visit per user in Redis.
@@ -116,6 +118,8 @@ BATCH_VOTE_HOURS = 24
 BATCHES_SHOWN = 20
 # People list (#2063): everyone sees who is around; each user can hide their details.
 HIDE_KEY = "phamos_ophice_hide_details"
+# Cockpit spaces (#2076): stopping inside opens the cockpit, unless switched off (per user).
+AUTO_COCKPIT_KEY = "phamos_ophice_no_auto_cockpit"
 RECENT_CHATS = 5
 # Which cockpit someone is in (#2065): a heartbeat from every cockpit tab while it is visible.
 COCKPIT_CACHE_KEY = "phamos_ophice_cockpits"
@@ -343,6 +347,8 @@ def get_space():
 		"areas": _areas(),
 		# The map tools and the Debug menu are only shown to map editors (#2071).
 		"can_edit_map": can_edit_map(user),
+		# Cockpit spaces open their cockpit when I stop inside (#2076), unless I switched it off.
+		"auto_cockpit": _auto_cockpit(user),
 	}
 
 
@@ -1197,16 +1203,23 @@ def _areas():
 		AREA_DOCTYPE,
 		fields=[
 			"name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room",
-			"color_hue", "chat_mode", "kind",
+			"color_hue", "chat_mode", "kind", "cockpit",
 		],
 		order_by="creation asc",
 		limit=MAX_AREAS,
 	)
 	# An area without a stored color (made before colors existed) gets a steady one from its
 	# name: this runs on reads, which Frappe does not commit, so nothing random here.
+	tiles = None
 	for area in areas:
 		area.chat_mode = area.chat_mode or "Saved"
 		area.kind = area.kind or "Meeting"
+		if area.cockpit:
+			# The cockpit's app icon, shown on its space (#2076).
+			tiles = tiles if tiles is not None else _cockpit_tiles()
+			tile = tiles.get(area.cockpit) or {}
+			area.cockpit_logo = tile.get("logo", "")
+			area.cockpit_title = tile.get("title", "")
 		if area.color_hue is None or area.color_hue == "":
 			area.color_hue = int(hashlib.md5(area.name.encode()).hexdigest(), 16) % 360
 	return areas
@@ -1245,9 +1258,12 @@ def _overlaps(name, x, y, width, height):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_area(title, meeting_url="", x=0, y=0, width=1, height=1, name=None, chat_mode="Saved", kind="Meeting"):
+def save_area(
+	title, meeting_url="", x=0, y=0, width=1, height=1, name=None, chat_mode="Saved", kind="Meeting", cockpit=""
+):
 	"""Create or change a space, for everyone (map editors only, #2071). A meeting space has a
-	Jitsi meeting and a chat; the start space (#2072, only one) has neither."""
+	Jitsi meeting and a chat; the start space (#2072, only one) has neither; a cockpit space
+	(#2076) belongs to a cockpit and may have a meeting."""
 	_require_map_editor()
 	if chat_mode not in CHAT_MODES:
 		frappe.throw(_("Unknown chat mode."))
@@ -1262,7 +1278,10 @@ def save_area(title, meeting_url="", x=0, y=0, width=1, height=1, name=None, cha
 			if kind == "Start":
 				frappe.throw(_("There is already a start space: {0}.").format(other))
 			frappe.throw(_("There is already a guest area: {0}.").format(other))
-	if kind == "Start":
+	cockpit = (cockpit or "").strip() if kind == "Cockpit" else ""
+	if kind == "Cockpit" and cockpit not in _cockpit_tiles():
+		frappe.throw(_("Pick the cockpit this space belongs to."))
+	if kind == "Start" or (kind == "Cockpit" and not (meeting_url or "").strip()):
 		domain = room = ""
 	else:
 		domain, room = _parse_meeting_url(meeting_url)
@@ -1281,6 +1300,7 @@ def save_area(title, meeting_url="", x=0, y=0, width=1, height=1, name=None, cha
 		"width": width,
 		"height": height,
 		"chat_mode": chat_mode,
+		"cockpit": cockpit,
 	}
 	if name:
 		if not frappe.db.exists(AREA_DOCTYPE, name):
@@ -1345,7 +1365,7 @@ def _area(name):
 def _require_inside(name):
 	"""The area, if I stand in it: being there is the permission to read and write its chat."""
 	area = _area(name)
-	if (area.kind or "Meeting") != "Meeting":
+	if (area.kind or "Meeting") not in AREA_CHAT_KINDS or not area.jitsi_room and area.kind == "Cockpit":
 		frappe.throw(_("This space has no chat."))
 	if not _inside_area(area, frappe.session.user):
 		frappe.throw(_("Step into the area to use its chat."), frappe.PermissionError)
@@ -1764,6 +1784,28 @@ def get_people():
 	from phamos.api.ophice_guest import online_guests
 
 	return {"people": online_guests() + people, "hide_details": _hides_details(me)}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_auto_cockpit(on=1):
+	"""Cockpit spaces (#2076): open the cockpit when I stop in its space, or not."""
+	_require_user()
+	if frappe.utils.cint(on):
+		frappe.defaults.clear_user_default(AUTO_COCKPIT_KEY, frappe.session.user)
+	else:
+		frappe.defaults.set_user_default(AUTO_COCKPIT_KEY, "1", frappe.session.user)
+	return bool(frappe.utils.cint(on))
+
+
+def _auto_cockpit(user):
+	return frappe.db.get_value("DefaultValue", {"parent": user, "defkey": AUTO_COCKPIT_KEY}, "defvalue") != "1"
+
+
+@frappe.whitelist()
+def cockpit_choices():
+	"""Map editors: the cockpits a space can belong to (all of them, not only mine)."""
+	_require_map_editor()
+	return sorted(_cockpit_tiles().values(), key=lambda c: c["title"])
 
 
 @frappe.whitelist(methods=["POST"])

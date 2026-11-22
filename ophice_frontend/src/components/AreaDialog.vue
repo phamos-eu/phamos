@@ -32,21 +32,30 @@
 				<p v-if="KIND_HINTS[kind]" class="text-xs text-ink-gray-5" data-testid="area-kind-hint">
 					{{ KIND_HINTS[kind] }}
 				</p>
-				<!-- Every kind but Start has a meeting. -->
+				<!-- A cockpit space (#2076): which cockpit opens here. -->
+				<FormControl
+					v-if="kind === 'Cockpit'"
+					v-model="cockpit"
+					type="select"
+					:label="__('Cockpit')"
+					:options="[{ label: __('Pick a cockpit'), value: '' }, ...cockpitOptions]"
+					data-testid="area-cockpit-select"
+				/>
+				<!-- Every kind but Start has a meeting (optional for a cockpit space). -->
 				<template v-if="kind !== 'Start'">
 				<FormControl
 					v-model="url"
-					:label="__('Jitsi meeting URL')"
+					:label="kind === 'Cockpit' ? __('Jitsi meeting URL (optional)') : __('Jitsi meeting URL')"
 					placeholder="https://meet.jit.si/FullTimeDefencesRejectOverly"
 				/>
 				<p class="text-xs text-ink-gray-5">
 					{{ __("Whoever stops inside the area joins this meeting, with microphone and camera off.") }}
 				</p>
-				<p v-if="kind !== 'Meeting'" class="text-xs text-ink-gray-5">
+				<p v-if="kind === 'Guest' || kind === 'Customer meeting'" class="text-xs text-ink-gray-5">
 					{{ __("Chat: the guest chat, kept only for a short while (comes with the guest chat).") }}
 				</p>
 				<FormControl
-					v-if="kind === 'Meeting'"
+					v-if="kind === 'Meeting' || (kind === 'Cockpit' && url)"
 					v-model="chatMode"
 					type="select"
 					:label="__('Chat')"
@@ -76,7 +85,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { Button, Dialog, FeatherIcon, FormControl } from "frappe-ui"
+import { Button, call, Dialog, FeatherIcon, FormControl } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -97,13 +106,27 @@ const KINDS = [
 	{ kind: "Start", icon: "log-in", label: __("Start") },
 	{ kind: "Guest", icon: "user-plus", label: __("Guest area") },
 	{ kind: "Customer meeting", icon: "briefcase", label: __("Customer meeting") },
+	{ kind: "Cockpit", icon: "grid", label: __("Cockpit space") },
 ]
 // What each kind does (#2072, #2081).
 const KIND_HINTS = {
 	Start: __("People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space."),
 	Guest: __("External guests arrive here through the guest link and can only move inside it. Employees walk in and out freely and meet them in its meeting. There is only one guest area."),
 	"Customer meeting": __("A meeting room for guests: employees invite a guest from the guest area to come here."),
+	Cockpit: __("Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional."),
 }
+const cockpit = ref("")
+const cockpitOptions = ref([])
+async function loadCockpits() {
+	if (cockpitOptions.value.length) return
+	try {
+		const rows = await call("phamos.api.ophice.cockpit_choices")
+		cockpitOptions.value = (rows || []).map((c) => ({ label: c.title, value: c.route }))
+	} catch {
+		cockpitOptions.value = []
+	}
+}
+watch(kind, (value) => value === "Cockpit" && loadCockpits(), { immediate: true })
 const kind = ref("Meeting")
 const title = ref("")
 const url = ref("")
@@ -115,6 +138,7 @@ watch(
 	() => props.area,
 	(area) => {
 		kind.value = area?.kind || "Meeting"
+		cockpit.value = area?.cockpit || ""
 		title.value = area?.title || ""
 		url.value = area?.meeting_url || ""
 		chatMode.value = area?.chat_mode || "Saved"
@@ -133,6 +157,7 @@ async function save() {
 			title: title.value,
 			meeting_url: kind.value === "Start" ? "" : url.value,
 			chat_mode: chatMode.value,
+			cockpit: kind.value === "Cockpit" ? cockpit.value : "",
 		})
 		emit("close")
 	} catch (e) {

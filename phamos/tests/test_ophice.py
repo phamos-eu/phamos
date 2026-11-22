@@ -1211,3 +1211,33 @@ class OphiceBrbCountdownTestCase(_OphiceRoomBase):
 		later = (datetime.now(timezone.utc) + timedelta(hours=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
 		with self.assertRaises(frappe.ValidationError):
 			ophice.set_status("brb", "", later)
+
+
+class OphiceCockpitSpaceTestCase(_OphiceRoomBase):
+	"""Cockpit spaces (#2076): a space belongs to a cockpit, a meeting is optional; each person can
+	switch off that the cockpit opens when they stop inside."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.set_user(self.A)
+
+	def test_cockpit_space_needs_a_known_cockpit_and_may_skip_the_meeting(self):
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("HR", "", 0, 0, 3, 3, kind="Cockpit", cockpit="/nowhere")
+		name = ophice.save_area("HR", "", 0, 0, 3, 3, kind="Cockpit", cockpit="/human-resources-cockpit")
+		area = next(a for a in ophice._areas() if a.name == name)
+		self.assertEqual((area.kind, area.cockpit, area.jitsi_room), ("Cockpit", "/human-resources-cockpit", ""))
+		with self.assertRaises(frappe.ValidationError):
+			ophice.get_area_chat(name)  # no meeting, no chat
+		# With a meeting it has the area chat like a meeting space.
+		ophice.save_area("HR", "https://jitsi.example.org/HumanResources", 0, 0, 3, 3, name=name, kind="Cockpit", cockpit="/human-resources-cockpit")
+		self.assertEqual(ophice.get_area_chat(name)["mode"], "Saved")
+		self.assertIn("/human-resources-cockpit", [c["route"] for c in ophice.cockpit_choices()])
+
+	def test_switch_off_opening_the_cockpit(self):
+		self.assertTrue(ophice.get_space()["auto_cockpit"])
+		ophice.set_auto_cockpit(0)
+		self.assertFalse(ophice.get_space()["auto_cockpit"])
+		ophice.set_auto_cockpit(1)
+		self.assertTrue(ophice.get_space()["auto_cockpit"])

@@ -100,6 +100,8 @@
 			:now="clock"
 			:meeting="meetingArea"
 			:area-of="areaOfUser"
+			:auto-cockpit="autoCockpit"
+			@auto-cockpit="setAutoCockpit"
 			@pick="(person, event) => openChatWith(person, event)"
 			@hide="setHideDetails"
 		/>
@@ -218,7 +220,7 @@
 				/>
 				<!-- Guest and customer meeting areas: the guest chat, kept only for a short while (#2083). -->
 				<GuestChat
-					v-if="(meetingArea.kind || 'Meeting') !== 'Meeting'"
+					v-if="GUEST_KINDS.includes(meetingArea.kind)"
 					:key="`guest-chat-${meetingArea.name}`"
 					class="min-h-0 flex-1"
 					:title="meetingArea.title"
@@ -548,7 +550,9 @@ const SEND_MOVE_EVERY_MS = 120
 const REMOTE_MOVING_MS = 250
 const API = "phamos.api.ophice"
 // Spaces with a meeting (#2060, #2081): stop inside and you join it.
-const MEETING_KINDS = ["Meeting", "Guest", "Customer meeting"]
+const MEETING_KINDS = ["Meeting", "Guest", "Customer meeting", "Cockpit"]
+// Guest kinds have the guest chat (#2083); the others the area chat.
+const GUEST_KINDS = ["Guest", "Customer meeting"]
 // Encounters (#2056): closer than this (centres, tiles) opens the chat; farther than the second
 // closes it again, so standing right at the edge does not flicker.
 // Each chip's perimeter has half the encounter distance as radius: two touching circles = in range.
@@ -864,6 +868,7 @@ function nearestInRange() {
 /** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
 function chatOnStop() {
 	joinAreaIfInside()
+	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
 	const bubble = bubbles[other.user]
@@ -1161,7 +1166,11 @@ function areaAt(chip) {
 	// Meeting spaces only: the start space (#2072) has no meeting, chat or glow.
 	return (
 		areas.value.find(
-			(a) => MEETING_KINDS.includes(a.kind || "Meeting") && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
+			(a) =>
+				MEETING_KINDS.includes(a.kind || "Meeting") &&
+				// A cockpit space only has a meeting when it has a link (#2076).
+				(a.kind !== "Cockpit" || a.jitsi_room) &&
+				cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
 		) || null
 	)
 }
@@ -1183,6 +1192,40 @@ const huddle = computed(() => {
 	if (!name) return []
 	return [me.value, ...others.value].filter((chip) => chip && areaOfUser.value[chip.user]?.name === name)
 })
+
+// --- Cockpit spaces (#2076): stop inside and its cockpit opens (once per visit to the space).
+
+const autoCockpit = ref(true)
+let cockpitSpaceHere = null
+
+function cockpitSpaceAt(chip) {
+	if (!chip) return null
+	const cx = chip.x + 0.5
+	const cy = chip.y + 0.5
+	return areas.value.find((a) => a.kind === "Cockpit" && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height) || null
+}
+
+function openCockpitSpace() {
+	const space = cockpitSpaceAt(me.value)
+	if (!space) {
+		cockpitSpaceHere = null
+		return
+	}
+	if (!autoCockpit.value || cockpitSpaceHere === space.name || props.cockpitOpen) return
+	cockpitSpaceHere = space.name
+	const cockpit = cockpits.value.find((c) => c.route === space.cockpit)
+	if (cockpit) emit("open-cockpit", cockpit)
+	else toast({ title: __("You can't open {0}; you can still use this space and its meeting.", [space.cockpit_title || space.cockpit]), icon: "info" })
+}
+
+async function setAutoCockpit(on) {
+	autoCockpit.value = on
+	try {
+		await call(`${API}.set_auto_cockpit`, { on: on ? 1 : 0 })
+	} catch {
+		autoCockpit.value = !on
+	}
+}
 
 function joinAreaIfInside() {
 	const area = areaAt(me.value)
@@ -1249,7 +1292,7 @@ watch(
 	() => meetingArea.value?.name,
 	() => {
 		const area = meetingArea.value
-		if (area && (area.kind || "Meeting") !== "Meeting") loadGuestChat(area)
+		if (area && GUEST_KINDS.includes(area.kind)) loadGuestChat(area)
 		else guestChat.area = ""
 	}
 )
@@ -1504,6 +1547,7 @@ async function saveArea(values) {
 			height: values.height,
 			chat_mode: values.chat_mode || "Saved",
 			kind: values.kind || "Meeting",
+			cockpit: values.cockpit || "",
 		})
 	} catch (e) {
 		throw new Error(errorText(e) || __("The area could not be saved."))
@@ -1855,7 +1899,7 @@ async function sendFromPing(ping, text, done) {
 		if (ping.kind === "meeting") {
 			const area = meetingArea.value
 			if (!area) throw new Error(__("You are no longer in the meeting."))
-			if ((area.kind || "Meeting") === "Meeting") await call(`${API}.send_area_message`, { area: area.name, text })
+			if (!GUEST_KINDS.includes(area.kind)) await call(`${API}.send_area_message`, { area: area.name, text })
 			else await sendGuestChat(text)
 		} else {
 			const other = others.value.find((o) => o.user === ping.user)
@@ -2087,6 +2131,7 @@ onMounted(async () => {
 		backgroundLayout.value = data.background_layout || { ...FITTED }
 		setAreas(data.areas)
 		canEditMap.value = Boolean(data.can_edit_map)
+		autoCockpit.value = data.auto_cockpit !== false
 		for (const notice of data.notices || []) upsertNotice(notice)
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {

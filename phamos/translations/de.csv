@@ -2994,3 +2994,11 @@ Map,Karte
 Call,Anruf
 "Call (folded, still running)","Anruf (eingeklappt, läuft weiter)"
 Back to the map,Zurück zur Karte
+Cockpit space,Cockpit-Bereich
+"Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional.","Wer hier stehen bleibt, öffnet dieses Cockpit, sofern er es öffnen darf (jede Person kann das abschalten). Eine Besprechung ist optional."
+Pick a cockpit,Cockpit wählen
+Jitsi meeting URL (optional),Jitsi-Besprechungs-URL (optional)
+You can't open {0}; you can still use this space and its meeting.,Sie können {0} nicht öffnen; den Bereich und seine Besprechung können Sie trotzdem nutzen.
+Open cockpits in their spaces,Cockpits in ihren Bereichen öffnen
+Stopping in a cockpit space opens that cockpit.,"Wer in einem Cockpit-Bereich stehen bleibt, öffnet dieses Cockpit."
+Pick the cockpit this space belongs to.,"Wählen Sie das Cockpit, zu dem dieser Bereich gehört."

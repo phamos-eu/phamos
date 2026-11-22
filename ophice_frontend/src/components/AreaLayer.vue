@@ -22,6 +22,8 @@
 		>
 			<!-- The start space (#2072): where people are beamed in; no meeting, so no Jitsi logo. -->
 			<FeatherIcon v-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
+			<!-- A cockpit space (#2076): the cockpit's app icon -->
+			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-icon" />
 			<img
 				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
@@ -239,6 +241,12 @@ function cancel() {
 	background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.55), hsl(var(--area-h) 70% 70% / 0.25));
 	border: 2.5px dotted rgba(255, 255, 255, 0.95);
 	box-shadow: 0 0 14px 3px rgba(186, 230, 253, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.6);
+}
+.area__cockpit-icon {
+	width: 40%;
+	max-width: 30px;
+	border-radius: 6px;
+	box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .area__start-icon {
 	width: 40%;
