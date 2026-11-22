@@ -459,6 +459,8 @@ class OphiceAreaTestCase(FrappeTestCase):
 		self.conf.start()
 		self.publish = patch.object(ophice.frappe, "publish_realtime")
 		self.publish.start()
+		# The default grid (#2089); the site's own size comes back with the rollback.
+		frappe.db.set_default(ophice.GRID_KEY, json.dumps({"cols": ophice.COLS, "rows": ophice.ROWS}))
 
 	def tearDown(self):
 		self.publish.stop()

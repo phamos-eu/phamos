@@ -17,19 +17,16 @@ OPHICE_DEFAULT_APP = "phamos"
 
 def sync_ophice_start_page(on):
 	"""Set or clear the standard default app, so everyone lands in Ophice after login."""
-	current = frappe.db.get_single_value("System Settings", "default_app")
+	# Uncached: a cached value can outlive a rollback and make this skip the write (#2089).
+	current = frappe.db.get_single_value("System Settings", "default_app", cache=False)
 	if on and current != OPHICE_DEFAULT_APP:
 		frappe.db.set_single_value("System Settings", "default_app", OPHICE_DEFAULT_APP)
 	elif not on and current == OPHICE_DEFAULT_APP:
 		# Only what this switch set; another default app someone chose stays.
 		frappe.db.set_single_value("System Settings", "default_app", "")
-	else:
-		return
-	# set_single_value skips the cached System Settings that frappe.get_system_settings() reads
-	# (and its copy on frappe.local): without this the login page keeps the old default (#2089).
+	# set_single_value skips the cached System Settings that frappe.get_system_settings() reads:
+	# without this the login page keeps the old default until the cache is cleared.
 	frappe.clear_document_cache("System Settings", "System Settings")
-	if hasattr(frappe.local, "system_settings"):
-		del frappe.local.system_settings
 
 
 class CockpitSettings(Document):

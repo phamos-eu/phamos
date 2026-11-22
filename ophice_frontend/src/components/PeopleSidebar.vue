@@ -1,21 +1,43 @@
 <template>
 	<!--
-		In a meeting (#2067): only the chips of everyone else, online first (the people in my meeting
-		huddle above the chat). Each chip shows the glow of the area it is in.
+		People (#2063, #2091). Folded: a strip of chips at the side, with status (dot, away / be right
+		back), place (the glow of the space) and cockpit (icon) still readable. Hovering the strip
+		unfolds the full list over the map; the handle keeps it open (remembered in this browser).
+		In a meeting it stays folded and shows the people outside the meeting.
 	-->
-	<aside
-		v-if="meeting"
-		class="flex w-16 flex-shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-outline-gray-2 bg-surface-white py-3"
-		:aria-label="__('People')"
+	<div
+		class="relative z-30 h-full flex-shrink-0"
+		:class="folded ? 'w-16' : 'w-64'"
 		data-testid="people-sidebar"
+		:data-folded="folded ? '1' : '0'"
+		@mouseenter="hoverIn"
+		@mouseleave="hoverOut"
+	>
+	<aside
+		v-if="folded"
+		class="flex h-full w-16 flex-col items-center gap-2 overflow-y-auto border-r border-outline-gray-2 bg-surface-white py-2"
+		:aria-label="__('People')"
+		data-testid="people-strip"
 	>
 		<button
-			v-for="person in outside"
+			v-if="!meeting"
+			type="button"
+			class="flex flex-col items-center rounded-lg px-1.5 py-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+			:title="__('Keep the people list open')"
+			data-testid="people-pin"
+			@click="$emit('pin', true)"
+		>
+			<FeatherIcon name="users" class="h-4 w-4" />
+			<span class="text-[10px] tabular-nums">{{ onlineCount }}</span>
+		</button>
+		<button
+			v-for="person in stripPeople"
 			:key="person.user"
 			type="button"
 			class="relative flex-shrink-0 rounded-full"
 			:class="{ 'opacity-50': !person.online }"
 			:title="`${person.full_name} · ${lineOf(person).text}`"
+			:disabled="person.user === me"
 			data-testid="person"
 			@click="$emit('pick', person, $event)"
 		>
@@ -23,18 +45,45 @@
 				<UserAvatar :name="person.user" :label="person.full_name" :image="person.user_image" size="sm" />
 			</span>
 			<span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-white" :class="dotClass(person)" />
+			<!-- Away / be right back at a glance -->
+			<span
+				v-if="person.status?.kind === 'away' || person.status?.kind === 'brb'"
+				class="absolute -left-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-surface-white text-ink-gray-7 shadow"
+				data-testid="person-status-badge"
+			>
+				<FeatherIcon :name="person.status.kind === 'away' ? 'moon' : 'coffee'" class="h-2.5 w-2.5" />
+			</span>
+			<!-- The cockpit they work in (#2065) -->
+			<img
+				v-if="person.online && person.cockpit?.logo"
+				:src="person.cockpit.logo"
+				alt=""
+				class="absolute -bottom-1 -left-1 h-3.5 w-3.5 rounded ring-2 ring-surface-white"
+				data-testid="person-cockpit-badge"
+			/>
 		</button>
 	</aside>
-	<!-- Everyone with Raven, online first, and what they are doing (#2063). Click to chat. -->
+	<!-- The full list: in the page when kept open, over the map while the strip is hovered. -->
 	<aside
-		v-else
-		class="flex w-64 flex-shrink-0 flex-col border-r border-outline-gray-2 bg-surface-white text-ink-gray-9"
+		v-if="!folded || hovering"
+		class="flex w-64 flex-col border-r border-outline-gray-2 bg-surface-white text-ink-gray-9"
+		:class="folded ? 'people--over absolute inset-y-0 left-0 z-40 shadow-2xl' : 'h-full'"
 		:aria-label="__('People')"
-		data-testid="people-sidebar"
+		data-testid="people-list"
 	>
 		<div class="flex items-center gap-2 px-3 pb-2 pt-3">
 			<span class="text-sm font-semibold">{{ __("People") }}</span>
 			<span class="text-xs text-ink-gray-5">{{ __("{0} online", [onlineCount]) }}</span>
+			<button
+				v-if="!meeting"
+				type="button"
+				class="ml-auto rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:title="pinned ? __('Fold the list back to the chips') : __('Keep the people list open')"
+				data-testid="people-fold"
+				@click="$emit('pin', !pinned)"
+			>
+				<FeatherIcon :name="pinned ? 'chevrons-left' : 'chevrons-right'" class="h-4 w-4" />
+			</button>
 		</div>
 		<div class="px-3 pb-2">
 			<input
@@ -128,6 +177,7 @@
 			</span>
 		</label>
 	</aside>
+	</div>
 </template>
 
 <script setup>
@@ -151,8 +201,25 @@ const props = defineProps({
 	areaOf: { type: Object, default: () => ({}) },
 	/** Cockpit spaces open their cockpit when I stop inside (#2076). */
 	autoCockpit: { type: Boolean, default: true },
+	/** Kept open; otherwise folded to the chips, unfolding on hover (#2091). */
+	pinned: { type: Boolean, default: false },
 })
-defineEmits(["pick", "hide", "auto-cockpit"])
+defineEmits(["pick", "hide", "auto-cockpit", "pin"])
+
+// Folded: the strip of chips; in a meeting always (the people there huddle above the chat).
+const folded = computed(() => Boolean(props.meeting) || !props.pinned)
+const stripPeople = computed(() => (props.meeting ? outside.value : props.people))
+// Unfold after a short hover, fold back a moment after the mouse left (no flicker on the way past).
+const hovering = ref(false)
+let hoverTimer = null
+function hoverIn() {
+	clearTimeout(hoverTimer)
+	if (folded.value) hoverTimer = setTimeout(() => (hovering.value = true), 150)
+}
+function hoverOut() {
+	clearTimeout(hoverTimer)
+	hoverTimer = setTimeout(() => (hovering.value = false), 300)
+}
 
 const query = ref("")
 const onlineCount = computed(() => props.people.filter((p) => p.online).length)
@@ -202,3 +269,20 @@ function lineOf(person) {
 	return { icon: "", text: __("Around in Ophice") }
 }
 </script>
+
+<style scoped>
+.people--over {
+	animation: people-unfold 140ms ease-out;
+}
+@keyframes people-unfold {
+	from {
+		opacity: 0;
+		transform: translateX(-12px);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.people--over {
+		animation: none;
+	}
+}
+</style>

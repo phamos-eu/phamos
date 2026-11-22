@@ -72,12 +72,36 @@ function check() {
 	emit("navigated", now)
 }
 
+// Text size (#2091): the cockpit is the same site, so its page scales with Ophice's setting.
+const TEXT_SIZE_KEY = "phamos_ophice_text_size"
+let baseFont = 0
+function applyTextSize(value) {
+	try {
+		const root = frame.value?.contentDocument?.documentElement
+		if (!root) return
+		if (!baseFont) baseFont = parseFloat(frame.value.contentWindow.getComputedStyle(root).fontSize) || 16
+		const scale = value ?? (parseFloat(localStorage.getItem(TEXT_SIZE_KEY)) || 1)
+		root.style.fontSize = scale === 1 ? "" : `${baseFont * scale}px`
+	} catch {
+		// not readable: the cockpit keeps its own size
+	}
+}
+const onTextSize = (event) => applyTextSize(event.detail)
+
 function onLoad() {
 	check()
+	baseFont = 0
+	applyTextSize()
 }
 
-onMounted(() => (timer = setInterval(check, 500)))
-onBeforeUnmount(() => clearInterval(timer))
+onMounted(() => {
+	timer = setInterval(check, 500)
+	window.addEventListener("ophice-text-size", onTextSize)
+})
+onBeforeUnmount(() => {
+	clearInterval(timer)
+	window.removeEventListener("ophice-text-size", onTextSize)
+})
 
 defineExpose({ location })
 </script>

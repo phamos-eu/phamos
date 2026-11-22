@@ -6,20 +6,30 @@
 				<img :src="OPHICE_ICON" alt="" class="h-6 w-6 rounded-md" />
 				{{ __("Ophice") }}
 			</div>
-			<div class="ml-auto text-sm text-ink-gray-5">
+			<!-- One line; shortened when the text is large or the window small (#2091). -->
+			<div
+				class="ml-auto min-w-0 truncate text-sm text-ink-gray-5"
+				:title="__('Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)')"
+			>
 				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
 			</div>
-			<Button
+			<!-- Text size (#2091): for weaker eyes and small screens; the map has its own zoom. -->
+			<div
 				v-if="me"
-				:variant="showPeople ? 'solid' : 'subtle'"
-				:title="__('Show or hide the people list')"
-				:aria-pressed="showPeople"
-				data-testid="people-toggle"
-				@click="togglePeople"
+				class="flex items-center rounded-lg border border-outline-gray-2 bg-surface-white p-0.5 text-xs"
+				:title="__('Text size of Ophice and the cockpits in it')"
+				data-testid="text-size"
 			>
-				<template #prefix><FeatherIcon name="users" class="h-4 w-4" /></template>
-				{{ __("People") }}
-			</Button>
+				<button type="button" class="ophice-zoom__button" :disabled="uiScale <= UI_SCALES[0]" :title="__('Smaller text')" data-testid="text-smaller" @click="stepUiScale(-1)">
+					<span class="text-[11px] font-semibold">A−</span>
+				</button>
+				<button type="button" class="ophice-zoom__button w-11 tabular-nums text-ink-gray-7" :title="__('Normal text size')" data-testid="text-reset" @click="setUiScale(1)">
+					{{ Math.round(uiScale * 100) }} %
+				</button>
+				<button type="button" class="ophice-zoom__button" :disabled="uiScale >= UI_SCALES[UI_SCALES.length - 1]" :title="__('Larger text')" data-testid="text-larger" @click="stepUiScale(1)">
+					<span class="text-sm font-semibold">A+</span>
+				</button>
+			</div>
 			<!-- My status (#2053): be right back / away, shown above my chip. -->
 			<Button
 				v-if="me"
@@ -93,7 +103,9 @@
 		<div class="flex min-h-0 flex-1">
 		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
 		<PeopleSidebar
-			v-if="me && showPeople"
+			v-if="me"
+			:pinned="showPeople"
+			@pin="setPeoplePinned"
 			:people="people"
 			:me="me.user"
 			:hide-details="hideDetails"
@@ -462,43 +474,45 @@
 				-->
 				<template v-if="!meetingArea">
 					<template v-for="notice in batchNoticeList" :key="`batch-${notice.name}`">
-						<div
-							v-if="noticeOpen[notice.name]"
-							class="ophice-notice absolute"
-							data-no-pan
-							:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
-							data-testid="notice-at-area"
-							@pointerdown="raise(`batch:${notice.name}`)"
-						>
-							<BatchNotice
-								:notice="notice"
-								:now="clock"
-								:busy="batchBusy[notice.name] || ''"
-								@vote="(choice) => voteBatch(notice, choice)"
-								@dismiss="dismissedBatches.add(notice.name)"
-							/>
-							<button
-								type="button"
-								class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-outline-gray-2 bg-surface-white text-ink-gray-6 shadow hover:text-ink-gray-9"
-								:title="__('Make small')"
-								data-testid="notice-shrink"
-								@click.stop="shrinkNotice(notice.name)"
+						<!--
+							Space chat notices (#2066, #2091): above their space, a thin line runs down while
+							they stay (8 s; hovering holds it), then they fade away. Once per change.
+						-->
+						<Transition name="notice-fade">
+							<div
+								v-if="noticeOpen[notice.name]"
+								class="ophice-notice absolute"
+								data-no-pan
+								:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
+								data-testid="notice-at-area"
+								@pointerdown="raise(`batch:${notice.name}`)"
 							>
-								<FeatherIcon name="minimize-2" class="h-3 w-3" />
-							</button>
-						</div>
-						<button
-							v-else
-							type="button"
-							class="ophice-notice-bubble absolute flex items-center justify-center rounded-full text-ink-white shadow-lg"
-							:class="notice.vote_until && !notice.my_vote ? 'bg-amber-600' : 'bg-surface-gray-7'"
-							:style="bubbleAtArea(notice)"
-							:title="__('Chat of {0}', [notice.area_title])"
-							data-testid="notice-bubble"
-							@click="openNotice(notice.name)"
-						>
-							<FeatherIcon :name="notice.vote_until && !notice.my_vote ? 'users' : 'message-square'" class="h-3.5 w-3.5" />
-						</button>
+								<BatchNotice
+									:notice="notice"
+									:now="clock"
+									:busy="batchBusy[notice.name] || ''"
+									@vote="(choice) => voteBatch(notice, choice)"
+									@dismiss="dismissedBatches.add(notice.name)"
+								/>
+								<button
+									type="button"
+									class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-outline-gray-2 bg-surface-white text-ink-gray-6 shadow hover:text-ink-gray-9"
+									:title="__('Close')"
+									data-testid="notice-close"
+									@click.stop="shrinkNotice(notice.name)"
+								>
+									<FeatherIcon name="x" class="h-3 w-3" />
+								</button>
+								<div class="ophice-notice__cooldown" aria-hidden="true">
+									<div
+										class="ophice-notice__cooldown-bar"
+										:style="{ animationDuration: `${NOTICE_OPEN_MS}ms` }"
+										data-testid="notice-cooldown"
+										@animationend="shrinkNotice(notice.name)"
+									/>
+								</div>
+							</div>
+						</Transition>
 					</template>
 					<div
 						v-if="noticeList.length"
@@ -1036,39 +1050,30 @@ function zOf(key) {
 	return index < 0 ? 20 : 21 + index
 }
 
-// Chat notices: open for a moment when they come, then a bubble at their space.
-const NOTICE_OPEN_MS = 6000
+// Chat notices: open for a moment when they come, then they fade (#2091). The cool-down line's
+// animation decides when; hovering pauses it.
+const NOTICE_OPEN_MS = 8000
 const noticeOpen = reactive({})
-const noticeTimers = {}
-function openNotice(name, forMs = 0) {
+function openNotice(name) {
 	noticeOpen[name] = true
 	raise(`batch:${name}`)
-	clearTimeout(noticeTimers[name])
-	if (forMs) noticeTimers[name] = setTimeout(() => shrinkNotice(name), forMs)
 }
 function shrinkNotice(name) {
-	clearTimeout(noticeTimers[name])
 	noticeOpen[name] = false
 }
-function bubbleAtArea(notice) {
-	const area = areas.value.find((a) => a.name === notice.area)
-	if (!area) return { right: "8px", bottom: "8px", width: "24px", height: "24px", zIndex: 15 }
-	const t = tile.value
-	return {
-		left: `${(area.x + area.width) * t - 12}px`,
-		top: `${area.y * t - 12}px`,
-		width: "24px",
-		height: "24px",
-		zIndex: 15,
-	}
-}
 
+// Above its space; on it, at its top, when there is no room above (#2091).
 function noticeAtArea(notice) {
 	const area = areas.value.find((a) => a.name === notice.area)
-	if (!area) return { right: "8px", bottom: "8px" }
+	if (!area) return { right: "8px", top: "8px" }
 	const t = tile.value
-	const centre = (area.x + area.width / 2) * t - NOTICE_W / 2
-	return noticeBox(centre, (area.y + area.height) * t + 6, area.y * t - 6)
+	const width = t * (me.value?.cols || 0)
+	const left = (area.x + area.width / 2) * t - NOTICE_W / 2
+	const above = area.y * t - NOTICE_H - 8
+	return {
+		left: `${Math.max(4, Math.min(width - NOTICE_W - 4, left))}px`,
+		top: `${above >= 4 ? above : area.y * t + 6}px`,
+	}
 }
 const noticeAtMe = computed(() => {
 	if (!me.value) return {}
@@ -1794,7 +1799,44 @@ const hideDetails = ref(false)
 const chatWith = ref(null)
 // Inviting a guest to a customer meeting (#2084): { guest, at }.
 const guestInvite = ref(null)
-const showPeople = ref(readFlag(PEOPLE_KEY, true))
+// --- Text size (#2091): scales Ophice's text and controls (they are in rem) and the cockpit inside
+// Ophice; not the map, which has its own zoom (#2089). Remembered in this browser.
+const UI_SCALES = [0.85, 0.9, 1, 1.1, 1.25, 1.4, 1.6]
+const UI_SCALE_KEY = "phamos_ophice_text_size"
+const BASE_FONT_PX = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+function readUiScale() {
+	try {
+		const value = parseFloat(localStorage.getItem(UI_SCALE_KEY))
+		return UI_SCALES.includes(value) ? value : 1
+	} catch {
+		return 1
+	}
+}
+const uiScale = ref(readUiScale())
+function setUiScale(value) {
+	uiScale.value = value
+	try {
+		localStorage.setItem(UI_SCALE_KEY, String(value))
+	} catch {
+		// private window: back to normal after a reload
+	}
+}
+function stepUiScale(by) {
+	const index = UI_SCALES.indexOf(uiScale.value)
+	setUiScale(UI_SCALES[Math.max(0, Math.min(UI_SCALES.length - 1, (index < 0 ? 2 : index) + by))])
+}
+watch(
+	uiScale,
+	(value) => {
+		document.documentElement.style.fontSize = value === 1 ? "" : `${BASE_FONT_PX * value}px`
+		// The cockpit in Ophice's frame follows (App.vue / CockpitFrame.vue listen).
+		window.dispatchEvent(new CustomEvent("ophice-text-size", { detail: value }))
+	},
+	{ immediate: true }
+)
+
+// Kept open (#2091); folded to the chips by default.
+const showPeople = ref(readFlag(PEOPLE_KEY, false))
 let peopleTimer = null
 let peopleSoon = null
 
@@ -1807,18 +1849,19 @@ function readFlag(key, fallback) {
 	}
 }
 
-function togglePeople() {
-	showPeople.value = !showPeople.value
+/** Keep the people list open, or fold it back to its chips (#2091). */
+function setPeoplePinned(value) {
+	showPeople.value = Boolean(value)
 	try {
 		localStorage.setItem(PEOPLE_KEY, showPeople.value ? "1" : "0")
 	} catch {
 		// private window: back to the default after a reload
 	}
-	if (showPeople.value) loadPeople()
 }
 
+// The strip shows everyone too (#2091), so the list is always loaded.
 async function loadPeople() {
-	if (!showPeople.value || !me.value) return
+	if (!me.value) return
 	try {
 		const data = await call(`${API}.get_people`)
 		people.value = data.people || []
@@ -2080,7 +2123,7 @@ watch(
 		for (const key of keys) {
 			if (seenNotices.has(key)) continue
 			seenNotices.add(key)
-			openNotice(key.split(":")[0], NOTICE_OPEN_MS)
+			openNotice(key.split(":")[0])
 		}
 	}
 )
@@ -2571,6 +2614,51 @@ onBeforeUnmount(() => {
 	.ophice-canvas--spring {
 		transition-duration: 1ms;
 	}
+}
+/* Space chat notices (#2091): a cool-down line at the bottom, then a fade. */
+.ophice-notice__cooldown {
+	position: absolute;
+	left: 12px;
+	right: 12px;
+	bottom: 4px;
+	height: 3px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-gray-3);
+}
+.ophice-notice__cooldown-bar {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--ink-gray-6, #6b7280);
+	transform-origin: left center;
+	animation-name: ophice-cooldown;
+	animation-timing-function: linear;
+	animation-fill-mode: forwards;
+}
+.ophice-notice:hover .ophice-notice__cooldown-bar,
+.ophice-notice:focus-within .ophice-notice__cooldown-bar {
+	animation-play-state: paused;
+}
+@keyframes ophice-cooldown {
+	from {
+		transform: scaleX(1);
+	}
+	to {
+		transform: scaleX(0);
+	}
+}
+.notice-fade-enter-active {
+	transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+.notice-fade-leave-active {
+	transition: opacity 600ms ease-in;
+}
+.notice-fade-enter-from {
+	opacity: 0;
+	transform: translateY(6px);
+}
+.notice-fade-leave-to {
+	opacity: 0;
 }
 .ophice-zoom__button {
 	display: flex;
