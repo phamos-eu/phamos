@@ -120,6 +120,13 @@ class OphicePresenceTestCase(FrappeTestCase):
 			self.assertEqual(ophice.move(99, -1), {"user": "Administrator", "x": ophice._cols() - 1.0, "y": 0.0})
 		self.assertEqual(publish.call_args.args[0], ophice.EVENT_MOVE)
 
+	def test_move_lift_is_passed_on(self):
+		ophice.heartbeat(1, 1)
+		frappe.cache.delete_value(f"phamos_ophice_moves:{frappe.session.user}")
+		with patch.object(ophice.frappe, "publish_realtime"):
+			self.assertNotIn("lift", ophice.move(2, 2))
+			self.assertEqual(ophice.move(4, 2, lift=1)["lift"], 1)
+
 	def test_move_throttled_per_user(self):
 		ophice.heartbeat(1, 1)
 		frappe.cache.delete_value(f"phamos_ophice_moves:{frappe.session.user}")
