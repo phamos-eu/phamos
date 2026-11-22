@@ -242,11 +242,14 @@ function cancel() {
 	border: 2.5px dotted rgba(255, 255, 255, 0.95);
 	box-shadow: 0 0 14px 3px rgba(186, 230, 253, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.6);
 }
+/* A bit bigger, but see-through, so it marks the space without sitting on it like a sticker
+   (PM, 2026-11-22). A thin light edge keeps it readable on any map. */
 .area__cockpit-icon {
-	width: 40%;
-	max-width: 30px;
-	border-radius: 6px;
-	box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.5);
+	width: 50%;
+	max-width: 40px;
+	border-radius: 8px;
+	opacity: 0.65;
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .area__start-icon {
 	width: 40%;
