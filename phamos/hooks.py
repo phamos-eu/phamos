@@ -10,6 +10,18 @@ app_license = "AGPL-3.0"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits open inside it. Frappe's
+	# "Default App" opens an app's first tile it shows. So Ophice is listed twice, and exactly one
+	# of the two shows: here, first, while the start-page switch (#2077, Cockpit Settings) is on;
+	# otherwise further down, so a site whose default app is already "phamos" keeps landing in the
+	# Personal Cockpit after this release (review of the release).
+	{
+		"name": "ophice",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_start_tile_permission",
+	},
 	{
 		"name": "personal_cockpit",
 		"logo": "/assets/phamos/manifest/personal-icon-192.png",
@@ -79,6 +91,14 @@ add_to_apps_screen = [
 		"title": "Implementation Cockpit",
 		"route": "/implementation-cockpit",
 		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
+	# Ophice while it is not the start page (see the first tile).
+	{
+		"name": "ophice_tile",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_tile_permission",
 	},
 	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher and "Open in Cockpit"
 	# skip it (no route in spa_boot.COCKPITS, no phamos.api.bookstack module).
@@ -177,6 +197,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/ophice", "to_route": "ophice"},
+    {"from_route": "/ophice/<path:app_path>", "to_route": "ophice"},
     {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
     {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
@@ -586,6 +608,7 @@ fixtures = [
             "name", "in", [
                 "Bookstack User",
                 "Bookstack Manager",
+                "Ophice Map Editor",
             ]
         ]
     ]},
@@ -661,6 +684,10 @@ scheduler_events = {
         # Personal Cockpit: end focus sessions that ran past their limit (#1556).
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
+        ],
+        # Ophice: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
+        "* * * * *": [
+            "phamos.api.ophice.burn_due_encounters",
         ],
         # Personal Cockpit: fix today's day plans that were never started (#1559).
         "0 10 * * *": [

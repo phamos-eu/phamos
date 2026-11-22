@@ -382,6 +382,7 @@ class Phriend {
 					: this.host.open_reports && this.host.open_reports(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
+			pinned: !!this.host.pinned,
 			close_label: __("Close"),
 			hands: this.feature("reactions"),
 			menu: this.has_menu() ? () => this.menu_entries() : null,
