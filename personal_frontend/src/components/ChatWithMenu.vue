@@ -17,6 +17,10 @@
 				<FeatherIcon name="x" class="h-4 w-4" />
 			</button>
 		</div>
+		<div v-if="person.working_on" class="px-1.5 pb-2">
+			<p class="pb-1 text-xs font-medium text-ink-gray-5">{{ __("Working on") }}</p>
+			<WorkingOnCard :card="person.working_on" />
+		</div>
 		<p v-if="loading" class="px-1.5 py-1 text-xs text-ink-gray-5">{{ __("Loading…") }}</p>
 		<p v-else-if="error" class="px-1.5 py-1 text-xs text-ink-red-4">{{ error }}</p>
 		<template v-else>
@@ -55,6 +59,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { call, FeatherIcon } from "frappe-ui"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import WorkingOnCard from "./WorkingOnCard.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { relativeTime } from "../utils/ophiceTime.js"
 

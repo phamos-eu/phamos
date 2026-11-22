@@ -27,6 +27,7 @@ import math
 import random
 import re
 import time
+from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -1351,6 +1352,7 @@ def get_people():
 	)
 	online = {c["user"]: c for c in _online()}
 	areas = _areas()
+	working = _working_on([u.user for u in users if u.user == me or not _hides_details(u.user)])
 	chatting = _in_encounter([u.user for u in users if u.user in online])
 	people = []
 	for row in users:
@@ -1367,6 +1369,8 @@ def get_people():
 			"status": _status_of(row.user),
 			"area": "",
 			"in_chat": False,
+			# What they work on now (#2064): the Implementation, the issue only as a detail.
+			"working_on": working.get(row.user),
 		}
 		if chip and (not hidden or row.user == me):
 			cx, cy = chip["x"] + 0.5, chip["y"] + 0.5
@@ -1456,3 +1460,56 @@ def start_direct_message(user):
 
 	_require_user()
 	return {"url": f"/raven/dm-channel/{create_direct_message_channel(user)}"}
+
+
+# --- What someone works on right now (#2064): the running timer's Implementation.
+#
+# PM: the specific task is not important, the Implementation is. So the card names the
+# Implementation and its customer; the GitLab issue is a small link; goal and task text stay
+# private. Only a timer that runs now counts (a paused one does not).
+
+
+def _working_on(users):
+	"""user → {implementation, customer_name, project_name, url, issue} for running timers."""
+	if not users:
+		return {}
+	record = frappe.qb.DocType("Timesheet Record")
+	item = frappe.qb.DocType("Timesheet Record Item")
+	employee = frappe.qb.DocType("Employee")
+	rows = (
+		frappe.qb.from_(record)
+		.join(item)
+		.on((item.parent == record.name) & (item.parenttype == "Timesheet Record"))
+		.join(employee)
+		.on(employee.name == record.employee)
+		.select(employee.user_id, record.project, record.gitlab_issue, item.from_time)
+		.where(employee.user_id.isin(list(users)))
+		.where(record.docstatus == 0)
+		.where(item.to_time.isnull())
+		.orderby(item.from_time, order=frappe.qb.desc)
+		.run(as_dict=True)
+	)
+	result = {}
+	for row in rows:
+		if row.user_id in result or not row.project:
+			continue
+		project = frappe.db.get_value("Project", row.project, ["project_name", "custom_implementation"], as_dict=True)
+		if not project:
+			continue
+		card = {
+			"implementation": project.custom_implementation or "",
+			"customer_name": "",
+			"project_name": project.project_name or row.project,
+			"url": "",
+			"issue": None,
+		}
+		if project.custom_implementation:
+			customer = frappe.db.get_value("Implementation", project.custom_implementation, "customer")
+			card["customer_name"] = (frappe.db.get_value("Customer", customer, "customer_name") if customer else "") or ""
+			card["url"] = "/app/implementation/" + quote(project.custom_implementation, safe="")
+		if row.gitlab_issue:
+			title, url = frappe.db.get_value("GitLab Issue", row.gitlab_issue, ["title", "issue_url"]) or ("", "")
+			if url and str(url).startswith("https://"):
+				card["issue"] = {"title": title or row.gitlab_issue, "url": url}
+		result[row.user_id] = card
+	return result

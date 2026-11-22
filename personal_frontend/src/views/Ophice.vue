@@ -975,7 +975,9 @@ async function setHideDetails(hide) {
 
 function openChatWith(person, event) {
 	if (!person?.user || person.user === me.value?.user) return
-	chatWith.value = { person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
+	// A chip on the map: the list knows more (what they work on).
+	const known = people.value.find((p) => p.user === person.user)
+	chatWith.value = { person: known || person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
 }
 
 function nameOf(user) {

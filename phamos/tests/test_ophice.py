@@ -674,3 +674,52 @@ class OphicePeopleTestCase(_OphiceRoomBase):
 		ophice.get_area_chat(area)  # B joins the area's channel
 		frappe.set_user(self.A)
 		self.assertEqual(len(ophice.get_chat_options(self.B)["chats"]), 1)
+
+
+class OphiceWorkingOnTestCase(FrappeTestCase):
+	"""What someone works on (#2064): the running timer's Implementation, not the task."""
+
+	def setUp(self):
+		from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
+		from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
+
+		for target in ("frappe.db.commit", "frappe.desk.form.assign_to.notify_assignment"):
+			patcher = patch(target)
+			patcher.start()
+			self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		self.user = "tm-a@example.com"
+		_ensure_user(self.user)
+		employee = _ensure_employee(self.user)
+		activity = "TM Development"
+		if not frappe.db.exists("Activity Type", activity):
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": activity}).insert(ignore_permissions=True)
+		frappe.db.set_value("Employee", employee, "activity_type", activity)
+		self.implementation = make_implementation().name
+		self.project = frappe.get_doc(
+			{
+				"doctype": "Project",
+				"project_name": "Ophice working on",
+				"status": "Open",
+				"task_in_timesheet_record": "Task is optional",
+				"percent_billable": "75",
+				"custom_implementation": self.implementation,
+			}
+		).insert(ignore_permissions=True).name
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def test_running_timer_shows_the_implementation_without_goal(self):
+		from phamos.api import personal_cockpit as pc
+
+		self.assertEqual(ophice._working_on([self.user]), {})
+		frappe.set_user(self.user)
+		pc.start_timer(self.project, 3600, "Private goal text")
+		frappe.set_user("Administrator")
+		card = ophice._working_on([self.user])[self.user]
+		self.assertEqual(card["implementation"], self.implementation)
+		self.assertEqual(card["project_name"], "Ophice working on")
+		self.assertTrue(card["url"].startswith("/app/implementation/"))
+		self.assertNotIn("Private goal text", str(card))

@@ -51,6 +51,7 @@
 						</span>
 					</span>
 				</button>
+				<WorkingOnCard v-if="person.working_on" :card="person.working_on" class="mb-1 ml-11 mr-1.5" />
 			</li>
 		</ul>
 		<label class="flex cursor-pointer items-start gap-2 border-t border-outline-gray-2 px-3 py-2 text-xs text-ink-gray-6">
@@ -73,6 +74,7 @@
 import { computed, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import WorkingOnCard from "./WorkingOnCard.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { clockTime } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
