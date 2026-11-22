@@ -1,11 +1,11 @@
 <template>
 	<!--
 		Shortcut bar (#2073): the cockpits I may open, Personal Cockpit first. Opens them inside
-		Ophice. Top right, down the right side (PM, 2026-11-22).
+		Ophice. A plain column at the right edge, from the top (PM, 2026-11-22).
 	-->
 	<nav
 		v-if="cockpits.length"
-		class="flex flex-col items-center gap-1.5 rounded-2xl border border-outline-gray-2 bg-surface-white/90 px-1.5 py-2 shadow-xl backdrop-blur"
+		class="flex w-16 flex-col items-center gap-1.5 overflow-y-auto py-3"
 		:aria-label="__('Cockpits')"
 		data-testid="cockpit-bar"
 	>

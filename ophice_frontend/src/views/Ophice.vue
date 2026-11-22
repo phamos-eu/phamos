@@ -210,17 +210,12 @@
 			>
 				{{ __("Drag on the grid to mark a meeting area, click an area to edit it") }}
 			</p>
-			<!-- Shortcut bar (#2073): the cockpits, top right down the right side; they open inside Ophice. -->
-			<CockpitBar
-				v-if="me && !meetingArea"
-				class="absolute right-3 top-3 z-30"
-				:cockpits="cockpits"
-				:open-route="openRoute"
-				@open="(cockpit) => emit('open-cockpit', cockpit)"
-			/>
-			<!-- Burn and chat notices (#2057, #2066): bottom right, where Frappe's notifications are (PM). -->
+			<!--
+				Burn and chat notices (#2057, #2066) sit where they happened, on the map (PM): at their
+				space, or next to my chip. In the meeting view (small map) they wait at the bottom right.
+			-->
 			<div
-				v-if="noticeList.length || batchNoticeList.length"
+				v-if="meetingArea && (noticeList.length || batchNoticeList.length)"
 				class="pointer-events-none absolute bottom-6 right-6 z-30 flex flex-col items-end gap-2"
 				data-testid="notice-stack"
 			>
@@ -351,6 +346,31 @@
 						/>
 					</span>
 				</div>
+				<!-- Chat notices at their space (#2066), burn notices next to my chip (#2057). -->
+				<template v-if="!meetingArea">
+					<BatchNotice
+						v-for="notice in batchNoticeList"
+						:key="`batch-${notice.name}`"
+						class="ophice-notice absolute z-30"
+						:style="noticeAtArea(notice)"
+						:notice="notice"
+						:now="clock"
+						:busy="batchBusy[notice.name] || ''"
+						data-testid="notice-at-area"
+						@vote="(choice) => voteBatch(notice, choice)"
+						@dismiss="dismissedBatches.add(notice.name)"
+					/>
+					<div v-if="noticeList.length" class="absolute z-30 flex flex-col gap-2" :style="noticeAtMe" data-testid="notice-at-me">
+						<BurnNotice
+							v-for="notice in noticeList"
+							:key="notice.encounter"
+							:notice="notice"
+							:now="now"
+							:saving="notice.saving"
+							@save="saveEncounter(notice)"
+						/>
+					</div>
+				</template>
 				<!-- Statuses float above their chips, under the chat bubbles. -->
 				<StatusTag
 					v-for="chip in statusChips"
@@ -363,6 +383,15 @@
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
+		<!-- Shortcut bar (#2073): the cockpits in a column at the right edge, part of the page like
+		     the people list (PM: not floating over the map); they open inside Ophice. -->
+		<CockpitBar
+			v-if="me"
+			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
+			:cockpits="cockpits"
+			:open-route="openRoute"
+			@open="(cockpit) => emit('open-cockpit', cockpit)"
+		/>
 		</div>
 		<ChatWithMenu v-if="chatWith" :key="chatWith.person.user" :person="chatWith.person" :at="chatWith.at" @close="chatWith = null" />
 	</div>
@@ -625,6 +654,32 @@ function perimeterStyle(chip) {
 		transform: `translate(${chip.x * tile.value + offset}px, ${chip.y * tile.value + offset}px)`,
 	}
 }
+
+// Notices on the map (#2066): a card 320 px wide, kept inside the map.
+const NOTICE_W = 320
+const NOTICE_H = 110
+function noticeBox(left, top, bottomEdge) {
+	const width = tile.value * (me.value?.cols || 0)
+	const height = tile.value * (me.value?.rows || 0)
+	// Below the place; above it when there is no room below.
+	const y = top + NOTICE_H > height ? Math.max(0, bottomEdge - NOTICE_H) : top
+	return {
+		left: `${Math.max(4, Math.min(width - NOTICE_W - 4, left))}px`,
+		top: `${Math.max(4, y)}px`,
+	}
+}
+function noticeAtArea(notice) {
+	const area = areas.value.find((a) => a.name === notice.area)
+	if (!area) return { right: "8px", bottom: "8px" }
+	const t = tile.value
+	const centre = (area.x + area.width / 2) * t - NOTICE_W / 2
+	return noticeBox(centre, (area.y + area.height) * t + 6, area.y * t - 6)
+}
+const noticeAtMe = computed(() => {
+	if (!me.value) return {}
+	const t = tile.value
+	return noticeBox(me.value.x * t + t * 1.2, me.value.y * t - t * 0.5, me.value.y * t - 6)
+})
 
 function chipStyle(chip) {
 	return {
