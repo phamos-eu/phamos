@@ -59,8 +59,28 @@
 				class="flex min-h-0 min-w-0 flex-col gap-1.5"
 				:class="meeting ? (wide ? 'w-1/3 flex-shrink-0' : 'flex-shrink-0') : 'flex-1'"
 			>
-			<!-- The office, small -->
-			<div class="relative flex-shrink-0 overflow-hidden rounded-lg" :style="mapStyle" @dblclick="$emit('fullscreen')">
+			<!-- Each part can be folded away (PM, 2026-11-22); folded, the call keeps running. -->
+			<button
+				v-if="meeting"
+				type="button"
+				class="mini-map__section-head"
+				:aria-expanded="open.map"
+				data-testid="mini-map-toggle-map"
+				@click="toggle('map')"
+			>
+				<FeatherIcon :name="open.map ? 'chevron-down' : 'chevron-right'" class="h-3 w-3" />
+				<FeatherIcon name="map" class="h-3 w-3" />
+				<span>{{ __("Map") }}</span>
+			</button>
+			<!-- The office, small: a click goes back to the map, full screen -->
+			<div
+				v-show="open.map || !meeting"
+				class="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-lg"
+				:style="mapStyle"
+				:title="__('Back to the map')"
+				data-testid="mini-map-map"
+				@click="$emit('fullscreen')"
+			>
 				<div
 					v-for="area in areas"
 					:key="area.name"
@@ -171,14 +191,30 @@
 			</div>
 			</div>
 			<!-- In a meeting: the spots the call and the space's chat are laid over (#2075) -->
-			<div v-if="meeting" ref="videoSlot" class="min-h-0 min-w-0 flex-1 rounded-lg bg-black/80" data-testid="mini-map-video-slot" />
 			<div
 				v-if="meeting"
-				ref="chatSlot"
-				class="min-h-0 min-w-0 rounded-lg"
-				:class="wide ? 'w-1/3 flex-shrink-0' : 'flex-1'"
-				data-testid="mini-map-chat-slot"
-			/>
+				class="flex min-h-0 min-w-0 flex-col gap-1"
+				:class="open.video ? 'flex-1' : 'flex-none'"
+			>
+				<button type="button" class="mini-map__section-head" :aria-expanded="open.video" data-testid="mini-map-toggle-video" @click="toggle('video')">
+					<FeatherIcon :name="open.video ? 'chevron-down' : 'chevron-right'" class="h-3 w-3" />
+					<FeatherIcon name="video" class="h-3 w-3" />
+					<span v-if="open.video || !wide">{{ open.video ? __("Call") : __("Call (folded, still running)") }}</span>
+				</button>
+				<div v-show="open.video" ref="videoSlot" class="min-h-0 flex-1 rounded-lg bg-black/80" data-testid="mini-map-video-slot" />
+			</div>
+			<div
+				v-if="meeting"
+				class="flex min-h-0 min-w-0 flex-col gap-1"
+				:class="open.chat ? (wide ? 'w-1/3 flex-shrink-0' : 'flex-1') : 'flex-none'"
+			>
+				<button type="button" class="mini-map__section-head" :aria-expanded="open.chat" data-testid="mini-map-toggle-chat" @click="toggle('chat')">
+					<FeatherIcon :name="open.chat ? 'chevron-down' : 'chevron-right'" class="h-3 w-3" />
+					<FeatherIcon name="message-square" class="h-3 w-3" />
+					<span v-if="open.chat || !wide">{{ __("Chat") }}</span>
+				</button>
+				<div v-show="open.chat" ref="chatSlot" class="min-h-0 flex-1 rounded-lg" data-testid="mini-map-chat-slot" />
+			</div>
 			</div>
 			<!-- Resize from any corner. Tall = a side bar, wide = a bar (PM, 2026-11-22). -->
 			<template v-if="!floatTarget">
@@ -373,12 +409,36 @@ const wide = computed(() => {
 	const h = props.floatTarget ? floatSize.h : size.h
 	return w > h * 1.3
 })
+// Which parts are open (kept in this browser).
+const OPEN_KEY = "phamos_ophice_mini_map_open"
+function storedOpen() {
+	try {
+		const open = JSON.parse(localStorage.getItem(OPEN_KEY) || "null")
+		if (open && typeof open === "object") return { map: open.map !== false, video: open.video !== false, chat: open.chat !== false }
+	} catch {
+		// private window
+	}
+	return { map: true, video: true, chat: true }
+}
+const open = reactive(storedOpen())
+function toggle(part) {
+	open[part] = !open[part]
+	try {
+		localStorage.setItem(OPEN_KEY, JSON.stringify({ ...open }))
+	} catch {
+		// private window
+	}
+	nextTick(report)
+}
+// The panel keeps its height while the call or the chat is open; folded, it fits what is left.
+const fixedHeight = computed(() => props.meeting && (open.video || open.chat))
+
 const panelStyle = computed(() => ({
 	left: `${pos.x}px`,
 	top: `${pos.y}px`,
 	width: `${size.w}px`,
-	// Without a meeting the height follows the map and pings.
-	...(props.meeting ? { height: `${size.h}px` } : { maxHeight: `${window.innerHeight - 16}px` }),
+	// Without a meeting (or with call and chat folded) the height follows the map and pings.
+	...(fixedHeight.value ? { height: `${size.h}px` } : { maxHeight: `${window.innerHeight - 16}px` }),
 }))
 
 const CORNERS = ["nw", "ne", "sw", "se"]
@@ -445,6 +505,8 @@ const chatSlot = ref(null)
 function rectOf(el) {
 	if (!el) return null
 	const r = el.getBoundingClientRect()
+	// Folded away: the call stays (out of sight, still running), the chat hides.
+	if (!r.width || !r.height) return { hidden: true }
 	return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 function report() {
@@ -462,7 +524,7 @@ watch([root, mapColumn, videoSlot, chatSlot], (els) => {
 	nextTick(report)
 })
 watch(
-	() => [pos.x, pos.y, size.w, size.h, props.meeting, props.floatTarget, wide.value],
+	() => [pos.x, pos.y, size.w, size.h, props.meeting, props.floatTarget, wide.value, open.map, open.video, open.chat],
 	() => {
 		// A meeting makes the panel taller: keep all of it on the screen.
 		if (props.meeting && !props.floatTarget) {
@@ -493,6 +555,23 @@ onBeforeUnmount(() => {
 	height: 100vh;
 	border-radius: 0;
 	border: 0;
+}
+.mini-map__section-head {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 4px;
+	border-radius: 6px;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--ink-gray-6, #666);
+	text-align: left;
+	white-space: nowrap;
+}
+.mini-map__section-head:hover {
+	background: var(--surface-gray-2, #f3f3f3);
+	color: var(--ink-gray-9, #111);
 }
 .mini-map__resize {
 	position: absolute;

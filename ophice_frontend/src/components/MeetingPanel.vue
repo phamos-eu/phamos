@@ -244,12 +244,17 @@ const props = defineProps({
 })
 const emit = defineEmits(["leave", "update:rect", "popout", "bring-back", "float"])
 const PIP = { width: "100%", height: "58vh", borderRadius: "0" }
-const dockStyle = computed(() => ({
-	left: `${props.dock.left}px`,
-	top: `${props.dock.top}px`,
-	width: `${props.dock.width}px`,
-	height: `${props.dock.height}px`,
-}))
+const dockStyle = computed(() =>
+	props.dock.hidden
+		? // Folded in the mini map: out of sight, the call keeps running (sound included).
+			{ left: "-10000px", top: "0px", width: "320px", height: "200px" }
+		: {
+				left: `${props.dock.left}px`,
+				top: `${props.dock.top}px`,
+				width: `${props.dock.width}px`,
+				height: `${props.dock.height}px`,
+			}
+)
 const hintClosed = ref(false)
 
 // Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was

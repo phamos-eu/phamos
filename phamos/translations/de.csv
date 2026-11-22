@@ -2990,3 +2990,7 @@ You are no longer in the meeting.,Sie sind nicht mehr in der Besprechung.
 "For more than {0} hours, please set Away.","Für mehr als {0} Stunden bitte ""Abwesend"" setzen."
 Float: call and chat in a small window on top of everything,Schweben: Anruf und Chat in einem kleinen Fenster über allem
 Float,Schweben
+Map,Karte
+Call,Anruf
+"Call (folded, still running)","Anruf (eingeklappt, läuft weiter)"
+Back to the map,Zurück zur Karte

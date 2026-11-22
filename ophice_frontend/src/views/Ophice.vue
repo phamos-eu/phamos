@@ -195,7 +195,15 @@
 								: 'absolute z-20'
 				"
 				:style="{
-					...(cockpitOpen && dockRects?.chat ? rectPx(dockRects.chat) : pipBody ? {} : cockpitOpen ? floatingColumnStyle : areaChatStyle),
+					...(cockpitOpen && dockRects?.chat
+						? dockRects.chat.hidden
+							? { display: 'none' }
+							: rectPx(dockRects.chat)
+						: pipBody
+							? {}
+							: cockpitOpen
+								? floatingColumnStyle
+								: areaChatStyle),
 					...meetingFrameStyle,
 				}"
 				data-testid="meeting-column"
