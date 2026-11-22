@@ -45,7 +45,7 @@
 			<span class="area__title truncate">{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
-				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-4 w-4" />
+				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-5 w-5" />
 				{{ area.kind === "Guest" ? __("Guests") : __("Customers") }}
 			</span>
 			<!-- Resize handles at the corners, only while editing (the layer above takes the pointer). -->
@@ -304,17 +304,21 @@ function cancel() {
 	border-style: double;
 	border-width: 4px;
 }
-/* "Guests" / "Customers": white on the space itself, no pill, a bit bigger and centred
-   (PM, 2026-11-22: the marker inverted). The halo keeps it readable on any map. */
+/* "Guests" / "Customers": white on the space itself, no pill, a bit bigger, in the middle of the
+   space over the Jitsi logo (PM, 2026-11-22: the marker inverted). The halo keeps it readable. */
 .area__guests {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 1;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	align-self: center;
 	gap: 4px;
-	margin-top: 2px;
+	white-space: nowrap;
 	color: #fff;
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 700;
 	line-height: 1.3;
 	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8), 0 0 8px hsl(var(--area-h) 70% 20% / 0.8);
