@@ -11,11 +11,11 @@
 			'meeting-panel--busy': busy,
 			'meeting-panel--full': fullscreen,
 			// Over an open cockpit (#2075) it is fixed to the window; in the floating window it fills it.
-			fixed: floating && !pip,
-			relative: pip,
-			absolute: !floating && !pip,
+			fixed: dock || (floating && !pip),
+			relative: pip && !dock,
+			absolute: !dock && !floating && !pip,
 		}"
-		:style="{ ...(pip ? PIP : fullscreen ? {} : maximized ? FILL : box), '--area-h': hue ?? 220 }"
+		:style="{ ...(dock ? dockStyle : pip ? PIP : fullscreen ? {} : maximized ? FILL : box), '--area-h': hue ?? 220 }"
 		role="region"
 		:aria-label="__('Meeting {0}', [area.title])"
 		data-testid="meeting-panel"
@@ -29,7 +29,7 @@
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
 			<!-- Float (#2075): call and chat in a small window on top of everything. -->
 			<button
-				v-if="canFloat && !pip"
+				v-if="canFloat && !pip && !dock"
 				type="button"
 				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:title="__('Float: call and chat in a small window on top of everything')"
@@ -197,7 +197,7 @@
 			@joined="giveKeysBack"
 			@stolen="giveKeysBack"
 		/>
-		<template v-if="!fullscreen && !maximized && !pip">
+		<template v-if="!fullscreen && !maximized && !pip && !dock">
 			<span
 				v-for="corner in CORNERS"
 				:key="corner"
@@ -239,9 +239,17 @@ const props = defineProps({
 	floating: { type: Boolean, default: false },
 	/** In the floating (picture-in-picture) window: fills its upper part, no moving or resizing. */
 	pip: { type: Boolean, default: false },
+	/** Laid over its spot in the mini map (#2075): { left, top, width, height } px; it follows it. */
+	dock: { type: Object, default: null },
 })
 const emit = defineEmits(["leave", "update:rect", "popout", "bring-back", "float"])
 const PIP = { width: "100%", height: "58vh", borderRadius: "0" }
+const dockStyle = computed(() => ({
+	left: `${props.dock.left}px`,
+	top: `${props.dock.top}px`,
+	width: `${props.dock.width}px`,
+	height: `${props.dock.height}px`,
+}))
 const hintClosed = ref(false)
 
 // Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was
@@ -300,7 +308,7 @@ const box = computed(() => ({
 let drag = null
 
 function start(kind, event) {
-	if (event.button !== 0 || fullscreen.value || maximized.value || props.pip) return
+	if (event.button !== 0 || fullscreen.value || maximized.value || props.pip || props.dock) return
 	event.preventDefault()
 	drag = { kind, startX: event.clientX, startY: event.clientY, from: { ...px.value }, target: event.currentTarget }
 	busy.value = true

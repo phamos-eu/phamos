@@ -148,17 +148,18 @@
 			<!-- The meeting of the area I stand in (#2060), top right. -->
 			<!-- Meeting view (#2061): the meeting is the big window, the map shrinks to the bottom left. -->
 			<!-- The same window all along (#2075): moving it to another place in the page would restart the call. -->
-			<Teleport :to="meetingPip || 'body'" :disabled="!meetingPip">
+			<Teleport :to="pipBody || 'body'" :disabled="!pipBody">
 			<MeetingPanel
 				v-if="meetingArea"
 				ref="meetingPanel"
-				:class="cockpitOpen ? 'z-[55]' : 'z-30'"
+				:class="cockpitOpen ? 'z-[61]' : 'z-30'"
 				:area="meetingArea"
 				:display-name="me?.full_name"
 				:bounds="cockpitOpen ? viewport : view"
 				:rect="cockpitOpen ? floatRect : meetingRect || defaultMeetingRect()"
 				:floating="cockpitOpen"
-				:pip="Boolean(meetingPip)"
+				:pip="Boolean(pipBody)"
+				:dock="cockpitOpen ? dockRects?.video : null"
 				:hue="meetingArea.color_hue"
 				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si'"
 				:popped-out="poppedOut === meetingArea.name"
@@ -180,15 +181,33 @@
 			/>
 			<!-- The area's chat (#2062), above the mini map. -->
 			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
-			<Teleport :to="meetingPip || 'body'" :disabled="!meetingPip">
+			<Teleport :to="pipBody || 'body'" :disabled="!pipBody">
 			<div
 				v-if="meetingArea && me"
 				class="flex flex-col gap-2 rounded-2xl p-2"
-				:class="meetingPip ? 'relative min-h-0 flex-1' : cockpitOpen ? 'fixed z-[55] shadow-2xl' : 'absolute z-20'"
-				:style="{ ...(meetingPip ? {} : cockpitOpen ? floatingColumnStyle : areaChatStyle), ...meetingFrameStyle }"
+				:class="
+					cockpitOpen && dockRects?.chat
+						? 'fixed z-[61]'
+						: pipBody
+							? 'relative min-h-0 flex-1'
+							: cockpitOpen
+								? 'fixed z-[55] shadow-2xl'
+								: 'absolute z-20'
+				"
+				:style="{
+					...(cockpitOpen && dockRects?.chat ? rectPx(dockRects.chat) : pipBody ? {} : cockpitOpen ? floatingColumnStyle : areaChatStyle),
+					...meetingFrameStyle,
+				}"
 				data-testid="meeting-column"
 			>
-				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
+				<!-- In the mini map the map shows who is there; the chat gets the room. -->
+				<MeetingHuddle
+					v-if="!(cockpitOpen && dockRects?.chat)"
+					:area="meetingArea"
+					:people="huddle"
+					:me="me.user"
+					@pick="(person, event) => openChatWith(person, event)"
+				/>
 				<!-- Guest and customer meeting areas: the guest chat, kept only for a short while (#2083). -->
 				<GuestChat
 					v-if="(meetingArea.kind || 'Meeting') !== 'Meeting'"
@@ -419,6 +438,10 @@
 			:background-layout="backgroundLayout"
 			:pings="pings"
 			:notice-count="noticeList.length + batchNoticeList.length"
+			:meeting="Boolean(meetingArea)"
+			:float-target="pipBody"
+			@slots="(slots) => (dockRects = slots)"
+			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
 			@open-chat="openFromPing"
@@ -1328,18 +1351,38 @@ const floatingColumnStyle = computed(() => {
 	}
 })
 
-const meetingPip = ref(null)
+// Where the call and chat sit inside the mini map (#2075): reported by the mini map.
+const dockRects = ref(null)
+function rectPx(rect) {
+	return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
+}
+watch(
+	() => props.cockpitOpen,
+	(open) => {
+		if (!open) dockRects.value = null
+	}
+)
+
+const pipBody = ref(null)
+/** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
+async function floatAll() {
+	pipBody.value = await openFloatingWindow({
+		width: meetingArea.value ? 420 : 320,
+		height: meetingArea.value ? 760 : 440,
+		onClose: () => (pipBody.value = null),
+	})
+}
 async function floatMeeting() {
 	// The call moves into the floating window: Jitsi joins again there (an iframe that moves restarts).
-	meetingPip.value = await openFloatingWindow({
+	pipBody.value = await openFloatingWindow({
 		width: 480,
 		height: 760,
-		onClose: () => (meetingPip.value = null),
+		onClose: () => (pipBody.value = null),
 	})
 }
 function closeMeetingPip() {
-	meetingPip.value?.ownerDocument?.defaultView?.close()
-	meetingPip.value = null
+	pipBody.value?.ownerDocument?.defaultView?.close()
+	pipBody.value = null
 }
 
 // Left column of the meeting view: the area chat fills it down to the mini map.

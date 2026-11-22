@@ -1,15 +1,18 @@
 <template>
 	<!--
-		The mini map over an open cockpit (#2074): the office live, small and draggable, with pings
-		(someone walks up, a message, a notice) and quick replies. "Full screen" goes back to the map;
-		"Float" (Chrome, Edge, newer Firefox) puts it in a small window that stays on top of everything.
+		The mini map over an open cockpit (#2074): the office live, draggable and resizable, with pings
+		and quick replies. In a meeting (#2075) it also holds the call and the space's chat: tall, they
+		stack under the map; wide, they sit side by side (PM, 2026-11-22). The call and chat themselves
+		are laid over the spots kept free here (a moved video window would restart the call).
+		"Float" (Chrome, Edge, newer Firefox) puts all of it in a small window on top of everything.
 	-->
 	<Teleport :to="floatTarget || 'body'" :disabled="!floatTarget">
 		<div
 			ref="root"
 			class="mini-map flex flex-col overflow-hidden rounded-xl border border-outline-gray-3 bg-surface-white text-ink-gray-9 shadow-2xl"
 			:class="floatTarget ? 'mini-map--floating' : 'fixed z-[60]'"
-			:style="floatTarget ? {} : { left: `${pos.x}px`, top: `${pos.y}px`, width: `${WIDTH}px` }"
+			:style="floatTarget ? {} : panelStyle"
+			:data-layout="wide ? 'wide' : 'tall'"
 			data-testid="mini-map"
 		>
 			<header
@@ -49,8 +52,15 @@
 				</button>
 			</header>
 
+			<div class="flex min-h-0 flex-1 gap-1.5 p-1.5" :class="wide ? 'flex-row' : 'flex-col'">
+			<!-- The map and the pings -->
+			<div
+				ref="mapColumn"
+				class="flex min-h-0 min-w-0 flex-col gap-1.5"
+				:class="meeting ? (wide ? 'w-1/3 flex-shrink-0' : 'flex-shrink-0') : 'flex-1'"
+			>
 			<!-- The office, small -->
-			<div class="relative flex-shrink-0 overflow-hidden" :style="mapStyle" @dblclick="$emit('fullscreen')">
+			<div class="relative flex-shrink-0 overflow-hidden rounded-lg" :style="mapStyle" @dblclick="$emit('fullscreen')">
 				<div
 					v-for="area in areas"
 					:key="area.name"
@@ -69,7 +79,12 @@
 			</div>
 
 			<!-- Pings: newest first -->
-			<div v-if="pings.length" class="max-h-64 space-y-1.5 overflow-y-auto border-t border-outline-gray-2 p-2" data-testid="mini-map-pings">
+			<div
+				v-if="pings.length"
+				class="min-h-0 space-y-1.5 overflow-y-auto"
+				:class="meeting && !wide ? 'max-h-40' : 'max-h-64 flex-1'"
+				data-testid="mini-map-pings"
+			>
 				<div
 					v-for="ping in pings"
 					:key="ping.id"
@@ -154,16 +169,36 @@
 					</div>
 				</div>
 			</div>
+			</div>
+			<!-- In a meeting: the spots the call and the space's chat are laid over (#2075) -->
+			<div v-if="meeting" ref="videoSlot" class="min-h-0 min-w-0 flex-1 rounded-lg bg-black/80" data-testid="mini-map-video-slot" />
+			<div
+				v-if="meeting"
+				ref="chatSlot"
+				class="min-h-0 min-w-0 rounded-lg"
+				:class="wide ? 'w-1/3 flex-shrink-0' : 'flex-1'"
+				data-testid="mini-map-chat-slot"
+			/>
+			</div>
+			<!-- Resize: drag the corner. Tall = a side bar, wide = a bar (PM, 2026-11-22). -->
+			<span
+				v-if="!floatTarget"
+				class="mini-map__resize mini-map__resize--se"
+				:title="__('Drag to resize')"
+				data-testid="mini-map-resize"
+				@pointerdown.stop="startResize('se', $event)"
+			/>
+			<span v-if="!floatTarget" class="mini-map__resize mini-map__resize--ne" :title="__('Drag to resize')" @pointerdown.stop="startResize('ne', $event)" />
 		</div>
 	</Teleport>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { ringHue } from "../utils/ophiceColor.js"
-import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { canFloat } from "../utils/pip.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -176,8 +211,12 @@ const props = defineProps({
 	/** [{ id, kind: walkup | message | meeting | reminder, text, user?, fresh? }] */
 	pings: { type: Array, default: () => [] },
 	noticeCount: { type: Number, default: 0 },
+	/** In a meeting: room for the call and the chat (#2075). */
+	meeting: { type: Boolean, default: false },
+	/** The floating window's body when it floats (Ophice opens it, so the call can go along). */
+	floatTarget: { type: Object, default: null },
 })
-const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float"])
 
 // Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
 const drafts = reactive({})
@@ -195,14 +234,25 @@ function reply(ping) {
 // Served by Frappe, not bundled.
 const OPHICE_ICON = "/assets/phamos/manifest/ophice-icon-192.png"
 const WIDTH = 280
+const MIN_W = 240
+const MIN_H = 220
+const SIZE_KEY = "phamos_ophice_mini_map_size"
 const MINUTES = [5, 15, 30, 60]
 const ICONS = { walkup: "user", message: "message-circle", meeting: "message-square", reminder: "clock" }
 const POS_KEY = "phamos_ophice_mini_map_pos"
 
-const tile = computed(() => WIDTH / props.cols)
+// The map fills the width of its column; its height follows the office's shape.
+const mapWidth = ref(WIDTH - 12)
+const tile = computed(() => {
+	let t = mapWidth.value / props.cols
+	// Wide: the map must also fit the panel's height (with room for the header).
+	if (wide.value) t = Math.min(t, (panelHeight.value - 48) / props.rows)
+	return Math.max(2, t)
+})
 const mapStyle = computed(() => {
 	const layout = props.backgroundLayout || { fit: true }
 	return {
+		width: `${tile.value * props.cols}px`,
 		height: `${tile.value * props.rows}px`,
 		backgroundColor: "var(--surface-gray-2, #eee)",
 		backgroundImage: props.background ? `url("${encodeURI(props.background)}")` : "none",
@@ -254,7 +304,7 @@ let drag = null
 
 function keepInView() {
 	const height = root.value?.offsetHeight || 220
-	pos.x = Math.max(4, Math.min(window.innerWidth - WIDTH - 4, pos.x))
+	pos.x = Math.max(4, Math.min(window.innerWidth - size.w - 4, pos.x))
 	pos.y = Math.max(4, Math.min(window.innerHeight - Math.min(height, 120), pos.y))
 }
 
@@ -283,26 +333,118 @@ window.addEventListener("resize", keepInView)
 onBeforeUnmount(() => {
 	window.removeEventListener("resize", keepInView)
 	window.removeEventListener("pointermove", onDrag)
-	floatBody?.ownerDocument?.defaultView?.close()
 })
 
 // --- Float: Document Picture-in-Picture, a small window on top of everything (Chrome, Edge,
 // newer Firefox; not Safari). The same element moves into it; closing it brings it back.
 
-const floatTarget = ref(null)
-let floatBody = null
-
-async function float() {
-	floatBody = await openFloatingWindow({
-		width: WIDTH + 24,
-		height: 420,
-		onClose: () => {
-			floatTarget.value = null
-			floatBody = null
-		},
-	})
-	floatTarget.value = floatBody
+function float() {
+	emit("float")
 }
+
+// --- Size (kept in this browser) and layout
+
+function storedSize() {
+	try {
+		const size = JSON.parse(localStorage.getItem(SIZE_KEY) || "null")
+		if (size && Number.isFinite(size.w) && Number.isFinite(size.h)) return size
+	} catch {
+		// private window
+	}
+	return { w: 320, h: 640 }
+}
+const size = reactive(storedSize())
+const floatSize = reactive({ w: 0, h: 0 })
+const panelHeight = computed(() => (props.floatTarget ? floatSize.h : props.meeting ? size.h : 2000))
+const wide = computed(() => {
+	if (!props.meeting) return false
+	const w = props.floatTarget ? floatSize.w : size.w
+	const h = props.floatTarget ? floatSize.h : size.h
+	return w > h * 1.3
+})
+const panelStyle = computed(() => ({
+	left: `${pos.x}px`,
+	top: `${pos.y}px`,
+	width: `${size.w}px`,
+	// Without a meeting the height follows the map and pings.
+	...(props.meeting ? { height: `${size.h}px` } : { maxHeight: `${window.innerHeight - 16}px` }),
+}))
+
+let resize = null
+function startResize(corner, event) {
+	if (event.button !== 0) return
+	event.preventDefault()
+	resize = { corner, x: event.clientX, y: event.clientY, from: { ...size, top: pos.y } }
+	window.addEventListener("pointermove", onResize)
+	window.addEventListener("pointerup", endResize, { once: true })
+}
+function onResize(event) {
+	if (!resize) return
+	const dx = event.clientX - resize.x
+	const dy = event.clientY - resize.y
+	size.w = Math.max(MIN_W, Math.min(window.innerWidth - pos.x - 4, resize.from.w + dx))
+	if (resize.corner === "se") {
+		size.h = Math.max(MIN_H, Math.min(window.innerHeight - pos.y - 4, resize.from.h + dy))
+	} else {
+		// Top edge: the bottom stays where it is.
+		const bottom = resize.from.top + resize.from.h
+		const top = Math.max(4, Math.min(bottom - MIN_H, resize.from.top + dy))
+		pos.y = top
+		size.h = bottom - top
+	}
+}
+function endResize() {
+	resize = null
+	window.removeEventListener("pointermove", onResize)
+	try {
+		localStorage.setItem(SIZE_KEY, JSON.stringify({ w: size.w, h: size.h }))
+		localStorage.setItem(POS_KEY, JSON.stringify({ x: pos.x, y: pos.y }))
+	} catch {
+		// private window
+	}
+}
+
+// --- The spots for the call and the chat: their place on the screen goes to Ophice, which lays
+// the call and the chat over them (and keeps them there while the panel moves or resizes).
+
+const mapColumn = ref(null)
+const videoSlot = ref(null)
+const chatSlot = ref(null)
+function rectOf(el) {
+	if (!el) return null
+	const r = el.getBoundingClientRect()
+	return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+function report() {
+	if (mapColumn.value) mapWidth.value = mapColumn.value.clientWidth
+	if (props.floatTarget && root.value) {
+		floatSize.w = root.value.clientWidth
+		floatSize.h = root.value.clientHeight
+	}
+	emit("slots", props.meeting ? { video: rectOf(videoSlot.value), chat: rectOf(chatSlot.value) } : null)
+}
+const observer = new ResizeObserver(() => report())
+watch([root, mapColumn, videoSlot, chatSlot], (els) => {
+	observer.disconnect()
+	for (const el of els) if (el) observer.observe(el)
+	nextTick(report)
+})
+watch(
+	() => [pos.x, pos.y, size.w, size.h, props.meeting, props.floatTarget, wide.value],
+	() => {
+		// A meeting makes the panel taller: keep all of it on the screen.
+		if (props.meeting && !props.floatTarget) {
+			size.h = Math.min(size.h, window.innerHeight - 8)
+			if (pos.y + size.h > window.innerHeight - 4) pos.y = Math.max(4, window.innerHeight - size.h - 4)
+		}
+		nextTick(report)
+	},
+	{ immediate: true }
+)
+onBeforeUnmount(() => {
+	observer.disconnect()
+	emit("slots", null)
+})
 </script>
 
 <style scoped>
@@ -316,9 +458,25 @@ async function float() {
 }
 .mini-map--floating {
 	width: 100%;
-	min-height: 100vh;
+	height: 100vh;
 	border-radius: 0;
 	border: 0;
+}
+.mini-map__resize {
+	position: absolute;
+	right: 0;
+	width: 14px;
+	height: 14px;
+	z-index: 2;
+}
+.mini-map__resize--se {
+	bottom: 0;
+	cursor: nwse-resize;
+	background: linear-gradient(135deg, transparent 50%, var(--outline-gray-4, #999) 50%, transparent 60%, transparent 70%, var(--outline-gray-4, #999) 70%, transparent 80%);
+}
+.mini-map__resize--ne {
+	top: 0;
+	cursor: nesw-resize;
 }
 .mini-map__ping--new {
 	animation: mini-map-ping 1.2s ease-out 2;
