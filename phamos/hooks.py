@@ -11,6 +11,8 @@ required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
 	# Ophice (#2069, #2070): where people "go to work"; the cockpits will open inside it.
+	# Keep it first: the start-page switch (#2077) uses Frappe's default app, which opens the
+	# app's first tile.
 	{
 		"name": "ophice",
 		"logo": "/assets/phamos/manifest/ophice-icon-192.png",

@@ -1241,3 +1241,29 @@ class OphiceCockpitSpaceTestCase(_OphiceRoomBase):
 		self.assertFalse(ophice.get_space()["auto_cockpit"])
 		ophice.set_auto_cockpit(1)
 		self.assertTrue(ophice.get_space()["auto_cockpit"])
+
+
+class OphiceStartPageTestCase(FrappeTestCase):
+	"""Ophice as the start page (#2077): the Cockpit Settings switch sets Frappe's default app, whose
+	first tile must be Ophice."""
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def test_switch_sends_everyone_to_ophice(self):
+		from frappe.apps import get_default_path
+
+		from phamos.hooks import add_to_apps_screen
+
+		# The default app lands on its first tile: Ophice must stay first.
+		self.assertEqual(add_to_apps_screen[0]["route"], "/ophice")
+		frappe.set_user("Administrator")
+		settings = frappe.get_single("Cockpit Settings")
+		settings.ophice_start_page = 1
+		settings.save(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "phamos")
+		self.assertEqual(get_default_path(), "/ophice")
+		settings.ophice_start_page = 0
+		settings.save(ignore_permissions=True)
+		self.assertFalse(frappe.db.get_single_value("System Settings", "default_app"))

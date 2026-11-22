@@ -10,8 +10,24 @@ from frappe.model.document import Document
 MIN_PRIVACY_REVEAL_SECONDS = 10
 
 
+# Ophice as the start page (#2077): Frappe's own "Default App" (System Settings) takes the first
+# Apps-screen tile of the app; for phamos that is Ophice (hooks.add_to_apps_screen, kept first).
+OPHICE_DEFAULT_APP = "phamos"
+
+
+def sync_ophice_start_page(on):
+	"""Set or clear the standard default app, so everyone lands in Ophice after login."""
+	current = frappe.db.get_single_value("System Settings", "default_app")
+	if on and current != OPHICE_DEFAULT_APP:
+		frappe.db.set_single_value("System Settings", "default_app", OPHICE_DEFAULT_APP)
+	elif not on and current == OPHICE_DEFAULT_APP:
+		# Only what this switch set; another default app someone chose stays.
+		frappe.db.set_single_value("System Settings", "default_app", "")
+
+
 class CockpitSettings(Document):
 	def on_update(self):
+		sync_ophice_start_page(bool(self.ophice_start_page))
 		# Company events of #1814 move once the General Management Department is known (#1949).
 		# A site getting this release has no such department at migrate time, so the patch leaves
 		# them for this save.
