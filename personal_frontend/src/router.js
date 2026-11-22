@@ -19,12 +19,6 @@ import spaConfig from "./config"
 import TodosFocus from "./views/TodosFocus.vue"
 import { ensureFocusLoaded } from "./focusStore.js"
 
-/** A full page load of another app (not a route of this one); cancels the navigation here. */
-function leaveFor(url) {
-	window.location.replace(url)
-	return false
-}
-
 const router = createSpaRouter({
 	config: spaConfig,
 	rootRedirect: "/todos/plan", // My Day answers "what do I do now" (#1602)
@@ -52,10 +46,6 @@ const router = createSpaRouter({
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },
-		// Ophice moved to its own app at /ophice (#2070); old links (and its first name, /space)
-		// load the page there. (The component is never shown: beforeEnter leaves first.)
-		{ path: "/ophice", name: "Ophice", component: TodosFocus, beforeEnter: () => leaveFor("/ophice") },
-		{ path: "/space", component: TodosFocus, beforeEnter: () => leaveFor("/ophice") },
 	],
 })
 

@@ -33,7 +33,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue"
 import { __ } from "@spa/utils/i18n.js"
 
-const props = defineProps({
+defineProps({
 	/** where the frame starts, e.g. "/personal-cockpit/todos/plan" */
 	src: { type: String, required: true },
 	/** a new value reloads the frame at `src`, even when `src` is unchanged */

@@ -12,6 +12,11 @@ from frappe.tests.utils import FrappeTestCase
 from phamos.api import ophice
 
 
+
+def _read_encounter(encounter):
+	"""What the session user sees of an encounter (the party check included)."""
+	return ophice._encounter_payload(ophice._require_party(encounter, ("Open", "Parting")))
+
 class OphiceTestCase(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
@@ -243,13 +248,13 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		self.assertEqual({c.kwargs["user"] for c in mine}, {self.A, self.B})
 		self.assertEqual(row["owner"], self.A)
 		frappe.set_user(self.B)
-		messages = ophice.get_encounter(encounter)["messages"]
+		messages = _read_encounter(encounter)["messages"]
 		self.assertEqual([m["owner"] for m in messages], [self.A])
 		# shown as text: the tags the user typed come back as text, not markup
 		self.assertEqual(messages[0]["text"], "Hi <b>there</b>\nline 2")
 		frappe.set_user(self.C)
 		with self.assertRaises(frappe.PermissionError):
-			ophice.get_encounter(encounter)
+			_read_encounter(encounter)
 		with self.assertRaises(frappe.PermissionError):
 			ophice.send_encounter_message(encounter, "let me in")
 
@@ -267,7 +272,7 @@ class OphiceEncounterTestCase(FrappeTestCase):
 			with patch.object(ophice, "DUMMY_REPLY_DELAY", 0), patch.object(ophice.frappe, "publish_realtime"):
 				ophice.dummy_reply(encounter, self.B)
 			frappe.set_user(self.A)
-			messages = ophice.get_encounter(encounter)["messages"]
+			messages = _read_encounter(encounter)["messages"]
 		self.assertEqual(messages[-1]["owner"], self.B)
 		self.assertIn(messages[-1]["text"], ("Yes", "No", "Maybe"))
 
@@ -1508,7 +1513,7 @@ class OphiceServerReviewTestCase(_OphiceRoomBase):
 		self.assertFalse(frappe.db.exists("Raven Channel", batch.raven_channel))
 
 	def test_reading_endpoints_that_write_are_post_only(self):
-		for fn in (ophice.get_area_chat, ophice.get_encounter):
+		for fn in (ophice.get_area_chat,):
 			self.assertIn("POST", frappe.allowed_http_methods_for_whitelisted_func[fn])
 			self.assertNotIn("GET", frappe.allowed_http_methods_for_whitelisted_func[fn])
 

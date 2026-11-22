@@ -2677,7 +2677,6 @@ Live Since,Live seit
 Phriend Feedback,Phriend-Rückmeldung
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
 Ophice,Ophice
-Back to cockpit,Zurück zum Cockpit
 "Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen (zweimal: Doppelsprung, halten: fliegen)"
 Ophice could not be loaded.,Ophice konnte nicht geladen werden.
 Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
@@ -2728,8 +2727,6 @@ No sound? Click once into the video.,Kein Ton? Einmal in das Video klicken.
 Done,Fertig
 Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
-Edit meeting area,Besprechungsbereich bearbeiten
-New meeting area,Neuer Besprechungsbereich
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
 "Whoever stops inside the area joins this meeting, with microphone and camera off.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit ausgeschaltetem Mikrofon und ausgeschalteter Kamera."
@@ -2750,9 +2747,6 @@ Adjust,Anpassen
 Background image,Hintergrundbild
 Fit,Einpassen
 Size,Größe
-Horizontal position,Horizontale Lage
-Vertical position,Vertikale Lage
-The grid stays as it is; everyone sees the change.,Das Raster bleibt unverändert; alle sehen die Änderung.
 The background could not be adjusted.,Der Hintergrund konnte nicht angepasst werden.
 Upload a background first.,Laden Sie zuerst einen Hintergrund hoch.
 Away,Abwesend
@@ -2784,18 +2778,13 @@ Fullscreen,Vollbild
 Leave fullscreen,Vollbild beenden
 Drag to resize,Ziehen zum Ändern der Größe
 Chat of {0},Chat von {0}
-Burn chat now: deletes the history for everyone,Chat jetzt verbrennen: löscht den Verlauf für alle
-Delete this room's history for everyone? This cannot be undone.,Den Verlauf dieses Raums für alle löschen? Das kann nicht rückgängig gemacht werden.
 Burn,Verbrennen
 No messages yet. Say hello to the room.,Noch keine Nachrichten. Sagen Sie dem Raum Hallo.
 Message the room,Nachricht an den Raum
 "Enter sends, Esc goes back to the map","Enter sendet, Esc geht zurück zur Karte"
 Confidential,Vertraulich
-History is kept for this room. Anyone in the room can burn it.,Der Verlauf dieses Raums bleibt erhalten. Alle im Raum können ihn verbrennen.
-Deleted for good when the last person leaves the room.,"Endgültig gelöscht, sobald die letzte Person den Raum verlässt."
 "Never stored. Only people in the room see it, only now.","Nie gespeichert. Nur wer gerade im Raum ist, sieht es, und nur jetzt."
 The chat could not be loaded.,Der Chat konnte nicht geladen werden.
-The chat could not be burned.,Der Chat konnte nicht verbrannt werden.
 "Saved: history is kept, can be burned","Gespeichert: Verlauf bleibt, kann verbrannt werden"
 Not saved: deleted when the last person leaves,"Nicht gespeichert: gelöscht, wenn die letzte Person geht"
 "Confidential: never stored, only live","Vertraulich: nie gespeichert, nur live"
@@ -2803,7 +2792,6 @@ Unknown chat mode.,Unbekannter Chat-Modus.
 Step into the area to use its chat.,"Betreten Sie den Bereich, um seinen Chat zu nutzen."
 Ophice area chat: {0},Ophice-Bereichschat: {0}
 You can't chat: no Raven access.,Sie können nicht chatten: kein Zugang zu Raven.
-{0} online,{0} online
 Find a person,Person suchen
 you,Sie
 Hide my details,Meine Details ausblenden
@@ -2817,7 +2805,6 @@ Direct message,Direktnachricht
 New direct message,Neue Direktnachricht
 Recent chats together,Letzte gemeinsame Chats
 The chats could not be loaded.,Die Chats konnten nicht geladen werden.
-Show or hide the people list,Personenliste ein- oder ausblenden
 The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
 Open the Implementation,Implementation öffnen
 Working on,Arbeitet an
@@ -2875,7 +2862,6 @@ Open the meeting in its own browser window,Besprechung in einem eigenen Browserf
 Own window,Eigenes Fenster
 "Here in Ophice, meet.jit.si ends the call after 5 minutes. In its own window the meeting runs up to 1 h 35 min.",Hier im Ophice beendet meet.jit.si den Anruf nach 5 Minuten. Im eigenen Fenster läuft die Besprechung bis zu 1 Std. 35 Min.
 Open in own window,Im eigenen Fenster öffnen
-The meeting runs in its own window.,Die Besprechung läuft in einem eigenen Fenster.
 Show that window,Dieses Fenster zeigen
 Back into Ophice,Zurück ins Ophice
 The browser blocked the new window. Please allow pop-ups for this site.,Der Browser hat das neue Fenster blockiert. Bitte Pop-ups für diese Seite erlauben.
@@ -2884,11 +2870,9 @@ Keep the video on top,Video im Vordergrund halten
 "The video then floats above all windows, also when you go back to another tab or app.","Das Video schwebt dann über allen Fenstern, auch wenn Sie zu einem anderen Tab oder Programm wechseln."
 Shortcut,Tastenkürzel
 with,mit
-Google's Picture-in-Picture extension,der Bild-im-Bild-Erweiterung von Google
 Got it,Verstanden
 Keep the video on top of all windows,Video über allen Fenstern halten
 On top,Im Vordergrund
-"Tip: right-click a video there and choose ""Picture in picture"" to keep it on top of all windows.","Tipp: Dort per Rechtsklick auf ein Video ""Bild im Bild"" wählen, dann bleibt es über allen Fenstern."
 The meeting window was closed,Das Besprechungsfenster wurde geschlossen
 Your call runs in its own window,Ihr Anruf läuft in einem eigenen Fenster
 "Open it again, or continue the call here in Ophice.",Öffnen Sie es wieder oder führen Sie den Anruf hier im Ophice weiter.
@@ -2910,7 +2894,6 @@ External guests arrive here through the guest link and can only move inside it. 
 A meeting room for guests: employees invite a guest from the guest area to come here.,Ein Besprechungsraum für Gäste: Mitarbeitende laden einen Gast aus dem Gastbereich hierher ein.
 "Chat: the guest chat, kept only for a short while (comes with the guest chat).","Chat: der Gast-Chat, nur kurz gespeichert (kommt mit dem Gast-Chat)."
 Guests,Gäste
-"External guests can be here. The guest chat, kept only for a short while, comes soon.","Hier können externe Gäste sein. Der Gast-Chat, nur kurz gespeichert, kommt bald."
 There is already a guest area: {0}.,Es gibt schon einen Gastbereich: {0}.
 phamos Ophice,phamos Ophice
 Move with WASD or the arrow keys,Mit WASD oder den Pfeiltasten bewegen
@@ -2925,7 +2908,6 @@ Coming in…,Sie kommen herein …
 "Privacy: we use your name and where your chip stands only for this visit. Chats are not stored for long. Video runs through Jitsi. Your visit ends when you close this page, after 12 hours at the latest.","Datenschutz: Ihren Namen und den Ort Ihres Chips verwenden wir nur für diesen Besuch. Chats werden nicht lange gespeichert. Video läuft über Jitsi. Ihr Besuch endet, wenn Sie diese Seite schließen, spätestens nach 12 Stunden."
 Something went wrong. Please try again.,Etwas ist schiefgegangen. Bitte versuchen Sie es noch einmal.
 Almost: drop your chip right on the entrance.,Fast: Lassen Sie Ihren Chip genau auf dem Eingang los.
-{0} is a guest. Meet them in the guest area.,{0} ist ein Gast. Treffen Sie den Gast im Gastbereich.
 Guest · {0},Gast · {0}
 Guest,Gast
 Your visit has ended. Please come in again.,Ihr Besuch ist beendet. Bitte kommen Sie erneut herein.
@@ -2967,7 +2949,6 @@ Guests can only be invited to a customer meeting area.,Gäste können nur in ein
 This invite is no longer open.,Diese Einladung ist nicht mehr offen.
 {0} notices on the map,{0} Hinweise auf der Karte
 Float: keep the map on top of all windows,Schweben: Karte über allen Fenstern halten
-"Back to the map, full screen (the cockpit stays open)","Zurück zur Karte, Vollbild (das Cockpit bleibt offen)"
 I'll get back to you in,Ich melde mich in
 Coming soon,Kommt bald
 Book an appointment with me,Termin mit mir buchen
@@ -3002,7 +2983,6 @@ You can't open {0}; you can still use this space and its meeting.,Sie können {0
 Open cockpits in their spaces,Cockpits in ihren Bereichen öffnen
 Stopping in a cockpit space opens that cockpit.,"Wer in einem Cockpit-Bereich stehen bleibt, öffnet dieses Cockpit."
 Pick the cockpit this space belongs to.,"Wählen Sie das Cockpit, zu dem dieser Bereich gehört."
-Make small,Verkleinern
 Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldung
 "Float: call and chat in a small window on top of everything, also outside the browser","Schweben: Anruf und Chat in einem kleinen Fenster über allem, auch außerhalb des Browsers"
 Zoom out,Verkleinern
@@ -3041,8 +3021,6 @@ Vote on the chat of {0},Über den Chat von {0} abstimmen
 The chat of {0} will be deleted unless someone saves it,"Der Chat von {0} wird gelöscht, außer jemand speichert ihn"
 Make it the big tile,Zur großen Kachel machen
 "Standard arrangement of video, chat and map","Standard-Anordnung von Video, Chat und Karte"
-Drag onto another tile,Auf eine andere Kachel ziehen
-Drag to change the size,"Ziehen, um die Größe zu ändern"
 Double-click to switch,Doppelklick zum Wechseln
 Double-tap to switch,Doppeltippen zum Wechseln
 Video,Video

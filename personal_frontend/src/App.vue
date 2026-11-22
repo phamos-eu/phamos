@@ -1,10 +1,5 @@
 <template>
-	<!-- Ophice (#2053) and other standalone pages: full screen, no sidebar or top bar. -->
-	<div v-if="route.meta.standalone" class="h-full min-h-0">
-		<router-view />
-		<Toasts />
-	</div>
-	<CockpitShell v-else :title="pageTitle">
+	<CockpitShell :title="pageTitle">
 		<template #sidebar>
 			<div class="relative flex h-full">
 				<div
@@ -38,7 +33,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { Toasts } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"

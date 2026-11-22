@@ -20,8 +20,7 @@
   "jitsi_room",
   "color_hue",
   "section_chat",
-  "chat_mode",
-  "raven_channel"
+  "chat_mode"
  ],
  "fields": [
   {
@@ -135,18 +134,11 @@
    "label": "Chat mode",
    "options": "Saved\nNot saved\nConfidential",
    "depends_on": "eval:doc.kind == 'Meeting'"
-  },
-  {
-   "description": "Private Raven channel of the area chat (Saved and Not saved).",
-   "fieldname": "raven_channel",
-   "fieldtype": "Data",
-   "label": "Raven channel",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 23:00:00.000000",
+ "modified": "2026-11-22 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

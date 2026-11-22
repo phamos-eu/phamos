@@ -1003,13 +1003,6 @@ def open_encounter(with_user):
 
 
 @frappe.whitelist(methods=["POST"])
-def get_encounter(encounter):
-	"""An encounter of mine (open or parting), with its latest messages."""
-	_require_user()
-	return _encounter_payload(_require_party(encounter, ("Open", "Parting")))
-
-
-@frappe.whitelist(methods=["POST"])
 def send_encounter_message(encounter, text):
 	"""Post a message into the encounter's Raven channel and tell both people right away."""
 	_require_user()

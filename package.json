@@ -18,7 +18,7 @@
 		"build": "yarn install:frontends && cd personal_frontend && yarn build && cd ../human_resources_frontend && yarn build && cd ../sales_frontend && yarn build && cd ../accounting_frontend && yarn build && cd ../project_management_frontend && yarn build && cd ../software_development_frontend && yarn build && cd ../general_management_frontend && yarn build && cd ../team_frontend && yarn build && cd ../scan_frontend && yarn build && cd ../implementation_frontend && yarn build && cd ../ophice_frontend && yarn build",
 		"build:scan": "cd scan_frontend && yarn build",
 		"build:implementation": "cd implementation_frontend && yarn build",
-		"test:spa": "cd personal_frontend && yarn test",
+		"test:spa": "cd personal_frontend && yarn test && cd ../ophice_frontend && yarn test",
 		"dev:ophice": "cd ophice_frontend && yarn dev",
 		"build:ophice": "cd ophice_frontend && yarn build"
 	},
