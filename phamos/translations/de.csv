@@ -3005,3 +3005,27 @@ Pick the cockpit this space belongs to.,"Wählen Sie das Cockpit, zu dem dieser 
 Make small,Verkleinern
 Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldung
 "Float: call and chat in a small window on top of everything, also outside the browser","Schweben: Anruf und Chat in einem kleinen Fenster über allem, auch außerhalb des Browsers"
+Zoom out,Verkleinern
+Zoom in,Vergrößern
+Show the whole grid,Ganzes Raster zeigen
+{0} × {1} tiles,{0} × {1} Kacheln
+Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
+"Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
+Width,Breite
+Left,Links
+Top,Oben
+Half a tile less,Eine halbe Kachel weniger
+Half a tile more,Eine halbe Kachel mehr
+Grid,Raster
+Across,Breit
+Down,Hoch
+One tile less,Eine Kachel weniger
+One tile more,Eine Kachel mehr
+Grows the grid to the right and down until it covers the image,"Vergrößert das Raster nach rechts und unten, bis es das Bild abdeckt"
+Grid to cover the image,Raster über das ganze Bild
+Starting zoom for everyone: {0} %,Start-Zoom für alle: {0} %
+Use mine,Meinen nehmen
+Everyone sees the change.,Alle sehen die Änderung.
+The grid could not be changed.,Das Raster konnte nicht geändert werden.
+The space {0} would be cut off. Move or shrink it first.,Der Bereich {0} würde abgeschnitten. Verschieben oder verkleinern Sie ihn zuerst.
+Grid too small,Raster zu klein

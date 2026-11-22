@@ -210,6 +210,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { imagePlacement } from "../utils/ophiceView.js"
 import { Button, call, FeatherIcon, FormControl, toast } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import ChipFigure from "../components/ChipFigure.vue"
@@ -336,14 +337,18 @@ const tile = computed(() => {
 })
 const chipScale = computed(() => (tile.value * 0.8) / AVATAR_PX)
 
+// The background in grid tiles (#2089), drawn in px; for guests it stays inside the grid.
 const gridStyle = computed(() => {
-	const layout = space.value?.background_layout || { fit: true }
+	const cols = space.value?.cols || 0
+	const rows = space.value?.rows || 0
+	const t = tile.value
+	const box = imagePlacement(space.value?.background_layout || { fit: true }, space.value?.background_ratio || 0, cols, rows)
 	return {
-		width: `${tile.value * (space.value?.cols || 0)}px`,
-		height: `${tile.value * (space.value?.rows || 0)}px`,
+		width: `${t * cols}px`,
+		height: `${t * rows}px`,
 		"--background-image": space.value?.background ? `url("${encodeURI(space.value.background)}")` : "none",
-		"--background-size": layout.fit ? "cover" : `${layout.scale}% auto`,
-		"--background-position": layout.fit ? "center" : `${layout.x}% ${layout.y}%`,
+		"--background-size": `${box.width * t}px ${box.height * t}px`,
+		"--background-position": `${box.left * t}px ${box.top * t}px`,
 	}
 })
 

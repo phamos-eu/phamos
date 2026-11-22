@@ -38,8 +38,12 @@ from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, s
 from phamos.cockpits.settings import COCKPITS as _COCKPITS
 
 # One shared world for everyone; the frontend draws exactly this grid.
+# The walkable grid (#2089): a site value map editors can grow; these are the defaults.
 COLS = 40
 ROWS = 25
+GRID_KEY = "phamos_ophice_grid"
+GRID_LIMITS = ((10, 120), (10, 80))
+EVENT_GRID = "ophice_grid"
 POSITION_KEY = "phamos_ophice_position"
 DUMMIES_CONF_KEY = "ophice_dummies"
 MAX_DUMMIES = 10
@@ -174,6 +178,49 @@ def _require_user():
 		frappe.throw(_("Ophice is only available to System Users."), frappe.PermissionError)
 
 
+def _grid():
+	"""(cols, rows) of the walkable grid: the stored size, else 40 x 25 (#2089)."""
+	# Read from the table, not frappe.db.get_default(): its Redis cache survives test rollbacks.
+	raw = frappe.db.get_value("DefaultValue", {"parent": "__default", "defkey": GRID_KEY}, "defvalue")
+	try:
+		data = json.loads(raw or "{}")
+	except (TypeError, ValueError):
+		data = {}
+	if not isinstance(data, dict):
+		data = {}
+	(cmin, cmax), (rmin, rmax) = GRID_LIMITS
+	cols = max(cmin, min(cmax, frappe.utils.cint(data.get("cols")) or COLS))
+	rows = max(rmin, min(rmax, frappe.utils.cint(data.get("rows")) or ROWS))
+	return cols, rows
+
+
+def _cols():
+	return _grid()[0]
+
+
+def _rows():
+	return _grid()[1]
+
+
+@frappe.whitelist(methods=["POST"])
+def set_grid(cols, rows):
+	"""Grow or shrink the walkable grid, for everyone (map editors only, #2089). Shrinking is
+	refused while a space would end up outside; chips are moved onto the grid as they arrive."""
+	_require_map_editor()
+	(cmin, cmax), (rmin, rmax) = GRID_LIMITS
+	cols = max(cmin, min(cmax, frappe.utils.cint(cols)))
+	rows = max(rmin, min(rmax, frappe.utils.cint(rows)))
+	for area in _areas():
+		if area.x + area.width > cols + 1e-9 or area.y + area.height > rows + 1e-9:
+			frappe.throw(
+				_("The space {0} would be cut off. Move or shrink it first.").format(area.title),
+				title=_("Grid too small"),
+			)
+	frappe.db.set_default(GRID_KEY, json.dumps({"cols": cols, "rows": rows}, separators=(",", ":")))
+	_publish(EVENT_GRID, {"cols": cols, "rows": rows, "by": frappe.session.user})
+	return {"cols": cols, "rows": rows}
+
+
 def _clamp(value, cells):
 	"""A float inside 0..cells-1, two decimals; anything that is not a finite number counts as 0."""
 	try:
@@ -186,7 +233,7 @@ def _clamp(value, cells):
 
 
 def _spawn():
-	return {"x": float(COLS // 2), "y": float(ROWS // 2)}
+	return {"x": float(_cols() // 2), "y": float(_rows() // 2)}
 
 
 def _stored_position():
@@ -199,7 +246,7 @@ def _stored_position():
 		return None
 	if not isinstance(data, dict):
 		return None
-	return {"x": _clamp(data.get("x"), COLS), "y": _clamp(data.get("y"), ROWS)}
+	return {"x": _clamp(data.get("x"), _cols()), "y": _clamp(data.get("y"), _rows())}
 
 
 def _chip(user, position):
@@ -225,7 +272,7 @@ def _dummies(me):
 		user = entry.get("user")
 		if not isinstance(user, str) or user == me or not frappe.db.get_value("User", user, "enabled"):
 			continue
-		chips.append(_chip(user, {"x": _clamp(entry.get("x"), COLS), "y": _clamp(entry.get("y"), ROWS), "dummy": True}))
+		chips.append(_chip(user, {"x": _clamp(entry.get("x"), _cols()), "y": _clamp(entry.get("y"), _rows()), "dummy": True}))
 	return chips
 
 
@@ -310,8 +357,8 @@ def _free_spot(start, user):
 		return random.choice(spots)
 	# Too small or full: the middle of it (chips are drawn one tile wide).
 	return {
-		"x": _clamp(start.x + start.width / 2 - 0.5, COLS),
-		"y": _clamp(start.y + start.height / 2 - 0.5, ROWS),
+		"x": _clamp(start.x + start.width / 2 - 0.5, _cols()),
+		"y": _clamp(start.y + start.height / 2 - 0.5, _rows()),
 	}
 
 
@@ -338,9 +385,9 @@ def get_space():
 		position = _stored_position() or _spawn()
 	_touch(user)
 	return {
-		"cols": COLS,
-		"rows": ROWS,
-		"me": {**_chip(user, position), "cols": COLS, "rows": ROWS},
+		"cols": _cols(),
+		"rows": _rows(),
+		"me": {**_chip(user, position), "cols": _cols(), "rows": _rows()},
 		"beam_in": arriving,
 		"others": dummies + online + [c for c in _away_offline() if c["user"] not in present],
 		"presence_ttl": PRESENCE_TTL,
@@ -348,6 +395,7 @@ def get_space():
 		"notices": _my_notices(user),
 		"background": _background().get("url") or "",
 		"background_layout": _background_layout(_background()),
+		"background_ratio": _background_ratio(_background()),
 		"areas": _areas(),
 		# The map tools and the Debug menu are only shown to map editors (#2071).
 		"can_edit_map": can_edit_map(user),
@@ -361,7 +409,7 @@ def heartbeat(x, y):
 	"""I am here (join, and every few seconds while the page is open), standing at x, y."""
 	_require_user()
 	user = frappe.session.user
-	chip = _chip(user, {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)})
+	chip = _chip(user, {"x": _clamp(x, _cols()), "y": _clamp(y, _rows())})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, {**chip, "ts": time.time()})
 	_touch(user)
 	# Just came in (#2072): the others play the beam-in once.
@@ -380,7 +428,7 @@ def move(x, y):
 	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
 	if not isinstance(entry, dict) or _throttled():
 		return None
-	entry.update({"x": _clamp(x, COLS), "y": _clamp(y, ROWS), "ts": time.time()})
+	entry.update({"x": _clamp(x, _cols()), "y": _clamp(y, _rows()), "ts": time.time()})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, entry)
 	message = {"user": user, "x": entry["x"], "y": entry["y"]}
 	_publish(EVENT_MOVE, message)
@@ -407,7 +455,7 @@ def leave():
 def save_my_position(x, y):
 	"""Remember where my chip stands; values outside the grid are moved onto its edge."""
 	_require_user()
-	position = {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)}
+	position = {"x": _clamp(x, _cols()), "y": _clamp(y, _rows())}
 	frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	return position
 
@@ -550,7 +598,7 @@ def _away_offline():
 			data = None
 		if not isinstance(data, dict):
 			continue
-		position = {"x": _clamp(data.get("x"), COLS), "y": _clamp(data.get("y"), ROWS), "offline": True}
+		position = {"x": _clamp(data.get("x"), _cols()), "y": _clamp(data.get("y"), _rows()), "offline": True}
 		chips.append(_chip(row.parent, position))
 	return chips
 
@@ -569,35 +617,73 @@ def _background():
 	return value if isinstance(value, dict) else {}
 
 
-# How the image lies on the grid: "fit" (cover), or a size in % of the grid width and a
-# position in % (CSS background-position) - so the map can be spaced to the grid.
-BACKGROUND_SCALE_RANGE = (20, 300)
+# How the image lies on the map (#2089): "fit" (covers the grid), or a place and width in grid
+# tiles; the height follows the image's ratio. It may reach beyond the grid: those parts are
+# shown dimmed. "zoom" is everyone's starting zoom (1 = the whole grid fits the window).
+BACKGROUND_MIN_WIDTH = 5
+ZOOM_RANGE = (1.0, 3.0)
+
+
+def _background_ratio(value):
+	"""Width / height of the background image: stored at upload, else read once from the file."""
+	ratio = frappe.utils.flt(value.get("ratio"))
+	if ratio > 0:
+		return ratio
+	if not value.get("file") or not frappe.db.exists("File", value["file"]):
+		return None
+	from PIL import Image
+
+	try:
+		path = frappe.get_doc("File", value["file"]).get_full_path()
+		with Image.open(path) as image:
+			width, height = image.size
+	except Exception:
+		return None
+	return round(width / height, 6) if height else None
 
 
 def _background_layout(value):
 	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
+	cols, rows = _grid()
+	zoom = round(max(ZOOM_RANGE[0], min(ZOOM_RANGE[1], frappe.utils.flt(layout.get("zoom")) or 1)), 2)
 	if layout.get("fit", True):
-		return {"fit": True, "scale": 100, "x": 50, "y": 50}
-	return {
-		"fit": False,
-		"scale": max(BACKGROUND_SCALE_RANGE[0], min(BACKGROUND_SCALE_RANGE[1], frappe.utils.flt(layout.get("scale"), 1) or 100)),
-		"x": max(0.0, min(100.0, frappe.utils.flt(layout.get("x"), 1))),
-		"y": max(0.0, min(100.0, frappe.utils.flt(layout.get("y"), 1))),
-	}
+		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": zoom}
+	ratio = _background_ratio(value) or cols / rows
+	if "width" not in layout:
+		# The first layout (#2058): size in % of the grid width, CSS background-position in %.
+		width = frappe.utils.flt(layout.get("scale") or 100) / 100 * cols
+		height = width / ratio
+		left = (cols - width) * frappe.utils.flt(layout.get("x", 50)) / 100
+		top = (rows - height) * frappe.utils.flt(layout.get("y", 50)) / 100
+	else:
+		width = frappe.utils.flt(layout.get("width")) or cols
+		left = frappe.utils.flt(layout.get("left"))
+		top = frappe.utils.flt(layout.get("top"))
+	width = max(BACKGROUND_MIN_WIDTH, min(4 * cols, width))
+	height = width / ratio
+	left = max(-width, min(cols, left))
+	top = max(-height, min(rows, top))
+	return {"fit": False, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
 
 
 @frappe.whitelist(methods=["POST"])
-def set_background_layout(fit=1, scale=100, x=50, y=50):
-	"""Size and position of the background image on the grid, for everyone."""
+def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
+	"""Place and size of the background image on the map, and the starting zoom, for everyone."""
 	_require_map_editor()
 	value = _background()
 	if not value.get("url"):
 		frappe.throw(_("Upload a background first."))
-	value["layout"] = {"fit": bool(frappe.utils.cint(fit)), "scale": scale, "x": x, "y": y}
+	value["layout"] = {
+		"fit": bool(frappe.utils.cint(fit)),
+		"left": frappe.utils.flt(left),
+		"top": frappe.utils.flt(top),
+		"width": frappe.utils.flt(width) or _cols(),
+		"zoom": frappe.utils.flt(zoom) or 1,
+	}
 	layout = _background_layout(value)
 	value["layout"] = layout
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")))
-	_publish(EVENT_BACKGROUND, {"url": value["url"], "layout": layout, "by": frappe.session.user})
+	_publish(EVENT_BACKGROUND, {"url": value["url"], "layout": layout, "ratio": _background_ratio(value), "by": frappe.session.user})
 	return layout
 
 
@@ -607,7 +693,15 @@ def _set_background(value):
 	if previous and previous != value.get("file") and frappe.db.exists("File", previous):
 		frappe.delete_doc("File", previous, ignore_permissions=True, delete_permanently=True)
 	# A new image starts fitted to the grid.
-	_publish(EVENT_BACKGROUND, {"url": value.get("url", ""), "layout": _background_layout(value), "by": frappe.session.user})
+	_publish(
+		EVENT_BACKGROUND,
+		{
+			"url": value.get("url", ""),
+			"layout": _background_layout(value),
+			"ratio": _background_ratio(value) if value else None,
+			"by": frappe.session.user,
+		},
+	)
 
 
 def _store_background(content, filename):
@@ -624,6 +718,7 @@ def _store_background(content, filename):
 	try:
 		with Image.open(BytesIO(content)) as image:
 			image_format = image.format
+			width, height = image.size
 			image.verify()
 	except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
 		frappe.throw(_("This file is not an image Ophice can show (PNG, JPEG, WebP or GIF)."))
@@ -641,7 +736,8 @@ def _store_background(content, filename):
 			"folder": "Home",
 		}
 	).insert(ignore_permissions=True)
-	_set_background({"url": file_doc.file_url, "file": file_doc.name})
+	# The ratio places the image in grid tiles (#2089).
+	_set_background({"url": file_doc.file_url, "file": file_doc.name, "ratio": round(width / height, 6) if height else None})
 	return file_doc.file_url
 
 
@@ -1248,10 +1344,10 @@ def _half(value):
 
 def _clean_rect(x, y, width, height):
 	"""A rectangle in half-tile steps inside the grid, at least half a tile each way."""
-	x = max(0, min(COLS - AREA_STEP, _half(x)))
-	y = max(0, min(ROWS - AREA_STEP, _half(y)))
-	width = max(AREA_STEP, min(COLS - x, _half(width)))
-	height = max(AREA_STEP, min(ROWS - y, _half(height)))
+	x = max(0, min(_cols() - AREA_STEP, _half(x)))
+	y = max(0, min(_rows() - AREA_STEP, _half(y)))
+	width = max(AREA_STEP, min(_cols() - x, _half(width)))
+	height = max(AREA_STEP, min(_rows() - y, _half(height)))
 	return x, y, width, height
 
 

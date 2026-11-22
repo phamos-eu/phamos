@@ -23,6 +23,13 @@ def sync_ophice_start_page(on):
 	elif not on and current == OPHICE_DEFAULT_APP:
 		# Only what this switch set; another default app someone chose stays.
 		frappe.db.set_single_value("System Settings", "default_app", "")
+	else:
+		return
+	# set_single_value skips the cached System Settings that frappe.get_system_settings() reads
+	# (and its copy on frappe.local): without this the login page keeps the old default (#2089).
+	frappe.clear_document_cache("System Settings", "System Settings")
+	if hasattr(frappe.local, "system_settings"):
+		del frappe.local.system_settings
 
 
 class CockpitSettings(Document):

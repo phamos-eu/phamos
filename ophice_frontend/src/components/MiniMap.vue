@@ -63,30 +63,63 @@
 				<FeatherIcon name="map" class="h-3 w-3" />
 				<span>{{ __("Map") }}</span>
 			</button>
-			<!-- The office, small: a click goes back to the map, full screen -->
+			<!--
+				The office, small: a click goes back to the map, full screen. Drag or scroll to look
+				around first, Ctrl/⌘ + scroll or the buttons to zoom (#2089), remembered in this browser.
+			-->
 			<div
 				v-show="open.map || !meeting"
-				class="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-lg"
+				class="mini-map__view relative flex-shrink-0 cursor-pointer overflow-hidden rounded-lg"
 				:style="mapStyle"
 				:title="__('Back to the map')"
 				data-testid="mini-map-map"
+				@pointerdown="cam.onPointerDown"
+				@pointermove="cam.onPointerMove"
+				@pointerup="cam.onPointerUp"
+				@pointercancel="cam.onPointerUp"
+				@click.capture="cam.onClickCapture"
 				@click="$emit('fullscreen')"
+				@wheel.prevent="cam.onWheel"
 			>
 				<div
-					v-for="area in areas"
-					:key="area.name"
-					class="absolute rounded-sm"
-					:style="areaStyle(area)"
-				/>
-				<span
-					v-for="chip in others"
-					:key="chip.user"
-					class="mini-map__chip absolute rounded-full"
-					:class="{ 'opacity-40': chip.offline }"
-					:style="chipStyle(chip, chip.guest ? 'rgb(217,119,6)' : `hsl(${ringHue(chip.user)} 80% 45%)`)"
-					:title="chip.full_name"
-				/>
-				<span v-if="me" class="mini-map__chip mini-map__chip--me absolute rounded-full" :style="chipStyle(me, 'rgb(37,99,235)')" :title="__('You')" />
+					class="absolute left-0 top-0"
+					:class="{ 'mini-map__canvas--spring': cam.springing.value }"
+					:style="canvasStyle"
+				>
+					<img
+						v-if="background && imageBox"
+						:src="background"
+						alt=""
+						draggable="false"
+						class="pointer-events-none absolute max-w-none select-none"
+						:style="imageStyle"
+					/>
+					<div class="absolute" :style="gridStyle">
+						<div
+							v-for="area in areas"
+							:key="area.name"
+							class="absolute rounded-sm"
+							:style="areaStyle(area)"
+						/>
+						<span
+							v-for="chip in others"
+							:key="chip.user"
+							class="mini-map__chip absolute rounded-full"
+							:class="{ 'opacity-40': chip.offline }"
+							:style="chipStyle(chip, chip.guest ? 'rgb(217,119,6)' : `hsl(${ringHue(chip.user)} 80% 45%)`)"
+							:title="chip.full_name"
+						/>
+						<span v-if="me" class="mini-map__chip mini-map__chip--me absolute rounded-full" :style="chipStyle(me, 'rgb(37,99,235)')" :title="__('You')" />
+					</div>
+				</div>
+				<div class="absolute bottom-1 right-1 flex gap-0.5" @click.stop @pointerdown.stop>
+					<button type="button" class="mini-map__zoom" :title="__('Zoom out')" data-testid="mini-map-zoom-out" @click="cam.zoomBy(1 / 1.25)">
+						<FeatherIcon name="minus" class="h-3 w-3" />
+					</button>
+					<button type="button" class="mini-map__zoom" :title="__('Zoom in')" data-testid="mini-map-zoom-in" @click="cam.zoomBy(1.25)">
+						<FeatherIcon name="plus" class="h-3 w-3" />
+					</button>
+				</div>
 			</div>
 
 			<!-- Pings: newest first -->
@@ -235,6 +268,8 @@ import PopOutIcon from "./PopOutIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat } from "../utils/pip.js"
+import { useMapCamera } from "../composables/useMapCamera.js"
+import { imagePlacement } from "../utils/ophiceView.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -244,6 +279,8 @@ const props = defineProps({
 	areas: { type: Array, default: () => [] },
 	background: { type: String, default: "" },
 	backgroundLayout: { type: Object, default: () => ({ fit: true }) },
+	/** The image's width / height, to place it in tiles (#2089). */
+	backgroundRatio: { type: Number, default: 0 },
 	/** [{ id, kind: walkup | message | meeting | reminder, text, user?, fresh? }] */
 	pings: { type: Array, default: () => [] },
 	noticeCount: { type: Number, default: 0 },
@@ -285,21 +322,54 @@ const tile = computed(() => {
 	if (wide.value) t = Math.min(t, (panelHeight.value - 48) / props.rows)
 	return Math.max(2, t)
 })
-const mapStyle = computed(() => {
-	const layout = props.backgroundLayout || { fit: true }
-	return {
-		width: `${tile.value * props.cols}px`,
-		height: `${tile.value * props.rows}px`,
-		backgroundColor: "var(--surface-gray-2, #eee)",
-		backgroundImage: props.background ? `url("${encodeURI(props.background)}")` : "none",
-		backgroundSize: layout.fit ? "cover" : `${layout.scale}% auto`,
-		backgroundPosition: layout.fit ? "center" : `${layout.x}% ${layout.y}%`,
-		backgroundRepeat: "no-repeat",
-	}
+// The box keeps the office's shape at "fit"; inside, the camera zooms and pans (#2089).
+const mapStyle = computed(() => ({
+	width: `${tile.value * props.cols}px`,
+	height: `${tile.value * props.rows}px`,
+	backgroundColor: "var(--surface-gray-2, #eee)",
+}))
+const imageBox = computed(() =>
+	props.background ? imagePlacement(props.backgroundLayout, props.backgroundRatio, props.cols, props.rows) : null
+)
+const cam = useMapCamera({
+	view: () => ({ width: tile.value * props.cols, height: tile.value * props.rows }),
+	grid: () => ({ cols: props.cols, rows: props.rows }),
+	image: () => imageBox.value,
+	storageKey: "phamos_ophice_zoom_cockpit_map",
+	pad: 0,
+	minTile: 2,
 })
+const t = () => cam.tile.value
+const canvasStyle = computed(() => ({
+	width: `${cam.size.value.width}px`,
+	height: `${cam.size.value.height}px`,
+	transform: cam.transform.value,
+}))
+const gridStyle = computed(() => ({
+	left: `${cam.origin.value.x}px`,
+	top: `${cam.origin.value.y}px`,
+	width: `${t() * props.cols}px`,
+	height: `${t() * props.rows}px`,
+}))
+const imageStyle = computed(() => {
+	const box = imageBox.value
+	const c = cam.canvas.value
+	return box
+		? { left: `${(box.left - c.x) * t()}px`, top: `${(box.top - c.y) * t()}px`, width: `${box.width * t()}px`, height: `${box.height * t()}px` }
+		: {}
+})
+// Start on my chip; the view follows it while I walk (the cockpit is in front, so rarely).
+watch(
+	() => cam.tile.value,
+	(value) => value && props.me && !cam.isPlaced() && cam.place(props.me.x, props.me.y)
+)
+watch(
+	() => props.me && [props.me.x, props.me.y],
+	() => props.me && cam.followChip(props.me.x, props.me.y, { resume: false })
+)
 
 function areaStyle(area) {
-	const t = tile.value
+	const t = cam.tile.value
 	const h = area.color_hue ?? 220
 	return {
 		left: `${area.x * t}px`,
@@ -312,7 +382,7 @@ function areaStyle(area) {
 }
 
 function chipStyle(chip, color) {
-	const t = tile.value
+	const t = cam.tile.value
 	const size = Math.max(7, t * 0.9)
 	return {
 		width: `${size}px`,
@@ -548,6 +618,23 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.mini-map__canvas--spring {
+	transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mini-map__view {
+	touch-action: none;
+}
+.mini-map__zoom {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.25rem;
+	height: 1.25rem;
+	border-radius: 0.25rem;
+	background: rgba(255, 255, 255, 0.9);
+	color: #374151;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
 .mini-map__chip {
 	box-shadow: 0 0 0 1.5px #fff, 0 1px 2px rgba(0, 0, 0, 0.5);
 	transition: left 160ms linear, top 160ms linear;

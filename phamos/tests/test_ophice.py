@@ -23,8 +23,8 @@ class OphiceTestCase(FrappeTestCase):
 
 	def test_spawn_when_nothing_is_stored(self):
 		space = ophice.get_space()
-		self.assertEqual((space["me"]["x"], space["me"]["y"]), (ophice.COLS // 2, ophice.ROWS // 2))
-		self.assertEqual((space["cols"], space["rows"]), (ophice.COLS, ophice.ROWS))
+		self.assertEqual((space["me"]["x"], space["me"]["y"]), (ophice._cols() // 2, ophice._rows() // 2))
+		self.assertEqual((space["cols"], space["rows"]), (ophice._cols(), ophice._rows()))
 		self.assertEqual(space["me"]["user"], "Administrator")
 
 	def test_free_position_round_trip(self):
@@ -33,13 +33,15 @@ class OphiceTestCase(FrappeTestCase):
 		self.assertEqual((me["x"], me["y"]), (3.46, 7.1))
 
 	def test_clamped_to_the_grid(self):
-		self.assertEqual(ophice.save_my_position(-5, 999), {"x": 0.0, "y": ophice.ROWS - 1.0})
+		self.assertEqual(ophice.save_my_position(-5, 999), {"x": 0.0, "y": ophice._rows() - 1.0})
 		self.assertEqual(ophice.save_my_position("abc", "nan"), {"x": 0.0, "y": 0.0})
 
 	def test_broken_stored_value_falls_back_to_spawn(self):
+		# Not coming in (#2072): otherwise the chip is beamed into the site's start space.
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
 		frappe.defaults.set_user_default(ophice.POSITION_KEY, "not json")
 		me = ophice.get_space()["me"]
-		self.assertEqual((me["x"], me["y"]), (ophice.COLS // 2, ophice.ROWS // 2))
+		self.assertEqual((me["x"], me["y"]), (ophice._cols() // 2, ophice._rows() // 2))
 
 	def test_dummies_from_site_config(self):
 		dummies = [{"user": "Guest", "x": 5, "y": 6}, {"user": "Administrator", "x": 1, "y": 1}, {"user": "nobody@example.com"}, "junk"]
@@ -104,7 +106,7 @@ class OphicePresenceTestCase(FrappeTestCase):
 			self.assertIsNone(ophice.move(3, 3))
 			publish.assert_not_called()
 			ophice.heartbeat(1, 1)
-			self.assertEqual(ophice.move(99, -1), {"user": "Administrator", "x": ophice.COLS - 1.0, "y": 0.0})
+			self.assertEqual(ophice.move(99, -1), {"user": "Administrator", "x": ophice._cols() - 1.0, "y": 0.0})
 		self.assertEqual(publish.call_args.args[0], ophice.EVENT_MOVE)
 
 	def test_move_throttled_per_user(self):
@@ -421,15 +423,32 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 		self.assertEqual(ophice.get_space()["background"], "")
 
 
-	def test_background_layout_is_clamped_and_shared(self):
+	def test_background_layout_in_tiles_is_clamped_and_shared(self):
+		"""#2089: place and width in grid tiles, may reach beyond the grid, clamped; ratio stored."""
+		cols, rows = ophice._grid()
 		with patch.object(ophice.frappe, "publish_realtime"):
 			with self.assertRaises(frappe.ValidationError):
-				ophice.set_background_layout(0, 150, 10, 90)  # no background yet
+				ophice.set_background_layout(0, 1, 1, 30)  # no background yet
 			ophice._store_background(self._png(), "map.png")
-			self.assertEqual(ophice.get_space()["background_layout"], {"fit": True, "scale": 100, "x": 50, "y": 50})
-			layout = ophice.set_background_layout(0, 999, -5, 40)
-		self.assertEqual(layout, {"fit": False, "scale": 300, "x": 0.0, "y": 40.0})
+			self.assertEqual(ophice.get_space()["background_layout"], {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0})
+			ratio = ophice.get_space()["background_ratio"]
+			self.assertGreater(ratio, 0)
+			layout = ophice.set_background_layout(0, -999, 3.25, 999, 9)
+		self.assertEqual(layout["width"], 4 * cols)
+		self.assertEqual(layout["left"], -4 * cols)
+		self.assertEqual((layout["top"], layout["zoom"], layout["fit"]), (3.25, 3.0, False))
 		self.assertEqual(ophice.get_space()["background_layout"], layout)
+
+	def test_old_percent_layout_converts_to_tiles(self):
+		with patch.object(ophice.frappe, "publish_realtime"):
+			ophice._store_background(self._png(), "map.png")
+		cols, rows = ophice._grid()
+		value = ophice._background()
+		value["layout"] = {"fit": False, "scale": 50, "x": 100, "y": 0}
+		layout = ophice._background_layout(value)
+		# Half the grid wide, flush right, at the top.
+		self.assertEqual((layout["width"], layout["left"], layout["top"]), (cols / 2, cols / 2, 0))
+
 
 class OphiceAreaTestCase(FrappeTestCase):
 	"""Meeting areas (#2060): rectangles with a fixed Jitsi meeting."""
@@ -883,7 +902,7 @@ class OphiceMapEditorTestCase(_OphiceRoomBase):
 		with self.assertRaises(frappe.PermissionError):
 			ophice.delete_area(area)
 		with self.assertRaises(frappe.PermissionError):
-			ophice.set_background_layout(fit=0, scale=120)
+			ophice.set_background_layout(fit=0, width=20)
 		with self.assertRaises(frappe.PermissionError):
 			ophice.remove_background()
 		self.assertTrue(frappe.db.exists(ophice.AREA_DOCTYPE, area))
@@ -1267,3 +1286,24 @@ class OphiceStartPageTestCase(FrappeTestCase):
 		settings.ophice_start_page = 0
 		settings.save(ignore_permissions=True)
 		self.assertFalse(frappe.db.get_single_value("System Settings", "default_app"))
+
+
+class OphiceGridTestCase(_OphiceRoomBase):
+	"""Growable grid (#2089): map editors set it, spaces are never cut off, chips clamp to it."""
+
+	def test_grid_grows_and_clamps(self):
+		frappe.set_user(self.A)  # map editor
+		self.assertEqual(ophice.set_grid(60, 999), {"cols": 60, "rows": 80})
+		self.assertEqual(ophice.get_space()["cols"], 60)
+		self.assertEqual(ophice.save_my_position(59, 79), {"x": 59.0, "y": 79.0})
+		frappe.set_user(self.B)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.set_grid(30, 20)
+
+	def test_shrinking_never_cuts_a_space_off(self):
+		frappe.set_user(self.A)
+		ophice.set_grid(60, 40)
+		ophice.save_area("Far", "https://jitsi.example.org/FarAway", 50, 30, 4, 4)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_grid(40, 25)
+		self.assertEqual(ophice._grid(), (60, 40))

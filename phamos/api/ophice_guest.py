@@ -303,13 +303,14 @@ def guest_space():
 	]
 	background = ophice._background()
 	return {
-		"cols": ophice.COLS,
-		"rows": ophice.ROWS,
+		"cols": ophice._cols(),
+		"rows": ophice._rows(),
 		"me": chip,
 		"areas": [_rect(a) for a in areas],
 		"others": others,
 		"background": background.get("url") or "",
 		"background_layout": ophice._background_layout(background),
+		"background_ratio": ophice._background_ratio(background),
 		"expires_in": max(0, round(entry["expires"] - time.time())),
 		# The meeting and chat where I stand (#2083); the page asks every second.
 		"room": _chat_for_guest(guest_id, chip, areas),

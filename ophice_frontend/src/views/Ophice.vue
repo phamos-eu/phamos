@@ -63,7 +63,7 @@
 				{{ __("Background") }}
 			</Button>
 			<Button
-				v-if="canEditMap && background"
+				v-if="canEditMap"
 				:variant="adjustingBackground ? 'solid' : 'subtle'"
 				:title="__('Size and position of the background image on the grid, for everyone')"
 				:aria-pressed="adjustingBackground"
@@ -106,46 +106,74 @@
 			@hide="setHideDetails"
 		/>
 		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-			<!-- Size and position of the background image against the grid (#2058), top left. -->
+			<!--
+				Adjust (#2058, #2089): the image in grid tiles (drag it on the map, or nudge it here), the
+				grid's size, and everyone's starting zoom. Top left; everyone sees the changes.
+			-->
 			<div
-				v-if="adjustingBackground && background"
+				v-if="adjustingBackground && me"
 				class="absolute left-6 top-6 z-30 w-72 space-y-3 rounded-xl border border-outline-gray-2 bg-surface-white p-3 text-sm text-ink-gray-9 shadow-xl"
+				data-no-pan
 				data-testid="background-adjust"
 			>
-				<div class="flex items-center justify-between">
-					<span class="font-medium">{{ __("Background image") }}</span>
-					<Button variant="ghost" :disabled="backgroundLayout.fit" @click="setLayout({ fit: true })">
-						{{ __("Fit") }}
+				<template v-if="background && imageBox">
+					<div class="flex items-center justify-between">
+						<span class="font-medium">{{ __("Background image") }}</span>
+						<Button variant="ghost" :disabled="backgroundLayout.fit" @click="setLayout({ fit: true })">
+							{{ __("Fit") }}
+						</Button>
+					</div>
+					<p class="text-xs text-ink-gray-5">
+						{{ __("Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.") }}
+					</p>
+					<div class="grid grid-cols-3 gap-2 text-xs">
+						<label v-for="field in IMAGE_FIELDS" :key="field.key" class="block">
+							<span class="text-ink-gray-6">{{ field.label }}</span>
+							<div class="mt-0.5 flex items-center">
+								<button type="button" class="ophice-zoom__button" :title="__('Half a tile less')" @click="nudgeImage(field.key, -0.5)">
+									<FeatherIcon name="minus" class="h-3 w-3" />
+								</button>
+								<span class="w-9 text-center tabular-nums" :data-testid="`background-${field.key}`">{{ fmtTiles(imageBox[field.key]) }}</span>
+								<button type="button" class="ophice-zoom__button" :title="__('Half a tile more')" @click="nudgeImage(field.key, 0.5)">
+									<FeatherIcon name="plus" class="h-3 w-3" />
+								</button>
+							</div>
+						</label>
+					</div>
+				</template>
+				<div class="space-y-1.5 border-t border-outline-gray-2 pt-2" :class="{ 'border-t-0 pt-0': !background }">
+					<span class="font-medium">{{ __("Grid") }}</span>
+					<div class="flex items-center gap-2 text-xs">
+						<label v-for="axis in GRID_AXES" :key="axis.key" class="flex items-center gap-1">
+							<span class="text-ink-gray-6">{{ axis.label }}</span>
+							<button type="button" class="ophice-zoom__button" :disabled="gridBusy" :title="__('One tile less')" @click="changeGrid(axis.key, -1)">
+								<FeatherIcon name="minus" class="h-3 w-3" />
+							</button>
+							<span class="w-7 text-center tabular-nums" :data-testid="`grid-${axis.key}`">{{ me[axis.key] }}</span>
+							<button type="button" class="ophice-zoom__button" :disabled="gridBusy" :title="__('One tile more')" @click="changeGrid(axis.key, 1)">
+								<FeatherIcon name="plus" class="h-3 w-3" />
+							</button>
+						</label>
+					</div>
+					<Button
+						v-if="background && imageBox"
+						size="sm"
+						variant="subtle"
+						:loading="gridBusy"
+						:title="__('Grows the grid to the right and down until it covers the image')"
+						data-testid="grid-cover-image"
+						@click="gridToImage"
+					>
+						{{ __("Grid to cover the image") }}
 					</Button>
 				</div>
-				<label class="block">
-					<span class="flex justify-between text-xs text-ink-gray-6">
-						<span>{{ __("Size") }}</span><span>{{ backgroundLayout.fit ? __("Fit") : `${backgroundLayout.scale} %` }}</span>
-					</span>
-					<input
-						type="range" min="20" max="300" step="1" class="w-full"
-						:value="backgroundLayout.scale"
-						data-testid="background-scale"
-						@input="setLayout({ fit: false, scale: +$event.target.value })"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-xs text-ink-gray-6">{{ __("Horizontal position") }}</span>
-					<input
-						type="range" min="0" max="100" step="0.5" class="w-full"
-						:value="backgroundLayout.x"
-						@input="setLayout({ fit: false, x: +$event.target.value })"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-xs text-ink-gray-6">{{ __("Vertical position") }}</span>
-					<input
-						type="range" min="0" max="100" step="0.5" class="w-full"
-						:value="backgroundLayout.y"
-						@input="setLayout({ fit: false, y: +$event.target.value })"
-					/>
-				</label>
-				<p class="text-xs text-ink-gray-5">{{ __("The grid stays as it is; everyone sees the change.") }}</p>
+				<div class="flex items-center justify-between gap-2 border-t border-outline-gray-2 pt-2 text-xs">
+					<span class="text-ink-gray-6">{{ __("Starting zoom for everyone: {0} %", [Math.round((backgroundLayout.zoom || 1) * 100)]) }}</span>
+					<Button size="sm" variant="ghost" :disabled="!background" data-testid="zoom-for-everyone" @click="setLayout({ zoom: mainCam.zoom.value })">
+						{{ __("Use mine") }}
+					</Button>
+				</div>
+				<p class="text-xs text-ink-gray-5">{{ __("Everyone sees the change.") }}</p>
 			</div>
 			<!-- The meeting of the area I stand in (#2060), top right. -->
 			<!-- Meeting view (#2061): the meeting is the big window, the map shrinks to the bottom left. -->
@@ -275,16 +303,52 @@
 					@save="saveEncounter(notice)"
 				/>
 			</div>
+			<!--
+				The map (#2089): a view onto a canvas that can be bigger than the window. Drag or scroll to
+				look around (it bounces at the edges), Ctrl/⌘ + scroll or the buttons to zoom. In a meeting
+				it is the mini map at the bottom left, with its own zoom. The canvas holds the background
+				image (it may reach beyond the grid; those parts are dimmed) and the walkable grid.
+			-->
 			<div
 				v-if="me"
-				class="ophice-grid rounded-lg border border-outline-gray-2 bg-surface-white"
+				class="ophice-viewport overflow-hidden"
+				:class="meetingArea ? 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl' : 'absolute inset-0'"
+				:style="viewportStyle"
+				data-testid="map-viewport"
+				@pointerdown="onViewportDown"
+				@pointermove="camera().onPointerMove"
+				@pointerup="camera().onPointerUp"
+				@pointercancel="camera().onPointerUp"
+				@click.capture="camera().onClickCapture"
+				@wheel="onViewportWheel"
+			>
+			<div
+				class="ophice-canvas absolute left-0 top-0"
+				:class="{ 'ophice-canvas--spring': camera().springing.value, 'ophice-canvas--dragging': camera().dragging.value }"
+				:style="canvasStyle"
+				data-testid="map-canvas"
+			>
+				<BackgroundImage
+					v-if="background && imageBox"
+					:src="background"
+					:placement="imageBox"
+					:canvas="camera().canvas.value"
+					:tile="tile"
+				/>
+				<MapFog
+					v-if="background && imageBox"
+					:canvas="camera().canvas.value"
+					:revealed="{ x: 0, y: 0, w: me.cols, h: me.rows }"
+					:tile="tile"
+				/>
+			<div
+				class="ophice-grid absolute"
 				:class="{
-					'ophice-grid--image': background,
+					'ophice-grid--plain rounded-lg border border-outline-gray-2 bg-surface-white': !background,
 					'ophice-grid--lines': editingAreas || adjustingBackground,
-					relative: !meetingArea,
-					'ophice-grid--mini absolute z-20 shadow-xl': meetingArea,
 				}"
 				:style="gridStyle"
+				data-testid="map-grid"
 			>
 				<AreaLayer
 					:areas="areas"
@@ -358,6 +422,7 @@
 					:video="bubble.user === videoUser ? bubble.video : null"
 					:display-name="me.full_name"
 					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
+					data-no-pan
 					@pointerdown.capture="raise(`chat:${bubble.user}`)"
 					@send="(text, done) => sendMessage(bubble, text, done)"
 					@close="closeBubble(bubble.user)"
@@ -400,6 +465,7 @@
 						<div
 							v-if="noticeOpen[notice.name]"
 							class="ophice-notice absolute"
+							data-no-pan
 							:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
 							data-testid="notice-at-area"
 							@pointerdown="raise(`batch:${notice.name}`)"
@@ -437,6 +503,7 @@
 					<div
 						v-if="noticeList.length"
 						class="absolute flex flex-col gap-2"
+						data-no-pan
 						:style="{ ...noticeAtMe, zIndex: zOf('burn') }"
 						data-testid="notice-at-me"
 						@pointerdown="raise('burn')"
@@ -461,6 +528,43 @@
 					:class="{ 'ophice-chip--remote': chip.user !== me.user }"
 				/>
 			</div>
+				<!-- Adjust (#2089): the image's outline with move and resize handles, on top of everything. -->
+				<BackgroundImage
+					v-if="adjustingBackground && background && imageBox"
+					frame
+					:src="background"
+					:placement="imageBox"
+					:canvas="camera().canvas.value"
+					:tile="tile"
+					:ratio="backgroundRatio"
+					@change="(place) => setLayout({ fit: false, ...place })"
+				/>
+			</div>
+			<!-- Zoom (#2089): per person, remembered in this browser. -->
+			<div
+				class="ophice-zoom absolute z-30 flex items-center gap-0.5 rounded-lg border border-outline-gray-2 bg-surface-white/95 p-0.5 text-xs shadow"
+				:class="meetingArea ? 'right-1.5 top-1.5' : 'bottom-3 left-3'"
+				data-no-pan
+				data-testid="map-zoom"
+			>
+				<button type="button" class="ophice-zoom__button" :title="__('Zoom out')" data-testid="zoom-out" @click="camera().zoomBy(1 / 1.25)">
+					<FeatherIcon name="minus" class="h-3.5 w-3.5" />
+				</button>
+				<span class="w-10 text-center tabular-nums text-ink-gray-7" data-testid="zoom-level">{{ Math.round(camera().zoom.value * 100) }} %</span>
+				<button type="button" class="ophice-zoom__button" :title="__('Zoom in')" data-testid="zoom-in" @click="camera().zoomBy(1.25)">
+					<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+				</button>
+				<button
+					type="button"
+					class="ophice-zoom__button px-1.5"
+					:title="__('Show the whole grid')"
+					data-testid="zoom-fit"
+					@click="camera().fit(me.x, me.y)"
+				>
+					{{ __("Fit") }}
+				</button>
+			</div>
+			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
 		<!-- Shortcut bar (#2073): the cockpits in a column at the right edge, part of the page like
@@ -483,6 +587,7 @@
 			:areas="areas"
 			:background="background"
 			:background-layout="backgroundLayout"
+			:background-ratio="backgroundRatio"
 			:pings="pings"
 			:notice-count="noticeList.length + batchNoticeList.length"
 			:meeting="Boolean(meetingArea)"
@@ -517,6 +622,10 @@ import CockpitBar from "../components/CockpitBar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
+import MapFog from "../components/MapFog.vue"
+import BackgroundImage from "../components/BackgroundImage.vue"
+import { useMapCamera } from "../composables/useMapCamera.js"
+import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
@@ -583,6 +692,7 @@ const SHIFT_SPEED = 16.5
 // Two chips can't overlap: centres stay at least this far apart (one chip is 0.8 tiles wide).
 const MIN_DISTANCE = 0.8
 const SAVE_AFTER_MS = 400
+const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 // A quick tap (pressed and released before the next frame) still moves this long.
 const TAP_SECONDS = 0.05
 // The avatar is drawn at 40px and scaled to the tile.
@@ -625,12 +735,7 @@ const MINI_MIN = 260
 const MINI_MAX = 440
 const STAGE_PAD = 16
 const miniWidth = computed(() => Math.max(MINI_MIN, Math.min(MINI_MAX, view.width * MINI_SHARE)))
-const tile = computed(() => {
-	if (!me.value || !view.width) return 0
-	if (meetingArea.value) return Math.max(4, Math.floor(miniWidth.value / me.value.cols))
-	const size = Math.min((view.width - 32) / me.value.cols, (view.height - 32) / me.value.rows)
-	return Math.max(8, Math.floor(size))
-})
+// `tile` and the cameras are set up below, once the background settings exist (#2089).
 
 // Where the meeting window sits, as shares of the stage (they follow the window size); the
 // user's own placement is kept in this browser.
@@ -667,25 +772,135 @@ function setMeetingRect(rect) {
 }
 const chipScale = computed(() => (tile.value * 0.8) / AVATAR_PX)
 
+// The walkable grid inside the canvas: its tile (0,0) sits at the camera's origin.
 const gridStyle = computed(() => ({
+	left: `${camera().origin.value.x}px`,
+	top: `${camera().origin.value.y}px`,
 	width: `${tile.value * me.value.cols}px`,
 	height: `${tile.value * me.value.rows}px`,
-	...(meetingArea.value ? { left: `${STAGE_PAD}px`, bottom: `${STAGE_PAD}px` } : {}),
 	"--tile": `${tile.value}px`,
-	// The grid lines stay on top of the image (see .ophice-grid--image).
-	"--background-image": background.value ? `url("${encodeURI(background.value)}")` : "none",
-	// Size in % of the grid width, position in %: the map can be spaced against the grid.
-	"--background-size": backgroundLayout.value.fit ? "cover" : `${backgroundLayout.value.scale}% auto`,
-	"--background-position": backgroundLayout.value.fit
-		? "center"
-		: `${backgroundLayout.value.x}% ${backgroundLayout.value.y}%`,
 }))
+const canvasStyle = computed(() => ({
+	width: `${camera().size.value.width}px`,
+	height: `${camera().size.value.height}px`,
+	transform: camera().transform.value,
+}))
+const viewportStyle = computed(() =>
+	meetingArea.value
+		? { left: `${STAGE_PAD}px`, bottom: `${STAGE_PAD}px`, width: `${miniView.value.width}px`, height: `${miniView.value.height}px` }
+		: {}
+)
+
+// Adjust panel (#2089): the image's place and width in tiles, nudged in half tiles.
+const IMAGE_FIELDS = [
+	{ key: "width", label: __("Width") },
+	{ key: "left", label: __("Left") },
+	{ key: "top", label: __("Top") },
+]
+const GRID_AXES = [
+	{ key: "cols", label: __("Across") },
+	{ key: "rows", label: __("Down") },
+]
+const gridBusy = ref(false)
+
+function fmtTiles(value) {
+	return Math.round((value || 0) * 100) / 100
+}
+
+/** Move the image (left/top) or change its width by `by` tiles; the width keeps the ratio. */
+function nudgeImage(key, by) {
+	const box = imageBox.value
+	if (!box) return
+	const next = { left: box.left, top: box.top, width: box.width }
+	next[key] = Math.round((next[key] + by) * 1000) / 1000
+	if (key === "width") next.width = Math.max(5, next.width)
+	setLayout({ fit: false, ...next })
+}
+
+async function setGrid(cols, rows) {
+	gridBusy.value = true
+	try {
+		const size = await call(`${API}.set_grid`, { cols, rows })
+		me.value.cols = size.cols
+		me.value.rows = size.rows
+		moveTo(me.value.x, me.value.y)
+	} catch (e) {
+		toast.error(errorText(e) || __("The grid could not be changed."))
+	} finally {
+		gridBusy.value = false
+	}
+}
+
+function changeGrid(key, by) {
+	const size = { cols: me.value.cols, rows: me.value.rows }
+	size[key] += by
+	setGrid(size.cols, size.rows)
+}
+
+/** Grow the grid right and down until it covers the image (it starts at the grid's corner). */
+function gridToImage() {
+	const box = imageBox.value
+	if (!box) return
+	setGrid(Math.max(me.value.cols, Math.ceil(box.left + box.width)), Math.max(me.value.rows, Math.ceil(box.top + box.height)))
+}
+
+// Where the background lies, in grid tiles (null without one).
+const backgroundRatio = ref(0)
+const imageBox = computed(() =>
+	background.value && me.value
+		? imagePlacement(backgroundLayout.value, backgroundRatio.value, me.value.cols, me.value.rows)
+		: null
+)
+
+/** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
+function onViewportDown(event) {
+	if (editingAreas.value || adjustingBackground.value) return
+	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	camera().onPointerDown(event)
+}
+
+/** Scroll pans, Ctrl/⌘ + scroll zooms; not inside a scrolling panel (a chat) over the map. */
+function onViewportWheel(event) {
+	if (event.target.closest?.("[data-no-pan]") && !(event.ctrlKey || event.metaKey)) return
+	event.preventDefault()
+	camera().onWheel(event)
+}
 
 // --- Background image (one for everyone, anyone may change it).
 
 const background = ref("")
-const FITTED = { fit: true, scale: 100, x: 50, y: 50 }
+const FITTED = { fit: true, left: 0, top: 0, width: 40, zoom: 1 }
 const backgroundLayout = ref({ ...FITTED })
+
+// The map's camera (#2089): the big map fills the stage, in a meeting the mini map sits at the
+// bottom left; each has its own zoom, remembered in this browser.
+const gridSize = () => ({ cols: me.value?.cols || 40, rows: me.value?.rows || 25 })
+const miniView = computed(() => {
+	const { cols, rows } = gridSize()
+	return { width: miniWidth.value, height: Math.round((miniWidth.value * rows) / cols) }
+})
+const mainCam = useMapCamera({
+	view,
+	grid: gridSize,
+	image: () => imageBox.value,
+	storageKey: "phamos_ophice_zoom",
+	startZoom: () => backgroundLayout.value?.zoom || 1,
+	minTile: 8,
+})
+const miniCam = useMapCamera({
+	view: () => miniView.value,
+	grid: gridSize,
+	image: () => imageBox.value,
+	storageKey: "phamos_ophice_zoom_mini",
+	pad: 0,
+})
+const camera = () => (meetingArea.value ? miniCam : mainCam)
+const tile = computed(() => (me.value ? camera().tile.value : 0))
+// The first time the map has a size: centre on my chip.
+watch(
+	() => mainCam.tile.value,
+	(value) => value && me.value && !mainCam.isPlaced() && mainCam.place(me.value.x, me.value.y)
+)
 const adjustingBackground = ref(false)
 // The map tools (spaces, background) are for map editors (#2071); the server checks it too.
 const canEditMap = ref(false)
@@ -707,12 +922,18 @@ let layoutTimer = null
 
 // Live for me while dragging; saved (and sent to everyone) a moment after the last change.
 function setLayout(change) {
-	backgroundLayout.value = change.fit ? { ...FITTED } : { ...backgroundLayout.value, ...change, fit: false }
+	const current = backgroundLayout.value
+	if (change.fit) backgroundLayout.value = { ...FITTED, zoom: current.zoom || 1 }
+	else if (change.fit === false) {
+		// From "fit" to placed: start where the image lies now (covering the grid).
+		const from = current.fit && imageBox.value ? imageBox.value : current
+		backgroundLayout.value = { left: from.left, top: from.top, width: from.width, zoom: current.zoom || 1, ...change, fit: false }
+	} else backgroundLayout.value = { ...current, ...change }
 	clearTimeout(layoutTimer)
 	layoutTimer = setTimeout(async () => {
-		const { fit, scale, x, y } = backgroundLayout.value
+		const { fit, left, top, width, zoom } = backgroundLayout.value
 		try {
-			await call(`${API}.set_background_layout`, { fit: fit ? 1 : 0, scale, x, y })
+			await call(`${API}.set_background_layout`, { fit: fit ? 1 : 0, left, top, width, zoom })
 		} catch (e) {
 			toast.error(errorText(e) || __("The background could not be adjusted."))
 		} finally {
@@ -881,6 +1102,15 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (props.cockpitOpen) return
+	// Adjust (#2089): arrow keys move the image (1 px, with Shift half a tile), not the chip.
+	if (adjustingBackground.value && imageBox.value && ARROWS[event.key] && !isTyping(event.target)) {
+		event.preventDefault()
+		const step = event.shiftKey ? 0.5 : 1 / (tile.value || 1)
+		const [dx, dy] = ARROWS[event.key]
+		const box = imageBox.value
+		setLayout({ fit: false, left: Math.round((box.left + dx * step) * 1000) / 1000, top: Math.round((box.top + dy * step) * 1000) / 1000, width: box.width })
+		return
+	}
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
 	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length && !document.fullscreenElement) {
 		event.preventDefault()
@@ -1239,6 +1469,16 @@ const areas = ref([])
 const editingAreas = ref(false)
 const areaDraft = ref(null)
 const meetingArea = ref(null)
+// A meeting starts or ends (#2089): the map changes size; centre it on my chip.
+watch(
+	() => meetingArea.value?.name,
+	() =>
+		nextTick(() => {
+			if (!me.value) return
+			if (meetingArea.value) miniCam.place(me.value.x, me.value.y)
+			else mainCam.place(me.value.x, me.value.y)
+		})
+)
 // Left with Esc or "Leave": no rejoining until walking out of that area.
 let meetingLeftHere = null
 
@@ -1536,11 +1776,11 @@ function closeMeetingPip() {
 
 // Left column of the meeting view: the area chat fills it down to the mini map.
 const areaChatStyle = computed(() => {
-	const miniHeight = me.value ? tile.value * me.value.rows : 0
+	const miniHeight = me.value ? miniView.value.height : 0
 	return {
 		left: `${STAGE_PAD}px`,
 		top: `${STAGE_PAD}px`,
-		width: `${tile.value * (me.value?.cols || 0)}px`,
+		width: `${miniView.value.width}px`,
 		bottom: `${miniHeight + STAGE_PAD * 2}px`,
 	}
 })
@@ -2069,7 +2309,18 @@ const SOCKET_EVENTS = [
 			background.value = message?.url || ""
 			// Not while I'm dragging the sliders myself (my own echo would jump back).
 			if (!layoutTimer) backgroundLayout.value = message?.layout || { ...FITTED }
+			if (message?.ratio) backgroundRatio.value = message.ratio
 			if (!background.value) adjustingBackground.value = false
+		},
+	],
+	// The grid grew or shrank (#2089): the same for everyone, my chip stays on it.
+	[
+		"ophice_grid",
+		(message) => {
+			if (!me.value || !message?.cols) return
+			me.value.cols = message.cols
+			me.value.rows = message.rows
+			moveTo(me.value.x, me.value.y)
 		},
 	],
 	...NOTICE_EVENTS,
@@ -2182,11 +2433,18 @@ function tick(now) {
 		const maxX = me.value.cols - 1
 		const maxY = me.value.rows - 1
 		moving.value = true
-		const x = Math.max(0, Math.min(maxX, me.value.x + dx * step))
-		const y = Math.max(0, Math.min(maxY, me.value.y + dy * step))
+		// No edge (PM, 2026-11-22): walking off one side brings me back on the opposite side.
+		const rawX = me.value.x + dx * step
+		const rawY = me.value.y + dy * step
+		const x = rawX < 0 ? maxX : rawX > maxX ? 0 : rawX
+		const y = rawY < 0 ? maxY : rawY > maxY ? 0 : rawY
+		const wrapped = x !== rawX || y !== rawY
 		// Each axis on its own, so a chip slides along another one instead of sticking to it.
 		if (!blocked(x, me.value.y)) me.value.x = x
 		if (!blocked(me.value.x, y)) me.value.y = y
+		// The view follows my chip near its edge (#2089); after a wrap it jumps to the other side.
+		if (wrapped) camera().place(me.value.x, me.value.y)
+		else camera().followChip(me.value.x, me.value.y)
 		scheduleSave()
 		queueMove()
 		checkEncounters()
@@ -2236,10 +2494,13 @@ onMounted(async () => {
 		me.value = data.me
 		// Came in (first visit of the day, or back after a while): beamed in at the start space.
 		if (data.beam_in) playBeam(data.me.user)
+		// The view starts on my chip (#2089).
+		nextTick(() => mainCam.place(me.value.x, me.value.y))
 		saved = { x: me.value.x, y: me.value.y }
 		presenceTtlMs = (data.presence_ttl || 45) * 1000
 		background.value = data.background || ""
 		backgroundLayout.value = data.background_layout || { ...FITTED }
+		backgroundRatio.value = data.background_ratio || 0
 		setAreas(data.areas)
 		canEditMap.value = Boolean(data.can_edit_map)
 		autoCockpit.value = data.auto_cockpit !== false
@@ -2292,18 +2553,37 @@ onBeforeUnmount(() => {
 	background-image: var(--grid-lines);
 	background-size: var(--grid-cell) var(--grid-cell);
 }
-/* An uploaded image fills the grid; while editing, the lines stay on top of it. */
-.ophice-grid--image {
-	background-image: var(--background-image);
-	background-size: var(--background-size, cover);
-	background-position: var(--background-position, center);
-	background-repeat: no-repeat;
+/* The camera (#2089): the canvas moves by transform only; after a drag or scroll past the edge it
+   springs back with a small overshoot (the bounce). */
+.ophice-viewport {
+	touch-action: none;
 }
-.ophice-grid--image.ophice-grid--lines {
-	background-image: var(--grid-lines), var(--background-image);
-	background-size: var(--grid-cell) var(--grid-cell), var(--grid-cell) var(--grid-cell), var(--background-size, cover);
-	background-position: 0 0, 0 0, var(--background-position, center);
-	background-repeat: repeat, repeat, no-repeat;
+.ophice-canvas {
+	will-change: transform;
+}
+.ophice-canvas--dragging {
+	cursor: grabbing;
+}
+.ophice-canvas--spring {
+	transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+	.ophice-canvas--spring {
+		transition-duration: 1ms;
+	}
+}
+.ophice-zoom__button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 0.375rem;
+	color: var(--ink-gray-7);
+}
+.ophice-zoom__button:hover {
+	background: var(--surface-gray-2);
+	color: var(--ink-gray-9);
 }
 .ophice-chip {
 	top: 0;
