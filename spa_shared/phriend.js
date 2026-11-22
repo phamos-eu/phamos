@@ -31,9 +31,9 @@ function boot() {
  * @param {() => string} heading  the page heading the shell shows, for "Reported on"
  * @param {object} [socket]  the cockpit's realtime socket (frappe-ui), for Phriend's events (#2012)
  */
-export function mountPhriend(router, heading, socket) {
+export function mountPhriend(router, heading, socket, extra = {}) {
 	watchFailedRequests()
-	if (instance || !boot().phriend?.enabled) return
+	if (instance || !boot().phriend?.enabled) return instance
 	const current = () =>
 		pageContext(
 			router.currentRoute.value,
@@ -83,9 +83,12 @@ export function mountPhriend(router, heading, socket) {
 		on_event: socket?.on ? (cb) => socket.on("phriend_event", cb) : null,
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
+		// Ophice (#2053) pins the ball onto its map: { pinned: true }
+		...extra,
 	})
 	early.splice(0).forEach((item) => instance.log.record_failed_request(item))
 	instance.mount()
+	return instance
 }
 
 function openStatus(router, ctx) {

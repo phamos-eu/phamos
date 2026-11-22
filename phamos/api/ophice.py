@@ -102,14 +102,14 @@ COCKPIT_COLORS = {route: color for route, (_prefix, color) in _COCKPITS.items()}
 # Areas are drawn in half tiles (#2067).
 AREA_STEP = 0.5
 # Kinds of space (#2072): a meeting, or the start space where chips are beamed in.
-AREA_KINDS = ("Meeting", "Start", "Guest", "Customer meeting", "Cockpit")
+AREA_KINDS = ("Meeting", "Start", "Guest", "Customer meeting", "Cockpit", "Phriend")
 # Kinds with a meeting: whoever stops inside joins it (#2060, #2081). Guest and Customer meeting
 # are also where external guests may be (#2080).
 MEETING_KINDS = ("Meeting", "Guest", "Customer meeting", "Cockpit")
 # Spaces whose meeting has the normal area chat (Raven batches); guest kinds have the guest chat.
 AREA_CHAT_KINDS = ("Meeting", "Cockpit")
 # Only one of each of these on the map.
-SINGLE_KINDS = ("Start", "Guest")
+SINGLE_KINDS = ("Start", "Guest", "Phriend")
 # Coming in (#2072): first visit of the day, or back after this long. Last visit per user in Redis.
 ARRIVAL_GAP_SECONDS = 5 * 60
 LAST_SEEN_CACHE_KEY = "phamos_ophice_last_seen"
@@ -1462,11 +1462,14 @@ def save_area(
 		if other:
 			if kind == "Start":
 				frappe.throw(_("There is already a start space: {0}.").format(other))
+			if kind == "Phriend":
+				frappe.throw(_("Phriend already has a place on the map: {0}.").format(other))
 			frappe.throw(_("There is already a guest area: {0}.").format(other))
 	cockpit = (cockpit or "").strip() if kind == "Cockpit" else ""
 	if kind == "Cockpit" and cockpit not in _cockpit_tiles():
 		frappe.throw(_("Pick the cockpit this space belongs to."))
-	if kind == "Start" or (kind == "Cockpit" and not (meeting_url or "").strip()):
+	# No meeting: the start space, Phriend's place (#2053), a cockpit space without a link.
+	if kind in ("Start", "Phriend") or (kind == "Cockpit" and not (meeting_url or "").strip()):
 		domain = room = ""
 	else:
 		domain, room = _parse_meeting_url(meeting_url)

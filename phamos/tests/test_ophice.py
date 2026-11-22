@@ -1550,3 +1550,29 @@ class OphiceAreaJitsiTestCase(FrappeTestCase):
 			doc.insert(ignore_permissions=True)
 		doc.jitsi_domain = "jitsi.example.org"
 		doc.insert(ignore_permissions=True)
+
+
+class OphicePhriendPlaceTestCase(_OphiceRoomBase):
+	"""Phriend on the map (#2053): a map editor gives it one place; no meeting, no chat."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+
+	def test_one_place_without_meeting(self):
+		frappe.set_user(self.A)  # map editor
+		name = ophice.save_area("Phriend", "https://jitsi.example.org/Ignored", 5, 5, 1, 1, kind="Phriend")
+		area = frappe.get_doc(ophice.AREA_DOCTYPE, name)
+		self.assertEqual((area.kind, area.meeting_url, area.jitsi_room), ("Phriend", "", ""))
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Second", "", 9, 9, 1, 1, kind="Phriend")
+		# Not a meeting: nobody joins it, it has no chat, and the people list does not name it.
+		self._put(self.B, 5, 5)
+		frappe.set_user(self.B)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.get_area_chat(name)
+		b = next(p for p in ophice.get_people()["people"] if p["user"] == self.B)
+		self.assertEqual(b["area"], "")
+		frappe.set_user(self.B)  # not a map editor
+		with self.assertRaises(frappe.PermissionError):
+			ophice.save_area("Mine", "", 9, 9, 1, 1, kind="Phriend")

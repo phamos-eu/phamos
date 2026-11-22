@@ -41,8 +41,12 @@
 					:options="[{ label: __('Pick a cockpit'), value: '' }, ...cockpitOptions]"
 					data-testid="area-cockpit-select"
 				/>
-				<!-- Every kind but Start has a meeting (optional for a cockpit space). -->
-				<template v-if="kind !== 'Start'">
+				<!-- Phriend's place (#2053): Phriend stands in its middle, a bit bigger than a person. -->
+				<p v-if="kind === 'Phriend'" class="text-xs text-ink-gray-5">
+					{{ __("Phriend stands in the middle of this space, a little bigger than the people. A click on it does what Phriend does everywhere: report a problem, the reports here, its menu. Only one place.") }}
+				</p>
+				<!-- Every kind but Start and Phriend has a meeting (optional for a cockpit space). -->
+				<template v-if="kind !== 'Start' && kind !== 'Phriend'">
 				<FormControl
 					v-model="url"
 					:label="kind === 'Cockpit' ? __('Jitsi meeting URL (optional)') : __('Jitsi meeting URL')"
@@ -107,6 +111,7 @@ const KINDS = [
 	{ kind: "Guest", icon: "user-plus", label: __("Guest area") },
 	{ kind: "Customer meeting", icon: "briefcase", label: __("Customer meeting") },
 	{ kind: "Cockpit", icon: "grid", label: __("Cockpit space") },
+	{ kind: "Phriend", icon: "smile", label: __("Phriend") },
 ]
 // What each kind does (#2072, #2081).
 const KIND_HINTS = {
@@ -155,7 +160,7 @@ async function save() {
 			...props.area,
 			kind: kind.value,
 			title: title.value,
-			meeting_url: kind.value === "Start" ? "" : url.value,
+			meeting_url: kind.value === "Start" || kind.value === "Phriend" ? "" : url.value,
 			chat_mode: chatMode.value,
 			cockpit: kind.value === "Cockpit" ? cockpit.value : "",
 		})

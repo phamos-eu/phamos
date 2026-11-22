@@ -667,6 +667,8 @@ import ChatWithMenu from "../components/ChatWithMenu.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
+import { mountPhriend } from "@spa/phriend.js"
+import router from "../router.js"
 
 const props = defineProps({
 	/** A cockpit is in front (#2073): the keyboard belongs to it, the chip stands still. */
@@ -2636,9 +2638,46 @@ onMounted(async () => {
 	peopleTimer = setInterval(loadPeople, PEOPLE_REFRESH_MS)
 	loadBatchNotices()
 	loadCockpits()
+	startPhriend()
 })
 
+// --- Phriend on the map (#2053, PM 2026-11-22): not the floating ball of the cockpits, but standing
+// on the place a map editor gave it (a space of the kind Phriend), a little bigger than a person.
+// It is the real Phriend (report a problem, the reports here, its menu); Ophice only pins it there.
+// Hidden while editing spaces (it would cover its own place), while a cockpit is open (the
+// cockpit has its own Phriend) and when its place is off screen.
+
+let phriend = null
+let phriendTimer = null
+// Phriend's width next to a person's chip (one tile): "slightly bigger".
+const PHRIEND_TILES = 1.25
+
+function startPhriend() {
+	phriend = mountPhriend(router, () => __("Ophice"), socket, { pinned: true })
+	if (!phriend?.ball) return
+	pinPhriend()
+	phriendTimer = setInterval(pinPhriend, 200)
+}
+
+function pinPhriend() {
+	const ball = phriend?.ball
+	if (!ball) return
+	const anchor = document.querySelector("[data-phriend-anchor]")
+	if (!anchor || props.cockpitOpen || editingAreas.value) return ball.pin(null)
+	const spot = anchor.getBoundingClientRect()
+	const box = stage.value?.getBoundingClientRect()
+	const onScreen =
+		spot.width > 0 && box && spot.right > box.left && spot.left < box.right && spot.bottom > box.top && spot.top < box.bottom
+	if (!onScreen) return ball.pin(null)
+	const size = Math.max(28, spot.width * PHRIEND_TILES)
+	const height = (size * 76) / 64
+	// The head on the middle of the place, the legs below it, like a chip.
+	ball.pin({ left: spot.left + spot.width / 2 - size / 2, top: spot.top + spot.height / 2 - height * 0.42, size })
+}
+
 onBeforeUnmount(() => {
+	clearInterval(phriendTimer)
+	phriend?.ball?.pin(null)
 	clearInterval(clockTimer)
 	clearInterval(peopleTimer)
 	clearTimeout(peopleSoon)

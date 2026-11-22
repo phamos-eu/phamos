@@ -15,13 +15,20 @@
 				'area--lifted': gesture?.area?.name === area.name && draft,
 				'area--start': area.kind === 'Start',
 				'area--guests': area.kind === 'Guest' || area.kind === 'Customer meeting',
+				'area--phriend': area.kind === 'Phriend',
 			}"
-			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265 }"
+			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265, '--tile-px': `${tile}px` }"
 			:title="area.title"
 			data-testid="meeting-area"
 		>
+			<!-- Phriend's place (#2053): the ball itself stands on it (Ophice.vue); while editing, a
+				 dashed frame to move it by. The anchor in the middle tells Ophice where to pin the ball. -->
+			<template v-if="area.kind === 'Phriend'">
+				<span class="area__phriend-anchor" data-phriend-anchor />
+				<span v-if="editing" class="area__title truncate">{{ __("Phriend") }}</span>
+			</template>
 			<!-- The start space (#2072): where people are beamed in; no meeting, so no Jitsi logo. -->
-			<FeatherIcon v-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
+			<FeatherIcon v-else-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
 			<!-- A cockpit space (#2076): the cockpit's app icon -->
 			<span
 				v-else-if="area.kind === 'Cockpit' && COCKPIT_SYMBOLS[area.cockpit] && area.cockpit_color"
@@ -42,7 +49,7 @@
 				@error="failedLogos[area.jitsi_domain] = true"
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
-			<span class="area__title truncate">{{ area.title }}</span>
+			<span v-if="area.kind !== 'Phriend'" class="area__title truncate">{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
 				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-5 w-5" />
@@ -245,6 +252,27 @@ function cancel() {
 </script>
 
 <style scoped>
+/* Phriend's place: invisible on the map (Phriend itself stands there), a dashed frame while
+   editing. The anchor is one tile in the middle; Ophice pins the ball onto it. */
+.area--phriend {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+.area--phriend.area--editing {
+	border: 2px dashed rgba(255, 255, 255, 0.9);
+	background: rgba(0, 0, 0, 0.15);
+}
+.area__phriend-anchor {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: var(--tile-px, 24px);
+	height: var(--tile-px, 24px);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
 /* Clearly visible on any map (PM: "a little more solid"), each area in its own random color
    (--area-h, a hue; PM 2026-11-22): a solid tint, a firm edge with a light inner line, and
    the white Jitsi watermark with a dark halo. Saturation and lightness stay fixed so the

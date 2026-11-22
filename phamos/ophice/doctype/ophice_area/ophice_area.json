@@ -32,12 +32,12 @@
   },
   {
    "default": "Meeting",
-   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one. Guest: where external guests arrive and stay (#2080); only one. Customer meeting: where employees meet guests they invited (#2080). Cockpit: stopping inside opens its cockpit (#2076); a meeting is optional.",
+   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one. Guest: where external guests arrive and stay (#2080); only one. Customer meeting: where employees meet guests they invited (#2080). Cockpit: stopping inside opens its cockpit (#2076); a meeting is optional. Phriend: where Phriend stands on the map (only one).",
    "fieldname": "kind",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Kind",
-   "options": "Meeting\nStart\nGuest\nCustomer meeting\nCockpit"
+   "options": "Meeting\nStart\nGuest\nCustomer meeting\nCockpit\nPhriend"
   },
   {
    "depends_on": "eval:doc.kind == 'Cockpit'",
@@ -54,8 +54,8 @@
    "in_list_view": 1,
    "label": "Meeting URL",
    "reqd": 0,
-   "mandatory_depends_on": "eval:!['Start', 'Cockpit'].includes(doc.kind)",
-   "depends_on": "eval:doc.kind != 'Start'"
+   "mandatory_depends_on": "eval:!['Start', 'Cockpit', 'Phriend'].includes(doc.kind)",
+   "depends_on": "eval:!['Start', 'Phriend'].includes(doc.kind)"
   },
   {
    "fieldname": "column_break_main",
@@ -97,7 +97,7 @@
    "fieldname": "section_jitsi",
    "fieldtype": "Section Break",
    "label": "Jitsi",
-   "depends_on": "eval:doc.kind != 'Start'"
+   "depends_on": "eval:!['Start', 'Phriend'].includes(doc.kind)"
   },
   {
    "description": "From the meeting URL.",
@@ -138,7 +138,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 21:00:00.000000",
+ "modified": "2026-11-22 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",
