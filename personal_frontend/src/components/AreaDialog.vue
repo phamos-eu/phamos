@@ -12,6 +12,17 @@
 				<p class="text-xs text-ink-gray-5">
 					{{ __("Whoever stops inside the area joins this meeting, with microphone and camera off.") }}
 				</p>
+				<FormControl
+					v-model="chatMode"
+					type="select"
+					:label="__('Chat')"
+					:options="[
+						{ label: __('Saved: history is kept, can be burned'), value: 'Saved' },
+						{ label: __('Not saved: deleted when the last person leaves'), value: 'Not saved' },
+						{ label: __('Confidential: never stored, only live'), value: 'Confidential' },
+					]"
+					data-testid="area-chat-mode-select"
+				/>
 				<p v-if="error" class="text-sm text-ink-red-4">{{ error }}</p>
 				<button type="submit" class="hidden" />
 			</form>
@@ -48,6 +59,7 @@ const open = computed({
 })
 const title = ref("")
 const url = ref("")
+const chatMode = ref("Saved")
 const error = ref("")
 const busy = ref("")
 
@@ -56,6 +68,7 @@ watch(
 	(area) => {
 		title.value = area?.title || ""
 		url.value = area?.meeting_url || ""
+		chatMode.value = area?.chat_mode || "Saved"
 		error.value = ""
 	},
 	{ immediate: true }
@@ -65,7 +78,7 @@ async function save() {
 	busy.value = "save"
 	error.value = ""
 	try {
-		await props.onSave({ ...props.area, title: title.value, meeting_url: url.value })
+		await props.onSave({ ...props.area, title: title.value, meeting_url: url.value, chat_mode: chatMode.value })
 		emit("close")
 	} catch (e) {
 		error.value = e?.message || __("The area could not be saved.")

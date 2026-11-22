@@ -138,6 +138,17 @@
 				:on-save="saveStatus"
 				@close="statusOpen = false"
 			/>
+			<!-- The area's chat (#2062), above the mini map. -->
+			<AreaChat
+				v-if="meetingArea && me"
+				:key="meetingArea.name"
+				class="absolute z-20"
+				:style="areaChatStyle"
+				:area="meetingArea"
+				:me="me.user"
+				:name-of="nameOf"
+				:socket="socket"
+			/>
 			<AreaDialog :area="areaDraft" :on-save="saveArea" :on-delete="deleteArea" @close="areaDraft = null" />
 			<p
 				v-if="editingAreas"
@@ -271,6 +282,7 @@ import BurnNotice from "../components/BurnNotice.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
+import AreaChat from "../components/AreaChat.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -858,8 +870,27 @@ function leaveMeetingIfOutside() {
 }
 
 function leaveMeeting(byChoice) {
-	if (byChoice && meetingArea.value) meetingLeftHere = meetingArea.value.name
+	const left = meetingArea.value
+	if (byChoice && left) meetingLeftHere = left.name
 	meetingArea.value = null
+	// A "Not saved" chat burns once nobody is left in the area (#2062).
+	if (left) call(`${API}.leave_area`, { area: left.name }).catch(() => {})
+}
+
+// Left column of the meeting view: the area chat fills it down to the mini map.
+const areaChatStyle = computed(() => {
+	const miniHeight = me.value ? tile.value * me.value.rows : 0
+	return {
+		left: `${STAGE_PAD}px`,
+		top: `${STAGE_PAD}px`,
+		width: `${tile.value * (me.value?.cols || 0)}px`,
+		bottom: `${miniHeight + STAGE_PAD * 2}px`,
+	}
+})
+
+function nameOf(user) {
+	if (user === me.value?.user) return me.value.full_name
+	return others.value.find((o) => o.user === user)?.full_name || user
 }
 
 function setAreas(list) {
@@ -883,6 +914,7 @@ async function saveArea(values) {
 			y: values.y,
 			width: values.width,
 			height: values.height,
+			chat_mode: values.chat_mode || "Saved",
 		})
 	} catch (e) {
 		throw new Error(errorText(e) || __("The area could not be saved."))

@@ -548,3 +548,89 @@ class OphiceStatusTestCase(FrappeTestCase):
 		self.assertEqual(len(chips), 1)
 		self.assertTrue(chips[0]["offline"])
 		self.assertEqual(chips[0]["status"]["note"], "Lunch")
+
+
+class OphiceAreaChatTestCase(FrappeTestCase):
+	"""Area chat (#2062): Saved, Not saved, Confidential; only for whoever stands in the area."""
+
+	A = "ophice-a@example.com"
+	B = "ophice-b@example.com"
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		for email in (self.A, self.B):
+			if not frappe.db.exists("User", email):
+				user = frappe.get_doc(
+					{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+				).insert(ignore_permissions=True)
+				user.add_roles("Raven User")
+		if not frappe.get_all("Raven Workspace", limit=1):
+			frappe.get_doc({"doctype": "Raven Workspace", "workspace_name": "Ophice Test", "type": "Public"}).insert(
+				ignore_permissions=True
+			)
+		self.conf = patch.dict(frappe.conf, {"ophice_jitsi_domain": None, "ophice_jitsi_domains": ["jitsi.example.org"]})
+		self.conf.start()
+		self.publish = patch.object(ophice.frappe, "publish_realtime")
+		self.sent = self.publish.start()
+		frappe.cache.delete_value(ophice.PRESENCE_CACHE_KEY)
+		self._put(self.A, 1, 1)
+		self._put(self.B, 30, 20)
+
+	def tearDown(self):
+		self.publish.stop()
+		self.conf.stop()
+		frappe.set_user("Administrator")
+		frappe.cache.delete_value(ophice.PRESENCE_CACHE_KEY)
+		frappe.db.rollback()
+
+	def _put(self, user, x, y):
+		frappe.cache.hset(ophice.PRESENCE_CACHE_KEY, user, {"user": user, "x": x, "y": y, "ts": ophice.time.time()})
+
+	def _area(self, mode):
+		frappe.set_user(self.A)
+		return ophice.save_area("Chat test", "https://jitsi.example.org/ChatTest", 0, 0, 3, 3, chat_mode=mode)
+
+	def _recipients(self):
+		return {c.kwargs.get("user") for c in self.sent.call_args_list if c.args and c.args[0] == ophice.EVENT_AREA_MESSAGE}
+
+	def test_saved_keeps_history_in_raven_and_only_people_inside_may_read(self):
+		area = self._area("Saved")
+		ophice.send_area_message(area, "Hello area")
+		channel = frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel")
+		self.assertTrue(frappe.db.exists("Raven Message", {"channel_id": channel}))
+		self.assertEqual([m["text"] for m in ophice.get_area_chat(area)["messages"]], ["Hello area"])
+		frappe.set_user(self.B)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.get_area_chat(area)
+		# B steps in: same channel, the history is there, and B gets the next message.
+		self._put(self.B, 2, 2)
+		self.assertEqual(len(ophice.get_area_chat(area)["messages"]), 1)
+		self.sent.reset_mock()
+		ophice.send_area_message(area, "Hi")
+		self.assertEqual(self._recipients(), {self.A, self.B})
+		self.assertEqual(frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel"), channel)
+
+	def test_burn_deletes_the_saved_history(self):
+		area = self._area("Saved")
+		ophice.send_area_message(area, "secret")
+		self.assertEqual(ophice.burn_area_chat(area), 1)
+		self.assertEqual(ophice.get_area_chat(area)["messages"], [])
+
+	def test_not_saved_burns_when_the_last_person_leaves(self):
+		area = self._area("Not saved")
+		ophice.send_area_message(area, "gone soon")
+		self._put(self.B, 2, 2)
+		self.assertFalse(ophice.leave_area(area))  # B is still inside
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
+		self.assertTrue(ophice.leave_area(area))
+		channel = frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel")
+		self.assertFalse(frappe.db.exists("Raven Message", {"channel_id": channel}))
+
+	def test_confidential_stores_nothing(self):
+		area = self._area("Confidential")
+		before = frappe.db.count("Raven Message")
+		row = ophice.send_area_message(area, "off the record")
+		self.assertEqual(row["text"], "off the record")
+		self.assertEqual(frappe.db.count("Raven Message"), before)
+		self.assertFalse(frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel"))
+		self.assertEqual(self._recipients(), {self.A})

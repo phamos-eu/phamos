@@ -90,6 +90,12 @@ MAX_AREAS = 50
 # Every area gets its own random color (PM, 2026-11-22): a hue, at least this far from the others.
 AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
+# Area chat (#2062): what happens to what is written in an area.
+CHAT_MODES = ("Saved", "Not saved", "Confidential")
+EVENT_AREA_MESSAGE = "ophice_area_message"
+EVENT_AREA_BURNED = "ophice_area_burned"
+# The server sees moves a moment late: a chip this close to the edge still counts as inside.
+AREA_SLACK = 0.5
 
 # Status (#2053): "Be right back" or "Away" with a note and a return time, shown above the chip.
 STATUS_KEY = "phamos_ophice_status"
@@ -989,6 +995,7 @@ def burn_due_encounters():
 	for doc in frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
 			_start_parting(doc)
+	_burn_empty_unsaved_areas()
 	frappe.db.commit()
 
 
@@ -1046,13 +1053,17 @@ def _parse_meeting_url(url):
 def _areas():
 	areas = frappe.get_all(
 		AREA_DOCTYPE,
-		fields=["name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room", "color_hue"],
+		fields=[
+			"name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room",
+			"color_hue", "chat_mode",
+		],
 		order_by="creation asc",
 		limit=MAX_AREAS,
 	)
 	# An area without a stored color (made before colors existed) gets a steady one from its
 	# name: this runs on reads, which Frappe does not commit, so nothing random here.
 	for area in areas:
+		area.chat_mode = area.chat_mode or "Saved"
 		if area.color_hue is None or area.color_hue == "":
 			area.color_hue = int(hashlib.md5(area.name.encode()).hexdigest(), 16) % 360
 	return areas
@@ -1090,9 +1101,11 @@ def _overlaps(name, x, y, width, height):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_area(title, meeting_url, x, y, width, height, name=None):
+def save_area(title, meeting_url, x, y, width, height, name=None, chat_mode="Saved"):
 	"""Create or change a meeting area, for everyone (any Ophice user may, like the background)."""
 	_require_user()
+	if chat_mode not in CHAT_MODES:
+		frappe.throw(_("Unknown chat mode."))
 	title = (title or "").strip()[:AREA_TITLE_LENGTH]
 	if not title:
 		frappe.throw(_("Give the area a name."))
@@ -1110,6 +1123,7 @@ def save_area(title, meeting_url, x, y, width, height, name=None):
 		"y": y,
 		"width": width,
 		"height": height,
+		"chat_mode": chat_mode,
 	}
 	if name:
 		if not frappe.db.exists(AREA_DOCTYPE, name):
@@ -1133,3 +1147,165 @@ def delete_area(name):
 	if frappe.db.exists(AREA_DOCTYPE, name):
 		frappe.delete_doc(AREA_DOCTYPE, name, ignore_permissions=True)
 	_publish(EVENT_AREAS, {"areas": _areas()})
+
+
+# --- Area chat (#2062): every meeting area has a chat, for whoever stands in it.
+#
+# Saved: a private Raven channel per area; everyone who used the chat is a member, the history
+# stays (and can be burned on purpose). Not saved: the same channel, emptied for good when the
+# last person has left the area. Confidential: nothing is stored; messages go over realtime to
+# the people standing in the area right now, and are gone with the page.
+
+
+def _inside_area(area, user):
+	position = _position_of(user)
+	if not position:
+		return False
+	cx, cy = position[0] + 0.5, position[1] + 0.5
+	return (
+		area.x - AREA_SLACK <= cx < area.x + area.width + AREA_SLACK
+		and area.y - AREA_SLACK <= cy < area.y + area.height + AREA_SLACK
+	)
+
+
+def _people_in(area, exclude=None):
+	return [c["user"] for c in _online() if c["user"] != exclude and _inside_area(area, c["user"])]
+
+
+def _area(name):
+	if not name or not frappe.db.exists(AREA_DOCTYPE, name):
+		frappe.throw(_("This area no longer exists."))
+	area = frappe.get_doc(AREA_DOCTYPE, name)
+	area.chat_mode = area.chat_mode or "Saved"
+	return area
+
+
+def _require_inside(name):
+	"""The area, if I stand in it: being there is the permission to read and write its chat."""
+	area = _area(name)
+	if not _inside_area(area, frappe.session.user):
+		frappe.throw(_("Step into the area to use its chat."), frappe.PermissionError)
+	return area
+
+
+def _area_channel(area):
+	"""The area's private Raven channel (made on first use), with me as a member."""
+	from phamos.api.issue_chat import _ensure_members, _resolve_workspace
+
+	user = frappe.session.user
+	channel = area.raven_channel if area.raven_channel and frappe.db.exists("Raven Channel", area.raven_channel) else None
+	if not channel:
+		# Two people stepping in at once must not make two channels.
+		_lock_pair(f"area:{area.name}")
+		channel = frappe.db.get_value(AREA_DOCTYPE, area.name, "raven_channel", for_update=True)
+		if not channel or not frappe.db.exists("Raven Channel", channel):
+			doc = frappe.get_doc(
+				{
+					"doctype": "Raven Channel",
+					"channel_name": f"ophice-area-{frappe.generate_hash(length=8)}",
+					"channel_description": _("Ophice area chat: {0}").format(area.title),
+					"type": "Private",
+					"workspace": _resolve_workspace(),
+				}
+			)
+			doc.flags.do_not_add_member = True
+			doc.insert(ignore_permissions=True)
+			channel = doc.name
+			frappe.db.set_value(AREA_DOCTYPE, area.name, "raven_channel", channel, update_modified=False)
+		area.raven_channel = channel
+	skipped = _ensure_members(frappe.get_doc("Raven Channel", channel), [user], admin=user, silent=True)
+	if skipped:
+		frappe.throw(_("You can't chat: no Raven access."))
+	return channel
+
+
+def _clean_text(text):
+	text = (text or "").strip()
+	if not text:
+		frappe.throw(_("Write something first."))
+	if len(text) > MAX_MESSAGE_LENGTH:
+		frappe.throw(_("A message can be at most {0} characters.").format(MAX_MESSAGE_LENGTH))
+	return text
+
+
+@frappe.whitelist()
+def get_area_chat(area):
+	"""The chat of the area I stand in: its mode and, unless confidential, the latest messages."""
+	_require_user()
+	doc = _require_inside(area)
+	if doc.chat_mode == "Confidential":
+		return {"area": doc.name, "mode": doc.chat_mode, "messages": []}
+	return {"area": doc.name, "mode": doc.chat_mode, "messages": _messages(_area_channel(doc))}
+
+
+@frappe.whitelist(methods=["POST"])
+def send_area_message(area, text):
+	"""Write into the chat of the area I stand in; everyone in the area gets it right away."""
+	_require_user()
+	text = _clean_text(text)
+	doc = _require_inside(area)
+	user = frappe.session.user
+	if doc.chat_mode == "Confidential":
+		# Never written anywhere: only relayed to the people in the area now.
+		row = {"name": frappe.generate_hash(length=12), "owner": user, "text": text, "creation": str(now_datetime())}
+		after_commit = False
+	else:
+		message = frappe.get_doc(
+			{
+				"doctype": "Raven Message",
+				"channel_id": _area_channel(doc),
+				"message_type": "Text",
+				"text": "<p>{}</p>".format(escape_html(text).replace("\n", "<br>")),
+			}
+		).insert(ignore_permissions=True)
+		row = _message_row(message)
+		after_commit = True
+	payload = {"area": doc.name, "message": row}
+	for person in {user, *_people_in(doc)}:
+		frappe.publish_realtime(EVENT_AREA_MESSAGE, payload, user=person, after_commit=after_commit)
+	return row
+
+
+def _burn_area_messages(area, notify=True):
+	"""Delete every message of the area's channel for good (the channel itself stays)."""
+	if not area.raven_channel or not frappe.db.exists("Raven Channel", area.raven_channel):
+		return 0
+	names = frappe.get_all("Raven Message", filters={"channel_id": area.raven_channel}, pluck="name")
+	for name in names:
+		_delete_permanently("Raven Message", name)
+	if notify and names:
+		_publish(EVENT_AREA_BURNED, {"area": area.name})
+	return len(names)
+
+
+@frappe.whitelist(methods=["POST"])
+def burn_area_chat(area):
+	"""Burn the history of the area I stand in, for everyone. Cannot be undone."""
+	_require_user()
+	doc = _require_inside(area)
+	if doc.chat_mode == "Confidential":
+		return 0
+	count = _burn_area_messages(doc)
+	if not count:
+		_publish(EVENT_AREA_BURNED, {"area": doc.name})
+	return count
+
+
+@frappe.whitelist(methods=["POST"])
+def leave_area(area):
+	"""I walked out of an area: a "Not saved" chat burns when nobody is left in it."""
+	_require_user()
+	if not area or not frappe.db.exists(AREA_DOCTYPE, area):
+		return False
+	doc = _area(area)
+	if doc.chat_mode != "Not saved" or _people_in(doc, exclude=frappe.session.user):
+		return False
+	return bool(_burn_area_messages(doc))
+
+
+def _burn_empty_unsaved_areas():
+	"""Scheduler: "Not saved" chats of areas nobody stands in (tabs closed without leaving)."""
+	for name in frappe.get_all(AREA_DOCTYPE, filters={"chat_mode": "Not saved", "raven_channel": ("is", "set")}, pluck="name"):
+		doc = _area(name)
+		if not _people_in(doc):
+			_burn_area_messages(doc)

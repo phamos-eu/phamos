@@ -16,7 +16,10 @@
   "section_jitsi",
   "jitsi_domain",
   "jitsi_room",
-  "color_hue"
+  "color_hue",
+  "section_chat",
+  "chat_mode",
+  "raven_channel"
  ],
  "fields": [
   {
@@ -89,11 +92,31 @@
    "fieldtype": "Int",
    "label": "Color Hue",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_chat",
+   "fieldtype": "Section Break",
+   "label": "Area chat"
+  },
+  {
+   "default": "Saved",
+   "description": "Saved: history kept (can be burned). Not saved: deleted when the last person leaves. Confidential: never stored, only live.",
+   "fieldname": "chat_mode",
+   "fieldtype": "Select",
+   "label": "Chat mode",
+   "options": "Saved\nNot saved\nConfidential"
+  },
+  {
+   "description": "Private Raven channel of the area chat (Saved and Not saved).",
+   "fieldname": "raven_channel",
+   "fieldtype": "Data",
+   "label": "Raven channel",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 10:00:00.000000",
+ "modified": "2026-11-22 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

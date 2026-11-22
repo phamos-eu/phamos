@@ -2783,3 +2783,23 @@ The return time can be at most {0} days ahead.,Die Rückkehrzeit darf höchstens
 Fullscreen,Vollbild
 Leave fullscreen,Vollbild beenden
 Drag to resize,Ziehen zum Ändern der Größe
+Chat of {0},Chat von {0}
+Burn chat now: deletes the history for everyone,Chat jetzt verbrennen: löscht den Verlauf für alle
+Delete this room's history for everyone? This cannot be undone.,Den Verlauf dieses Raums für alle löschen? Das kann nicht rückgängig gemacht werden.
+Burn,Verbrennen
+No messages yet. Say hello to the room.,Noch keine Nachrichten. Sagen Sie dem Raum Hallo.
+Message the room,Nachricht an den Raum
+"Enter sends, Esc goes back to the map","Enter sendet, Esc geht zurück zur Karte"
+Confidential,Vertraulich
+History is kept for this room. Anyone in the room can burn it.,Der Verlauf dieses Raums bleibt erhalten. Alle im Raum können ihn verbrennen.
+Deleted for good when the last person leaves the room.,"Endgültig gelöscht, sobald die letzte Person den Raum verlässt."
+"Never stored. Only people in the room see it, only now.","Nie gespeichert. Nur wer gerade im Raum ist, sieht es, und nur jetzt."
+The chat could not be loaded.,Der Chat konnte nicht geladen werden.
+The chat could not be burned.,Der Chat konnte nicht verbrannt werden.
+"Saved: history is kept, can be burned","Gespeichert: Verlauf bleibt, kann verbrannt werden"
+Not saved: deleted when the last person leaves,"Nicht gespeichert: gelöscht, wenn die letzte Person geht"
+"Confidential: never stored, only live","Vertraulich: nie gespeichert, nur live"
+Unknown chat mode.,Unbekannter Chat-Modus.
+Step into the area to use its chat.,"Betreten Sie den Bereich, um seinen Chat zu nutzen."
+Ophice area chat: {0},Ophice-Bereichschat: {0}
+You can't chat: no Raven access.,Sie können nicht chatten: kein Zugang zu Raven.
