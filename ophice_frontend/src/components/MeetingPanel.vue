@@ -20,6 +20,20 @@
 		>
 			<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
+			<!-- Chrome's picture-in-picture (#2078): how to keep the video on top. -->
+			<button
+				v-if="CHROMIUM"
+				type="button"
+				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:class="{ 'bg-surface-gray-2 text-ink-gray-9': pipTip }"
+				:title="__('Keep the video on top of all windows')"
+				data-testid="pip-tip-button"
+				@pointerdown.stop
+				@click="pipTip = !pipTip"
+			>
+				<FeatherIcon name="copy" class="h-3.5 w-3.5" />
+				{{ __("On top") }}
+			</button>
 			<button
 				type="button"
 				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
@@ -67,6 +81,7 @@
 				<FeatherIcon name="x" class="h-3.5 w-3.5" />
 			</button>
 		</div>
+		<PipTip v-if="pipTip" class="absolute right-3 top-12 z-20" @close="closePipTip" />
 		<!-- The meeting runs in its own window: no second call here. -->
 		<div
 			v-if="poppedOut"
@@ -75,6 +90,9 @@
 		>
 			<FeatherIcon name="external-link" class="h-8 w-8 text-ink-gray-5" />
 			<p>{{ __("The meeting runs in its own window.") }}</p>
+			<p v-if="CHROMIUM" class="max-w-xs text-xs text-ink-gray-5">
+				{{ __("Tip: right-click a video there and choose \"Picture in picture\" to keep it on top of all windows.") }}
+			</p>
 			<div class="flex flex-wrap justify-center gap-2">
 				<Button variant="subtle" @click="$emit('popout')">{{ __("Show that window") }}</Button>
 				<Button variant="ghost" @click="$emit('bring-back')">{{ __("Back into Ophice") }}</Button>
@@ -109,6 +127,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import VideoCall from "./VideoCall.vue"
+import PipTip from "./PipTip.vue"
 
 const props = defineProps({
 	/** { title, jitsi_domain, jitsi_room } */
@@ -127,6 +146,27 @@ const props = defineProps({
 })
 const emit = defineEmits(["leave", "update:rect", "popout", "bring-back"])
 const hintClosed = ref(false)
+
+// Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was
+// closed once; the "On top" button brings it back.
+const CHROMIUM = Boolean(navigator.userAgentData?.brands?.some((b) => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand)))
+const PIP_TIP_KEY = "phamos_ophice_pip_tip_seen"
+function seen() {
+	try {
+		return localStorage.getItem(PIP_TIP_KEY) === "1"
+	} catch {
+		return false
+	}
+}
+const pipTip = ref(CHROMIUM && !seen())
+function closePipTip() {
+	pipTip.value = false
+	try {
+		localStorage.setItem(PIP_TIP_KEY, "1")
+	} catch {
+		// private window: it shows again next time
+	}
+}
 
 const CORNERS = ["nw", "ne", "sw", "se"]
 const MIN_W = 320
