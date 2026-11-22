@@ -119,11 +119,16 @@
 				<p class="text-xs text-ink-gray-5">{{ __("The grid stays as it is; everyone sees the change.") }}</p>
 			</div>
 			<!-- The meeting of the area I stand in (#2060), top right. -->
+			<!-- Meeting view (#2061): the meeting is the big window, the map shrinks to the bottom left. -->
 			<MeetingPanel
 				v-if="meetingArea"
-				class="absolute right-6 top-6 z-30"
+				ref="meetingPanel"
+				class="z-30"
 				:area="meetingArea"
 				:display-name="me?.full_name"
+				:bounds="view"
+				:rect="meetingRect || defaultMeetingRect()"
+				@update:rect="setMeetingRect"
 				@leave="leaveMeeting(true)"
 			/>
 			<StatusMenu
@@ -157,8 +162,12 @@
 			</div>
 			<div
 				v-if="me"
-				class="ophice-grid relative rounded-lg border border-outline-gray-2 bg-surface-white"
-				:class="{ 'ophice-grid--image': background }"
+				class="ophice-grid rounded-lg border border-outline-gray-2 bg-surface-white"
+				:class="{
+					'ophice-grid--image': background,
+					relative: !meetingArea,
+					'ophice-grid--mini absolute z-20 shadow-xl': meetingArea,
+				}"
 				:style="gridStyle"
 			>
 				<AreaLayer
@@ -313,17 +322,59 @@ const moving = ref(false)
 const error = ref("")
 const view = reactive({ width: 0, height: 0 })
 
-// The largest square tile that fits the whole grid into the page.
+// The largest square tile that fits the whole grid into the page; in a meeting (#2061) into
+// the mini map at the bottom left.
+const MINI_SHARE = 0.3
+const MINI_MIN = 260
+const MINI_MAX = 440
+const STAGE_PAD = 16
+const miniWidth = computed(() => Math.max(MINI_MIN, Math.min(MINI_MAX, view.width * MINI_SHARE)))
 const tile = computed(() => {
 	if (!me.value || !view.width) return 0
+	if (meetingArea.value) return Math.max(4, Math.floor(miniWidth.value / me.value.cols))
 	const size = Math.min((view.width - 32) / me.value.cols, (view.height - 32) / me.value.rows)
 	return Math.max(8, Math.floor(size))
 })
+
+// Where the meeting window sits, as shares of the stage (they follow the window size); the
+// user's own placement is kept in this browser.
+const MEETING_RECT_KEY = "phamos_ophice_meeting_rect"
+function defaultMeetingRect() {
+	const width = view.width || 1200
+	const height = view.height || 800
+	const left = miniWidth.value + STAGE_PAD * 2
+	return {
+		x: left / width,
+		y: STAGE_PAD / height,
+		w: (width - left - STAGE_PAD) / width,
+		h: (height - STAGE_PAD * 2) / height,
+	}
+}
+function storedMeetingRect() {
+	try {
+		const rect = JSON.parse(localStorage.getItem(MEETING_RECT_KEY) || "null")
+		const ok = rect && ["x", "y", "w", "h"].every((k) => Number.isFinite(rect[k]) && rect[k] >= 0 && rect[k] <= 1)
+		return ok ? rect : null
+	} catch {
+		return null
+	}
+}
+const meetingRect = ref(storedMeetingRect())
+const meetingPanel = ref(null)
+function setMeetingRect(rect) {
+	meetingRect.value = rect
+	try {
+		localStorage.setItem(MEETING_RECT_KEY, JSON.stringify(rect))
+	} catch {
+		// private window: the placement lasts until the reload
+	}
+}
 const chipScale = computed(() => (tile.value * 0.8) / AVATAR_PX)
 
 const gridStyle = computed(() => ({
 	width: `${tile.value * me.value.cols}px`,
 	height: `${tile.value * me.value.rows}px`,
+	...(meetingArea.value ? { left: `${STAGE_PAD}px`, bottom: `${STAGE_PAD}px` } : {}),
 	"--tile": `${tile.value}px`,
 	// The grid lines stay on top of the image (see .ophice-grid--image).
 	"--background-image": background.value ? `url("${encodeURI(background.value)}")` : "none",
@@ -453,9 +504,9 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
-	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length) {
+	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length && !document.fullscreenElement) {
 		event.preventDefault()
-		leaveMeeting(true)
+		if (!meetingPanel.value?.exitFill()) leaveMeeting(true)
 		return
 	}
 	if (!held.size && !event.repeat) {

@@ -2780,3 +2780,6 @@ Unknown status.,Unbekannter Status.
 The note can be at most {0} characters.,Die Notiz darf höchstens {0} Zeichen lang sein.
 The return time must be in the future.,Die Rückkehrzeit muss in der Zukunft liegen.
 The return time can be at most {0} days ahead.,Die Rückkehrzeit darf höchstens {0} Tage in der Zukunft liegen.
+Fullscreen,Vollbild
+Leave fullscreen,Vollbild beenden
+Drag to resize,Ziehen zum Ändern der Größe

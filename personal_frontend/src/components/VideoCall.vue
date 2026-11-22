@@ -1,7 +1,8 @@
 <template>
 	<!-- The video call of an encounter (#2059): Jitsi, joined muted with the camera off. -->
 	<div
-		class="relative aspect-video w-full overflow-hidden bg-surface-gray-7"
+		class="relative w-full overflow-hidden bg-surface-gray-7"
+		:class="{ 'aspect-video': !fill }"
 		data-testid="video-call"
 		@mouseenter="pointerOver = true"
 		@mouseleave="pointerOver = false"
@@ -64,6 +65,8 @@ const props = defineProps({
 	domain: { type: String, required: true },
 	room: { type: String, required: true },
 	displayName: { type: String, default: "" },
+	/** Fill the parent's height instead of keeping 16:9 (meeting view, #2061). */
+	fill: { type: Boolean, default: false },
 })
 const emit = defineEmits(["joined", "toggled", "stolen"])
 
