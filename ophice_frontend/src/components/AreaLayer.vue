@@ -33,6 +33,15 @@
 				<FeatherIcon :name="COCKPIT_SYMBOLS[area.cockpit]" class="area__cockpit-symbol" />
 			</span>
 			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-img" />
+			<!-- Guest and customer spaces (#2081): bold, in the cockpit icon's style (PM, 2026-11-22). -->
+			<span
+				v-else-if="area.kind === 'Guest' || area.kind === 'Customer meeting'"
+				class="area__cockpit-icon area__guest-icon"
+				:style="{ '--tile': `hsl(${area.color_hue ?? 265} 70% 36%)` }"
+				data-testid="area-guest-icon"
+			>
+				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="area__cockpit-symbol" />
+			</span>
 			<img
 				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
@@ -278,6 +287,11 @@ function cancel() {
 	background: color-mix(in srgb, var(--tile) 55%, transparent);
 	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+/* Guests and customers stay bold: an almost solid tile. */
+.area__guest-icon {
+	background: color-mix(in srgb, var(--tile) 88%, transparent);
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 1px 4px rgba(0, 0, 0, 0.45);
+}
 .area__cockpit-symbol {
 	width: 55%;
 	height: 55%;
@@ -355,12 +369,13 @@ function cancel() {
 	background: rgba(124, 58, 237, 0.35);
 	border: 2.5px dashed rgb(109, 40, 217);
 }
+/* The Jitsi watermark, faded (PM, 2026-11-22): it says "meeting" without dominating the map. */
 .area__logo {
 	width: 65%;
 	max-width: 110px;
 	max-height: 50%;
-	opacity: 0.9;
-	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 6px hsl(var(--area-h) 70% 25% / 0.8));
+	opacity: 0.5;
+	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
 	user-select: none;
 }
 .area__logo-text {
