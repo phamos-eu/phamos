@@ -22,18 +22,8 @@
 		>
 			<!-- The start space (#2072): where people are beamed in; no meeting, so no Jitsi logo. -->
 			<FeatherIcon v-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
-			<!-- A cockpit space (#2076): the cockpit's app icon, always at the top right (PM, 2026-11-22). -->
-			<img
-				v-if="area.kind === 'Cockpit' && area.cockpit_logo"
-				:src="area.cockpit_logo"
-				alt=""
-				class="area__cockpit-icon"
-				draggable="false"
-				data-testid="area-cockpit-icon"
-			/>
-			<template v-if="area.kind === 'Start'" />
-			<!-- A cockpit space without a meeting has no Jitsi logo, only its name. -->
-			<template v-else-if="area.kind === 'Cockpit' && !area.jitsi_room" />
+			<!-- A cockpit space (#2076): the cockpit's app icon -->
+			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-icon" />
 			<img
 				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
@@ -253,11 +243,8 @@ function cancel() {
 	box-shadow: 0 0 14px 3px rgba(186, 230, 253, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.6);
 }
 .area__cockpit-icon {
-	position: absolute;
-	top: 4px;
-	right: 4px;
-	width: 26px;
-	height: 26px;
+	width: 40%;
+	max-width: 30px;
 	border-radius: 6px;
 	box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.5);
 }
