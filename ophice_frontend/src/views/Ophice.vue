@@ -200,12 +200,11 @@
 				:display-name="me?.full_name"
 				:bounds="cockpitOpen ? viewport : view"
 				:rect="cockpitOpen ? floatRect : meetingRect || defaultMeetingRect()"
-				:snapped="inTiles"
 				:floating="cockpitOpen"
 				:pip="Boolean(pipBody)"
 				:dock="cockpitOpen ? dockRects?.video : inTiles ? tileRects.video : null"
 				:hue="meetingArea.color_hue"
-				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si'"
+				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si' && !(inTiles && mapBig)"
 				:popped-out="poppedOut === meetingArea.name"
 				:window-closed="meetingWindowClosed"
 				@update:rect="(rect) => (cockpitOpen ? setFloatRect(rect) : setMeetingRect(rect))"
@@ -215,15 +214,6 @@
 				@float="floatMeeting"
 			/>
 			</Teleport>
-			<!-- Meeting tiles (#2091): the cockpits' tiling; video, chat and map lie over the tiles. -->
-			<MeetingTiles
-				v-if="meetingArea && me && !cockpitOpen && !pipBody"
-				ref="meetingTiles"
-				:hue="meetingArea.color_hue"
-				:style="{ inset: `${STAGE_PAD}px` }"
-				class="z-10"
-				@rects="(rects) => (tileRects = rects)"
-			/>
 			<StatusMenu
 				v-if="statusOpen && me"
 				:class="statusAt ? 'fixed z-50' : 'absolute right-6 top-6 z-40'"
@@ -246,7 +236,7 @@
 							: cockpitOpen
 								? 'fixed z-[55] shadow-2xl'
 								: inTiles
-									? 'z-20 rounded-b-xl'
+									? 'z-20'
 									: 'absolute z-20'
 				"
 				:style="{
@@ -259,7 +249,7 @@
 							: cockpitOpen
 								? floatingColumnStyle
 								: areaChatStyle),
-					...(inTiles ? {} : meetingFrameStyle),
+					...meetingFrameStyle,
 				}"
 				data-testid="meeting-column"
 			>
@@ -337,7 +327,7 @@
 			<div
 				v-if="me"
 				class="ophice-viewport overflow-hidden"
-				:class="meetingArea ? (inTiles ? 'z-20 rounded-b-lg bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0'"
+				:class="meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0'"
 				:style="viewportStyle"
 				data-testid="map-viewport"
 				@pointerdown="onViewportDown"
@@ -573,11 +563,11 @@
 			</div>
 			<!-- A small map switches on a double click (#2091); a faint hint says so. -->
 			<div
-				v-if="inTiles && meetingTiles?.biggest !== 'map'"
+				v-if="inTiles"
 				class="ophice-switch-hint pointer-events-none absolute inset-x-0 bottom-2 z-30 text-center"
 				data-testid="map-switch-hint"
 			>
-				{{ SWITCH_HINT }}
+				{{ mapBig ? SWITCH_BACK_HINT : SWITCH_HINT }}
 			</div>
 			<!-- Zoom (#2089): per person, remembered in this browser. -->
 			<div
@@ -662,7 +652,6 @@ import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
 import MapFog from "../components/MapFog.vue"
-import MeetingTiles from "../components/MeetingTiles.vue"
 import BackgroundImage from "../components/BackgroundImage.vue"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
@@ -766,7 +755,7 @@ const others = ref([])
 // Drives the kicking legs of my chip.
 const moving = ref(false)
 const error = ref("")
-const view = reactive({ width: 0, height: 0 })
+const view = reactive({ width: 0, height: 0, left: 0, top: 0 })
 
 // The largest square tile that fits the whole grid into the page; in a meeting (#2061) into
 // the mini map at the bottom left.
@@ -828,7 +817,7 @@ const canvasStyle = computed(() => ({
 const viewportStyle = computed(() =>
 	meetingArea.value
 		? tileRects.value?.map
-			? rectStyle(tileRects.value.map)
+			? { ...rectStyle(tileRects.value.map), ...meetingFrameStyle.value }
 			: { left: `${STAGE_PAD}px`, bottom: `${STAGE_PAD}px`, width: `${miniView.value.width}px`, height: `${miniView.value.height}px` }
 		: {}
 )
@@ -901,13 +890,16 @@ function onViewportDown(event) {
 	camera().onPointerDown(event)
 }
 
-/** A double click on the map in a meeting makes it the big tile (#2091: double click, PM). */
+/** A double click on the map in a meeting: the map big, or back to the standard view (#2091). */
 function onViewportDblclick(event) {
 	if (!inTiles.value || event.target.closest?.("[data-no-pan]")) return
-	meetingTiles.value?.makeBig("map")
+	mapBig.value = !mapBig.value
+	nextTick(() => me.value && miniCam.place(me.value.x, me.value.y))
 }
 // "Double-click to switch" on small maps; "double-tap" on touch screens.
-const SWITCH_HINT = window.matchMedia?.("(pointer: coarse)").matches ? __("Double-tap to switch") : __("Double-click to switch")
+const COARSE = window.matchMedia?.("(pointer: coarse)").matches
+const SWITCH_HINT = COARSE ? __("Double-tap to switch") : __("Double-click to switch")
+const SWITCH_BACK_HINT = COARSE ? __("Double-tap for the meeting view") : __("Double-click for the meeting view")
 
 /** Scroll pans, Ctrl/⌘ + scroll zooms; not inside a scrolling panel (a chat) over the map. */
 function onViewportWheel(event) {
@@ -925,17 +917,35 @@ const backgroundLayout = ref({ ...FITTED })
 // The map's camera (#2089): the big map fills the stage, in a meeting the mini map sits at the
 // bottom left; each has its own zoom, remembered in this browser.
 const gridSize = () => ({ cols: me.value?.cols || 40, rows: me.value?.rows || 25 })
-// --- Meeting tiles (#2091): the cockpits' tiling (MeetingTiles.vue, spa_shared/panels/tiling.js).
-// The tiles report where the call, the chat and the map lie (window px); those are fixed there.
-const meetingTiles = ref(null)
-const tileRects = ref(null)
-const inTiles = computed(() => Boolean(meetingArea.value && tileRects.value && !props.cockpitOpen && !pipBody.value))
+// --- Meeting view (#2061, #2091): fixed places. The chat top left, the map bottom left, the call
+// big on the right. A double click on the map swaps it with the call (the map big), another one
+// brings the standard view back (PM, 2026-11-22). The call's frame is never moved in the page
+// (that would restart it): everything lies at fixed window px.
+const mapBig = ref(false)
+const inTiles = computed(() => Boolean(meetingArea.value && !props.cockpitOpen && !pipBody.value && view.width))
+// The places themselves, without asking whether a meeting is on: the mini map's camera reads them
+// while the page is still being set up.
+const fixedPlaces = computed(() => {
+	const { cols, rows } = gridSize()
+	const pad = STAGE_PAD
+	const leftW = miniWidth.value
+	const mapH = Math.round(Math.min(view.height * 0.45, (leftW * rows) / cols))
+	const at = (x, y, w, h) => ({ left: view.left + x, top: view.top + y, width: w, height: h })
+	const small = at(pad, view.height - pad - mapH, leftW, mapH)
+	const big = at(pad * 2 + leftW, pad, view.width - pad * 3 - leftW, view.height - pad * 2)
+	return {
+		chat: at(pad, pad, leftW, view.height - pad * 3 - mapH),
+		map: mapBig.value ? big : small,
+		video: mapBig.value ? small : big,
+	}
+})
+const tileRects = computed(() => (inTiles.value ? fixedPlaces.value : null))
 const rectStyle = (r) => ({ position: "fixed", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
 
 // The map's tile in a meeting is its camera's view.
 const miniView = computed(() => {
-	const r = tileRects.value?.map
-	return r ? { width: Math.max(0, r.width), height: Math.max(0, r.height) } : { width: miniWidth.value, height: Math.round((miniWidth.value * 2) / 3) }
+	const r = fixedPlaces.value.map
+	return { width: Math.max(0, r.width), height: Math.max(0, r.height) }
 })
 const mainCam = useMapCamera({
 	view,
@@ -1548,7 +1558,7 @@ const meetingArea = ref(null)
 // A meeting starts or ends (#2089): the map changes size; centre it on my chip.
 watch(
 	() => meetingArea.value?.name,
-	(name) => !name && (tileRects.value = null)
+	(name) => !name && (mapBig.value = false)
 )
 watch(
 	() => meetingArea.value?.name,
@@ -2578,6 +2588,10 @@ function measure() {
 	if (!el) return
 	view.width = el.clientWidth
 	view.height = el.clientHeight
+	// Where the stage starts in the window: the meeting view lies at fixed window px (#2091).
+	const box = el.getBoundingClientRect()
+	view.left = box.left
+	view.top = box.top
 }
 
 onMounted(async () => {
