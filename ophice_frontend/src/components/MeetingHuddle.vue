@@ -1,6 +1,9 @@
 <template>
 	<!-- The people in my meeting (#2067), above the area chat: a huddle in the area's colour. -->
-	<div
+	<!-- Someone who leaves floats up out of the huddle and the others close up; newcomers fade in. -->
+	<TransitionGroup
+		tag="div"
+		name="huddle"
 		class="flex flex-shrink-0 flex-wrap items-start gap-3 rounded-xl px-3 py-2.5"
 		:style="frameStyle"
 		:aria-label="__('In {0}', [area.title])"
@@ -23,7 +26,7 @@
 				{{ person.user === me ? __("you") : firstName(person) }}
 			</span>
 		</button>
-	</div>
+	</TransitionGroup>
 </template>
 
 <script setup>
@@ -56,3 +59,28 @@ function firstName(person) {
 	return (person.full_name || person.user).split(" ")[0]
 }
 </script>
+
+<style scoped>
+.huddle-enter-active {
+	animation: huddle-in 300ms ease-out both;
+}
+.huddle-leave-active {
+	pointer-events: none;
+	animation: huddle-out 550ms ease-out both;
+}
+@keyframes huddle-in {
+	from { opacity: 0; transform: scale(0.85); }
+}
+/* Float up and fade first, then give the place back (width and gap) so the others slide in. */
+@keyframes huddle-out {
+	0% { opacity: 1; transform: none; width: 3.5rem; margin-right: 0; }
+	55% { opacity: 0; transform: translateY(-10px) scale(0.9); width: 3.5rem; margin-right: 0; }
+	100% { opacity: 0; transform: translateY(-10px) scale(0.9); width: 0; margin-right: -0.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.huddle-enter-active,
+	.huddle-leave-active {
+		animation-duration: 1ms;
+	}
+}
+</style>
