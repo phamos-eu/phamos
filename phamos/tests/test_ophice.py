@@ -871,3 +871,57 @@ class OphiceMapEditorTestCase(_OphiceRoomBase):
 		with self.assertRaises(frappe.PermissionError):
 			ophice.remove_background()
 		self.assertTrue(frappe.db.exists(ophice.AREA_DOCTYPE, area))
+
+
+class OphiceStartSpaceTestCase(_OphiceRoomBase):
+	"""Start space and beam-in (#2072): coming in lands you in the start space, a reload does not."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
+		frappe.set_user(self.A)
+		self.start = ophice.save_area("Entrance", "", 20, 10, 3, 2, kind="Start")
+
+	def tearDown(self):
+		frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
+		frappe.cache.delete_value(ophice._beam_key(self.A))
+		super().tearDown()
+
+	def _inside_start(self, me):
+		return 20 <= me["x"] and me["x"] + 1 <= 23 and 10 <= me["y"] and me["y"] + 1 <= 12
+
+	def test_only_one_start_space_without_meeting_or_chat(self):
+		self.assertEqual(frappe.db.get_value(ophice.AREA_DOCTYPE, self.start, "meeting_url"), "")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Second", "", 2, 2, 2, 2, kind="Start")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.get_area_chat(self.start)
+
+	def test_coming_in_beams_into_the_start_space_and_a_reload_does_not(self):
+		first = ophice.get_space()
+		self.assertTrue(first["beam_in"])
+		self.assertTrue(self._inside_start(first["me"]))
+		# The first heartbeat tells the others to play the beam-in, once.
+		ophice.heartbeat(first["me"]["x"], first["me"]["y"])
+		ophice.heartbeat(first["me"]["x"], first["me"]["y"])
+		beams = [
+			c.args[1].get("beam")
+			for c in self.sent.call_args_list
+			if c.args and c.args[0] == ophice.EVENT_PRESENCE and c.args[1].get("user") == self.A
+		]
+		self.assertEqual(beams, [True, None])
+		# Moved away, then reloaded right after: no beam-in, the chip stays where it was.
+		ophice.save_my_position(5, 5)
+		again = ophice.get_space()
+		self.assertFalse(again["beam_in"])
+		self.assertEqual((again["me"]["x"], again["me"]["y"]), (5.0, 5.0))
+		# Back after more than five minutes: beamed in again.
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, self.A, ophice.time.time() - ophice.ARRIVAL_GAP_SECONDS - 5)
+		self.assertTrue(ophice.get_space()["beam_in"])
+
+	def test_arrivals_do_not_land_on_each_other(self):
+		self._put(self.B, 20, 10)
+		for _ in range(5):
+			frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
+			me = ophice.get_space()["me"]
+			self.assertGreaterEqual(ophice.math.hypot(me["x"] - 20, me["y"] - 10), ophice.START_SPOT_GAP)

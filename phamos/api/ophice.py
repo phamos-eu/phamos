@@ -93,6 +93,13 @@ AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
 # Areas are drawn in half tiles (#2067).
 AREA_STEP = 0.5
+# Kinds of space (#2072): a meeting, or the start space where chips are beamed in.
+AREA_KINDS = ("Meeting", "Start")
+# Coming in (#2072): first visit of the day, or back after this long. Last visit per user in Redis.
+ARRIVAL_GAP_SECONDS = 5 * 60
+LAST_SEEN_CACHE_KEY = "phamos_ophice_last_seen"
+# Chips in the start space keep at least this distance (tiles) from each other.
+START_SPOT_GAP = 1.2
 # Area chat (#2062): what happens to what is written in an area.
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
@@ -236,6 +243,62 @@ def _throttled():
 	return count > MOVE_LIMIT
 
 
+# --- Coming in (#2072): the chip is beamed in at the start space.
+
+
+def _last_seen(user):
+	try:
+		return float(frappe.cache.hget(LAST_SEEN_CACHE_KEY, user) or 0)
+	except (TypeError, ValueError):
+		return 0.0
+
+
+def _touch(user):
+	frappe.cache.hset(LAST_SEEN_CACHE_KEY, user, time.time())
+
+
+def _arriving(user):
+	"""First visit of the day, or back after more than ARRIVAL_GAP_SECONDS: a reload or a short
+	connection loss is not an arrival, so nobody drops out of a meeting."""
+	seen = _last_seen(user)
+	if not seen or time.time() - seen > ARRIVAL_GAP_SECONDS:
+		return True
+	zone = ZoneInfo(frappe.utils.get_system_timezone())
+	return datetime.fromtimestamp(seen, zone).date() != datetime.now(zone).date()
+
+
+def _start_space():
+	return next((a for a in _areas() if a.kind == "Start"), None)
+
+
+def _start_spot(user):
+	"""A free spot in the start space (not on top of anyone), or the middle of the map without one."""
+	start = _start_space()
+	if not start:
+		return _spawn()
+	taken = [(c["x"], c["y"]) for c in _online(exclude=user)]
+	spots = []
+	y = start.y
+	while y + 1 <= start.y + start.height + 1e-9:
+		x = start.x
+		while x + 1 <= start.x + start.width + 1e-9:
+			if all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken):
+				spots.append({"x": float(x), "y": float(y)})
+			x += 1
+		y += 1
+	if spots:
+		return random.choice(spots)
+	# Too small or full: the middle of it (chips are drawn one tile wide).
+	return {
+		"x": _clamp(start.x + start.width / 2 - 0.5, COLS),
+		"y": _clamp(start.y + start.height / 2 - 0.5, ROWS),
+	}
+
+
+def _beam_key(user):
+	return f"phamos_ophice_beam:{user}"
+
+
 @frappe.whitelist()
 def get_space():
 	"""The grid size, my chip (where it stands, or the spawn) and the other chips."""
@@ -245,10 +308,20 @@ def get_space():
 	dummy_users = {d["user"] for d in dummies}
 	online = [c for c in _online(exclude=user) if c["user"] not in dummy_users]
 	present = dummy_users | {c["user"] for c in online} | {user}
+	arriving = _arriving(user)
+	if arriving:
+		# Beamed in at the start space; the others see it with my first heartbeat.
+		position = _start_spot(user)
+		frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
+		frappe.cache.set_value(_beam_key(user), 1, expires_in_sec=60)
+	else:
+		position = _stored_position() or _spawn()
+	_touch(user)
 	return {
 		"cols": COLS,
 		"rows": ROWS,
-		"me": {**_chip(user, _stored_position() or _spawn()), "cols": COLS, "rows": ROWS},
+		"me": {**_chip(user, position), "cols": COLS, "rows": ROWS},
+		"beam_in": arriving,
 		"others": dummies + online + [c for c in _away_offline() if c["user"] not in present],
 		"presence_ttl": PRESENCE_TTL,
 		# Burn notices still running for me (#2057), e.g. after a reload.
@@ -268,7 +341,12 @@ def heartbeat(x, y):
 	user = frappe.session.user
 	chip = _chip(user, {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, {**chip, "ts": time.time()})
-	_publish(EVENT_PRESENCE, chip)
+	_touch(user)
+	# Just came in (#2072): the others play the beam-in once.
+	beam = bool(frappe.cache.get_value(_beam_key(user)))
+	if beam:
+		frappe.cache.delete_value(_beam_key(user))
+	_publish(EVENT_PRESENCE, {**chip, "beam": True} if beam else chip)
 	return chip
 
 
@@ -1094,7 +1172,7 @@ def _areas():
 		AREA_DOCTYPE,
 		fields=[
 			"name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room",
-			"color_hue", "chat_mode",
+			"color_hue", "chat_mode", "kind",
 		],
 		order_by="creation asc",
 		limit=MAX_AREAS,
@@ -1103,6 +1181,7 @@ def _areas():
 	# name: this runs on reads, which Frappe does not commit, so nothing random here.
 	for area in areas:
 		area.chat_mode = area.chat_mode or "Saved"
+		area.kind = area.kind or "Meeting"
 		if area.color_hue is None or area.color_hue == "":
 			area.color_hue = int(hashlib.md5(area.name.encode()).hexdigest(), 16) % 360
 	return areas
@@ -1141,22 +1220,32 @@ def _overlaps(name, x, y, width, height):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_area(title, meeting_url, x, y, width, height, name=None, chat_mode="Saved"):
-	"""Create or change a meeting area, for everyone (map editors only, #2071)."""
+def save_area(title, meeting_url="", x=0, y=0, width=1, height=1, name=None, chat_mode="Saved", kind="Meeting"):
+	"""Create or change a space, for everyone (map editors only, #2071). A meeting space has a
+	Jitsi meeting and a chat; the start space (#2072, only one) has neither."""
 	_require_map_editor()
 	if chat_mode not in CHAT_MODES:
 		frappe.throw(_("Unknown chat mode."))
+	if kind not in AREA_KINDS:
+		frappe.throw(_("Unknown kind of space."))
 	title = (title or "").strip()[:AREA_TITLE_LENGTH]
 	if not title:
 		frappe.throw(_("Give the area a name."))
-	domain, room = _parse_meeting_url(meeting_url)
+	if kind == "Start":
+		other = frappe.db.get_value(AREA_DOCTYPE, {"kind": "Start", "name": ("!=", name or "")}, "title")
+		if other:
+			frappe.throw(_("There is already a start space: {0}.").format(other))
+		domain = room = ""
+	else:
+		domain, room = _parse_meeting_url(meeting_url)
 	x, y, width, height = _clean_rect(x, y, width, height)
 	clash = _overlaps(name, x, y, width, height)
 	if clash:
 		frappe.throw(_("This overlaps the area {0}.").format(clash))
 	values = {
 		"title": title,
-		"meeting_url": f"https://{domain}/{room}",
+		"kind": kind,
+		"meeting_url": f"https://{domain}/{room}" if domain else "",
 		"jitsi_domain": domain,
 		"jitsi_room": room,
 		"x": x,
@@ -1228,6 +1317,8 @@ def _area(name):
 def _require_inside(name):
 	"""The area, if I stand in it: being there is the permission to read and write its chat."""
 	area = _area(name)
+	if (area.kind or "Meeting") != "Meeting":
+		frappe.throw(_("This space has no chat."))
 	if not _inside_area(area, frappe.session.user):
 		frappe.throw(_("Step into the area to use its chat."), frappe.PermissionError)
 	return area
@@ -1610,7 +1701,8 @@ def get_people():
 		limit=500,
 	)
 	online = {c["user"]: c for c in _online()}
-	areas = _areas()
+	# Only meeting spaces say where someone is; standing in the start space is just "around".
+	areas = [a for a in _areas() if a.kind == "Meeting"]
 	working = _working_on([u.user for u in users if u.user == me or not _hides_details(u.user)])
 	cockpits = _cockpits_now()
 	chatting = _in_encounter([u.user for u in users if u.user in online])

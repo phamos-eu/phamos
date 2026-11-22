@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "title",
+  "kind",
   "meeting_url",
   "column_break_main",
   "x",
@@ -30,12 +31,23 @@
    "reqd": 1
   },
   {
+   "default": "Meeting",
+   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "Meeting\nStart"
+  },
+  {
    "description": "https://<allowed Jitsi server>/<room>, for example https://meet.jit.si/OurStandup",
    "fieldname": "meeting_url",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Meeting URL",
-   "reqd": 1
+   "reqd": 0,
+   "mandatory_depends_on": "eval:doc.kind != 'Start'",
+   "depends_on": "eval:doc.kind != 'Start'"
   },
   {
    "fieldname": "column_break_main",
@@ -76,7 +88,8 @@
   {
    "fieldname": "section_jitsi",
    "fieldtype": "Section Break",
-   "label": "Jitsi"
+   "label": "Jitsi",
+   "depends_on": "eval:doc.kind != 'Start'"
   },
   {
    "description": "From the meeting URL.",
@@ -102,7 +115,8 @@
   {
    "fieldname": "section_chat",
    "fieldtype": "Section Break",
-   "label": "Area chat"
+   "label": "Area chat",
+   "depends_on": "eval:doc.kind != 'Start'"
   },
   {
    "default": "Saved",
@@ -110,7 +124,8 @@
    "fieldname": "chat_mode",
    "fieldtype": "Select",
    "label": "Chat mode",
-   "options": "Saved\nNot saved\nConfidential"
+   "options": "Saved\nNot saved\nConfidential",
+   "depends_on": "eval:doc.kind != 'Start'"
   },
   {
    "description": "Private Raven channel of the area chat (Saved and Not saved).",
@@ -122,7 +137,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 15:00:00.000000",
+ "modified": "2026-11-22 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

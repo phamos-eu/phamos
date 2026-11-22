@@ -13,13 +13,16 @@
 				'area--active': area.name === activeName,
 				'area--editing': editing,
 				'area--lifted': gesture?.area?.name === area.name && draft,
+				'area--start': area.kind === 'Start',
 			}"
 			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265 }"
 			:title="area.title"
 			data-testid="meeting-area"
 		>
+			<!-- The start space (#2072): where people are beamed in; no meeting, so no Jitsi logo. -->
+			<FeatherIcon v-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
 			<img
-				v-if="!failedLogos[area.jitsi_domain]"
+				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
 				alt=""
 				class="area__logo"
@@ -52,6 +55,7 @@
 
 <script setup>
 import { computed, reactive, ref } from "vue"
+import { FeatherIcon } from "frappe-ui"
 
 const props = defineProps({
 	areas: { type: Array, default: () => [] },
@@ -222,6 +226,19 @@ function cancel() {
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 1px 4px rgba(0, 0, 0, 0.35);
 	color: #fff;
 	gap: 3px;
+}
+/* The start space: light, with a soft glow, so it reads as an entrance and not as a meeting. */
+.area--start {
+	background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.55), hsl(var(--area-h) 70% 70% / 0.25));
+	border: 2.5px dotted rgba(255, 255, 255, 0.95);
+	box-shadow: 0 0 14px 3px rgba(186, 230, 253, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.6);
+}
+.area__start-icon {
+	width: 40%;
+	max-width: 28px;
+	height: auto;
+	color: #fff;
+	filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
 }
 .area--active {
 	background: hsl(var(--area-h) 70% 42% / 0.45);

@@ -2854,3 +2854,16 @@ You left the room,Sie sind gegangen
 in the last {0} minutes,in den letzten {0} Minuten
 Only Ophice map editors can change the map.,Nur Ophice-Kartenbearbeiter können die Karte ändern.
 Ophice Map Editor,Ophice-Kartenbearbeiter
+Edit space,Bereich bearbeiten
+New space,Neuer Bereich
+Kind of space,Art des Bereichs
+Meeting,Besprechung
+Start,Start
+Entrance,Eingang
+"People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space.","Wer ins Ophice kommt, wird hier hineingebeamt: beim ersten Besuch des Tages oder nach mehr als 5 Minuten Abwesenheit. Es gibt nur einen Startbereich."
+Debug,Debug
+Debug: simulate things on your own screen only,Debug: Abläufe nur auf dem eigenen Bildschirm simulieren
+Simulate beam-in,Hineinbeamen simulieren
+There is already a start space: {0}.,Es gibt schon einen Startbereich: {0}.
+Unknown kind of space.,Unbekannte Art von Bereich.
+This space has no chat.,Dieser Bereich hat keinen Chat.

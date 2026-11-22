@@ -86,6 +86,13 @@
 			>
 				{{ __("Remove") }}
 			</Button>
+			<!-- Debug (#2072): replays things on my own screen only, for testing. Map editors only. -->
+			<Dropdown v-if="canEditMap" :options="debugOptions" placement="right">
+				<Button variant="ghost" :title="__('Debug: simulate things on your own screen only')" data-testid="debug-menu">
+					<template #prefix><FeatherIcon name="tool" class="h-4 w-4" /></template>
+					{{ __("Debug") }}
+				</Button>
+			</Dropdown>
 		</header>
 
 		<div class="flex min-h-0 flex-1">
@@ -254,7 +261,13 @@
 					:title="other.offline ? __('{0} (away, page closed)', [other.full_name]) : other.full_name"
 					data-testid="other-chip"
 				>
-					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
+					<span v-if="beams[other.user]" :key="beams[other.user]" class="ophice-beam" aria-hidden="true" />
+					<span
+						:key="`chip-${beams[other.user] || 0}`"
+						class="inline-flex"
+						:class="{ 'ophice-beam-drop': beams[other.user] }"
+						:style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }"
+					>
 						<ChipFigure
 							:user="other.user"
 							:label="other.full_name"
@@ -288,7 +301,13 @@
 					data-testid="my-chip"
 					@click="toggleStatus($event)"
 				>
-					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
+					<span v-if="beams[me.user]" :key="beams[me.user]" class="ophice-beam" aria-hidden="true" data-testid="beam" />
+					<span
+						:key="`chip-${beams[me.user] || 0}`"
+						class="inline-flex"
+						:class="{ 'ophice-beam-drop': beams[me.user] }"
+						:style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }"
+					>
 						<ChipFigure
 							:user="me.user"
 							:label="me.full_name"
@@ -321,7 +340,7 @@
 
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
-import { Button, call, FeatherIcon, toast } from "frappe-ui"
+import { Button, call, Dropdown, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
@@ -455,6 +474,8 @@ const backgroundLayout = ref({ ...FITTED })
 const adjustingBackground = ref(false)
 // The map tools (spaces, background) are for map editors (#2071); the server checks it too.
 const canEditMap = ref(false)
+// Nothing here is sent to the others or changes my real position.
+const debugOptions = [{ label: __("Simulate beam-in"), icon: "log-in", onClick: () => me.value && playBeam(me.value.user) }]
 let layoutTimer = null
 
 // Live for me while dragging; saved (and sent to everyone) a moment after the last change.
@@ -676,8 +697,22 @@ let presenceTtlMs = 45000
 const lastSeen = new Map()
 const movingTimers = new Map()
 
+// --- Beam-in (#2072): a column of light, the chip drops in. user -> start time while it plays.
+
+const BEAM_MS = 1600
+const beams = reactive({})
+
+function playBeam(user) {
+	const started = Date.now()
+	beams[user] = started
+	setTimeout(() => {
+		if (beams[user] === started) delete beams[user]
+	}, BEAM_MS)
+}
+
 function upsertOther(chip) {
 	if (!chip?.user || chip.user === me.value?.user) return
+	if (chip.beam) playBeam(chip.user)
 	lastSeen.set(chip.user, Date.now())
 	const existing = others.value.find((o) => o.user === chip.user)
 	// Away with the page closed (#2053): stays, greyed out; any heartbeat makes it live again.
@@ -906,7 +941,12 @@ function areaAt(chip) {
 	if (!chip) return null
 	const cx = chip.x + 0.5
 	const cy = chip.y + 0.5
-	return areas.value.find((a) => cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height) || null
+	// Meeting spaces only: the start space (#2072) has no meeting, chat or glow.
+	return (
+		areas.value.find(
+			(a) => (a.kind || "Meeting") === "Meeting" && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
+		) || null
+	)
 }
 
 // Who stands in which area, from the chips on the map (#2067): the sidebar groups and colours by it.
@@ -1050,6 +1090,7 @@ async function saveArea(values) {
 			width: values.width,
 			height: values.height,
 			chat_mode: values.chat_mode || "Saved",
+			kind: values.kind || "Meeting",
 		})
 	} catch (e) {
 		throw new Error(errorText(e) || __("The area could not be saved."))
@@ -1496,6 +1537,8 @@ onMounted(async () => {
 	try {
 		const data = await call(`${API}.get_space`)
 		me.value = data.me
+		// Came in (first visit of the day, or back after a while): beamed in at the start space.
+		if (data.beam_in) playBeam(data.me.user)
 		saved = { x: me.value.x, y: me.value.y }
 		presenceTtlMs = (data.presence_ttl || 45) * 1000
 		background.value = data.background || ""
@@ -1567,6 +1610,41 @@ onBeforeUnmount(() => {
 	top: 0;
 	left: 0;
 	will-change: transform;
+}
+/* Beam-in (#2072): a column of light comes down onto the spot, the chip drops in and the light
+   fades. Compositor-only (opacity and transform). */
+.ophice-beam {
+	position: absolute;
+	bottom: 30%;
+	left: 50%;
+	width: 70%;
+	height: 900%;
+	pointer-events: none;
+	border-radius: 999px 999px 40% 40%;
+	background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(186, 230, 253, 0.7) 35%, rgba(186, 230, 253, 0));
+	box-shadow: 0 0 24px 8px rgba(186, 230, 253, 0.55);
+	transform-origin: bottom center;
+	animation: ophice-beam 1600ms ease-out forwards;
+}
+@keyframes ophice-beam {
+	0% { opacity: 0; transform: translateX(-50%) scaleX(0.2) scaleY(0.3); }
+	20% { opacity: 1; transform: translateX(-50%) scaleX(1) scaleY(1); }
+	65% { opacity: 0.9; transform: translateX(-50%) scaleX(0.8) scaleY(1); }
+	100% { opacity: 0; transform: translateX(-50%) scaleX(0.1) scaleY(1); }
+}
+.ophice-beam-drop {
+	animation: ophice-beam-drop 1100ms cubic-bezier(0.25, 1.4, 0.5, 1) 250ms both;
+}
+@keyframes ophice-beam-drop {
+	0% { opacity: 0; transform: translateY(-160%) scale(calc(var(--chip-scale) * 0.4)); }
+	60% { opacity: 1; transform: translateY(6%) scale(calc(var(--chip-scale) * 1.08)); }
+	100% { opacity: 1; transform: translateY(0) scale(var(--chip-scale)); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.ophice-beam,
+	.ophice-beam-drop {
+		animation-duration: 1ms;
+	}
 }
 /* Perimeters: a circle per chip, stronger for my own, green when touching another. A light edge
    with a thin dark outline keeps it visible on any background image, light or dark. */
