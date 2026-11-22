@@ -10,8 +10,11 @@ const API = "phamos.phriend.api.";
 export const LATER = "Battle tested";
 
 // The question for a request { name, kind, round, title, subject }; the title is escaped here.
-export function question_text(__, req) {
-	const title = `“${escape_html(req.title || req.subject || "")}”`;
+// With issue_url(name) the title links to the report, so the user can read what it was about.
+export function question_text(__, req, issue_url) {
+	let title = `“${escape_html(req.title || req.subject || "")}”`;
+	if (issue_url && req.subject)
+		title = `<a href="${escape_html(issue_url(req.subject))}" target="_blank" rel="noopener">${title}</a>`;
 	const later = req.round === LATER;
 	if (req.kind === "Stars")
 		return later
@@ -35,7 +38,7 @@ export function picks_html(__, kind) {
 export function rating_item(phriend, req) {
 	const __ = phriend.__;
 	const csrf = () => phriend.host.csrf_token();
-	const html = `<div class="rate-q">${question_text(__, req)}</div>${picks_html(__, req.kind)}
+	const html = `<div class="rate-q">${question_text(__, req, phriend.host.issue_url)}</div>${picks_html(__, req.kind)}
 		<div class="rate-foot"><button type="button" class="link" data-decline>${escape_html(__("No thanks"))}</button></div>`;
 
 	const send = async (rating, comment) => {

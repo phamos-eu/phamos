@@ -13,6 +13,12 @@ describe("rating a fix (#2014)", () => {
 	it("escapes the report's title", () => {
 		expect(question_text(__, { kind: "Thumbs", title: "<img src=x onerror=alert(1)>" })).not.toContain("<img")
 	})
+	it("links the title to the report when the host knows where reports live", () => {
+		const url = (name) => `/app/issue/${encodeURIComponent(name)}`
+		const text = question_text(__, { kind: "Stars", round: "First impression", title: "Search", subject: "ISS-1" }, url)
+		expect(text).toContain('<a href="/app/issue/ISS-1" target="_blank" rel="noopener">“Search”</a>')
+		expect(question_text(__, { kind: "Stars", title: "Search", subject: "ISS-1" })).not.toContain("<a")
+	})
 	it("offers thumbs for bugs and five stars for improvements", () => {
 		expect((picks_html(__, "Thumbs").match(/class="pick"/g) || []).length).toBe(2)
 		expect(picks_html(__, "Thumbs")).toContain('data-r="-1"')
