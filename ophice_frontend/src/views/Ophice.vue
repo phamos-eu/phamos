@@ -470,7 +470,7 @@
 			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
 			:cockpits="cockpits"
 			:open-route="openRoute"
-			@open="(cockpit) => emit('open-cockpit', cockpit)"
+			@open="openCockpit"
 		/>
 		</div>
 		<!-- Over an open cockpit (#2074): the office small, with pings and quick replies. -->
@@ -518,7 +518,7 @@ import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
 import { myZone } from "../utils/ophiceTime.js"
-import { openFloatingWindow } from "../utils/pip.js"
+import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1290,8 +1290,19 @@ function openCockpitSpace() {
 	if (!autoCockpit.value || cockpitSpaceHere === space.name || props.cockpitOpen) return
 	cockpitSpaceHere = space.name
 	const cockpit = cockpits.value.find((c) => c.route === space.cockpit)
-	if (cockpit) emit("open-cockpit", cockpit)
+	if (cockpit) openCockpit(cockpit)
 	else toast({ title: __("You can't open {0}; you can still use this space and its meeting.", [space.cockpit_title || space.cockpit]), icon: "info" })
+}
+
+/**
+ * Open a cockpit (shortcut bar or cockpit space). Where the browser has it, the mini map goes
+ * straight into its floating window, so it can be pulled out of the browser without a second click
+ * (PM, 2026-11-22). The browser only allows that right after a click or key press; walking is key
+ * presses, so stopping in a cockpit space still counts. Otherwise it stays over the cockpit.
+ */
+function openCockpit(cockpit) {
+	if (canFloat && !pipBody.value && navigator.userActivation?.isActive) floatAll()
+	emit("open-cockpit", cockpit)
 }
 
 async function setAutoCockpit(on) {
