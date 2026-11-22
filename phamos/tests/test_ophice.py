@@ -46,14 +46,15 @@ class OphiceTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: dummies}):
 			others = ophice.get_space()["others"]
 		# Guest is an enabled user; myself and unknown users are left out.
-		# Real guests on the site's map (#2082) are not this test's business.
-		others = [o for o in others if not o.get("guest")]
+		# Only the dummy chips: people really online on the site are not this test's business.
+		others = [o for o in others if o.get("dummy")]
 		self.assertEqual([(o["user"], o["x"], o["y"]) for o in others], [("Guest", 5.0, 6.0)])
 
 	def test_no_dummies_without_site_config(self):
 		# Real away users of the site would show up too: not part of this test.
 		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}), patch.object(ophice, "_away_offline", return_value=[]):
-			self.assertEqual(ophice.get_space()["others"], [])
+			# No dummy chips (people really online on the site may be there).
+			self.assertEqual([o for o in ophice.get_space()["others"] if o.get("dummy")], [])
 
 	def test_guest_is_refused(self):
 		frappe.set_user("Guest")
