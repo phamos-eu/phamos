@@ -63,7 +63,8 @@
 				@pointerdown.stop
 				@click="$emit('popout')"
 			>
-				<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+				<!-- Same icon as Float: both are pop-ups (PM, 2026-11-22). -->
+				<PopOutIcon class="h-3.5 w-3.5" />
 				{{ __("Own window") }}
 			</button>
 			<button
@@ -119,7 +120,8 @@
 						class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
 						:style="{ background: `hsl(${hue ?? 220} 75% 50% / 0.15)`, color: `hsl(${hue ?? 220} 75% 35%)` }"
 					>
-						<FeatherIcon :name="windowClosed ? 'alert-circle' : 'external-link'" class="h-5 w-5" />
+						<FeatherIcon v-if="windowClosed" name="alert-circle" class="h-5 w-5" />
+						<PopOutIcon v-else class="h-5 w-5" />
 					</span>
 					<div>
 						<p class="text-base font-semibold text-ink-gray-9">
@@ -137,7 +139,7 @@
 
 				<div class="flex flex-wrap gap-2">
 					<Button variant="solid" data-testid="meeting-show-window" @click="$emit('popout')">
-						<template #prefix><FeatherIcon name="external-link" class="h-4 w-4" /></template>
+						<template #prefix><PopOutIcon class="h-4 w-4" /></template>
 						{{ windowClosed ? __("Open it again") : __("Show that window") }}
 					</Button>
 					<Button variant="subtle" data-testid="meeting-bring-back" @click="$emit('bring-back')">
