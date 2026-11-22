@@ -2678,7 +2678,7 @@ Phriend Feedback,Phriend-Rückmeldung
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
 Ophice,Ophice
 Back to cockpit,Zurück zum Cockpit
-"Move with WASD or the arrow keys, Shift to go faster, Space to jump","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen"
+"Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen (zweimal: Doppelsprung, halten: fliegen)"
 Ophice could not be loaded.,Ophice konnte nicht geladen werden.
 Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
 Ophice is only available to System Users.,Ophice steht nur Systembenutzern zur Verfügung.
@@ -2755,3 +2755,28 @@ Vertical position,Vertikale Lage
 The grid stays as it is; everyone sees the change.,Das Raster bleibt unverändert; alle sehen die Änderung.
 The background could not be adjusted.,Der Hintergrund konnte nicht angepasst werden.
 Upload a background first.,Laden Sie zuerst einen Hintergrund hoch.
+Away,Abwesend
+Be right back,Gleich zurück
+Available,Verfügbar
+"Set a status: be right back, or away until a time","Status setzen: gleich zurück oder abwesend bis zu einer Uhrzeit"
+"{0} (away, page closed)","{0} (abwesend, Seite geschlossen)"
+Was due back at {0},Wollte um {0} zurück sein
+Back at {0},Zurück um {0}
+{0} local time in {1},{0} Ortszeit in {1}
+My status,Mein Status
+Doctor's appointment,Arzttermin
+Getting a coffee,Hole mir einen Kaffee
+Back at,Zurück um
+30 min,30 Min.
+1 hour,1 Stunde
+2 hours,2 Stunden
+Tomorrow 9:00,Morgen 9:00
+Your time zone: {0}. Everyone sees the time on their own clock.,Ihre Zeitzone: {0}. Alle sehen die Uhrzeit in ihrer eigenen Zeitzone.
+Shown above your chip until you move again.,"Wird über Ihrem Chip angezeigt, bis Sie sich wieder bewegen."
+Set status,Status setzen
+Please say when you will be back.,"Bitte geben Sie an, wann Sie zurück sind."
+The status could not be set.,Der Status konnte nicht gesetzt werden.
+Unknown status.,Unbekannter Status.
+The note can be at most {0} characters.,Die Notiz darf höchstens {0} Zeichen lang sein.
+The return time must be in the future.,Die Rückkehrzeit muss in der Zukunft liegen.
+The return time can be at most {0} days ahead.,Die Rückkehrzeit darf höchstens {0} Tage in der Zukunft liegen.

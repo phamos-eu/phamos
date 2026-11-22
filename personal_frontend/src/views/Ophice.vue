@@ -11,8 +11,21 @@
 			</router-link>
 			<div class="text-base font-semibold tracking-tight">{{ __("Ophice") }}</div>
 			<div class="ml-auto text-sm text-ink-gray-5">
-				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump") }}
+				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
 			</div>
+			<!-- My status (#2053): be right back / away, shown above my chip. -->
+			<Button
+				v-if="me"
+				:variant="statusOpen ? 'solid' : 'subtle'"
+				:title="__('Set a status: be right back, or away until a time')"
+				data-testid="status-button"
+				@click="statusOpen = !statusOpen"
+			>
+				<template #prefix>
+					<FeatherIcon :name="me.status?.kind === 'away' ? 'moon' : me.status ? 'coffee' : 'check-circle'" class="h-4 w-4" />
+				</template>
+				{{ me.status?.kind === "away" ? __("Away") : me.status ? __("Be right back") : __("Available") }}
+			</Button>
 			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. -->
 			<Button
 				v-if="me"
@@ -113,6 +126,13 @@
 				:display-name="me?.full_name"
 				@leave="leaveMeeting(true)"
 			/>
+			<StatusMenu
+				v-if="statusOpen && me"
+				class="absolute right-6 top-6 z-40"
+				:status="me.status"
+				:on-save="saveStatus"
+				@close="statusOpen = false"
+			/>
 			<AreaDialog :area="areaDraft" :on-save="saveArea" :on-delete="deleteArea" @close="areaDraft = null" />
 			<p
 				v-if="editingAreas"
@@ -170,7 +190,7 @@
 					:key="other.user"
 					class="ophice-chip ophice-chip--remote absolute flex items-center justify-center"
 					:style="chipStyle(other)"
-					:title="other.full_name"
+					:title="other.offline ? __('{0} (away, page closed)', [other.full_name]) : other.full_name"
 					data-testid="other-chip"
 				>
 					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
@@ -179,6 +199,7 @@
 							:label="other.full_name"
 							:image="other.user_image"
 							:moving="Boolean(other.moving)"
+							:offline="Boolean(other.offline)"
 						/>
 					</span>
 				</div>
@@ -212,9 +233,20 @@
 							ring
 							:moving="moving"
 							:jumping="jumping"
+							:double-jump="doubleJumped"
+							:flying="flying"
 						/>
 					</span>
 				</div>
+				<!-- Statuses float above their chips, under the chat bubbles. -->
+				<StatusTag
+					v-for="chip in statusChips"
+					:key="`status-${chip.user}`"
+					:status="chip.status"
+					:now="clock"
+					:style="tagStyle(chip)"
+					:class="{ 'ophice-chip--remote': chip.user !== me.user }"
+				/>
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
@@ -230,6 +262,8 @@ import BurnNotice from "../components/BurnNotice.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
+import StatusTag from "../components/StatusTag.vue"
+import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
@@ -433,15 +467,21 @@ function onKeydown(event) {
 			return
 		}
 	}
-	// Space: jump, over other chips, so nobody gets stuck anywhere (PM, 2026-11-22).
+	// Space: jump, over other chips, so nobody gets stuck anywhere (PM, 2026-11-22). Again in
+	// the air: double jump. Held until landing: hover with wings until it is let go.
 	if (event.code === "Space") {
 		event.preventDefault()
-		if (!event.repeat) startJump()
+		spaceHeld = true
+		if (event.repeat) return
+		backFromStatus()
+		if (!jump && !flying.value) startJump()
+		else if (jump && !jump.doubled) doubleJump()
 		return
 	}
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
+	backFromStatus()
 	held.add(key)
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
@@ -453,19 +493,25 @@ function onKeydown(event) {
 
 function onKeyup(event) {
 	shift = event.shiftKey
+	if (event.code === "Space") {
+		spaceHeld = false
+		if (flying.value) land()
+		return
+	}
 	// With Shift held, "w" arrives as "W": lower-case both ways.
 	const wasWalking = held.size > 0
 	held.delete(event.key.toLowerCase())
 	heldCount.value = held.size
 	// Every key let go next to someone: the chat opens and has the keyboard (PM, 2026-11-21).
 	// Whoever keeps a key held walks on, also when changing keys with overlap.
-	if (wasWalking && !held.size) chatOnStop()
+	if (wasWalking && !held.size && !flying.value && !jump) chatOnStop()
 }
 
 /** The nearest chip within the encounter distance, or null. */
 function nearestInRange() {
 	let best = null
 	for (const other of others.value) {
+		if (other.offline) continue
 		const distance = distanceTo(other)
 		if (distance < ENCOUNTER_DISTANCE && (!best || distance < best.distance)) best = { other, distance }
 	}
@@ -505,6 +551,8 @@ function releaseAll() {
 	heldCount.value = 0
 	tapped.clear()
 	shift = false
+	spaceHeld = false
+	if (flying.value) land()
 }
 
 // --- Other chips: dummies from the site config and the people who have the page open (#2055).
@@ -517,9 +565,14 @@ function upsertOther(chip) {
 	if (!chip?.user || chip.user === me.value?.user) return
 	lastSeen.set(chip.user, Date.now())
 	const existing = others.value.find((o) => o.user === chip.user)
-	if (existing) Object.assign(existing, chip)
-	else others.value.push({ ...chip, moving: false })
+	// Away with the page closed (#2053): stays, greyed out; any heartbeat makes it live again.
+	const values = { ...chip, offline: Boolean(chip.offline), status: chip.status || null }
+	if (existing) Object.assign(existing, values)
+	else others.value.push({ ...values, moving: false })
+	checkEncounters()
 }
+
+const awayOver = (o) => !o.status?.until || Date.parse(o.status.until) + AWAY_GRACE_MS < Date.now()
 
 function onRemoteMove(message) {
 	const other = others.value.find((o) => o.user === message?.user)
@@ -546,7 +599,12 @@ function onRemoteLeave(message) {
 // Chips whose heartbeat stopped (tab killed, network gone) fade out after the presence TTL.
 function pruneOthers() {
 	const now = Date.now()
-	others.value = others.value.filter((o) => o.dummy || now - (lastSeen.get(o.user) || 0) < presenceTtlMs)
+	others.value = others.value.filter((o) => {
+		if (o.dummy || now - (lastSeen.get(o.user) || 0) < presenceTtlMs) return true
+		// No heartbeat, but away: keep showing them, greyed out, until well after their return time.
+		if (o.status?.kind === "away" && !awayOver(o)) return (o.offline = true)
+		return false
+	})
 	checkEncounters()
 }
 
@@ -625,7 +683,7 @@ function checkEncounters() {
 	}
 	// Someone who left the page also leaves the chat.
 	for (const user of new Set([...Object.keys(bubbles), ...encounterByUser.keys()])) {
-		if (!others.value.some((o) => o.user === user)) {
+		if (!others.value.some((o) => o.user === user && !o.offline)) {
 			delete bubbles[user]
 			partFrom(user)
 		}
@@ -795,6 +853,63 @@ const noticeList = computed(() => Object.values(notices))
 const now = ref(Date.now())
 let nowTimer = null
 
+// --- Status (#2053): be right back / away with a note and a return time.
+
+const AWAY_GRACE_MS = 3600 * 1000
+const statusOpen = ref(false)
+// For "back in 20 minutes": a slow clock is enough.
+const clock = ref(Date.now())
+const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
+let statusClearing = false
+
+const statusChips = computed(() => {
+	if (!me.value) return []
+	return [me.value, ...others.value].filter((chip) => chip.status)
+})
+
+function tagStyle(chip) {
+	// Above the chip, clear of its ring; towards the map's edges the tag shifts inwards (the tail
+	// keeps pointing at the chip), so it is never cut off.
+	const share = Math.round(10 + (80 * chip.x) / Math.max(1, me.value.cols - 1))
+	return {
+		left: "0px",
+		top: "0px",
+		"--tail": `${share}%`,
+		transform: `translate(${(chip.x + 0.5) * tile.value}px, ${(chip.y - 0.12) * tile.value}px) translate(-${share}%, -100%)`,
+	}
+}
+
+async function saveStatus(values) {
+	try {
+		me.value.status = await call(`${API}.set_status`, values)
+	} catch (e) {
+		throw new Error(errorText(e) || __("The status could not be set."))
+	}
+}
+
+/** Moving means I'm back: the status goes. */
+function backFromStatus() {
+	if (!me.value?.status || statusClearing) return
+	statusClearing = true
+	me.value.status = null
+	call(`${API}.set_status`, { kind: "" })
+		.catch(() => {})
+		.finally(() => (statusClearing = false))
+}
+
+function onRemoteStatus(message) {
+	if (!message?.user) return
+	if (message.user === me.value?.user) {
+		// Set in another tab of mine.
+		me.value.status = message.status || null
+		return
+	}
+	const other = others.value.find((o) => o.user === message.user)
+	if (!other) return
+	other.status = message.status || null
+	if (other.offline && !other.status) others.value = others.value.filter((o) => o !== other)
+}
+
 function partFrom(user) {
 	const encounter = encounterByUser.get(user)
 	if (!encounter) return
@@ -860,6 +975,7 @@ function startClock() {
 		}
 		if (!Object.keys(notices).length) {
 			clearInterval(nowTimer)
+	clearInterval(clockTimer)
 			nowTimer = null
 		}
 	}, 250)
@@ -921,6 +1037,7 @@ const SOCKET_EVENTS = [
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
 	["ophice_areas", (message) => setAreas(message?.areas)],
+	["ophice_status", onRemoteStatus],
 	[
 		"ophice_background",
 		(message) => {
@@ -937,8 +1054,8 @@ const SOCKET_EVENTS = [
 
 function blocked(x, y) {
 	// In the air nothing blocks: that is the point of jumping.
-	if (jump) return false
-	return others.value.some((o) => Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
+	if (jump || flying.value) return false
+	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
 }
 
 // --- Jump (Space): a short hop forward that passes over other chips.
@@ -946,20 +1063,46 @@ function blocked(x, y) {
 const JUMP_MS = 420
 const JUMP_DISTANCE = 2 // tiles, in the direction walked (or last walked)
 const jumping = ref(false)
-let jump = null // { dir: [x, y], left: tiles still to cover }
+const doubleJumped = ref(false)
+// Space still held when the jump lands: hovering with wings, over everyone, until it's let go.
+const flying = ref(false)
+let spaceHeld = false
+let jump = null // { dir: [x, y], left: tiles still to cover, doubled }
 let lastDir = [1, 0]
 
 function startJump() {
 	if (jump || !me.value) return
-	jump = { dir: lastDir, left: JUMP_DISTANCE }
+	jump = { dir: lastDir, left: JUMP_DISTANCE, doubled: false }
 	jumping.value = true
+	doubleJumped.value = false
 	if (!frame) {
 		lastTime = performance.now()
 		frame = requestAnimationFrame(tick)
 	}
 }
 
-/** The jump's share of this frame's movement; on landing, slide on until no chip is underneath. */
+/** Space again in the air: a second hop, as far again, from where the chip is now. */
+function doubleJump() {
+	jump.left += JUMP_DISTANCE
+	jump.doubled = true
+	doubleJumped.value = true
+}
+
+/** Back on the ground: slide on until no chip is underneath, then as after a walk. */
+function land(dir = lastDir) {
+	flying.value = false
+	// Landed on someone: a little further along, up to 3 tiles.
+	for (let extra = 0; extra <= 3 && blocked(me.value.x, me.value.y); extra += 0.1) {
+		moveTo(me.value.x + dir[0] * 0.1, me.value.y + dir[1] * 0.1)
+	}
+	scheduleSave()
+	queueMove()
+	checkEncounters()
+	leaveMeetingIfOutside()
+	if (!held.size) chatOnStop()
+}
+
+/** The jump's share of this frame's movement; then hover (Space held) or land. */
 function jumpStep(dt) {
 	const step = Math.min(jump.left, (JUMP_DISTANCE * dt * 1000) / JUMP_MS)
 	jump.left -= step
@@ -969,10 +1112,9 @@ function jumpStep(dt) {
 	const dir = jump.dir
 	jump = null
 	jumping.value = false
-	// Landed on someone: a little further along, up to 3 tiles; else back where the jump began.
-	for (let extra = 0; extra <= 3 && blocked(me.value.x, me.value.y); extra += 0.1) {
-		moveTo(me.value.x + dir[0] * 0.1, me.value.y + dir[1] * 0.1)
-	}
+	doubleJumped.value = false
+	if (spaceHeld) flying.value = true
+	else land(dir)
 }
 
 function moveTo(x, y) {

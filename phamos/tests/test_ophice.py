@@ -48,7 +48,8 @@ class OphiceTestCase(FrappeTestCase):
 		self.assertEqual([(o["user"], o["x"], o["y"]) for o in others], [("Guest", 5.0, 6.0)])
 
 	def test_no_dummies_without_site_config(self):
-		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+		# Real away users of the site would show up too: not part of this test.
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}), patch.object(ophice, "_away_offline", return_value=[]):
 			self.assertEqual(ophice.get_space()["others"], [])
 
 	def test_guest_is_refused(self):
@@ -488,3 +489,62 @@ class OphiceAreaTestCase(FrappeTestCase):
 		first = frappe.get_all("Ophice Area", filters={"title": "Room 1"}, fields=["name", "color_hue"])[0]
 		ophice.save_area("Room 1b", "https://meet.jit.si/ColorRoom1", 3, 0, 2, 2, name=first.name)
 		self.assertEqual(frappe.db.get_value("Ophice Area", first.name, "color_hue"), first.color_hue)
+
+
+class OphiceStatusTestCase(FrappeTestCase):
+	"""Be right back / Away (#2053): a note, and a return time as an instant in UTC."""
+
+	USER = "ophice-a@example.com"
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		if not frappe.db.exists("User", self.USER):
+			user = frappe.get_doc(
+				{"doctype": "User", "email": self.USER, "first_name": "ophice-a", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+			user.add_roles("Raven User")
+		frappe.set_user(self.USER)
+		ophice.set_status("")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _in(self, **delta):
+		from datetime import datetime, timedelta, timezone
+
+		return (datetime.now(timezone.utc) + timedelta(**delta)).isoformat()
+
+	def test_brb_with_note(self):
+		status = ophice.set_status("brb", "<b>Coffee</b>", tz="Europe/Berlin")
+		self.assertEqual((status["kind"], status["note"], status["tz"], status["until"]), ("brb", "Coffee", "Europe/Berlin", ""))
+		self.assertEqual(ophice.get_space()["me"]["status"]["kind"], "brb")
+
+	def test_away_time_is_stored_in_utc(self):
+		# 15:30 in New York in winter is 20:30 UTC: the same instant for everyone.
+		from datetime import datetime, timedelta, timezone
+
+		back = (datetime.now(timezone.utc) + timedelta(days=1)).astimezone(timezone(timedelta(hours=-5)))
+		back = back.replace(hour=15, minute=30, second=0, microsecond=0)
+		status = ophice.set_status("away", "Doctor", back.isoformat(), "America/New_York")
+		self.assertTrue(status["until"].endswith("T20:30:00Z"))
+		self.assertEqual(status["tz"], "America/New_York")
+
+	def test_away_needs_a_future_time_with_a_zone(self):
+		for until in ("", "tomorrow", "2030-01-01T10:00:00", self._in(minutes=-5), self._in(days=30)):
+			with self.assertRaises(frappe.ValidationError, msg=until):
+				ophice.set_status("away", "x", until)
+
+	def test_unknown_zone_is_dropped_and_clear_works(self):
+		self.assertEqual(ophice.set_status("brb", tz="Mars/Base")["tz"], "")
+		self.assertIsNone(ophice.set_status(""))
+		self.assertIsNone(ophice.get_space()["me"]["status"])
+
+	def test_away_chip_stays_on_the_map_when_offline(self):
+		ophice.save_my_position(4, 5)
+		ophice.set_status("away", "Lunch", self._in(hours=1))
+		frappe.set_user("Administrator")
+		chips = [c for c in ophice.get_space()["others"] if c["user"] == self.USER]
+		self.assertEqual(len(chips), 1)
+		self.assertTrue(chips[0]["offline"])
+		self.assertEqual(chips[0]["status"]["note"], "Lunch")

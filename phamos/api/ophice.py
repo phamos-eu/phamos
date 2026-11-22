@@ -27,6 +27,8 @@ import math
 import random
 import re
 import time
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import frappe
 from frappe import _
@@ -89,6 +91,15 @@ MAX_AREAS = 50
 AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
 
+# Status (#2053): "Be right back" or "Away" with a note and a return time, shown above the chip.
+STATUS_KEY = "phamos_ophice_status"
+EVENT_STATUS = "ophice_status"
+STATUS_KINDS = ("brb", "away")
+STATUS_NOTE_LENGTH = 140
+AWAY_MAX_DAYS = 14
+# An away chip stays on the map (offline) until this long after its return time.
+AWAY_GRACE_SECONDS = 3600
+
 
 def _require_user():
 	if frappe.session.user == "Guest":
@@ -128,7 +139,13 @@ def _stored_position():
 
 def _chip(user, position):
 	full_name, user_image = frappe.db.get_value("User", user, ["full_name", "user_image"]) or ("", "")
-	return {**position, "user": user, "full_name": full_name or user, "user_image": user_image or ""}
+	return {
+		**position,
+		"user": user,
+		"full_name": full_name or user,
+		"user_image": user_image or "",
+		"status": _status_of(user),
+	}
 
 
 def _dummies(me):
@@ -183,11 +200,13 @@ def get_space():
 	user = frappe.session.user
 	dummies = _dummies(user)
 	dummy_users = {d["user"] for d in dummies}
+	online = [c for c in _online(exclude=user) if c["user"] not in dummy_users]
+	present = dummy_users | {c["user"] for c in online} | {user}
 	return {
 		"cols": COLS,
 		"rows": ROWS,
 		"me": {**_chip(user, _stored_position() or _spawn()), "cols": COLS, "rows": ROWS},
-		"others": dummies + [c for c in _online(exclude=user) if c["user"] not in dummy_users],
+		"others": dummies + online + [c for c in _away_offline() if c["user"] not in present],
 		"presence_ttl": PRESENCE_TTL,
 		# Burn notices still running for me (#2057), e.g. after a reload.
 		"notices": _my_notices(user),
@@ -229,7 +248,12 @@ def leave():
 	_require_user()
 	user = frappe.session.user
 	frappe.cache.hdel(PRESENCE_CACHE_KEY, user)
-	_publish(EVENT_LEAVE, {"user": user})
+	status = _status_of(user)
+	if status and status["kind"] == "away":
+		# Away chips stay on the map, greyed out, so the others see when I am back.
+		_publish(EVENT_PRESENCE, {**_chip(user, _stored_position() or _spawn()), "offline": True})
+	else:
+		_publish(EVENT_LEAVE, {"user": user})
 	# Leaving the page is parting from everyone I was chatting with (#2057).
 	_part_all_mine(user)
 
@@ -241,6 +265,136 @@ def save_my_position(x, y):
 	position = {"x": _clamp(x, COLS), "y": _clamp(y, ROWS)}
 	frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	return position
+
+
+# --- Status (#2053): "Be right back" and "Away", with a note and a return time.
+#
+# Stored per user as a user default (JSON). The return time is an instant in UTC ("...Z");
+# each page shows it in the viewer's own time zone. "tz" is the IANA zone of whoever set it,
+# so others can also see the time on their clock.
+
+
+def _utc(value):
+	return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_instant(value):
+	"""An ISO 8601 time with a zone (from the browser: Date.toISOString()) as an aware datetime."""
+	if not isinstance(value, str) or not value.strip():
+		return None
+	try:
+		parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+	except ValueError:
+		return None
+	# A time without a zone is ambiguous across time zones: refuse it.
+	return parsed if parsed.tzinfo else None
+
+
+def _clean_status(data):
+	"""A stored status, or None when it is empty, broken or an away that is long over."""
+	if not isinstance(data, dict) or data.get("kind") not in STATUS_KINDS:
+		return None
+	status = {
+		"kind": data["kind"],
+		"note": str(data.get("note") or "")[:STATUS_NOTE_LENGTH],
+		"until": "",
+		"tz": str(data.get("tz") or ""),
+		"since": str(data.get("since") or ""),
+	}
+	if status["kind"] == "away":
+		until = _parse_instant(data.get("until"))
+		if not until:
+			return None
+		if until + timedelta(seconds=AWAY_GRACE_SECONDS) < datetime.now(timezone.utc):
+			return None
+		status["until"] = _utc(until)
+	return status
+
+
+def _status_of(user):
+	# Straight from the table: the defaults' Redis cache can outlive a test rollback.
+	raw = frappe.db.get_value("DefaultValue", {"parent": user, "defkey": STATUS_KEY}, "defvalue")
+	if not raw:
+		return None
+	try:
+		return _clean_status(json.loads(raw))
+	except (TypeError, ValueError):
+		return None
+
+
+def _valid_zone(name):
+	if not isinstance(name, str) or not name or len(name) > 64:
+		return ""
+	try:
+		ZoneInfo(name)
+	except Exception:
+		return ""
+	return name
+
+
+@frappe.whitelist(methods=["POST"])
+def set_status(kind="", note="", until="", tz=""):
+	"""Set my status ("brb" or "away"), or clear it (empty kind). Away needs a return time."""
+	_require_user()
+	user = frappe.session.user
+	kind = (kind or "").strip()
+	if not kind:
+		frappe.defaults.clear_user_default(STATUS_KEY, user)
+		status = None
+	else:
+		if kind not in STATUS_KINDS:
+			frappe.throw(_("Unknown status."))
+		note = strip_html(note or "").strip()
+		if len(note) > STATUS_NOTE_LENGTH:
+			frappe.throw(_("The note can be at most {0} characters.").format(STATUS_NOTE_LENGTH))
+		now = datetime.now(timezone.utc)
+		status = {"kind": kind, "note": note, "until": "", "tz": _valid_zone(tz), "since": _utc(now)}
+		if kind == "away":
+			back = _parse_instant(until)
+			if not back:
+				frappe.throw(_("Please say when you will be back."))
+			if back <= now:
+				frappe.throw(_("The return time must be in the future."))
+			if back > now + timedelta(days=AWAY_MAX_DAYS):
+				frappe.throw(_("The return time can be at most {0} days ahead.").format(AWAY_MAX_DAYS))
+			status["until"] = _utc(back)
+		frappe.defaults.set_user_default(STATUS_KEY, json.dumps(status, separators=(",", ":")), user)
+	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
+	if isinstance(entry, dict):
+		entry["status"] = status
+		frappe.cache.hset(PRESENCE_CACHE_KEY, user, entry)
+	_publish(EVENT_STATUS, {"user": user, "status": status})
+	return status
+
+
+def _away_offline():
+	"""Chips of users who are away and closed the page: shown greyed out until they are back."""
+	rows = frappe.db.get_all(
+		"DefaultValue",
+		filters={"defkey": STATUS_KEY, "parent": ["not like", "\\_\\_%"]},
+		fields=["parent", "defvalue"],
+	)
+	chips = []
+	for row in rows:
+		try:
+			status = _clean_status(json.loads(row.defvalue or ""))
+		except (TypeError, ValueError):
+			continue
+		if not status or status["kind"] != "away":
+			continue
+		enabled, user_type = frappe.db.get_value("User", row.parent, ["enabled", "user_type"]) or (0, "")
+		if not enabled or user_type != "System User":
+			continue
+		raw = frappe.db.get_value("DefaultValue", {"parent": row.parent, "defkey": POSITION_KEY}, "defvalue")
+		try:
+			data = json.loads(raw) if raw else None
+		except (TypeError, ValueError):
+			data = None
+		if not isinstance(data, dict):
+			continue
+		position = {"x": _clamp(data.get("x"), COLS), "y": _clamp(data.get("y"), ROWS), "offline": True}
+		chips.append(_chip(row.parent, position))
+	return chips
 
 
 # --- Background image of Ophice (shared).
