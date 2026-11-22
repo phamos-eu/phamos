@@ -525,13 +525,14 @@ def get_customer_rooms(guest):
 
 @frappe.whitelist(methods=["POST"])
 def invite_guest(guest, area):
-	"""Employees: invite a guest to a customer meeting area. A pin is set there; the guest decides."""
+	"""Employees: invite a guest to a customer meeting area. A pin is set in its middle; the guest decides."""
 	ophice._require_user()
 	guest_id, entry = _guest_of(guest)
 	room = ophice._area(area)
 	if room.kind != "Customer meeting":
 		frappe.throw(_("Guests can only be invited to a customer meeting area."))
-	pin = ophice._free_spot(room, GUEST_PREFIX + guest_id)
+	# The pin sits in the middle of the room (PM, 2026-11-22); chips are drawn one tile wide.
+	pin = {"x": round(room.x + room.width / 2 - 0.5, 2), "y": round(room.y + room.height / 2 - 0.5, 2)}
 	invite = {
 		"status": "pending",
 		"area": room.name,

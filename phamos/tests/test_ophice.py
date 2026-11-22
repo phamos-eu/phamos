@@ -46,6 +46,8 @@ class OphiceTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: dummies}):
 			others = ophice.get_space()["others"]
 		# Guest is an enabled user; myself and unknown users are left out.
+		# Real guests on the site's map (#2082) are not this test's business.
+		others = [o for o in others if not o.get("guest")]
 		self.assertEqual([(o["user"], o["x"], o["y"]) for o in others], [("Guest", 5.0, 6.0)])
 
 	def test_no_dummies_without_site_config(self):
@@ -838,6 +840,16 @@ class OphiceCockpitTestCase(_OphiceRoomBase):
 		self.assertIsNone(a["cockpit"])
 
 
+def _tiny_png():
+	from io import BytesIO
+
+	from PIL import Image
+
+	buffer = BytesIO()
+	Image.new("RGB", (4, 4), "green").save(buffer, format="PNG")
+	return buffer.getvalue()
+
+
 class OphiceAppTestCase(FrappeTestCase):
 	"""Ophice as an app of its own (#2070): on the Apps screen and at /ophice for System Users."""
 
@@ -982,15 +994,22 @@ class _OphiceGuestBase(_OphiceRoomBase):
 
 		self.g = ophice_guest
 		frappe.db.delete(ophice.AREA_DOCTYPE)
-		frappe.cache.delete_value(ophice_guest.GUEST_CACHE_KEY)
 		frappe.set_user(self.A)
 		ophice.save_area("Lobby", "https://jitsi.example.org/Lobby", 10, 10, 4, 3, kind="Guest")
 		frappe.set_user("Guest")
 		frappe.local.ophice_guest_token = None
 
+	# Only the sessions these tests made: real guests on the site stay in (PM tests as a guest).
+	TEST_GUESTS = ("Ada Guest", "Bob Guest")
+
 	def tearDown(self):
 		frappe.local.ophice_guest_token = None
-		frappe.cache.delete_value(self.g.GUEST_CACHE_KEY)
+		for guest_id, entry in (frappe.cache.hgetall(self.g.GUEST_CACHE_KEY) or {}).items():
+			if isinstance(entry, dict) and entry.get("name") in self.TEST_GUESTS:
+				guest_id = frappe.safe_decode(guest_id)
+				frappe.cache.hdel(self.g.GUEST_CACHE_KEY, guest_id)
+				frappe.cache.hdel(self.g.INVITE_CACHE_KEY, guest_id)
+				frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.g.GUEST_PREFIX + guest_id)
 		super().tearDown()
 
 	def _check(self):
@@ -1013,16 +1032,17 @@ class OphiceGuestEntryTestCase(_OphiceGuestBase):
 	def test_the_human_check(self):
 		check, path = self._check()  # too fast
 		with self.assertRaises(frappe.ValidationError):
-			self.g.enter("Ada", check["challenge"], check["door"], json.dumps(path))
+			self.g.enter("Ada Guest", check["challenge"], check["door"], json.dumps(path))
 		with patch.object(self.g, "CHECK_MIN_SECONDS", 0):
 			check, path = self._check()
 			with self.assertRaises(frappe.ValidationError):  # not at the entrance
-				self.g.enter("Ada", check["challenge"], abs(check["door"] - 0.5), json.dumps(path))
+				away = check["door"] + 0.3 if check["door"] < 0.5 else check["door"] - 0.3
+				self.g.enter("Ada Guest", check["challenge"], away, json.dumps(path))
 			with self.assertRaises(frappe.ValidationError):  # used once already
-				self.g.enter("Ada", check["challenge"], check["door"], json.dumps(path))
+				self.g.enter("Ada Guest", check["challenge"], check["door"], json.dumps(path))
 			check, _path = self._check()
 			with self.assertRaises(frappe.ValidationError):  # set, not dragged
-				self.g.enter("Ada", check["challenge"], check["door"], json.dumps([[check["door"], 0]]))
+				self.g.enter("Ada Guest", check["challenge"], check["door"], json.dumps([[check["door"], 0]]))
 		with self.assertRaises(frappe.PermissionError):
 			self.g.guest_space()  # no session yet
 
@@ -1100,10 +1120,6 @@ class OphiceGuestInviteTestCase(_OphiceGuestBase):
 		self.room = ophice.save_area("Room 1", "https://jitsi.example.org/Room1", 20, 10, 3, 3, kind="Customer meeting")
 		frappe.set_user("Guest")
 
-	def tearDown(self):
-		frappe.cache.delete_value(self.g.INVITE_CACHE_KEY)
-		super().tearDown()
-
 	def _invite(self, guest_user):
 		frappe.set_user(self.A)
 		invite = self.g.invite_guest(guest_user, self.room)
@@ -1114,7 +1130,8 @@ class OphiceGuestInviteTestCase(_OphiceGuestBase):
 		me = self._enter("Ada Guest")["me"]
 		invite = self._invite(me["user"])
 		self.assertEqual(invite["status"], "pending")
-		self.assertTrue(20 <= invite["pin"]["x"] + 0.5 <= 23)
+		# The middle of the room (20, 10, 3 x 3).
+		self.assertEqual((invite["pin"]["x"], invite["pin"]["y"]), (21.0, 11.0))
 		# Not accepted yet: the room is still closed.
 		self.assertEqual(self.g.guest_move(16, 11)["x"], 13.5)
 		accepted = self.g.answer_invite(1)
@@ -1126,8 +1143,13 @@ class OphiceGuestInviteTestCase(_OphiceGuestBase):
 		mid = ((start[0] + end[0]) / 2 - 0.5, (start[1] + end[1]) / 2 - 0.5)
 		moved = self.g.guest_move(*mid)
 		self.assertAlmostEqual(moved["x"], round(mid[0], 2), places=1)
-		off = self.g.guest_move(mid[0], mid[1] + 5)
-		self.assertLess(off["y"], mid[1] + 1)
+		off = self.g.guest_move(mid[0], mid[1] - 5)
+		self.assertNotEqual((off["x"], off["y"]), (round(mid[0], 2), round(mid[1] - 5, 2)))
+		# Wherever it lands: on the way, in the guest area or in the room, nowhere else.
+		cx, cy = off["x"] + 0.5, off["y"] + 0.5
+		on_way = self.g._onto_band(accepted["corridor"], cx, cy) == (cx, cy)
+		in_rect = any(self.g._inside(a, off["x"], off["y"]) for a in self.g.allowed_areas(me["user"].removeprefix("guest:")))
+		self.assertTrue(on_way or in_rect)
 		# At the pin: arrived, the corridor closes, the room stays open.
 		self.g.guest_move(invite["pin"]["x"], invite["pin"]["y"])
 		space = self.g.guest_space()
@@ -1150,6 +1172,16 @@ class OphiceGuestInviteTestCase(_OphiceGuestBase):
 		self.assertIsNone(self.g.guest_space()["invite"])
 		frappe.local.ophice_guest_token = first_token
 		self.assertEqual(self.g.guest_space()["invite"]["status"], "accepted")
+
+	def test_the_map_image_is_public_for_guests(self):
+		"""Guests load the background without login (PM, 2026-11-22)."""
+		frappe.set_user(self.A)
+		with patch.object(ophice, "_set_background") as stored:
+			url = ophice._store_background(_tiny_png(), "map.png")
+		self.assertTrue(url.startswith("/files/"))
+		self.assertEqual(frappe.db.get_value("File", {"file_url": url}, "is_private"), 0)
+		frappe.delete_doc("File", frappe.db.get_value("File", {"file_url": url}), ignore_permissions=True, force=True)
+		stored.assert_called_once()
 
 	def test_only_customer_meeting_areas(self):
 		me = self._enter()["me"]
