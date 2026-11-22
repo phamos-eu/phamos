@@ -393,6 +393,8 @@ async function send() {
 	const value = text.value.trim()
 	if (!value || sending.value) return
 	sending.value = true
+	// A message that goes through clears the error of an earlier failed one (AI review, !1300).
+	error.value = ""
 	try {
 		const row = await call(`${API}.send_area_message`, { area: props.area.name, text: value })
 		add(row, row.batch)
