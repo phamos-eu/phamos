@@ -1750,6 +1750,13 @@ function popOut() {
 		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
 		return
 	}
+	// The meeting page must not be able to steer Ophice's tab (reverse tabnabbing); Ophice keeps
+	// its own handle to bring the window forward and close it.
+	try {
+		meetingWindow.opener = null
+	} catch {
+		// some browsers do not allow it; the window then keeps the link
+	}
 	poppedOut.value = area.name
 	meetingWindowClosed.value = false
 	clearInterval(windowWatch)
@@ -1782,10 +1789,11 @@ function bringBack() {
 // window (bottom right by default, placement kept), or in a floating window on top of everything.
 
 const viewport = reactive({ width: window.innerWidth, height: window.innerHeight })
-window.addEventListener("resize", () => {
+function onViewportResize() {
 	viewport.width = window.innerWidth
 	viewport.height = window.innerHeight
-})
+}
+window.addEventListener("resize", onViewportResize)
 const FLOAT_RECT_KEY = "phamos_ophice_meeting_float_rect"
 function defaultFloatRect() {
 	const w = Math.min(460, viewport.width * 0.4)
@@ -2176,9 +2184,6 @@ function startClock() {
 		}
 		if (!Object.keys(notices).length) {
 			clearInterval(nowTimer)
-	clearInterval(clockTimer)
-	clearInterval(peopleTimer)
-	clearTimeout(peopleSoon)
 			nowTimer = null
 		}
 	}, 250)
@@ -2634,6 +2639,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+	clearInterval(clockTimer)
+	clearInterval(peopleTimer)
+	clearTimeout(peopleSoon)
+	window.removeEventListener("resize", onViewportResize)
 	window.removeEventListener("keydown", onKeydown)
 	window.removeEventListener("keyup", onKeyup)
 	window.removeEventListener("blur", releaseAll)

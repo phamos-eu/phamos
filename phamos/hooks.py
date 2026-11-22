@@ -10,15 +10,17 @@ app_license = "AGPL-3.0"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
-	# Ophice (#2069, #2070): where people "go to work"; the cockpits will open inside it.
-	# Keep it first: the start-page switch (#2077) uses Frappe's default app, which opens the
-	# app's first tile.
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits open inside it. Frappe's
+	# "Default App" opens an app's first tile it shows. So Ophice is listed twice, and exactly one
+	# of the two shows: here, first, while the start-page switch (#2077, Cockpit Settings) is on;
+	# otherwise further down, so a site whose default app is already "phamos" keeps landing in the
+	# Personal Cockpit after this release (review of the release).
 	{
 		"name": "ophice",
 		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
 		"title": "Ophice",
 		"route": "/ophice",
-		"has_permission": "phamos.api.ophice.check_app_permission",
+		"has_permission": "phamos.api.ophice.check_start_tile_permission",
 	},
 	{
 		"name": "personal_cockpit",
@@ -89,6 +91,14 @@ add_to_apps_screen = [
 		"title": "Implementation Cockpit",
 		"route": "/implementation-cockpit",
 		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
+	# Ophice while it is not the start page (see the first tile).
+	{
+		"name": "ophice_tile",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_tile_permission",
 	},
 	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher and "Open in Cockpit"
 	# skip it (no route in spa_boot.COCKPITS, no phamos.api.bookstack module).

@@ -560,7 +560,7 @@ onMounted(async () => {
 	resizeObserver = new ResizeObserver(measure)
 	window.addEventListener("keydown", onKeydown)
 	window.addEventListener("keyup", onKeyup)
-	window.addEventListener("blur", () => held.clear())
+	window.addEventListener("blur", releaseKeys)
 	window.addEventListener("pagehide", leave)
 	try {
 		info.value = await call(`${API}.guest_info`)
@@ -579,7 +579,12 @@ onMounted(async () => {
 	if (info.value.open) await newCheck()
 })
 
+function releaseKeys() {
+	held.clear()
+}
+
 onBeforeUnmount(() => {
+	window.removeEventListener("blur", releaseKeys)
 	stopLoops()
 	resizeObserver?.disconnect()
 	window.removeEventListener("keydown", onKeydown)

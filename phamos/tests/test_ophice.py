@@ -900,6 +900,8 @@ class OphiceAppTestCase(FrappeTestCase):
 		self.assertIn({"from_route": "/ophice", "to_route": "ophice"}, website_route_rules)
 		frappe.set_user("Administrator")
 		self.assertTrue(ophice.check_app_permission())
+		# Exactly one of the two Ophice tiles shows (start page or not).
+		self.assertNotEqual(ophice.check_start_tile_permission(), ophice.check_tile_permission())
 		frappe.set_user("Guest")
 		self.assertFalse(ophice.check_app_permission())
 
@@ -1293,7 +1295,7 @@ class OphiceStartPageTestCase(FrappeTestCase):
 
 		from phamos.hooks import add_to_apps_screen
 
-		# The default app lands on its first tile: Ophice must stay first.
+		# The default app lands on its first tile it shows: Ophice is listed first for that.
 		self.assertEqual(add_to_apps_screen[0]["route"], "/ophice")
 		frappe.set_user("Administrator")
 		settings = frappe.get_single("Cockpit Settings")
@@ -1304,6 +1306,31 @@ class OphiceStartPageTestCase(FrappeTestCase):
 		settings.ophice_start_page = 0
 		settings.save(ignore_permissions=True)
 		self.assertFalse(frappe.db.get_single_value("System Settings", "default_app"))
+
+	def test_switch_off_keeps_the_personal_cockpit_first(self):
+		"""A site whose default app is already "phamos" must not land in Ophice after the release
+		(review of the release): Ophice's first tile shows only while the switch is on."""
+		from frappe.apps import get_apps, get_default_path
+
+		frappe.set_user("Administrator")
+		frappe.db.set_single_value("Cockpit Settings", "ophice_start_page", 0)
+		frappe.db.set_single_value("System Settings", "default_app", "phamos")
+		frappe.clear_document_cache("System Settings", "System Settings")
+		# A request reads System Settings once (frappe.local); tests share one frappe.local.
+		if hasattr(frappe.local, "system_settings"):
+			del frappe.local.system_settings
+		self.assertEqual(get_default_path(), "/personal-cockpit")
+		# Ophice is still on the Apps screen, once.
+		self.assertEqual([a["route"] for a in get_apps()].count("/ophice"), 1)
+
+	def test_saving_other_settings_leaves_the_default_app_alone(self):
+		frappe.set_user("Administrator")
+		frappe.db.set_single_value("System Settings", "default_app", "phamos")
+		settings = frappe.get_single("Cockpit Settings")
+		settings.ophice_start_page = 0
+		settings.personal_color = settings.personal_color or "#0e7490"
+		settings.save(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_single_value("System Settings", "default_app", cache=False), "phamos")
 
 
 class OphiceGridTestCase(_OphiceRoomBase):
@@ -1484,3 +1511,37 @@ class OphiceServerReviewTestCase(_OphiceRoomBase):
 		for fn in (ophice.get_area_chat, ophice.get_encounter):
 			self.assertIn("POST", frappe.allowed_http_methods_for_whitelisted_func[fn])
 			self.assertNotIn("GET", frappe.allowed_http_methods_for_whitelisted_func[fn])
+
+
+class OphiceAreaJitsiTestCase(FrappeTestCase):
+	"""A space's Jitsi server is checked on every save, also in Desk (review of the release): the
+	page loads external_api.js from it into the site's origin."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.conf = patch.dict(frappe.conf, {"ophice_jitsi_domain": None, "ophice_jitsi_domains": ["jitsi.example.org"]})
+		self.conf.start()
+
+	def tearDown(self):
+		self.conf.stop()
+		frappe.db.rollback()
+
+	def test_untrusted_server_refused_in_desk(self):
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		doc = frappe.get_doc(
+			{
+				"doctype": ophice.AREA_DOCTYPE,
+				"title": "Desk edit",
+				"meeting_url": "https://evil.example.com/Room",
+				"jitsi_domain": "evil.example.com",
+				"jitsi_room": "Room",
+				"x": 1,
+				"y": 1,
+				"width": 2,
+				"height": 2,
+			}
+		)
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert(ignore_permissions=True)
+		doc.jitsi_domain = "jitsi.example.org"
+		doc.insert(ignore_permissions=True)

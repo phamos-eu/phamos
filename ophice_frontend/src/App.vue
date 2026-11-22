@@ -35,6 +35,7 @@ import { useRoute, useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import Ophice from "./views/Ophice.vue"
 import CockpitFrame from "./components/CockpitFrame.vue"
+import { isOwnPage } from "./utils/ophicePage.js"
 import GuestView from "./views/GuestView.vue"
 
 // Decided before anything loads: a guest page must never call the employees' API.
@@ -59,6 +60,10 @@ function pageOf(to) {
 }
 
 function load(page) {
+	if (!isOwnPage(page)) {
+		router.replace({ name: "Map" })
+		return
+	}
 	frameAt.value = page
 	frameSrc.value = page
 	frameKey.value += 1

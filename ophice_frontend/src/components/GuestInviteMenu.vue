@@ -58,6 +58,26 @@
 					<FeatherIcon v-if="busy === room.name" name="loader" class="h-3.5 w-3.5 animate-spin text-ink-gray-5" />
 				</button>
 			</template>
+			<!-- End the visit (#2080, review of the release): a wrong name, someone who should not be here. -->
+			<div class="mt-2 border-t border-outline-gray-2 px-1.5 pt-2">
+				<div v-if="confirmOut" class="flex items-center gap-2">
+					<span class="min-w-0 flex-1 text-xs text-ink-gray-7">{{ __("End {0}'s visit?", [guestName]) }}</span>
+					<Button size="sm" variant="solid" theme="red" :loading="busy === 'out'" data-testid="guest-send-out-confirm" @click="sendOut">
+						{{ __("Send out") }}
+					</Button>
+					<Button size="sm" variant="ghost" @click="confirmOut = false">{{ __("Cancel") }}</Button>
+				</div>
+				<button
+					v-else
+					type="button"
+					class="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-red-4"
+					data-testid="guest-send-out"
+					@click="confirmOut = true"
+				>
+					<FeatherIcon name="log-out" class="h-3.5 w-3.5" />
+					{{ __("Send out of Ophice") }}
+				</button>
+			</div>
 		</template>
 	</div>
 </template>
@@ -118,6 +138,21 @@ async function inviteTo(room) {
 	try {
 		invite.value = await call(`${API}.invite_guest`, { guest: props.guest.user, area: room.name })
 		toast({ title: __("{0} is invited to {1}.", [guestName.value, room.title]), icon: "send" })
+		emit("close")
+	} catch (e) {
+		error.value = errorText(e)
+	} finally {
+		busy.value = ""
+	}
+}
+
+const confirmOut = ref(false)
+
+async function sendOut() {
+	busy.value = "out"
+	try {
+		await call(`${API}.send_guest_out`, { guest: props.guest.user })
+		toast({ title: __("{0} has left Ophice.", [guestName.value]), icon: "log-out" })
 		emit("close")
 	} catch (e) {
 		error.value = errorText(e)

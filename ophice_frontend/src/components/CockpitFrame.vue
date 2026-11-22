@@ -11,7 +11,7 @@
 			:src="src"
 			class="min-h-0 w-full flex-1 border-0"
 			:title="__('Cockpit')"
-			allow="clipboard-read; clipboard-write; fullscreen"
+			allow="clipboard-write; fullscreen"
 			@load="onLoad"
 		/>
 		<!-- Back to the map: the mini map does it (#2074); this button only while Ophice is loading. -->

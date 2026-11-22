@@ -164,6 +164,20 @@ def can_edit_map(user=None):
 	return user == "Administrator" or MAP_EDITOR_ROLE in frappe.get_roles(user)
 
 
+def _start_page_on():
+	return bool(frappe.db.get_single_value("Cockpit Settings", "ophice_start_page"))
+
+
+def check_start_tile_permission():
+	"""Ophice's first Apps-screen tile: only while it is the start page (#2077)."""
+	return check_app_permission() and _start_page_on()
+
+
+def check_tile_permission():
+	"""Ophice's other Apps-screen tile: while it is not the start page."""
+	return check_app_permission() and not _start_page_on()
+
+
 def _require_map_editor():
 	_require_user()
 	if not can_edit_map():

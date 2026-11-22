@@ -11,7 +11,8 @@ MIN_PRIVACY_REVEAL_SECONDS = 10
 
 
 # Ophice as the start page (#2077): Frappe's own "Default App" (System Settings) takes the first
-# Apps-screen tile of the app; for phamos that is Ophice (hooks.add_to_apps_screen, kept first).
+# Apps-screen tile of the app it shows; while the switch is on, that is Ophice (see the two Ophice
+# tiles in hooks.add_to_apps_screen).
 OPHICE_DEFAULT_APP = "phamos"
 
 
@@ -31,7 +32,10 @@ def sync_ophice_start_page(on):
 
 class CockpitSettings(Document):
 	def on_update(self):
-		sync_ophice_start_page(bool(self.ophice_start_page))
+		# Only when the switch itself changed: saving a colour must not touch a default app that
+		# was chosen some other way (review of the release).
+		if self.has_value_changed("ophice_start_page"):
+			sync_ophice_start_page(bool(self.ophice_start_page))
 		# Company events of #1814 move once the General Management Department is known (#1949).
 		# A site getting this release has no such department at migrate time, so the patch leaves
 		# them for this save.
