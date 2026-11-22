@@ -36,27 +36,36 @@ class TestWebsiteFont(FrappeTestCase):
 		self.assertTrue((font.parent / "OFL.txt").exists(), "the licence ships with the font")
 
 	def test_website_pages_use_questrial_first(self):
-		stacks = re.findall(r"font-family:\s*([^;]+);", CSS.read_text())
+		# [^;}]: the last declaration of a rule needs no semicolon (review of !1292)
+		stacks = re.findall(r"font-family:\s*([^;}]+)", CSS.read_text())
 		self.assertTrue(stacks)
 		for stack in stacks:
-			if "Inter" in stack:
+			if re.search(r"\bInter\b", stack):
 				self.assertTrue(stack.strip().startswith("Questrial"), stack)
 
 	def test_frappe_font_variable_keeps_questrial_without_the_theme_font(self):
 		"""Frappe styles html/body and Web Page text with var(--font-stack); the theme sets Questrial in it
 		only while its Google Font field is filled, which is emptied to stop the request to Google."""
-		root = re.search(r":root\s*{([^}]*)}", CSS.read_text())
-		self.assertIsNotNone(root)
-		stack = re.search(r"--font-stack:\s*([^;]+);", root.group(1))
-		self.assertIsNotNone(stack, "web_profile.bundle.css sets --font-stack")
-		self.assertTrue(stack.group(1).strip().startswith('"Questrial"'), stack.group(1))
+		# every :root rule, not only the first; [^;}]: no semicolon needed on the last declaration
+		stacks = [
+			m.group(1).strip()
+			for block in re.finditer(r":root\s*{([^}]*)}", CSS.read_text())
+			for m in re.finditer(r"--font-stack:\s*([^;}]+)", block.group(1))
+		]
+		self.assertTrue(stacks, "web_profile.bundle.css sets --font-stack")
+		for stack in stacks:
+			self.assertTrue(stack.startswith('"Questrial"'), stack)
 
 	def test_nothing_in_the_app_loads_fonts_from_google(self):
-		offenders = []
-		for path in (APP_DIR / "public", APP_DIR / "templates", APP_DIR / "www"):
-			for file in path.rglob("*"):
-				if file.suffix not in {".css", ".scss", ".html", ".js", ".vue"} or SKIP_PARTS & set(file.parts):
+		offenders, scanned = [], 0
+		for root in (APP_DIR / "public", APP_DIR / "templates", APP_DIR / "www"):
+			for file in root.rglob("*"):
+				# parts below the scanned folder: a checkout that lives in a folder named "dist" or
+				# "frontend" must not skip everything (review of !1292)
+				if file.suffix not in {".css", ".scss", ".html", ".js", ".vue"} or SKIP_PARTS & set(file.relative_to(root).parts):
 					continue
+				scanned += 1
 				if GOOGLE.search(file.read_text(errors="ignore")):
 					offenders.append(str(file.relative_to(REPO_ROOT)))
+		self.assertGreater(scanned, 10, "the scan must look at the app's files, not pass on an empty list")
 		self.assertEqual(offenders, [])
