@@ -9,7 +9,12 @@
 		<Toasts />
 	</div>
 	<div v-else class="relative h-full min-h-0">
-		<Ophice :cockpit-open="frameVisible" :open-route="openRoute" @open-cockpit="openCockpit" />
+		<Ophice
+			:cockpit-open="frameVisible"
+			:open-route="openRoute"
+			@open-cockpit="openCockpit"
+			@back-to-map="router.push({ name: 'Map' })"
+		/>
 		<CockpitFrame
 			v-if="frameSrc"
 			v-show="frameVisible"

@@ -398,6 +398,23 @@
 			@open="(cockpit) => emit('open-cockpit', cockpit)"
 		/>
 		</div>
+		<!-- Over an open cockpit (#2074): the office small, with pings and quick replies. -->
+		<MiniMap
+			v-if="cockpitOpen && me"
+			:cols="me.cols"
+			:rows="me.rows"
+			:me="me"
+			:others="others"
+			:areas="areas"
+			:background="background"
+			:background-layout="backgroundLayout"
+			:pings="pings"
+			:notice-count="noticeList.length + batchNoticeList.length"
+			@fullscreen="emit('back-to-map')"
+			@reply="quickReply"
+			@open-chat="openFromPing"
+			@dismiss="(ping) => dropPing(ping.id)"
+		/>
 		<GuestInviteMenu
 			v-if="guestInvite"
 			:key="guestInvite.guest.user"
@@ -419,6 +436,8 @@ import BatchNotice from "../components/BatchNotice.vue"
 import CockpitBar from "../components/CockpitBar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
+import MiniMap from "../components/MiniMap.vue"
+import { myZone } from "../utils/ophiceTime.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -436,7 +455,7 @@ const props = defineProps({
 	/** The cockpit loaded in the frame, e.g. "/sales-cockpit" (a dot in the shortcut bar). */
 	openRoute: { type: String, default: "" },
 })
-const emit = defineEmits(["open-cockpit"])
+const emit = defineEmits(["open-cockpit", "back-to-map"])
 // Served by Frappe, not bundled.
 const OPHICE_ICON = "/assets/phamos/manifest/ophice-icon-192.png"
 
@@ -581,7 +600,19 @@ const adjustingBackground = ref(false)
 // The map tools (spaces, background) are for map editors (#2071); the server checks it too.
 const canEditMap = ref(false)
 // Nothing here is sent to the others or changes my real position.
-const debugOptions = [{ label: __("Simulate beam-in"), icon: "log-in", onClick: () => me.value && playBeam(me.value.user) }]
+const debugOptions = [
+	{ label: __("Simulate beam-in"), icon: "log-in", onClick: () => me.value && playBeam(me.value.user) },
+	{
+		// Shows on the mini map, so open a cockpit first (#2074).
+		label: __("Simulate a ping"),
+		icon: "bell",
+		onClick: () => {
+			const other = others.value.find((o) => !o.guest) || { user: "nobody@example.com", full_name: __("A colleague") }
+			pingWalkUp(other)
+			if (!props.cockpitOpen) toast({ title: __("Open a cockpit to see the ping on the mini map."), icon: "info" })
+		},
+	},
+]
 let layoutTimer = null
 
 // Live for me while dragging; saved (and sent to everyone) a moment after the last change.
@@ -867,6 +898,7 @@ function onRemoteMove(message) {
 	other.y = message.y
 	other.moving = true
 	checkEncounters()
+	noticeWalkUp(other)
 	clearTimeout(movingTimers.get(other.user))
 	movingTimers.set(
 		other.user,
@@ -1019,6 +1051,11 @@ async function focusBubble(user, text = "") {
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
 	const other = others.value.find((o) => o.user === message?.with)
+	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
+	if (other && props.cockpitOpen) {
+		pingWalkUp(other)
+		return
+	}
 	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
 	if (distanceTo(other) > PART_DISTANCE) return
 	openBubble(other, { fromPeer: true })
@@ -1053,6 +1090,10 @@ function addMessage(bubble, message) {
 function onEncounterMessage(payload) {
 	const bubble = Object.values(bubbles).find((b) => b.encounter && b.encounter === payload?.encounter)
 	if (bubble) addMessage(bubble, payload.message)
+	const message = payload?.message
+	if (props.cockpitOpen && message && message.owner !== me.value?.user) {
+		addPing("message", __("{0}: {1}", [nameOf(message.owner), (message.text || "").slice(0, 80)]), { user: message.owner })
+	}
 }
 
 // frappe-ui's call() puts the server's frappe.throw texts into error.messages.
@@ -1614,9 +1655,98 @@ function leaveOnPagehide() {
 	}
 }
 
+// --- Pings on the mini map (#2074), while a cockpit is open.
+
+const pings = ref([])
+const nearMe = new Set()
+let pingId = 0
+const MAX_PINGS = 6
+
+function addPing(kind, text, extra = {}) {
+	// One ping per person and kind: the newest replaces the older one.
+	const rest = pings.value.filter((p) => !(extra.user && p.user === extra.user && p.kind === kind))
+	const ping = reactive({ id: ++pingId, kind, text, fresh: true, ...extra })
+	pings.value = [ping, ...rest].slice(0, MAX_PINGS)
+	setTimeout(() => (ping.fresh = false), 2500)
+}
+
+function dropPing(id) {
+	pings.value = pings.value.filter((p) => p.id !== id)
+}
+
+function pingWalkUp(other) {
+	addPing("walkup", __("{0} came over to you.", [other.full_name]), { user: other.user, name: other.full_name })
+}
+
+/** Someone stops next to my chip while I work in a cockpit. */
+function noticeWalkUp(other) {
+	if (!props.cockpitOpen || other.guest || other.offline || !me.value) return
+	const near = distanceTo(other) < ENCOUNTER_DISTANCE
+	if (near && !nearMe.has(other.user)) pingWalkUp(other)
+	if (near) nearMe.add(other.user)
+	else nearMe.delete(other.user)
+}
+
+function onMeetingMessage(payload) {
+	const message = payload?.message
+	if (!props.cockpitOpen || !meetingArea.value || payload?.area !== meetingArea.value.name) return
+	if (!message || message.owner === me.value?.user) return
+	const who = message.author || nameOf(message.owner)
+	addPing("meeting", __("{0} in {1}: {2}", [who, meetingArea.value.title, (message.text || "").slice(0, 80)]))
+}
+
+// "I'll get back to you in x minutes": my status says so (everyone sees it above my chip), the
+// chat with that person gets the line, and I get a reminder when the time is up.
+const reminders = new Map()
+async function quickReply(ping, minutes) {
+	const note = __("I'll get back to you in {0} min", [minutes])
+	try {
+		await saveStatus({ kind: "brb", note, until: "", tz: myZone() })
+	} catch (e) {
+		toast({ title: e.message, icon: "alert-circle" })
+		return
+	}
+	const bubble = bubbles[ping.user]
+	if (bubble?.encounter) sendMessage(bubble, note, () => {})
+	dropPing(ping.id)
+	clearTimeout(reminders.get(ping.user))
+	reminders.set(
+		ping.user,
+		setTimeout(() => {
+			reminders.delete(ping.user)
+			const text = __("Time to get back to {0}.", [ping.name || nameOf(ping.user)])
+			toast({ title: text, icon: "clock" })
+			if (props.cockpitOpen) addPing("reminder", text, { user: ping.user })
+		}, minutes * 60000)
+	)
+}
+
+/** From a ping: back to the map; the chat with that person opens if they are still there. */
+function openFromPing(ping) {
+	dropPing(ping.id)
+	emit("back-to-map")
+	const other = others.value.find((o) => o.user === ping.user)
+	if (!other) return
+	nextTick(() => {
+		if (bubbles[other.user]) focusBubble(other.user)
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true })
+	})
+}
+
+// Back on the map: the pings are seen.
+watch(
+	() => props.cockpitOpen,
+	(open) => {
+		if (!open) pings.value = []
+		nearMe.clear()
+	}
+)
+
 const round = (value) => Math.round(value * 100) / 100
 
 const SOCKET_EVENTS = [
+	["ophice_area_message", onMeetingMessage],
+	["ophice_guest_chat", onMeetingMessage],
 	["ophice_presence", upsertOther],
 	["ophice_move", onRemoteMove],
 	["ophice_leave", onRemoteLeave],

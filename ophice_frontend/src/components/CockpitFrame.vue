@@ -14,8 +14,9 @@
 			allow="clipboard-read; clipboard-write; fullscreen"
 			@load="onLoad"
 		/>
-		<!-- Back to the map; the cockpit stays loaded. Bottom left, clear of the cockpits' own bars. -->
+		<!-- Back to the map: the mini map does it (#2074); this button only while Ophice is loading. -->
 		<button
+			v-if="showBack"
 			type="button"
 			class="absolute bottom-4 left-4 z-10 flex items-center gap-2 rounded-full border border-outline-gray-2 bg-surface-white py-1.5 pl-1.5 pr-3 text-sm font-medium text-ink-gray-8 shadow-xl hover:bg-surface-gray-2"
 			:title="__('Back to the Ophice map (the cockpit stays open)')"
@@ -37,6 +38,8 @@ const props = defineProps({
 	src: { type: String, required: true },
 	/** a new value reloads the frame at `src`, even when `src` is unchanged */
 	frameKey: { type: Number, default: 0 },
+	/** the plain "Back to map" button (the mini map replaces it once Ophice is loaded) */
+	showBack: { type: Boolean, default: false },
 })
 const emit = defineEmits(["navigated", "back", "leave"])
 
