@@ -195,11 +195,25 @@ def _grid():
 
 
 def _cols():
-	return _grid()[0]
+	return _request_grid()[0]
 
 
 def _rows():
-	return _grid()[1]
+	return _request_grid()[1]
+
+
+def _request_grid():
+	"""The grid size, read once per request: move and heartbeat (several a second per walking
+	user) would otherwise read it from the database twice on every call."""
+	# Only inside a web request: frappe.local lives as long as the request there. Elsewhere (jobs,
+	# tests) it can outlive a rollback, so the value is read fresh.
+	request = getattr(frappe.local, "request", None)
+	if request is None:
+		return _grid()
+	cached = getattr(frappe.local, "ophice_grid", None)
+	if cached is None or cached[0] is not request:
+		cached = frappe.local.ophice_grid = (request, _grid())
+	return cached[1]
 
 
 @frappe.whitelist(methods=["POST"])
@@ -217,6 +231,7 @@ def set_grid(cols, rows):
 				title=_("Grid too small"),
 			)
 	frappe.db.set_default(GRID_KEY, json.dumps({"cols": cols, "rows": rows}, separators=(",", ":")))
+	frappe.local.ophice_grid = None
 	_publish(EVENT_GRID, {"cols": cols, "rows": rows, "by": frappe.session.user})
 	return {"cols": cols, "rows": rows}
 
@@ -871,7 +886,9 @@ def _message_row(row):
 def _messages(channel):
 	rows = frappe.get_all(
 		"Raven Message",
-		filters={"channel_id": channel, "message_type": ("!=", "System"), "is_thread": 0},
+		# Not "is_thread": in Raven that marks a message that *started* a thread; its replies live
+		# in their own thread channel, so filtering by channel is enough.
+		filters={"channel_id": channel, "message_type": ("!=", "System")},
 		fields=["name", "owner", "text", "creation"],
 		order_by="creation desc",
 		limit=MESSAGES_SHOWN,
@@ -971,7 +988,7 @@ def open_encounter(with_user):
 	return payload
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_encounter(encounter):
 	"""An encounter of mine (open or parting), with its latest messages."""
 	_require_user()
@@ -1118,13 +1135,29 @@ def _delete_permanently(doctype, name):
 	frappe.delete_doc(doctype, name, ignore_permissions=True, force=True, delete_permanently=True)
 
 
+def _delete_channel(channel):
+	"""Delete a Raven channel for good: its messages the Raven way (search index, attached files,
+	Raven's own events), and also the threads someone started on them in Raven. A thread is a
+	channel of its own, named after its first message; Raven does not delete it with the channel
+	(RavenChannel.on_trash: "TODO: Delete all threads"), so "burned" would not mean gone."""
+	if not channel or not frappe.db.exists("Raven Channel", channel):
+		return
+	messages = frappe.get_all("Raven Message", filters={"channel_id": channel}, pluck="name")
+	threads = (
+		frappe.get_all("Raven Channel", filters={"name": ("in", messages), "is_thread": 1}, pluck="name")
+		if messages
+		else []
+	)
+	for thread in threads:
+		_delete_channel(thread)
+	for message in messages:
+		_delete_permanently("Raven Message", message)
+	_delete_permanently("Raven Channel", channel)
+
+
 def _burn(doc, silent=False):
-	"""Delete the chat for good: every message the Raven way (search index, attached files,
-	Raven's own events), then the channel, then the encounter."""
-	if doc.raven_channel and frappe.db.exists("Raven Channel", doc.raven_channel):
-		for message in frappe.get_all("Raven Message", filters={"channel_id": doc.raven_channel}, pluck="name"):
-			_delete_permanently("Raven Message", message)
-		_delete_permanently("Raven Channel", doc.raven_channel)
+	"""Delete the chat for good: messages, threads, channel, then the encounter."""
+	_delete_channel(doc.raven_channel)
 	_delete_permanently(ENCOUNTER_DOCTYPE, doc.name)
 	if not silent:
 		_publish_both(doc, EVENT_BURNED, {"encounter": doc.name})
@@ -1189,7 +1222,9 @@ def part_encounter(encounter):
 def save_encounter(encounter):
 	"""I want to keep this chat. Saved for real only when the other person says so too."""
 	_require_user()
-	doc = _require_party(encounter, ("Parting",))
+	# Locking read: when both press Save at the same moment, the second waits for the first and
+	# then sees its flag, so one of the two requests does the save (review of the release).
+	doc = _require_party(encounter, ("Parting",), for_update=True)
 	field = "saved_by_a" if frappe.session.user == doc.user_a else "saved_by_b"
 	frappe.db.set_value(ENCOUNTER_DOCTYPE, doc.name, field, 1, update_modified=False)
 	doc[field] = 1
@@ -1226,24 +1261,64 @@ def burn_if_due(encounter):
 		return {"burned": True}
 	# One second of slack for the page's clock.
 	if doc.status == "Parting" and get_datetime(doc.burn_at) <= add_to_date(now_datetime(), seconds=1):
-		_burn(doc)
-		return {"burned": True}
+		return {"burned": _burn_or_save(doc) == "burned"}
 	return {"burned": False}
+
+
+def _burn_or_save(doc):
+	"""The countdown is over: burned, unless both saved it (a save that raced with the countdown)."""
+	if doc.saved_by_a and doc.saved_by_b:
+		# _save works from one of the two people's side (their DM): act as user_a.
+		user = frappe.session.user
+		frappe.set_user(doc.user_a)
+		try:
+			_save(doc)
+		finally:
+			frappe.set_user(user)
+		return "saved"
+	_burn(doc)
+	return "burned"
+
+
+def _each(rows, step, what):
+	"""Scheduler: one row at a time. A row that fails (deleted meanwhile, a concurrent save) is
+	rolled back to its savepoint and logged; the other rows still get done."""
+	for row in rows:
+		try:
+			frappe.db.savepoint("ophice_row")
+			step(row)
+		except Exception:
+			frappe.db.rollback(save_point="ophice_row")
+			frappe.log_error(title=f"Ophice scheduler: {what}", reference_doctype=None)
 
 
 def burn_due_encounters():
 	"""Scheduler, every minute: burn what is overdue, and start the countdown for encounters whose
 	other person has left (tab closed, connection gone) without anyone walking away."""
-	for doc in frappe.get_all(
-		ENCOUNTER_DOCTYPE,
-		filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
-		fields=ENCOUNTER_FIELDS,
-	):
-		_burn(doc)
-	for doc in frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS):
+	from phamos.api.ophice_guest import purge_guests
+
+	_each(
+		frappe.get_all(
+			ENCOUNTER_DOCTYPE,
+			filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
+			fields=ENCOUNTER_FIELDS,
+		),
+		_burn_or_save,
+		"burn encounter",
+	)
+
+	def part_if_alone(doc):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
 			_start_parting(doc)
+
+	_each(
+		frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS),
+		part_if_alone,
+		"part encounter",
+	)
 	_settle_batches()
+	# Guest visits that ended (tab closed, 12 hours up) leave nothing behind in Redis (#2080).
+	purge_guests()
 	frappe.db.commit()
 
 
@@ -1454,7 +1529,13 @@ def _inside_area(area, user):
 
 
 def _people_in(area, exclude=None):
-	return [c["user"] for c in _online() if c["user"] != exclude and _inside_area(area, c["user"])]
+	"""The users standing in an area. Guests (#2080) are not users: they never join an employee
+	meeting's chat batch or its Raven channel."""
+	return [
+		c["user"]
+		for c in _online()
+		if c["user"] != exclude and not c.get("guest") and _inside_area(area, c["user"])
+	]
 
 
 def _area(name):
@@ -1636,7 +1717,7 @@ def _notify_batch(batch_or_area, extra=()):
 		frappe.publish_realtime(EVENT_AREA_BATCHES, {"area": area_name}, user=user, after_commit=True)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_area_chat(area):
 	"""The chat of the area I stand in: its mode and its batches (kept ones and the running one)."""
 	_require_user()
@@ -1712,19 +1793,23 @@ def leave_area(area):
 
 
 def _burn_batch(batch):
-	"""Delete the batch, its messages and its channel for good."""
-	if batch.raven_channel and frappe.db.exists("Raven Channel", batch.raven_channel):
-		for message in frappe.get_all("Raven Message", filters={"channel_id": batch.raven_channel}, pluck="name"):
-			_delete_permanently("Raven Message", message)
-		_delete_permanently("Raven Channel", batch.raven_channel)
+	"""Delete the batch, its messages, threads and channel for good."""
+	_delete_channel(batch.raven_channel)
 	_notify_batch(batch)
 	_delete_permanently(BATCH_DOCTYPE, batch.name)
 
 
-def _decide_vote(batch):
-	"""The majority of the votes cast decides; a tie (or no votes) keeps the batch."""
+def _decide_vote(batch, timed_out=False):
+	"""The majority of the votes cast decides; a tie (or no votes) keeps the batch.
+
+	A kept chat (history of an earlier meeting) is burned at the end of the vote time only by a
+	majority of everyone who was there: one person's Burn plus everyone else's silence keeps it
+	(review of the release; no data loss by accident)."""
 	votes = [p.vote for p in batch.participants]
-	if votes.count("Burn") > votes.count("Keep"):
+	burn = votes.count("Burn") > votes.count("Keep")
+	if burn and timed_out and batch.status == "Kept":
+		burn = votes.count("Burn") * 2 > len(batch.participants)
+	if burn:
 		_burn_batch(batch)
 		return "burned"
 	batch.saved = 1
@@ -1770,13 +1855,24 @@ def get_batch_notices():
 	vote without my vote. A chat that is kept anyway, or has no messages, is not a notice."""
 	_require_user()
 	user = frappe.session.user
-	names = frappe.get_all(
+	mine = frappe.get_all(
 		"Ophice Chat Batch Participant",
 		filters={"user": user, "parenttype": BATCH_DOCTYPE},
 		pluck="parent",
 	)
+	# Only those that can need me (grace time or a vote), not every kept chat I was ever in.
+	names = (
+		frappe.get_all(
+			BATCH_DOCTYPE,
+			filters={"name": ("in", list(set(mine)))},
+			or_filters={"status": "Ending", "vote_until": ("is", "set")},
+			pluck="name",
+		)
+		if mine
+		else []
+	)
 	notices = []
-	for name in set(names):
+	for name in names:
 		batch = frappe.get_doc(BATCH_DOCTYPE, name)
 		if not batch.raven_channel or not frappe.db.exists(
 			"Raven Message", {"channel_id": batch.raven_channel, "message_type": ("!=", "System")}
@@ -1797,22 +1893,24 @@ def _settle_batches():
 	"""Scheduler: start the grace time of meetings nobody is in any more (tabs closed), end grace
 	times and decide votes that are due."""
 	now = now_datetime()
-	for name in frappe.get_all(BATCH_DOCTYPE, filters={"status": "Open"}, pluck="name"):
-		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+
+	def check_open(name):
+		batch = frappe.get_doc(BATCH_DOCTYPE, name, for_update=True)
 		if not frappe.db.exists(AREA_DOCTYPE, batch.area):
 			_burn_batch(batch)
-			continue
+			return
 		people = _people_in(_area(batch.area))
 		if _sync_inside(batch, people):
 			batch.save(ignore_permissions=True)
 			_notify_batch(batch)
 		if not people:
 			_start_ending(batch)
-	for name in frappe.get_all(BATCH_DOCTYPE, filters={"status": "Ending", "grace_until": ("<=", now)}, pluck="name"):
-		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+
+	def end_grace(name):
+		batch = frappe.get_doc(BATCH_DOCTYPE, name, for_update=True)
 		area = _area(batch.area) if frappe.db.exists(AREA_DOCTYPE, batch.area) else None
 		if area and _people_in(area):
-			continue  # somebody is back; their page continues the batch
+			return  # somebody is back; their page continues the batch
 		if area and (area.chat_mode == "Saved" or batch.saved):
 			batch.status = "Kept"
 			batch.grace_until = None
@@ -1820,9 +1918,18 @@ def _settle_batches():
 			_notify_batch(batch)
 		else:
 			_burn_batch(batch)
-	for name in frappe.get_all(BATCH_DOCTYPE, filters={"vote_until": ("<=", now)}, pluck="name"):
+
+	def end_vote(name):
 		if frappe.db.exists(BATCH_DOCTYPE, name):
-			_decide_vote(frappe.get_doc(BATCH_DOCTYPE, name))
+			_decide_vote(frappe.get_doc(BATCH_DOCTYPE, name, for_update=True), timed_out=True)
+
+	_each(frappe.get_all(BATCH_DOCTYPE, filters={"status": "Open"}, pluck="name"), check_open, "open batch")
+	_each(
+		frappe.get_all(BATCH_DOCTYPE, filters={"status": "Ending", "grace_until": ("<=", now)}, pluck="name"),
+		end_grace,
+		"end grace",
+	)
+	_each(frappe.get_all(BATCH_DOCTYPE, filters={"vote_until": ("<=", now)}, pluck="name"), end_vote, "end vote")
 
 
 # --- People list (#2063): all Raven users, online first, with what they are doing.
@@ -2088,7 +2195,7 @@ def get_cockpits():
 @frappe.whitelist(methods=["POST"])
 def cockpit_heartbeat(route):
 	"""I am looking at the cockpit at `route` (its base route, e.g. /sales-cockpit)."""
-	if frappe.session.user == "Guest":
+	if frappe.session.user == "Guest" or not check_app_permission():
 		return False
 	user = frappe.session.user
 	if route not in _cockpit_tiles() or _hides_details(user):

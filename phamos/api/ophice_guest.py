@@ -41,6 +41,13 @@ CHECK_MIN_SAMPLES = 6
 # Moves per guest and second the server takes (more are dropped, the page sends at most ~7).
 MOVE_LIMIT = 15
 GUEST_PREFIX = "guest:"
+# A visit without a heartbeat for this long ends (review of the develop release): a closed tab
+# frees its place for the next guest well before the 12 hours.
+IDLE_SECONDS = 30 * 60
+# The heartbeat writes "seen" at most this often (the page asks every second).
+SEEN_EVERY = 60
+# The human check's pointer path: at most this many samples are read.
+CHECK_MAX_SAMPLES = 200
 
 
 # --- Session
@@ -56,18 +63,44 @@ def _token(guest_id):
 	return f"{guest_id}.{_sign(guest_id)}"
 
 
+def _expired(entry, now=None):
+	"""Over: the 12 hours are up, or the page has not called for IDLE_SECONDS."""
+	now = now or time.time()
+	if not isinstance(entry, dict) or entry.get("expires", 0) < now:
+		return True
+	return now - entry.get("seen", now) > IDLE_SECONDS
+
+
+def _end_visit(guest_id, publish=True):
+	"""Everything of a visit goes: session, invite, chip. Nothing about it stays in Redis."""
+	frappe.cache.hdel(GUEST_CACHE_KEY, guest_id)
+	frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
+	frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
+	if publish:
+		ophice._publish(ophice.EVENT_LEAVE, {"user": GUEST_PREFIX + guest_id})
+
+
 def _sessions():
-	"""Live guest sessions {guest_id: entry}; expired ones are dropped on the way."""
+	"""Live guest sessions {guest_id: entry}; ended ones are dropped on the way."""
 	now = time.time()
 	live = {}
 	for guest_id, entry in (frappe.cache.hgetall(GUEST_CACHE_KEY) or {}).items():
 		guest_id = frappe.safe_decode(guest_id)
-		if not isinstance(entry, dict) or entry.get("expires", 0) < now:
-			frappe.cache.hdel(GUEST_CACHE_KEY, guest_id)
-			frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
+		if _expired(entry, now):
+			_end_visit(guest_id)
 			continue
 		live[guest_id] = entry
 	return live
+
+
+def purge_guests():
+	"""Scheduler (every minute): ended visits and invites without a visit are removed, also when
+	no new guest comes in. Guest data must not stay in Redis (GDPR)."""
+	live = _sessions()
+	for guest_id in list((frappe.cache.hgetall(INVITE_CACHE_KEY) or {}).keys()):
+		guest_id = frappe.safe_decode(guest_id)
+		if guest_id not in live:
+			frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
 
 
 def _current_guest():
@@ -81,7 +114,7 @@ def _current_guest():
 	if not hmac.compare_digest(signature, _sign(guest_id)):
 		return None, None
 	entry = frappe.cache.hget(GUEST_CACHE_KEY, guest_id)
-	if not isinstance(entry, dict) or entry.get("expires", 0) < time.time():
+	if _expired(entry):
 		return None, None
 	return guest_id, entry
 
@@ -141,8 +174,11 @@ def _inside(area, x, y):
 
 
 def clamp_to(areas, x, y, corridor=None):
-	"""The nearest position whose chip centre lies inside one of the areas (or the corridor)."""
-	x, y = float(x), float(y)
+	"""The nearest position whose chip centre lies inside one of the areas (or the corridor).
+
+	x and y come from the guest's page: anything that is not a finite number on the grid (NaN,
+	Infinity, text) is made one first, so no NaN reaches the presence list everyone reads."""
+	x, y = ophice._clamp(x, ophice._cols()), ophice._clamp(y, ophice._rows())
 	px, py = x + 0.5, y + 0.5
 	candidates = []
 	for area in areas:
@@ -239,7 +275,7 @@ def _passes_check(challenge, x, path):
 	try:
 		x = float(x)
 		samples = json.loads(path) if isinstance(path, str) else path
-		points = [(float(p[0]), float(p[1])) for p in samples]
+		points = [(float(p[0]), float(p[1])) for p in list(samples)[:CHECK_MAX_SAMPLES]]
 	except (TypeError, ValueError, IndexError):
 		return False
 	if abs(x - data["door"]) > CHECK_TOLERANCE or len(points) < CHECK_MIN_SAMPLES:
@@ -268,14 +304,13 @@ def enter(name, challenge, x, path):
 	area = guest_area()
 	if not area:
 		frappe.throw(_("Ophice has no guest area at the moment."))
+	# Visits that are live right now (a closed tab ends after IDLE_SECONDS), not every visit of
+	# the last 12 hours: one person cannot lock the door for half a day.
 	if len(_sessions()) >= MAX_GUESTS:
 		frappe.throw(_("Ophice is full right now. Please try again in a few minutes."))
 	guest_id = frappe.generate_hash(length=20)
-	entry = {
-		"name": name,
-		"expires": time.time() + SESSION_SECONDS,
-		"ip": getattr(frappe.local, "request_ip", "") or "",
-	}
+	now = time.time()
+	entry = {"name": name, "expires": now + SESSION_SECONDS, "seen": now}
 	frappe.cache.hset(GUEST_CACHE_KEY, guest_id, entry)
 	_set_cookie(_token(guest_id), SESSION_SECONDS)
 	spot = ophice._free_spot(area, GUEST_PREFIX + guest_id)
@@ -288,16 +323,29 @@ def guest_space():
 	"""My chip, where I may go, and the chips there. Also my heartbeat (the page asks every second)."""
 	guest_id, entry = _require_guest()
 	areas = allowed_areas(guest_id)
+	if not areas:
+		# The guest area was removed: there is nowhere a guest may stand, so the visit ends.
+		_end_visit(guest_id)
+		frappe.throw(_("Ophice has no guest area at the moment."), frappe.PermissionError)
+	now = time.time()
+	if now - entry.get("seen", 0) > SEEN_EVERY:
+		entry["seen"] = now
+		frappe.cache.hset(GUEST_CACHE_KEY, guest_id, entry)
 	me = frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
 	if isinstance(me, dict):
 		x, y = clamp_to(areas, me["x"], me["y"], _corridor(guest_id))
+		# Pulled back (invite taken back, area changed): the employees see it at once.
+		event = ophice.EVENT_MOVE if (x, y) != (me["x"], me["y"]) else None
 	else:
-		spot = ophice._free_spot(areas[0], GUEST_PREFIX + guest_id) if areas else ophice._spawn()
+		spot = ophice._free_spot(areas[0], GUEST_PREFIX + guest_id)
 		x, y = spot["x"], spot["y"]
-	chip = _put(guest_id, entry, x, y, publish_event=None if isinstance(me, dict) else ophice.EVENT_PRESENCE)
-	# Only chips inside my areas: nothing about anyone elsewhere in the office.
+		event = ophice.EVENT_PRESENCE
+	chip = _put(guest_id, entry, x, y, publish_event=event)
+	_check_arrival(guest_id, x, y)
+	# Only chips inside my areas: nothing about anyone elsewhere in the office. Employees appear
+	# under an opaque id, never their user id (their e-mail address).
 	others = [
-		{k: c.get(k) for k in ("user", "full_name", "user_image", "x", "y", "guest")}
+		{**{k: c.get(k) for k in ("full_name", "user_image", "x", "y", "guest")}, "user": public_id(c["user"])}
 		for c in ophice._online(exclude=chip["user"])
 		if any(_inside(a, c["x"], c["y"]) for a in areas)
 	]
@@ -325,7 +373,7 @@ def guest_move(x, y):
 	guest_id, entry = _require_guest()
 	if _throttled(guest_id):
 		return None
-	x, y = clamp_to(allowed_areas(guest_id), frappe.utils.flt(x), frappe.utils.flt(y), _corridor(guest_id))
+	x, y = clamp_to(allowed_areas(guest_id), x, y, _corridor(guest_id))
 	_put(guest_id, entry, x, y, publish_event=ophice.EVENT_MOVE)
 	_check_arrival(guest_id, x, y)
 	return {"x": x, "y": y}
@@ -337,11 +385,25 @@ def guest_leave():
 	guest_id, _entry = _current_guest()
 	if not guest_id:
 		return False
-	frappe.cache.hdel(GUEST_CACHE_KEY, guest_id)
-	frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
-	frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
-	ophice._publish(ophice.EVENT_LEAVE, {"user": GUEST_PREFIX + guest_id})
+	_end_visit(guest_id)
 	_set_cookie("", 1)
+	return True
+
+
+def public_id(user):
+	"""What a guest sees instead of an employee's user id (their e-mail address): a stable,
+	opaque id. Guests keep their own "guest:<id>"."""
+	if not user or user.startswith(GUEST_PREFIX):
+		return user
+	return "staff:" + _sign("staff:" + user)[:16]
+
+
+@frappe.whitelist(methods=["POST"])
+def send_guest_out(guest):
+	"""Employees: end a guest's visit (a wrong name, someone who should not be there)."""
+	ophice._require_user()
+	guest_id, _entry = _guest_of(guest)
+	_end_visit(guest_id)
 	return True
 
 
@@ -431,16 +493,33 @@ def _guest_chat_area_of(x, y, areas):
 
 
 def _chat_for_guest(guest_id, chip, areas):
-	"""The meeting and chat of the area the guest stands in (for guest_space)."""
+	"""The meeting and chat of the area the guest stands in (for guest_space).
+
+	A guest reads only what was written since they stepped into that area: an earlier visitor's
+	conversation is not for the next one. Leaving the area resets it."""
 	area = _guest_chat_area_of(chip["x"], chip["y"], areas)
-	if not area:
+	entry = frappe.cache.hget(GUEST_CACHE_KEY, guest_id)
+	if not isinstance(entry, dict):
 		return None
+	since = entry.get("chat_since") or {}
+	if not area:
+		if since:
+			entry["chat_since"] = {}
+			frappe.cache.hset(GUEST_CACHE_KEY, guest_id, entry)
+		return None
+	if area.name not in since:
+		entry["chat_since"] = {area.name: time.time()}
+		frappe.cache.hset(GUEST_CACHE_KEY, guest_id, entry)
+	start = entry["chat_since"][area.name]
+	messages = [
+		{**m, "owner": public_id(m.get("owner"))} for m in _read_chat(area.name) if m.get("ts", 0) >= start
+	]
 	return {
 		"area": area.name,
 		"title": area.title,
 		"jitsi_domain": area.jitsi_domain,
 		"jitsi_room": area.jitsi_room,
-		"messages": _read_chat(area.name),
+		"messages": messages,
 	}
 
 
@@ -456,7 +535,8 @@ def guest_send(text):
 	area = _guest_chat_area_of(me["x"], me["y"], allowed_areas(guest_id)) if isinstance(me, dict) else None
 	if not area:
 		frappe.throw(_("Step into the area to chat."))
-	return _add_message(area, GUEST_PREFIX + guest_id, entry["name"], strip_html(text or ""), guest=True)
+	message = _add_message(area, GUEST_PREFIX + guest_id, entry["name"], strip_html(text or ""), guest=True)
+	return {**message, "owner": public_id(message["owner"])}
 
 
 def _employee_area(area_name):
@@ -503,7 +583,7 @@ def _guest_of(guest):
 	"""The guest id of a chip "guest:<id>" with a live session, or a clear error."""
 	guest_id = (guest or "").removeprefix(GUEST_PREFIX)
 	entry = frappe.cache.hget(GUEST_CACHE_KEY, guest_id) if guest_id else None
-	if not isinstance(entry, dict) or entry.get("expires", 0) < time.time():
+	if _expired(entry):
 		frappe.throw(_("This guest has left."))
 	return guest_id, entry
 
@@ -566,7 +646,9 @@ def answer_invite(accept):
 	accepted = frappe.utils.cint(accept) == 1
 	if accepted:
 		me = frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id) or {}
-		start = (float(me.get("x", invite["pin"]["x"])) + 0.5, float(me.get("y", invite["pin"]["y"])) + 0.5)
+		x = ophice._clamp(me.get("x", invite["pin"]["x"]), ophice._cols())
+		y = ophice._clamp(me.get("y", invite["pin"]["y"]), ophice._rows())
+		start = (x + 0.5, y + 0.5)
 		end = (invite["pin"]["x"] + 0.5, invite["pin"]["y"] + 0.5)
 		invite.update({"status": "accepted", "corridor": {"from": start, "to": end, "radius": CORRIDOR_RADIUS}})
 		frappe.cache.hset(INVITE_CACHE_KEY, guest_id, invite)
@@ -581,12 +663,16 @@ def answer_invite(accept):
 
 
 def _check_arrival(guest_id, x, y):
-	"""Arrived in the customer meeting area: the corridor closes."""
+	"""Arrived in the customer meeting area: the corridor closes. Walked out again after arriving:
+	the invite is over, so the guest cannot come back later into someone else's meeting."""
 	invite = _invite(guest_id)
-	if not invite or invite["status"] != "accepted":
+	if not invite or invite["status"] not in ("accepted", "arrived"):
 		return
 	room = next((a for a in ophice._areas() if a.name == invite["area"]), None)
-	if room and _inside(room, x, y):
+	inside = bool(room and _inside(room, x, y))
+	if invite["status"] == "accepted" and inside:
 		invite["status"] = "arrived"
 		invite.pop("corridor", None)
 		frappe.cache.hset(INVITE_CACHE_KEY, guest_id, invite)
+	elif invite["status"] == "arrived" and not inside:
+		frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)

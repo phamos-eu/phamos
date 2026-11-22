@@ -1092,7 +1092,9 @@ class OphiceGuestEntryTestCase(_OphiceGuestBase):
 		# A stands far away, B inside the guest area.
 		self._put(self.B, 11, 11)
 		users = {c["user"] for c in self.g.guest_space()["others"]}
-		self.assertEqual(users, {self.B})
+		# Employees appear under an opaque id, never their user id (their e-mail address).
+		self.assertEqual(users, {self.g.public_id(self.B)})
+		self.assertNotIn("@", "".join(users))
 
 	def test_employees_see_the_guest(self):
 		self._enter("Ada Guest")
@@ -1323,3 +1325,162 @@ class OphiceGridTestCase(_OphiceRoomBase):
 		with self.assertRaises(frappe.ValidationError):
 			ophice.set_grid(40, 25)
 		self.assertEqual(ophice._grid(), (60, 40))
+
+
+class OphiceGuestReviewTestCase(_OphiceGuestBase):
+	"""Fixes from the review of the develop release: guest input, chat between visitors, flooding,
+	clean-up, e-mail addresses."""
+
+	def tearDown(self):
+		for area in ophice._areas():
+			frappe.cache.delete(frappe.cache.make_key(self.g.CHAT_KEY_PREFIX + area.name))
+		super().tearDown()
+
+	def test_not_a_number_never_reaches_the_presence_list(self):
+		self._enter()
+		for x, y in (("nan", "nan"), ("inf", "-inf"), ("text", None)):
+			moved = self.g.guest_move(x, y)
+			self.assertTrue(ophice.math.isfinite(moved["x"]) and ophice.math.isfinite(moved["y"]))
+		for chip in ophice._online():
+			self.assertTrue(ophice.math.isfinite(chip["x"]) and ophice.math.isfinite(chip["y"]))
+
+	def test_a_later_guest_does_not_read_an_earlier_conversation(self):
+		self._enter("Ada Guest")
+		self.g.guest_send("Our offer is 10 000 EUR")
+		ada = frappe.local.ophice_guest_token
+		frappe.local.ophice_guest_token = None
+		self._enter("Bob Guest")
+		self.assertEqual(self.g.guest_space()["room"]["messages"], [])
+		self.g.guest_send("Hello")
+		self.assertEqual([m["text"] for m in self.g.guest_space()["room"]["messages"]], ["Hello"])
+		frappe.local.ophice_guest_token = ada
+		self.assertEqual(len(self.g.guest_space()["room"]["messages"]), 2)
+
+	def test_message_owners_are_opaque_for_guests(self):
+		self._enter()
+		area = self.g.guest_area().name
+		self._put(self.B, 11, 11)
+		frappe.set_user(self.B)
+		self.g.send_guest_chat(area, "Welcome")
+		frappe.set_user("Guest")
+		owners = {m["owner"] for m in self.g.guest_space()["room"]["messages"]}
+		self.assertEqual(owners, {self.g.public_id(self.B)})
+
+	def test_idle_visits_end_and_only_live_ones_count(self):
+		self._enter("Ada Guest")
+		guest_id = frappe.local.ophice_guest_token.split(".")[0]
+		entry = frappe.cache.hget(self.g.GUEST_CACHE_KEY, guest_id)
+		entry["seen"] = ophice.time.time() - self.g.IDLE_SECONDS - 5
+		frappe.cache.hset(self.g.GUEST_CACHE_KEY, guest_id, entry)
+		self.assertEqual(self.g._current_guest(), (None, None))
+		self.assertNotIn(guest_id, self.g._sessions())
+		self.assertIsNone(frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, self.g.GUEST_PREFIX + guest_id))
+		self.assertNotIn("ip", entry)
+
+	def test_employees_can_send_a_guest_out(self):
+		me = self._enter()["me"]
+		frappe.set_user(self.A)
+		self.assertTrue(self.g.send_guest_out(me["user"]))
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.PermissionError):
+			self.g.guest_space()
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.PermissionError):
+			self.g.send_guest_out(me["user"])
+
+	def test_purge_drops_invites_of_ended_visits(self):
+		frappe.cache.hset(self.g.INVITE_CACHE_KEY, "gone00000000000000000", {"status": "pending", "by": self.A})
+		self.g.purge_guests()
+		self.assertIsNone(frappe.cache.hget(self.g.INVITE_CACHE_KEY, "gone00000000000000000"))
+
+	def test_guests_are_not_people_in_a_meeting(self):
+		frappe.set_user(self.A)
+		room = ophice.save_area("Talk", "https://jitsi.example.org/Talk", 30, 20, 3, 3)
+		frappe.cache.hset(
+			ophice.PRESENCE_CACHE_KEY,
+			"guest:abc",
+			{"user": "guest:abc", "x": 31, "y": 21, "guest": True, "ts": ophice.time.time()},
+		)
+		self.assertNotIn("guest:abc", ophice._people_in(ophice._area(room)))
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, "guest:abc")
+
+	def test_leaving_the_meeting_room_ends_the_invite(self):
+		frappe.set_user(self.A)
+		room = ophice.save_area("Room 1", "https://jitsi.example.org/Room1", 20, 10, 3, 3, kind="Customer meeting")
+		frappe.set_user("Guest")
+		me = self._enter()["me"]
+		frappe.set_user(self.A)
+		invite = self.g.invite_guest(me["user"], room)
+		frappe.set_user("Guest")
+		self.g.answer_invite(1)
+		# Straight to the pin (the corridor allows it), arrived.
+		self.g.guest_move(invite["pin"]["x"], invite["pin"]["y"])
+		self.assertEqual(self.g.guest_space()["invite"]["status"], "arrived")
+		# Back into the guest area: the invite is over, the room is closed again.
+		self.g.guest_move(11, 11)
+		space = self.g.guest_space()
+		self.assertIsNone(space["invite"])
+		self.assertEqual([a["name"] for a in space["areas"]], [self.g.guest_area().name])
+
+
+class OphiceServerReviewTestCase(_OphiceRoomBase):
+	"""Fixes from the review of the develop release: saves racing the countdown, kept chats, the
+	scheduler, threads."""
+
+	def test_a_save_that_raced_the_countdown_is_saved_not_burned(self):
+		doc = frappe._dict(saved_by_a=1, saved_by_b=1, user_a=self.A, user_b=self.B)
+		with patch.object(ophice, "_save") as save, patch.object(ophice, "_burn") as burn:
+			self.assertEqual(ophice._burn_or_save(doc), "saved")
+			save.assert_called_once()
+			burn.assert_not_called()
+		doc.saved_by_b = 0
+		with patch.object(ophice, "_save") as save, patch.object(ophice, "_burn") as burn:
+			self.assertEqual(ophice._burn_or_save(doc), "burned")
+			burn.assert_called_once()
+
+	def test_one_burn_vote_and_silence_keep_an_old_chat(self):
+		frappe.set_user(self.A)
+		area = self._area("Saved")
+		self._put(self.B, 2, 2)
+		ophice.send_area_message(area, "minutes of the meeting")
+		name = ophice._running_batch_name(area)
+		frappe.db.set_value(ophice.BATCH_DOCTYPE, name, "status", "Kept")
+		ophice.vote_batch(name, "Burn")
+		frappe.db.set_value(
+			ophice.BATCH_DOCTYPE, name, "vote_until", ophice.add_to_date(ophice.now_datetime(), minutes=-1)
+		)
+		ophice._settle_batches()
+		self.assertTrue(frappe.db.exists(ophice.BATCH_DOCTYPE, name))
+		self.assertFalse(frappe.db.get_value(ophice.BATCH_DOCTYPE, name, "vote_until"))
+
+	def test_one_failing_row_does_not_stop_the_scheduler(self):
+		done = []
+
+		def step(row):
+			if row == 2:
+				raise frappe.DoesNotExistError("gone meanwhile")
+			done.append(row)
+
+		with patch.object(ophice.frappe, "log_error") as logged:
+			ophice._each([1, 2, 3], step, "test")
+		self.assertEqual(done, [1, 3])
+		logged.assert_called_once()
+
+	def test_burning_deletes_threads_too(self):
+		frappe.set_user(self.A)
+		area = self._area("Saved")
+		self._put(self.B, 2, 2)
+		message = ophice.send_area_message(area, "start a thread on me")
+		batch = frappe.get_doc(ophice.BATCH_DOCTYPE, ophice._running_batch_name(area))
+		with patch.object(ophice.frappe, "get_all", wraps=frappe.get_all) as get_all:
+			ophice._delete_channel(batch.raven_channel)
+		asked = [c for c in get_all.call_args_list if c.args and c.args[0] == "Raven Channel"]
+		self.assertTrue(asked and asked[0].kwargs["filters"]["is_thread"] == 1)
+		self.assertIn(message["name"], asked[0].kwargs["filters"]["name"][1])
+		self.assertFalse(frappe.db.exists("Raven Message", message["name"]))
+		self.assertFalse(frappe.db.exists("Raven Channel", batch.raven_channel))
+
+	def test_reading_endpoints_that_write_are_post_only(self):
+		for fn in (ophice.get_area_chat, ophice.get_encounter):
+			self.assertIn("POST", frappe.allowed_http_methods_for_whitelisted_func[fn])
+			self.assertNotIn("GET", frappe.allowed_http_methods_for_whitelisted_func[fn])
