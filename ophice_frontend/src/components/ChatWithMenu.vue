@@ -88,9 +88,8 @@ function errorText(e) {
 	return typeof first === "string" ? new DOMParser().parseFromString(first, "text/html").body.textContent : ""
 }
 
-// Raven keeps times in the server's zone without one: read as local is close enough for "2 days ago".
+// "2 days ago" from last_message_at: an ISO instant with its offset (phamos.api.ophice._as_instant).
 function ago(value) {
-	// An ISO instant with its offset (phamos.api.ophice._as_instant).
 	const date = new Date(String(value))
 	return Number.isNaN(date.getTime()) ? "" : relativeTime(date)
 }
