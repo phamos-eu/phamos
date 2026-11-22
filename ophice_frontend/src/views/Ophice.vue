@@ -218,10 +218,11 @@
 				:open-route="openRoute"
 				@open="(cockpit) => emit('open-cockpit', cockpit)"
 			/>
-			<!-- Burn notices (#2057): bottom centre, above the grid. -->
+			<!-- Burn and chat notices (#2057, #2066): bottom right, where Frappe's notifications are (PM). -->
 			<div
 				v-if="noticeList.length || batchNoticeList.length"
-				class="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex flex-col items-center gap-2"
+				class="pointer-events-none absolute bottom-6 right-6 z-30 flex flex-col items-end gap-2"
+				data-testid="notice-stack"
 			>
 				<BatchNotice
 					v-for="notice in batchNoticeList"
