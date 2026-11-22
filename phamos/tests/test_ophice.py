@@ -1190,3 +1190,24 @@ class OphiceGuestInviteTestCase(_OphiceGuestBase):
 		frappe.set_user(self.A)
 		with self.assertRaises(frappe.ValidationError):
 			self.g.invite_guest(me["user"], guest_area)
+
+
+class OphiceBrbCountdownTestCase(_OphiceRoomBase):
+	"""#2074: "I'll get back to you in 15 min" is a Be right back with a return time that counts down."""
+
+	def test_be_right_back_with_a_time(self):
+		from datetime import datetime, timedelta, timezone
+
+		frappe.set_user(self.A)
+		back = (datetime.now(timezone.utc) + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
+		status = ophice.set_status("brb", "I'll get back to you", back)
+		self.assertEqual((status["kind"], status["until"]), ("brb", back))
+		self.assertEqual(ophice._status_of(self.A)["until"], back)
+		# Without a time it stays as before; in the past or too far ahead is refused.
+		self.assertEqual(ophice.set_status("brb", "")["until"], "")
+		past = (datetime.now(timezone.utc) - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_status("brb", "", past)
+		later = (datetime.now(timezone.utc) + timedelta(hours=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_status("brb", "", later)

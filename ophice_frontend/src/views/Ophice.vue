@@ -414,6 +414,7 @@
 			@reply="quickReply"
 			@open-chat="openFromPing"
 			@dismiss="(ping) => dropPing(ping.id)"
+			@send="sendFromPing"
 		/>
 		<GuestInviteMenu
 			v-if="guestInvite"
@@ -1700,8 +1701,10 @@ function onMeetingMessage(payload) {
 const reminders = new Map()
 async function quickReply(ping, minutes) {
 	const note = __("I'll get back to you in {0} min", [minutes])
+	// The status carries the time, so the bubble above my chip counts down (PM, 2026-11-22).
+	const until = new Date(Date.now() + minutes * 60000).toISOString().replace(/\.\d{3}Z$/, "Z")
 	try {
-		await saveStatus({ kind: "brb", note, until: "", tz: myZone() })
+		await saveStatus({ kind: "brb", note: __("I'll get back to you"), until, tz: myZone() })
 	} catch (e) {
 		toast({ title: e.message, icon: "alert-circle" })
 		return
@@ -1719,6 +1722,31 @@ async function quickReply(ping, minutes) {
 			if (props.cockpitOpen) addPing("reminder", text, { user: ping.user })
 		}, minutes * 60000)
 	)
+}
+
+/** A reply typed in a ping, sent without leaving the cockpit: into the chat with that person, or
+ *  into the chat of the meeting I stand in. */
+async function sendFromPing(ping, text, done) {
+	try {
+		if (ping.kind === "meeting") {
+			const area = meetingArea.value
+			if (!area) throw new Error(__("You are no longer in the meeting."))
+			if ((area.kind || "Meeting") === "Meeting") await call(`${API}.send_area_message`, { area: area.name, text })
+			else await sendGuestChat(text)
+		} else {
+			const other = others.value.find((o) => o.user === ping.user)
+			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
+			if (!bubbles[other.user]?.encounter) await openBubble(other)
+			const bubble = bubbles[other.user]
+			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
+			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
+		}
+		ping.replies = [...(ping.replies || []), text]
+		done(true)
+	} catch (e) {
+		toast({ title: errorText(e) || e.message || __("The message could not be sent."), icon: "alert-circle" })
+		done(false)
+	}
 }
 
 /** From a ping: back to the map; the chat with that person opens if they are still there. */

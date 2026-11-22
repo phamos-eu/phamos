@@ -84,6 +84,31 @@
 							<FeatherIcon name="x" class="h-3 w-3" />
 						</button>
 					</div>
+					<!-- Answer right here, without leaving the cockpit (PM, 2026-11-22) -->
+					<template v-if="ping.kind !== 'reminder'">
+						<p v-for="(line, index) in ping.replies || []" :key="index" class="mt-1 text-[11px] text-ink-gray-6">
+							{{ __("You: {0}", [line]) }}
+						</p>
+						<form class="mt-1.5 flex items-center gap-1" @submit.prevent="reply(ping)">
+							<input
+								v-model="drafts[ping.id]"
+								type="text"
+								maxlength="1000"
+								class="h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-xs text-ink-gray-9"
+								:placeholder="ping.kind === 'meeting' ? __('Reply in the meeting chat') : __('Reply')"
+								data-testid="mini-map-reply-input"
+								@keydown.stop
+							/>
+							<button
+								type="submit"
+								class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-surface-gray-7 text-ink-white disabled:opacity-40"
+								:disabled="!(drafts[ping.id] || '').trim() || sending[ping.id]"
+								:title="__('Send')"
+							>
+								<FeatherIcon name="send" class="h-3.5 w-3.5" />
+							</button>
+						</form>
+					</template>
 					<!-- Someone walked up: answer without leaving the cockpit -->
 					<div v-if="ping.kind === 'walkup'" class="mt-1.5 space-y-1">
 						<p class="text-[11px] text-ink-gray-5">{{ __("I'll get back to you in") }}</p>
@@ -151,7 +176,20 @@ const props = defineProps({
 	pings: { type: Array, default: () => [] },
 	noticeCount: { type: Number, default: 0 },
 })
-defineEmits(["fullscreen", "reply", "open-chat", "dismiss"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send"])
+
+// Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
+const drafts = reactive({})
+const sending = reactive({})
+function reply(ping) {
+	const text = (drafts[ping.id] || "").trim()
+	if (!text || sending[ping.id]) return
+	sending[ping.id] = true
+	emit("send", ping, text, (ok) => {
+		sending[ping.id] = false
+		if (ok) drafts[ping.id] = ""
+	})
+}
 
 // Served by Frappe, not bundled.
 const OPHICE_ICON = "/assets/phamos/manifest/ophice-icon-192.png"

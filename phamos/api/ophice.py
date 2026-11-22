@@ -127,6 +127,8 @@ AREA_SLACK = 0.5
 STATUS_KEY = "phamos_ophice_status"
 EVENT_STATUS = "ophice_status"
 STATUS_KINDS = ("brb", "away")
+# "Be right back" with a return time, at most this far ahead (#2074).
+BRB_MAX_HOURS = 24
 STATUS_NOTE_LENGTH = 140
 AWAY_MAX_DAYS = 14
 # An away chip stays on the map (offline) until this long after its return time.
@@ -441,6 +443,11 @@ def _clean_status(data):
 		if until + timedelta(seconds=AWAY_GRACE_SECONDS) < datetime.now(timezone.utc):
 			return None
 		status["until"] = _utc(until)
+	elif data.get("until"):
+		# "Be right back" may say when (#2074: "I'll get back to you in 15 min"), counting down.
+		until = _parse_instant(data.get("until"))
+		if until:
+			status["until"] = _utc(until)
 	return status
 
 
@@ -490,6 +497,14 @@ def set_status(kind="", note="", until="", tz=""):
 				frappe.throw(_("The return time must be in the future."))
 			if back > now + timedelta(days=AWAY_MAX_DAYS):
 				frappe.throw(_("The return time can be at most {0} days ahead.").format(AWAY_MAX_DAYS))
+			status["until"] = _utc(back)
+		elif until:
+			# "Be right back" with a time (#2074): in the future, within a day.
+			back = _parse_instant(until)
+			if not back or back <= now:
+				frappe.throw(_("The return time must be in the future."))
+			if back > now + timedelta(hours=BRB_MAX_HOURS):
+				frappe.throw(_("For more than {0} hours, please set Away.").format(BRB_MAX_HOURS))
 			status["until"] = _utc(back)
 		frappe.defaults.set_user_default(STATUS_KEY, json.dumps(status, separators=(",", ":")), user)
 	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
