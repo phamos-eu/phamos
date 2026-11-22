@@ -181,9 +181,19 @@
 			</p>
 			<!-- Burn notices (#2057): bottom centre, above the grid. -->
 			<div
-				v-if="noticeList.length"
+				v-if="noticeList.length || batchNoticeList.length"
 				class="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex flex-col items-center gap-2"
 			>
+				<BatchNotice
+					v-for="notice in batchNoticeList"
+					:key="`batch-${notice.name}`"
+					class="pointer-events-auto"
+					:notice="notice"
+					:now="clock"
+					:busy="batchBusy[notice.name] || ''"
+					@vote="(choice) => voteBatch(notice, choice)"
+					@dismiss="dismissedBatches.add(notice.name)"
+				/>
 				<BurnNotice
 					v-for="notice in noticeList"
 					:key="notice.encounter"
@@ -306,6 +316,7 @@ import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
+import BatchNotice from "../components/BatchNotice.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
@@ -1175,7 +1186,47 @@ function startClock() {
 	}, 250)
 }
 
+// --- Meeting chats waiting for me elsewhere on the map (#2066): grace time or a vote.
+
+const batchNotices = ref([])
+const batchBusy = reactive({})
+const dismissedBatches = reactive(new Set())
+// The area I'm in shows its batches in its own chat; the rest come here.
+const batchNoticeList = computed(() =>
+	batchNotices.value.filter((n) => n.area !== meetingArea.value?.name && !dismissedBatches.has(n.name))
+)
+
+async function loadBatchNotices() {
+	try {
+		const rows = await call(`${API}.get_batch_notices`)
+		const loadedAt = Date.now()
+		batchNotices.value = (rows || []).map((row) => ({ ...row, loadedAt }))
+	} catch {
+		// Not critical: the next change brings them.
+	}
+}
+
+let batchNoticeTimer = null
+function onAreaBatches() {
+	clearTimeout(batchNoticeTimer)
+	batchNoticeTimer = setTimeout(loadBatchNotices, 300)
+}
+
+async function voteBatch(notice, choice) {
+	batchBusy[notice.name] = choice
+	try {
+		await call(`${API}.vote_batch`, { batch: notice.name, vote: choice })
+		if (choice === "Keep" && !notice.vote_until) dismissedBatches.add(notice.name)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || __("Your vote could not be saved."), icon: "alert-circle" })
+	} finally {
+		delete batchBusy[notice.name]
+		loadBatchNotices()
+	}
+}
+
 const NOTICE_EVENTS = [
+	["ophice_area_batches", onAreaBatches],
 	["ophice_burn_notice", upsertNotice],
 	["ophice_save_vote", upsertNotice],
 	["ophice_burn_cancel", (m) => delete notices[m?.encounter]],
@@ -1422,6 +1473,7 @@ onMounted(async () => {
 	heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS)
 	loadPeople()
 	peopleTimer = setInterval(loadPeople, PEOPLE_REFRESH_MS)
+	loadBatchNotices()
 })
 
 onBeforeUnmount(() => {
@@ -1431,6 +1483,7 @@ onBeforeUnmount(() => {
 	window.removeEventListener("pagehide", leaveOnPagehide)
 	for (const [event, handler] of SOCKET_EVENTS) socket?.off?.(event, handler)
 	clearInterval(heartbeatTimer)
+	clearTimeout(batchNoticeTimer)
 	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)

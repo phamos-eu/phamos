@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "creation": "2026-11-22 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "field_order": [
+  "user",
+  "vote"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Empty until this person votes in a running Keep/Burn vote.",
+   "fieldname": "vote",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Vote",
+   "options": "\nKeep\nBurn",
+   "read_only": 1
+  }
+ ],
+ "modified": "2026-11-22 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Ophice",
+ "name": "Ophice Chat Batch Participant",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

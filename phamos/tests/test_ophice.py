@@ -596,40 +596,104 @@ class _OphiceRoomBase(FrappeTestCase):
 
 
 class OphiceAreaChatTestCase(_OphiceRoomBase):
-	"""Area chat (#2062): Saved, Not saved, Confidential; only for whoever stands in the area."""
+	"""Area chat (#2062, #2066): batches per meeting, grace time, Keep/Burn vote; Confidential stores nothing."""
 
-	def test_saved_keeps_history_in_raven_and_only_people_inside_may_read(self):
+	def _meeting(self, mode, text="Hello area", area=None):
+		"""A and B in one area, A wrote a message: the running batch."""
+		area = area or self._area(mode)
+		self._put(self.A, 1, 1)
+		self._put(self.B, 2, 2)
+		frappe.set_user(self.A)
+		ophice.send_area_message(area, text)
+		return area, frappe.get_doc(ophice.BATCH_DOCTYPE, ophice._running_batch_name(area))
+
+	def _empty(self, area):
+		"""Both walk out: B's tab is gone, A leaves."""
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
+		frappe.set_user(self.A)
+		self.assertTrue(ophice.leave_area(area))
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.A)
+
+	def _grace_over(self, batch):
+		frappe.db.set_value(ophice.BATCH_DOCTYPE, batch.name, "grace_until", ophice.add_to_date(ophice.now_datetime(), minutes=-1))
+		ophice._settle_batches()
+
+	def test_batch_has_everyone_inside_and_only_people_inside_may_read(self):
 		area = self._area("Saved")
-		ophice.send_area_message(area, "Hello area")
-		channel = frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel")
-		self.assertTrue(frappe.db.exists("Raven Message", {"channel_id": channel}))
-		self.assertEqual([m["text"] for m in ophice.get_area_chat(area)["messages"]], ["Hello area"])
 		frappe.set_user(self.B)
 		with self.assertRaises(frappe.PermissionError):
 			ophice.get_area_chat(area)
-		# B steps in: same channel, the history is there, and B gets the next message.
 		self._put(self.B, 2, 2)
-		self.assertEqual(len(ophice.get_area_chat(area)["messages"]), 1)
+		chat = ophice.get_area_chat(area)
+		self.assertEqual(len(chat["batches"]), 1)
+		self.assertEqual(set(chat["batches"][0]["participants"]), {self.A, self.B})
 		self.sent.reset_mock()
 		ophice.send_area_message(area, "Hi")
 		self.assertEqual(self._recipients(), {self.A, self.B})
-		self.assertEqual(frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel"), channel)
+		channel = frappe.db.get_value(ophice.BATCH_DOCTYPE, chat["batches"][0]["name"], "raven_channel")
+		self.assertTrue(frappe.db.exists("Raven Message", {"channel_id": channel}))
 
-	def test_burn_deletes_the_saved_history(self):
-		area = self._area("Saved")
-		ophice.send_area_message(area, "secret")
-		self.assertEqual(ophice.burn_area_chat(area), 1)
-		self.assertEqual(ophice.get_area_chat(area)["messages"], [])
-
-	def test_not_saved_burns_when_the_last_person_leaves(self):
-		area = self._area("Not saved")
-		ophice.send_area_message(area, "gone soon")
+	def test_grace_time_continues_the_batch_and_saved_mode_keeps_it(self):
+		area, batch = self._meeting("Saved")
+		self._empty(area)
+		self.assertEqual(frappe.db.get_value(ophice.BATCH_DOCTYPE, batch.name, "status"), "Ending")
+		# A's connection is back within the grace time: the same batch carries on.
+		self._put(self.A, 1, 1)
+		frappe.set_user(self.A)
 		self._put(self.B, 2, 2)
-		self.assertFalse(ophice.leave_area(area))  # B is still inside
-		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
-		self.assertTrue(ophice.leave_area(area))
-		channel = frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel")
+		ophice.get_area_chat(area)
+		self.assertEqual(frappe.db.get_value(ophice.BATCH_DOCTYPE, batch.name, "status"), "Open")
+		self._empty(area)
+		self._grace_over(batch)
+		self.assertEqual(frappe.db.get_value(ophice.BATCH_DOCTYPE, batch.name, "status"), "Kept")
+		# The next meeting starts a new batch; the old history is there.
+		self._put(self.A, 1, 1)
+		self._put(self.B, 2, 2)
+		frappe.set_user(self.A)
+		self.assertEqual([b["status"] for b in ophice.get_area_chat(area)["batches"]], ["Kept", "Open"])
+
+	def test_not_saved_deletes_after_grace_unless_saved(self):
+		area, batch = self._meeting("Not saved")
+		channel = batch.raven_channel
+		self._empty(area)
+		frappe.set_user(self.B)
+		self.assertEqual([n["name"] for n in ophice.get_batch_notices()], [batch.name])
+		self._grace_over(batch)
+		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
+		self.assertFalse(frappe.db.exists("Raven Channel", channel))
 		self.assertFalse(frappe.db.exists("Raven Message", {"channel_id": channel}))
+		# Saved by one person during the grace time: kept.
+		area2, batch2 = self._meeting("Not saved", area=area)
+		self._empty(area2)
+		frappe.set_user(self.B)
+		self.assertEqual(ophice.vote_batch(batch2.name, "Keep")["result"], "voting")
+		self._grace_over(batch2)
+		self.assertEqual(frappe.db.get_value(ophice.BATCH_DOCTYPE, batch2.name, "status"), "Kept")
+
+	def test_vote_majority_burns_and_a_tie_keeps(self):
+		area, batch = self._meeting("Saved")
+		with self.assertRaises(frappe.PermissionError):
+			frappe.set_user("Administrator")
+			ophice.vote_batch(batch.name, "Burn")
+		frappe.set_user(self.A)
+		self.assertEqual(ophice.vote_batch(batch.name, "Burn")["result"], "voting")
+		frappe.set_user(self.B)
+		self.assertEqual([n["name"] for n in ophice.get_batch_notices()], [batch.name])
+		self.assertEqual(ophice.vote_batch(batch.name, "Keep")["result"], "kept")  # 1:1
+		self.assertTrue(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
+		self.assertFalse(frappe.db.get_value(ophice.BATCH_DOCTYPE, batch.name, "vote_until"))
+		ophice.vote_batch(batch.name, "Burn")
+		frappe.set_user(self.A)
+		self.assertEqual(ophice.vote_batch(batch.name, "Burn")["result"], "burned")
+		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
+
+	def test_vote_window_ends_with_the_votes_cast(self):
+		area, batch = self._meeting("Saved")
+		frappe.set_user(self.A)
+		ophice.vote_batch(batch.name, "Burn")
+		frappe.db.set_value(ophice.BATCH_DOCTYPE, batch.name, "vote_until", ophice.add_to_date(ophice.now_datetime(), minutes=-1))
+		ophice._settle_batches()
+		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
 
 	def test_confidential_stores_nothing(self):
 		area = self._area("Confidential")
@@ -637,7 +701,7 @@ class OphiceAreaChatTestCase(_OphiceRoomBase):
 		row = ophice.send_area_message(area, "off the record")
 		self.assertEqual(row["text"], "off the record")
 		self.assertEqual(frappe.db.count("Raven Message"), before)
-		self.assertFalse(frappe.db.get_value(ophice.AREA_DOCTYPE, area, "raven_channel"))
+		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, {"area": area}))
 		self.assertEqual(self._recipients(), {self.A})
 
 

@@ -94,7 +94,12 @@ AREA_TITLE_LENGTH = 60
 # Area chat (#2062): what happens to what is written in an area.
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
-EVENT_AREA_BURNED = "ophice_area_burned"
+EVENT_AREA_BATCHES = "ophice_area_batches"
+# Chat batches (#2066): one per meeting; grace time after the area empties, then a Keep/Burn vote.
+BATCH_DOCTYPE = "Ophice Chat Batch"
+BATCH_GRACE_MINUTES = 10
+BATCH_VOTE_HOURS = 24
+BATCHES_SHOWN = 20
 # People list (#2063): everyone sees who is around; each user can hide their details.
 HIDE_KEY = "phamos_ophice_hide_details"
 RECENT_CHATS = 5
@@ -1002,7 +1007,7 @@ def burn_due_encounters():
 	for doc in frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
 			_start_parting(doc)
-	_burn_empty_unsaved_areas()
+	_settle_batches()
 	frappe.db.commit()
 
 
@@ -1152,16 +1157,21 @@ def delete_area(name):
 	"""Remove a meeting area, for everyone."""
 	_require_user()
 	if frappe.db.exists(AREA_DOCTYPE, name):
+		# Its chat goes with it: the batches only make sense inside the area.
+		for batch in frappe.get_all(BATCH_DOCTYPE, filters={"area": name}, pluck="name"):
+			_burn_batch(frappe.get_doc(BATCH_DOCTYPE, batch))
 		frappe.delete_doc(AREA_DOCTYPE, name, ignore_permissions=True)
 	_publish(EVENT_AREAS, {"areas": _areas()})
 
 
-# --- Area chat (#2062): every meeting area has a chat, for whoever stands in it.
+# --- Area chat (#2062, #2066): every meeting area has a chat, for whoever stands in it.
 #
-# Saved: a private Raven channel per area; everyone who used the chat is a member, the history
-# stays (and can be burned on purpose). Not saved: the same channel, emptied for good when the
-# last person has left the area. Confidential: nothing is stored; messages go over realtime to
-# the people standing in the area right now, and are gone with the page.
+# The chat comes in batches: one batch per meeting, from two people in the area until it is
+# empty, each with its own private Raven channel. When the area empties, the batch waits
+# BATCH_GRACE_MINUTES (a lost connection must not lose the chat); a participant who steps back in
+# continues it. Then mode Saved keeps it, mode Not saved deletes it unless someone saved it.
+# Confidential stores nothing: messages go over realtime to the people in the area right now.
+# Save and Burn are a vote among the batch's participants; a tie keeps the batch.
 
 
 def _inside_area(area, user):
@@ -1195,37 +1205,6 @@ def _require_inside(name):
 	return area
 
 
-def _area_channel(area):
-	"""The area's private Raven channel (made on first use), with me as a member."""
-	from phamos.api.issue_chat import _ensure_members, _resolve_workspace
-
-	user = frappe.session.user
-	channel = area.raven_channel if area.raven_channel and frappe.db.exists("Raven Channel", area.raven_channel) else None
-	if not channel:
-		# Two people stepping in at once must not make two channels.
-		_lock_pair(f"area:{area.name}")
-		channel = frappe.db.get_value(AREA_DOCTYPE, area.name, "raven_channel", for_update=True)
-		if not channel or not frappe.db.exists("Raven Channel", channel):
-			doc = frappe.get_doc(
-				{
-					"doctype": "Raven Channel",
-					"channel_name": f"ophice-area-{frappe.generate_hash(length=8)}",
-					"channel_description": _("Ophice area chat: {0}").format(area.title),
-					"type": "Private",
-					"workspace": _resolve_workspace(),
-				}
-			)
-			doc.flags.do_not_add_member = True
-			doc.insert(ignore_permissions=True)
-			channel = doc.name
-			frappe.db.set_value(AREA_DOCTYPE, area.name, "raven_channel", channel, update_modified=False)
-		area.raven_channel = channel
-	skipped = _ensure_members(frappe.get_doc("Raven Channel", channel), [user], admin=user, silent=True)
-	if skipped:
-		frappe.throw(_("You can't chat: no Raven access."))
-	return channel
-
-
 def _clean_text(text):
 	text = (text or "").strip()
 	if not text:
@@ -1235,14 +1214,140 @@ def _clean_text(text):
 	return text
 
 
+def _running_batch_name(area_name, for_update=False):
+	return frappe.db.get_value(
+		BATCH_DOCTYPE,
+		{"area": area_name, "status": ("in", ("Open", "Ending"))},
+		"name",
+		order_by="creation desc",
+		for_update=for_update,
+	)
+
+
+def _new_batch(area):
+	"""A new batch with its own private Raven channel (no members yet)."""
+	from phamos.api.issue_chat import _resolve_workspace
+
+	channel = frappe.get_doc(
+		{
+			"doctype": "Raven Channel",
+			"channel_name": f"ophice-area-{frappe.generate_hash(length=8)}",
+			"channel_description": _("Ophice area chat: {0}").format(area.title),
+			"type": "Private",
+			"workspace": _resolve_workspace(),
+		}
+	)
+	channel.flags.do_not_add_member = True
+	channel.insert(ignore_permissions=True)
+	return frappe.get_doc(
+		{
+			"doctype": BATCH_DOCTYPE,
+			"area": area.name,
+			"status": "Open",
+			"raven_channel": channel.name,
+			"started_at": now_datetime(),
+		}
+	).insert(ignore_permissions=True)
+
+
+def _current_batch(area, create):
+	"""The area's running batch, with everyone inside as a participant. A new one is made when
+	`create` is set; an Ending one continues (somebody came back during the grace time)."""
+	from phamos.api.issue_chat import _ensure_members
+
+	name = _running_batch_name(area.name)
+	if not name and not create:
+		return None
+	# Two people stepping in at once must not make two batches.
+	_lock_pair(f"area:{area.name}")
+	name = _running_batch_name(area.name, for_update=True)
+	batch = frappe.get_doc(BATCH_DOCTYPE, name, for_update=True) if name else _new_batch(area)
+	people = list(dict.fromkeys([frappe.session.user, *_people_in(area)]))
+	known = {p.user for p in batch.participants}
+	new = [user for user in people if user not in known]
+	changed = bool(new) or batch.status == "Ending"
+	for user in new:
+		batch.append("participants", {"user": user})
+	if batch.status == "Ending":
+		batch.status = "Open"
+		batch.grace_until = None
+	if changed:
+		batch.save(ignore_permissions=True)
+	if new:
+		_ensure_members(frappe.get_doc("Raven Channel", batch.raven_channel), new, admin=frappe.session.user, silent=True)
+		_notify_batch(batch)
+	return batch
+
+
+def _seconds_until(value):
+	"""Seconds from now (negative: past), so a browser in any time zone can count from its own clock."""
+	return round((get_datetime(value) - now_datetime()).total_seconds()) if value else None
+
+
+def _batch_row(batch, user, messages=True):
+	votes = [p.vote for p in batch.participants]
+	row = {
+		"name": batch.name,
+		"area": batch.area,
+		"status": batch.status,
+		"saved": bool(batch.saved),
+		"started_at": str(batch.started_at),
+		"grace_until": str(batch.grace_until) if batch.grace_until else None,
+		"vote_until": str(batch.vote_until) if batch.vote_until else None,
+		"started_in": _seconds_until(batch.started_at),
+		"grace_in": _seconds_until(batch.grace_until),
+		"vote_in": _seconds_until(batch.vote_until),
+		"participants": [p.user for p in batch.participants],
+		"names": {p.user: frappe.utils.get_fullname(p.user) for p in batch.participants},
+		"mine": any(p.user == user for p in batch.participants),
+		"my_vote": next((p.vote for p in batch.participants if p.user == user), "") or "",
+		"keep_votes": votes.count("Keep"),
+		"burn_votes": votes.count("Burn"),
+	}
+	if messages:
+		row["messages"] = _messages(batch.raven_channel) if batch.raven_channel else []
+	return row
+
+
+def _area_batches(area):
+	"""The area's batches, oldest first: what is kept plus the running one."""
+	names = frappe.get_all(
+		BATCH_DOCTYPE,
+		filters={"area": area.name},
+		pluck="name",
+		order_by="started_at desc",
+		limit=BATCHES_SHOWN,
+	)
+	return [frappe.get_doc(BATCH_DOCTYPE, name) for name in reversed(names)]
+
+
+def _notify_batch(batch_or_area, extra=()):
+	"""Tell the participants and the people in the area to reload: a batch changed."""
+	if isinstance(batch_or_area, str):
+		area_name, users = batch_or_area, set()
+	else:
+		area_name = batch_or_area.area
+		users = {p.user for p in batch_or_area.participants}
+	if frappe.db.exists(AREA_DOCTYPE, area_name):
+		users |= set(_people_in(_area(area_name)))
+	for user in users | set(extra):
+		frappe.publish_realtime(EVENT_AREA_BATCHES, {"area": area_name}, user=user, after_commit=True)
+
+
 @frappe.whitelist()
 def get_area_chat(area):
-	"""The chat of the area I stand in: its mode and, unless confidential, the latest messages."""
+	"""The chat of the area I stand in: its mode and its batches (kept ones and the running one)."""
 	_require_user()
 	doc = _require_inside(area)
-	if doc.chat_mode == "Confidential":
-		return {"area": doc.name, "mode": doc.chat_mode, "messages": []}
-	return {"area": doc.name, "mode": doc.chat_mode, "messages": _messages(_area_channel(doc))}
+	user = frappe.session.user
+	if doc.chat_mode != "Confidential":
+		# Two people inside: a meeting, so its batch starts (or continues).
+		_current_batch(doc, create=len(set([user, *_people_in(doc)])) >= 2)
+	return {
+		"area": doc.name,
+		"mode": doc.chat_mode,
+		"batches": [_batch_row(b, user) for b in _area_batches(doc)],
+	}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1252,70 +1357,153 @@ def send_area_message(area, text):
 	text = _clean_text(text)
 	doc = _require_inside(area)
 	user = frappe.session.user
+	batch = None
 	if doc.chat_mode == "Confidential":
 		# Never written anywhere: only relayed to the people in the area now.
 		row = {"name": frappe.generate_hash(length=12), "owner": user, "text": text, "creation": str(now_datetime())}
 		after_commit = False
 	else:
+		batch = _current_batch(doc, create=True)
 		message = frappe.get_doc(
 			{
 				"doctype": "Raven Message",
-				"channel_id": _area_channel(doc),
+				"channel_id": batch.raven_channel,
 				"message_type": "Text",
 				"text": "<p>{}</p>".format(escape_html(text).replace("\n", "<br>")),
 			}
 		).insert(ignore_permissions=True)
 		row = _message_row(message)
 		after_commit = True
-	payload = {"area": doc.name, "message": row}
+	payload = {"area": doc.name, "batch": batch.name if batch else None, "message": row}
 	for person in {user, *_people_in(doc)}:
 		frappe.publish_realtime(EVENT_AREA_MESSAGE, payload, user=person, after_commit=after_commit)
-	return row
+	return {**row, "batch": payload["batch"]}
 
 
-def _burn_area_messages(area, notify=True):
-	"""Delete every message of the area's channel for good (the channel itself stays)."""
-	if not area.raven_channel or not frappe.db.exists("Raven Channel", area.raven_channel):
-		return 0
-	names = frappe.get_all("Raven Message", filters={"channel_id": area.raven_channel}, pluck="name")
-	for name in names:
-		_delete_permanently("Raven Message", name)
-	if notify and names:
-		_publish(EVENT_AREA_BURNED, {"area": area.name})
-	return len(names)
-
-
-@frappe.whitelist(methods=["POST"])
-def burn_area_chat(area):
-	"""Burn the history of the area I stand in, for everyone. Cannot be undone."""
-	_require_user()
-	doc = _require_inside(area)
-	if doc.chat_mode == "Confidential":
-		return 0
-	count = _burn_area_messages(doc)
-	if not count:
-		_publish(EVENT_AREA_BURNED, {"area": doc.name})
-	return count
+def _start_ending(batch):
+	batch.status = "Ending"
+	batch.grace_until = add_to_date(now_datetime(), minutes=BATCH_GRACE_MINUTES)
+	batch.save(ignore_permissions=True)
+	_notify_batch(batch)
 
 
 @frappe.whitelist(methods=["POST"])
 def leave_area(area):
-	"""I walked out of an area: a "Not saved" chat burns when nobody is left in it."""
+	"""I walked out of an area: when nobody is left, its batch's grace time starts."""
 	_require_user()
 	if not area or not frappe.db.exists(AREA_DOCTYPE, area):
 		return False
 	doc = _area(area)
-	if doc.chat_mode != "Not saved" or _people_in(doc, exclude=frappe.session.user):
+	if _people_in(doc, exclude=frappe.session.user):
 		return False
-	return bool(_burn_area_messages(doc))
+	name = _running_batch_name(doc.name)
+	if not name:
+		return False
+	batch = frappe.get_doc(BATCH_DOCTYPE, name)
+	if batch.status != "Open":
+		return False
+	_start_ending(batch)
+	return True
 
 
-def _burn_empty_unsaved_areas():
-	"""Scheduler: "Not saved" chats of areas nobody stands in (tabs closed without leaving)."""
-	for name in frappe.get_all(AREA_DOCTYPE, filters={"chat_mode": "Not saved", "raven_channel": ("is", "set")}, pluck="name"):
-		doc = _area(name)
-		if not _people_in(doc):
-			_burn_area_messages(doc)
+def _burn_batch(batch):
+	"""Delete the batch, its messages and its channel for good."""
+	if batch.raven_channel and frappe.db.exists("Raven Channel", batch.raven_channel):
+		for message in frappe.get_all("Raven Message", filters={"channel_id": batch.raven_channel}, pluck="name"):
+			_delete_permanently("Raven Message", message)
+		_delete_permanently("Raven Channel", batch.raven_channel)
+	_notify_batch(batch)
+	_delete_permanently(BATCH_DOCTYPE, batch.name)
+
+
+def _decide_vote(batch):
+	"""The majority of the votes cast decides; a tie (or no votes) keeps the batch."""
+	votes = [p.vote for p in batch.participants]
+	if votes.count("Burn") > votes.count("Keep"):
+		_burn_batch(batch)
+		return "burned"
+	batch.saved = 1
+	batch.vote_until = None
+	for p in batch.participants:
+		p.vote = ""
+	batch.save(ignore_permissions=True)
+	_notify_batch(batch)
+	return "kept"
+
+
+@frappe.whitelist(methods=["POST"])
+def vote_batch(batch, vote):
+	"""Save (Keep) or Burn a batch I took part in. The first vote opens a vote for all participants;
+	it is decided when everyone voted, or after BATCH_VOTE_HOURS by the votes cast."""
+	_require_user()
+	if vote not in ("Keep", "Burn"):
+		frappe.throw(_("Vote Keep or Burn."))
+	if not batch or not frappe.db.exists(BATCH_DOCTYPE, batch):
+		frappe.throw(_("This chat no longer exists."))
+	doc = frappe.get_doc(BATCH_DOCTYPE, batch, for_update=True)
+	user = frappe.session.user
+	mine = next((p for p in doc.participants if p.user == user), None)
+	if not mine:
+		frappe.throw(_("Only the people who were in this meeting can decide about its chat."), frappe.PermissionError)
+	if not doc.vote_until:
+		doc.vote_until = add_to_date(now_datetime(), hours=BATCH_VOTE_HOURS)
+	mine.vote = vote
+	if vote == "Keep":
+		# Anyone can save: a saved batch survives the grace time of a Not saved area.
+		doc.saved = 1
+	if all(p.vote for p in doc.participants):
+		return {"result": _decide_vote(doc)}
+	doc.save(ignore_permissions=True)
+	_notify_batch(doc)
+	return {"result": "voting", "batch": _batch_row(doc, user, messages=False)}
+
+
+@frappe.whitelist()
+def get_batch_notices():
+	"""Batches waiting for me, wherever I am on the map: grace time running, or my vote missing."""
+	_require_user()
+	user = frappe.session.user
+	names = frappe.get_all(
+		"Ophice Chat Batch Participant",
+		filters={"user": user, "parenttype": BATCH_DOCTYPE},
+		pluck="parent",
+	)
+	notices = []
+	for name in set(names):
+		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+		row = _batch_row(batch, user, messages=False)
+		if batch.status == "Ending" or (batch.vote_until and not row["my_vote"]):
+			row["area_title"] = frappe.db.get_value(AREA_DOCTYPE, batch.area, "title")
+			row["mode"] = frappe.db.get_value(AREA_DOCTYPE, batch.area, "chat_mode") or "Saved"
+			notices.append(row)
+	return sorted(notices, key=lambda r: r["started_at"])
+
+
+def _settle_batches():
+	"""Scheduler: start the grace time of meetings nobody is in any more (tabs closed), end grace
+	times and decide votes that are due."""
+	now = now_datetime()
+	for name in frappe.get_all(BATCH_DOCTYPE, filters={"status": "Open"}, pluck="name"):
+		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+		if not frappe.db.exists(AREA_DOCTYPE, batch.area):
+			_burn_batch(batch)
+		elif not _people_in(_area(batch.area)):
+			_start_ending(batch)
+	for name in frappe.get_all(BATCH_DOCTYPE, filters={"status": "Ending", "grace_until": ("<=", now)}, pluck="name"):
+		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+		area = _area(batch.area) if frappe.db.exists(AREA_DOCTYPE, batch.area) else None
+		if area and _people_in(area):
+			continue  # somebody is back; their page continues the batch
+		if area and (area.chat_mode == "Saved" or batch.saved):
+			batch.status = "Kept"
+			batch.grace_until = None
+			batch.save(ignore_permissions=True)
+			_notify_batch(batch)
+		else:
+			_burn_batch(batch)
+	for name in frappe.get_all(BATCH_DOCTYPE, filters={"vote_until": ("<=", now)}, pluck="name"):
+		if frappe.db.exists(BATCH_DOCTYPE, name):
+			_decide_vote(frappe.get_doc(BATCH_DOCTYPE, name))
 
 
 # --- People list (#2063): all Raven users, online first, with what they are doing.

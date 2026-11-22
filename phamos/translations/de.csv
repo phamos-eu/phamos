@@ -2822,3 +2822,27 @@ The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
 Open the Implementation,Implementation öffnen
 Working on,Arbeitet an
 "{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
+Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
+Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
+{0} msg.,{0} Nachr.
+Vote to burn {0},{0} zur Abstimmung stellen
+Vote to burn,Zur Abstimmung stellen
+Each meeting's chat is kept. The people who were there can vote to burn it.,"Der Chat jeder Besprechung bleibt erhalten. Wer dabei war, kann über das Verbrennen abstimmen."
+"Each meeting's chat is deleted 10 minutes after the room empties, unless someone saves it.","Der Chat jeder Besprechung wird 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn."
+"Vote: {0} keep, {1} burn. You voted {2}. Decided {3} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Sie haben für {2} gestimmt. Entschieden spätestens {3}; bei Gleichstand bleibt er erhalten."
+keep,Behalten
+burn,Verbrennen
+"Vote: {0} keep, {1} burn. Keep or burn this chat? Decided {2} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Diesen Chat behalten oder verbrennen? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. This chat will be kept {0}.,Der Raum ist leer. Dieser Chat wird {0} behalten.
+The room is empty. This chat is deleted {0} unless someone saves it.,"Der Raum ist leer. Dieser Chat wird {0} gelöscht, außer jemand speichert ihn."
+This meeting's chat is saved.,Der Chat dieser Besprechung ist gespeichert.
+This meeting's chat is temporary until someone saves it.,"Der Chat dieser Besprechung ist vorläufig, bis jemand ihn speichert."
+Keep,Behalten
+Your vote could not be saved.,Ihre Stimme konnte nicht gespeichert werden.
+"{0} keep, {1} burn. Your vote? Decided {2} at the latest; a tie keeps it.","{0} behalten, {1} verbrennen. Ihre Stimme? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. The chat will be kept.,Der Raum ist leer. Der Chat bleibt erhalten.
+The room is empty. Deleted {0} unless someone saves it.,"Der Raum ist leer. Wird {0} gelöscht, außer jemand speichert ihn."
+Vote Keep or Burn.,Stimmen Sie für Behalten oder Verbrennen.
+This chat no longer exists.,Diesen Chat gibt es nicht mehr.
+Only the people who were in this meeting can decide about its chat.,"Nur wer bei dieser Besprechung dabei war, kann über ihren Chat entscheiden."
