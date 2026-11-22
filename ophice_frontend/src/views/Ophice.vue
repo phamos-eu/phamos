@@ -210,10 +210,10 @@
 			>
 				{{ __("Drag on the grid to mark a meeting area, click an area to edit it") }}
 			</p>
-			<!-- Shortcut bar (#2073): the cockpits, bottom centre; they open inside Ophice. -->
+			<!-- Shortcut bar (#2073): the cockpits, top right down the right side; they open inside Ophice. -->
 			<CockpitBar
 				v-if="me && !meetingArea"
-				class="absolute bottom-3 left-1/2 z-30 -translate-x-1/2"
+				class="absolute right-3 top-3 z-30"
 				:cockpits="cockpits"
 				:open-route="openRoute"
 				@open="(cockpit) => emit('open-cockpit', cockpit)"
