@@ -17,6 +17,14 @@
 				<FeatherIcon name="x" class="h-4 w-4" />
 			</button>
 		</div>
+		<!-- Find people (PM, 2026-11-22): go to them, or call them to a meeting point. -->
+		<div v-if="onMap" class="flex items-center gap-1.5 px-1.5 pb-2" data-testid="chat-with-actions">
+			<GoToButton @go="(mode) => $emit('go', mode)" />
+			<Button size="sm" variant="subtle" :title="__('Set a meeting point for the two of you')" class="whitespace-nowrap" data-testid="meeting-point" @click="$emit('pin')">
+				<template #prefix><FeatherIcon name="map-pin" class="h-3.5 w-3.5" /></template>
+				{{ __("Meeting point") }}
+			</Button>
+		</div>
 		<div v-if="person.working_on" class="px-1.5 pb-2">
 			<p class="pb-1 text-xs font-medium text-ink-gray-5">{{ __("Working on") }}</p>
 			<WorkingOnCard :card="person.working_on" />
@@ -57,7 +65,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, FeatherIcon } from "frappe-ui"
+import { Button, call, FeatherIcon } from "frappe-ui"
+import GoToButton from "./GoToButton.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import WorkingOnCard from "./WorkingOnCard.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -68,8 +77,10 @@ const props = defineProps({
 	person: { type: Object, required: true },
 	/** where it was asked for: { x, y } in px of the window */
 	at: { type: Object, required: true },
+	/** Their chip is on the map: Go to and Meeting point. */
+	onMap: { type: Boolean, default: false },
 })
-const emit = defineEmits(["close"])
+const emit = defineEmits(["close", "go", "pin"])
 
 const API = "phamos.api.ophice"
 const root = ref(null)
