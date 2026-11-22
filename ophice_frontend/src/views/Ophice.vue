@@ -476,44 +476,47 @@
 				<template v-if="!meetingArea">
 					<template v-for="notice in batchNoticeList" :key="`batch-${notice.name}`">
 						<!--
-							Space chat notices (#2066, #2091): above their space, a thin line runs down while
-							they stay (8 s; hovering holds it), then they fade away. Once per change.
+							Space chat notices (#2066, #2091): only when there is something to decide (messages
+							that will be deleted unless saved, or my Keep/Burn vote), as a small icon at the
+							space's top right. A click opens the notice above the space (PM, 2026-11-22).
 						-->
-						<Transition name="notice-fade">
-							<div
-								v-if="noticeOpen[notice.name]"
-								class="ophice-notice absolute"
-								data-no-pan
-								:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
-								data-testid="notice-at-area"
-								@pointerdown="raise(`batch:${notice.name}`)"
+						<button
+							type="button"
+							class="ophice-notice-icon absolute flex items-center justify-center rounded-full text-ink-white shadow-lg"
+							:class="[notice.vote_until && !notice.my_vote ? 'bg-amber-600' : 'bg-surface-red-5', { 'ophice-notice-icon--new': !seenIcons.has(noticeKey(notice)) }]"
+							:style="iconAtArea(notice)"
+							:title="notice.vote_until && !notice.my_vote ? __('Vote on the chat of {0}', [notice.area_title]) : __('The chat of {0} will be deleted unless someone saves it', [notice.area_title])"
+							data-no-pan
+							data-testid="notice-icon"
+							@click.stop="toggleNotice(notice)"
+						>
+							<FeatherIcon :name="notice.vote_until && !notice.my_vote ? 'users' : 'message-square'" class="h-3 w-3" />
+						</button>
+						<div
+							v-if="noticeOpen[notice.name]"
+							class="ophice-notice absolute"
+							data-no-pan
+							:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
+							data-testid="notice-at-area"
+							@pointerdown="raise(`batch:${notice.name}`)"
+						>
+							<BatchNotice
+								:notice="notice"
+								:now="clock"
+								:busy="batchBusy[notice.name] || ''"
+								@vote="(choice) => voteBatch(notice, choice)"
+								@dismiss="dismissedBatches.add(notice.name)"
+							/>
+							<button
+								type="button"
+								class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-outline-gray-2 bg-surface-white text-ink-gray-6 shadow hover:text-ink-gray-9"
+								:title="__('Close')"
+								data-testid="notice-close"
+								@click.stop="shrinkNotice(notice.name)"
 							>
-								<BatchNotice
-									:notice="notice"
-									:now="clock"
-									:busy="batchBusy[notice.name] || ''"
-									@vote="(choice) => voteBatch(notice, choice)"
-									@dismiss="dismissedBatches.add(notice.name)"
-								/>
-								<button
-									type="button"
-									class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-outline-gray-2 bg-surface-white text-ink-gray-6 shadow hover:text-ink-gray-9"
-									:title="__('Close')"
-									data-testid="notice-close"
-									@click.stop="shrinkNotice(notice.name)"
-								>
-									<FeatherIcon name="x" class="h-3 w-3" />
-								</button>
-								<div class="ophice-notice__cooldown" aria-hidden="true">
-									<div
-										class="ophice-notice__cooldown-bar"
-										:style="{ animationDuration: `${NOTICE_OPEN_MS}ms` }"
-										data-testid="notice-cooldown"
-										@animationend="shrinkNotice(notice.name)"
-									/>
-								</div>
-							</div>
-						</Transition>
+								<FeatherIcon name="x" class="h-3 w-3" />
+							</button>
+						</div>
 					</template>
 					<div
 						v-if="noticeList.length"
@@ -1051,13 +1054,31 @@ function zOf(key) {
 	return index < 0 ? 20 : 21 + index
 }
 
-// Chat notices: open for a moment when they come, then they fade (#2091). The cool-down line's
-// animation decides when; hovering pauses it.
-const NOTICE_OPEN_MS = 8000
+// Chat notices (#2091): a small icon at the space; a click opens the notice above it.
 const noticeOpen = reactive({})
 function openNotice(name) {
 	noticeOpen[name] = true
 	raise(`batch:${name}`)
+}
+function toggleNotice(notice) {
+	seenIcons.add(noticeKey(notice))
+	if (noticeOpen[notice.name]) shrinkNotice(notice.name)
+	else openNotice(notice.name)
+}
+// An icon pulses until it was opened once per change (grace started, vote opened).
+const seenIcons = reactive(new Set())
+const noticeKey = (notice) => `${notice.name}:${notice.status}:${notice.vote_until || ""}`
+function iconAtArea(notice) {
+	const area = areas.value.find((a) => a.name === notice.area)
+	if (!area) return { right: "8px", top: "8px", width: "22px", height: "22px", zIndex: 15 }
+	const t = tile.value
+	return {
+		left: `${(area.x + area.width) * t - 11}px`,
+		top: `${area.y * t - 11}px`,
+		width: "22px",
+		height: "22px",
+		zIndex: 15,
+	}
 }
 function shrinkNotice(name) {
 	noticeOpen[name] = false
@@ -2125,19 +2146,6 @@ const dismissedBatches = reactive(new Set())
 const batchNoticeList = computed(() =>
 	batchNotices.value.filter((n) => n.area !== meetingArea.value?.name && !dismissedBatches.has(n.name))
 )
-// Chat notices pop up when they come (or change: a vote started), then shrink (see openNotice).
-const seenNotices = new Set()
-watch(
-	() => batchNoticeList.value.map((n) => `${n.name}:${n.status}:${n.vote_until || ""}`),
-	(keys) => {
-		// New, or changed (a vote started): pop up once more.
-		for (const key of keys) {
-			if (seenNotices.has(key)) continue
-			seenNotices.add(key)
-			openNotice(key.split(":")[0])
-		}
-	}
-)
 
 async function loadBatchNotices() {
 	try {
@@ -2626,50 +2634,22 @@ onBeforeUnmount(() => {
 		transition-duration: 1ms;
 	}
 }
-/* Space chat notices (#2091): a cool-down line at the bottom, then a fade. */
-.ophice-notice__cooldown {
-	position: absolute;
-	left: 12px;
-	right: 12px;
-	bottom: 4px;
-	height: 3px;
-	overflow: hidden;
-	border-radius: 999px;
-	background: var(--surface-gray-3);
+/* Space chat notices (#2091): a small icon at the space; it pulses until opened once. */
+.ophice-notice-icon {
+	box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, 0.35);
 }
-.ophice-notice__cooldown-bar {
-	height: 100%;
-	border-radius: 999px;
-	background: var(--ink-gray-6, #6b7280);
-	transform-origin: left center;
-	animation-name: ophice-cooldown;
-	animation-timing-function: linear;
-	animation-fill-mode: forwards;
+.ophice-notice-icon--new {
+	animation: ophice-notice-pulse 1.6s ease-out 3;
 }
-.ophice-notice:hover .ophice-notice__cooldown-bar,
-.ophice-notice:focus-within .ophice-notice__cooldown-bar {
-	animation-play-state: paused;
+@keyframes ophice-notice-pulse {
+	0% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(239, 68, 68, 0.6); }
+	70% { box-shadow: 0 0 0 2px #fff, 0 0 0 12px rgba(239, 68, 68, 0); }
+	100% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(239, 68, 68, 0); }
 }
-@keyframes ophice-cooldown {
-	from {
-		transform: scaleX(1);
+@media (prefers-reduced-motion: reduce) {
+	.ophice-notice-icon--new {
+		animation: none;
 	}
-	to {
-		transform: scaleX(0);
-	}
-}
-.notice-fade-enter-active {
-	transition: opacity 160ms ease-out, transform 160ms ease-out;
-}
-.notice-fade-leave-active {
-	transition: opacity 600ms ease-in;
-}
-.notice-fade-enter-from {
-	opacity: 0;
-	transform: translateY(6px);
-}
-.notice-fade-leave-to {
-	opacity: 0;
 }
 .ophice-zoom__button {
 	display: flex;

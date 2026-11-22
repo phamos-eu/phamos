@@ -723,6 +723,20 @@ class OphiceAreaChatTestCase(_OphiceRoomBase):
 		self.assertEqual(ophice.vote_batch(batch.name, "Burn")["result"], "burned")
 		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
 
+	def test_notices_only_when_there_is_something_to_decide(self):
+		"""#2091: a kept chat, or one without messages, is no notice."""
+		area, batch = self._meeting("Saved")
+		self._empty(area)
+		frappe.set_user(self.B)
+		self.assertEqual(ophice.get_batch_notices(), [])  # kept anyway after the grace time
+		frappe.set_user(self.A)
+		ophice.save_area("Chat test", "https://jitsi.example.org/ChatTest", 0, 0, 3, 3, name=area, chat_mode="Not saved")
+		frappe.set_user(self.B)
+		self.assertEqual([n["name"] for n in ophice.get_batch_notices()], [batch.name])
+		for message in frappe.get_all("Raven Message", filters={"channel_id": batch.raven_channel}, pluck="name"):
+			frappe.delete_doc("Raven Message", message, ignore_permissions=True, force=True)
+		self.assertEqual(ophice.get_batch_notices(), [])  # nothing to save
+
 	def test_vote_window_ends_with_the_votes_cast(self):
 		area, batch = self._meeting("Saved")
 		frappe.set_user(self.A)

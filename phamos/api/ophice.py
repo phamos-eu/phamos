@@ -1765,7 +1765,9 @@ def vote_batch(batch, vote):
 
 @frappe.whitelist()
 def get_batch_notices():
-	"""Batches waiting for me, wherever I am on the map: grace time running, or my vote missing."""
+	"""Meeting chats that need me, wherever I am on the map (#2066, #2091): only when there is
+	something to decide: messages that will be deleted unless someone saves them, or a Keep/Burn
+	vote without my vote. A chat that is kept anyway, or has no messages, is not a notice."""
 	_require_user()
 	user = frappe.session.user
 	names = frappe.get_all(
@@ -1776,10 +1778,17 @@ def get_batch_notices():
 	notices = []
 	for name in set(names):
 		batch = frappe.get_doc(BATCH_DOCTYPE, name)
+		if not batch.raven_channel or not frappe.db.exists(
+			"Raven Message", {"channel_id": batch.raven_channel, "message_type": ("!=", "System")}
+		):
+			continue
 		row = _batch_row(batch, user, messages=False)
-		if batch.status == "Ending" or (batch.vote_until and not row["my_vote"]):
+		mode = frappe.db.get_value(AREA_DOCTYPE, batch.area, "chat_mode") or "Saved"
+		deleted_soon = batch.status == "Ending" and mode != "Saved" and not batch.saved
+		my_vote_missing = bool(batch.vote_until) and not row["my_vote"]
+		if deleted_soon or my_vote_missing:
 			row["area_title"] = frappe.db.get_value(AREA_DOCTYPE, batch.area, "title")
-			row["mode"] = frappe.db.get_value(AREA_DOCTYPE, batch.area, "chat_mode") or "Saved"
+			row["mode"] = mode
 			notices.append(row)
 	return sorted(notices, key=lambda r: r["started_at"])
 
