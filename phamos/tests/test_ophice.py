@@ -973,9 +973,8 @@ class OphiceGuestAreaTestCase(_OphiceRoomBase):
 		self.assertEqual(a["area"], "Lobby")  # A stands at 1,1
 
 
-class OphiceGuestEntryTestCase(_OphiceRoomBase):
-	"""Guest entry (#2082): human check, a session without an account, only inside the guest area,
-	only the chips there; employees see "guest" chips and list rows."""
+class _OphiceGuestBase(_OphiceRoomBase):
+	"""A guest area and a clean guest session store; the helpers to come in as a guest."""
 
 	def setUp(self):
 		super().setUp()
@@ -1004,6 +1003,12 @@ class OphiceGuestEntryTestCase(_OphiceRoomBase):
 		# A person takes a moment; the test does not wait for it.
 		with patch.object(self.g, "CHECK_MIN_SECONDS", 0):
 			return self.g.enter(name, check["challenge"], check["door"], json.dumps(path))
+
+
+
+class OphiceGuestEntryTestCase(_OphiceGuestBase):
+	"""Guest entry (#2082): human check, a session without an account, only inside the guest area,
+	only the chips there; employees see "guest" chips and list rows."""
 
 	def test_the_human_check(self):
 		check, path = self._check()  # too fast
@@ -1048,7 +1053,7 @@ class OphiceGuestEntryTestCase(_OphiceRoomBase):
 			self._enter()
 
 
-class OphiceGuestChatTestCase(OphiceGuestEntryTestCase):
+class OphiceGuestChatTestCase(_OphiceGuestBase):
 	"""Guest chat (#2083): guests and employees in the guest area write to each other; only in
 	Redis, with an expiry; employees outside the area cannot read it."""
 
@@ -1083,3 +1088,72 @@ class OphiceGuestChatTestCase(OphiceGuestEntryTestCase):
 		frappe.set_user(self.A)  # A stands at 1,1, outside
 		with self.assertRaises(frappe.PermissionError):
 			self.g.get_guest_chat(space["areas"][0]["name"])
+
+
+class OphiceGuestInviteTestCase(_OphiceGuestBase):
+	"""Invites (#2084): pin in a customer meeting area, accept opens a corridor for this guest only,
+	arrival closes it; decline tells the inviter."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user(self.A)
+		self.room = ophice.save_area("Room 1", "https://jitsi.example.org/Room1", 20, 10, 3, 3, kind="Customer meeting")
+		frappe.set_user("Guest")
+
+	def tearDown(self):
+		frappe.cache.delete_value(self.g.INVITE_CACHE_KEY)
+		super().tearDown()
+
+	def _invite(self, guest_user):
+		frappe.set_user(self.A)
+		invite = self.g.invite_guest(guest_user, self.room)
+		frappe.set_user("Guest")
+		return invite
+
+	def test_accept_walk_the_corridor_and_arrive(self):
+		me = self._enter("Ada Guest")["me"]
+		invite = self._invite(me["user"])
+		self.assertEqual(invite["status"], "pending")
+		self.assertTrue(20 <= invite["pin"]["x"] + 0.5 <= 23)
+		# Not accepted yet: the room is still closed.
+		self.assertEqual(self.g.guest_move(16, 11)["x"], 13.5)
+		accepted = self.g.answer_invite(1)
+		self.assertEqual(accepted["status"], "accepted")
+		told = [c for c in self.sent.call_args_list if c.args and c.args[0] == self.g.EVENT_INVITE_ANSWER]
+		self.assertEqual(told[-1].kwargs.get("user"), self.A)
+		# Half way along the line: allowed. Far off the line: pulled back next to it.
+		start, end = accepted["corridor"]["from"], accepted["corridor"]["to"]
+		mid = ((start[0] + end[0]) / 2 - 0.5, (start[1] + end[1]) / 2 - 0.5)
+		moved = self.g.guest_move(*mid)
+		self.assertAlmostEqual(moved["x"], round(mid[0], 2), places=1)
+		off = self.g.guest_move(mid[0], mid[1] + 5)
+		self.assertLess(off["y"], mid[1] + 1)
+		# At the pin: arrived, the corridor closes, the room stays open.
+		self.g.guest_move(invite["pin"]["x"], invite["pin"]["y"])
+		space = self.g.guest_space()
+		self.assertEqual(space["invite"]["status"], "arrived")
+		self.assertEqual({a["name"] for a in space["areas"]}, {self.room, space["areas"][0]["name"]})
+		self.assertEqual(space["room"]["area"], self.room)
+
+	def test_decline_and_no_one_else_uses_the_corridor(self):
+		first = self._enter("Ada Guest")["me"]
+		self._invite(first["user"])
+		self.g.answer_invite(1)
+		first_token = frappe.local.ophice_guest_token
+		# A second guest: still only the guest area.
+		frappe.local.ophice_guest_token = None
+		second = self._enter("Bob Guest")["me"]
+		self.assertLessEqual(self.g.guest_move(16, 11)["x"], 13.5)
+		# The second guest declines an invite of their own: gone, the inviter is told.
+		self._invite(second["user"])
+		self.assertIsNone(self.g.answer_invite(0))
+		self.assertIsNone(self.g.guest_space()["invite"])
+		frappe.local.ophice_guest_token = first_token
+		self.assertEqual(self.g.guest_space()["invite"]["status"], "accepted")
+
+	def test_only_customer_meeting_areas(self):
+		me = self._enter()["me"]
+		guest_area = self.g.guest_area().name
+		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			self.g.invite_guest(me["user"], guest_area)

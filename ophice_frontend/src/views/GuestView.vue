@@ -87,84 +87,130 @@
 			</div>
 		</main>
 
-		<!-- Inside: the map, sharp only where I may be; the meeting and chat of my area beside it. -->
-		<main v-else class="flex min-h-0 flex-1">
-		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-			<div class="relative overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white" :style="gridStyle" data-testid="guest-map">
-				<!-- The office, blurred -->
-				<div class="guest-map__layer guest-map__layer--blur" aria-hidden="true" />
-				<!-- My area, sharp -->
-				<div
-					v-for="area in space.areas"
-					:key="area.name"
-					class="guest-map__layer"
-					:style="{ clipPath: clipOf(area) }"
-					aria-hidden="true"
-				/>
-				<div
-					v-for="area in space.areas"
-					:key="`frame-${area.name}`"
-					class="absolute rounded-md border-2 border-white/90 shadow-[0_0_14px_rgba(255,255,255,0.7)]"
-					:style="rectStyle(area)"
-					data-testid="guest-area"
-				>
-					<span class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
-						{{ area.title }}
-					</span>
-				</div>
-				<!-- The people in my area -->
-				<div
-					v-for="other in space.others"
-					:key="other.user"
-					class="guest-chip absolute flex items-center justify-center"
-					:style="chipStyle(other)"
-					:title="other.full_name"
-					data-testid="guest-other"
-				>
-					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
-						<ChipFigure :user="other.user" :label="other.full_name" :image="other.user_image" />
-					</span>
-				</div>
-				<div class="guest-chip absolute flex items-center justify-center" :style="chipStyle(me)" :title="me.full_name" data-testid="guest-me">
-					<span v-if="beaming" class="guest-beam" aria-hidden="true" />
-					<span class="inline-flex" :class="{ 'guest-drop': beaming }" :style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }">
-						<ChipFigure :user="me.user" :label="me.full_name" ring :moving="moving" />
-					</span>
-				</div>
-			</div>
-		</div>
-		<!-- The meeting and the guest chat of the area I stand in (#2083). -->
-		<aside
-			v-if="space.room"
-			class="flex w-[380px] flex-shrink-0 flex-col gap-3 border-l border-outline-gray-2 bg-surface-white p-3"
-			data-testid="guest-room"
-		>
-			<div class="overflow-hidden rounded-xl border border-outline-gray-2 bg-black" style="height: 42%">
-				<VideoCall
-					:key="space.room.area"
-					class="h-full"
-					fill
-					:domain="space.room.jitsi_domain"
-					:room="space.room.jitsi_room"
-					:display-name="me.full_name"
-				/>
-			</div>
+		<!--
+			Inside (PM, 2026-11-22): the chat as a column from top to bottom; beside it the meeting on
+			top and the map below, the same size. The map is sharp only where I may be.
+		-->
+		<main v-else class="flex min-h-0 flex-1 gap-3 p-3">
 			<GuestChat
-				class="min-h-0 flex-1"
+				v-if="space.room"
+				class="w-[360px] flex-shrink-0"
 				:title="space.room.title"
 				:messages="space.room.messages"
 				:me="me.user"
 				:on-send="sendChat"
 				ophice-path="/ophice/guest"
 			/>
-		</aside>
+			<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+				<!-- The meeting of the area I stand in (#2083) -->
+				<div
+					v-if="space.room"
+					class="min-h-0 flex-1 overflow-hidden rounded-xl border border-outline-gray-2 bg-black"
+					data-testid="guest-room"
+				>
+					<VideoCall
+						:key="space.room.area"
+						class="h-full"
+						fill
+						:domain="space.room.jitsi_domain"
+						:room="space.room.jitsi_room"
+						:display-name="me.full_name"
+					/>
+				</div>
+				<div
+					ref="stage"
+					class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-outline-gray-2 bg-surface-white"
+				>
+					<div class="relative overflow-hidden rounded-lg" :style="gridStyle" data-testid="guest-map">
+						<!-- The office, blurred -->
+						<div class="guest-map__layer guest-map__layer--blur" aria-hidden="true" />
+						<!-- Where I may be, sharp -->
+						<div
+							v-for="area in space.areas"
+							:key="area.name"
+							class="guest-map__layer"
+							:style="{ clipPath: clipOf(area) }"
+							aria-hidden="true"
+						/>
+						<div
+							v-for="area in space.areas"
+							:key="`frame-${area.name}`"
+							class="absolute rounded-md border-2 border-white/90 shadow-[0_0_14px_rgba(255,255,255,0.7)]"
+							:style="rectStyle(area)"
+							data-testid="guest-area"
+						>
+							<span class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
+								{{ area.title }}
+							</span>
+						</div>
+						<!-- The way to the pin (#2084): a dotted line from me, and the pin. -->
+						<svg v-if="walkTo" class="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+							<line
+								:x1="(me.x + 0.5) * tile"
+								:y1="(me.y + 0.5) * tile"
+								:x2="(walkTo.x + 0.5) * tile"
+								:y2="(walkTo.y + 0.5) * tile"
+								class="guest-path"
+								stroke-dasharray="2 8"
+								stroke-linecap="round"
+							/>
+						</svg>
+						<div v-if="walkTo" class="guest-pin absolute" :style="pinStyle" data-testid="guest-pin">
+							<FeatherIcon name="map-pin" class="h-full w-full" />
+						</div>
+						<!-- The people where I may be -->
+						<div
+							v-for="other in space.others"
+							:key="other.user"
+							class="guest-chip absolute flex items-center justify-center"
+							:style="chipStyle(other)"
+							:title="other.full_name"
+							data-testid="guest-other"
+						>
+							<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
+								<ChipFigure :user="other.user" :label="other.full_name" :image="other.user_image" />
+							</span>
+						</div>
+						<div class="guest-chip absolute flex items-center justify-center" :style="chipStyle(me)" :title="me.full_name" data-testid="guest-me">
+							<span v-if="beaming" class="guest-beam" aria-hidden="true" />
+							<span class="inline-flex" :class="{ 'guest-drop': beaming }" :style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }">
+								<ChipFigure :user="me.user" :label="me.full_name" ring :moving="moving" />
+							</span>
+						</div>
+					</div>
+					<!-- An invite to a customer meeting (#2084) -->
+					<div
+						v-if="space.invite?.status === 'pending'"
+						class="absolute left-1/2 top-3 z-10 w-80 -translate-x-1/2 space-y-2 rounded-xl border border-outline-gray-2 bg-surface-white p-3 text-sm shadow-2xl"
+						role="alertdialog"
+						data-testid="guest-invite"
+					>
+						<p class="font-medium">{{ __("{0} invites you to {1}", [space.invite.by_name, space.invite.area_title]) }}</p>
+						<p class="text-xs text-ink-gray-6">{{ __("A dotted line will show you the way; your chip walks there by itself. Use the arrow keys to walk yourself.") }}</p>
+						<div class="flex justify-end gap-2">
+							<Button variant="ghost" :loading="answering === 0" data-testid="guest-invite-decline" @click="answer(0)">
+								{{ __("Decline") }}
+							</Button>
+							<Button variant="solid" :loading="answering === 1" data-testid="guest-invite-accept" @click="answer(1)">
+								{{ __("Accept") }}
+							</Button>
+						</div>
+					</div>
+					<p
+						v-else-if="walkTo"
+						class="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+					>
+						{{ autoWalk ? __("On the way to {0} · arrow keys to walk yourself", [space.invite.area_title]) : __("Follow the dotted line to {0}", [space.invite.area_title]) }}
+					</p>
+				</div>
+			</div>
 		</main>
 	</div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
-import { call, FeatherIcon, FormControl } from "frappe-ui"
+import { Button, call, FeatherIcon, FormControl, toast } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import ChipFigure from "../components/ChipFigure.vue"
 import GuestChat from "../components/GuestChat.vue"
@@ -323,14 +369,60 @@ function chipStyle(chip) {
 
 /** The nearest spot whose chip centre lies inside one of my areas (the server does the same). */
 function clamp(x, y) {
-	let best = null
-	for (const area of space.value?.areas || []) {
-		const cx = Math.min(Math.max(x + 0.5, area.x), area.x + area.width)
-		const cy = Math.min(Math.max(y + 0.5, area.y), area.y + area.height)
-		const distance = (cx - x - 0.5) ** 2 + (cy - y - 0.5) ** 2
-		if (!best || distance < best.distance) best = { distance, x: cx - 0.5, y: cy - 0.5 }
+	const px = x + 0.5
+	const py = y + 0.5
+	const candidates = (space.value?.areas || []).map((area) => [
+		Math.min(Math.max(px, area.x), area.x + area.width),
+		Math.min(Math.max(py, area.y), area.y + area.height),
+	])
+	// The way to the pin (#2084), while it is open: a band along the line.
+	const corridor = space.value?.invite?.status === "accepted" ? space.value.invite.corridor : null
+	if (corridor) candidates.push(ontoBand(corridor, px, py))
+	if (!candidates.length) return { x, y }
+	let best = candidates[0]
+	for (const c of candidates) {
+		if ((c[0] - px) ** 2 + (c[1] - py) ** 2 < (best[0] - px) ** 2 + (best[1] - py) ** 2) best = c
 	}
-	return best ? { x: best.x, y: best.y } : { x, y }
+	return { x: best[0] - 0.5, y: best[1] - 0.5 }
+}
+
+/** The nearest point within the corridor's radius of its line (as the server does it). */
+function ontoBand(corridor, px, py) {
+	const [ax, ay] = corridor.from
+	const [bx, by] = corridor.to
+	const dx = bx - ax
+	const dy = by - ay
+	const length = dx * dx + dy * dy
+	const t = length ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / length)) : 0
+	const qx = ax + t * dx
+	const qy = ay + t * dy
+	const distance = Math.hypot(px - qx, py - qy)
+	const radius = corridor.radius || 0.75
+	if (distance <= radius) return [px, py]
+	return [qx + ((px - qx) * radius) / distance, qy + ((py - qy) * radius) / distance]
+}
+
+// --- Invites (#2084): accept, then the chip walks to the pin by itself until a key is pressed.
+
+const answering = ref(null)
+const autoWalk = ref(false)
+const walkTo = computed(() => (space.value?.invite?.status === "accepted" ? space.value.invite.pin : null))
+const pinStyle = computed(() => {
+	const t = tile.value
+	return { left: `${(walkTo.value.x + 0.1) * t}px`, top: `${(walkTo.value.y - 0.55) * t}px`, width: `${t * 0.8}px`, height: `${t * 0.8}px` }
+})
+
+async function answer(accept) {
+	answering.value = accept
+	try {
+		const invite = await call(`${API}.answer_invite`, { accept })
+		space.value = { ...space.value, invite }
+		autoWalk.value = Boolean(accept)
+	} catch (e) {
+		toast({ title: errorText(e), icon: "alert-circle" })
+	} finally {
+		answering.value = null
+	}
 }
 
 // Keys
@@ -369,10 +461,29 @@ function tickFrame(now) {
 		dx += DIRECTIONS[key][0]
 		dy += DIRECTIONS[key][1]
 	}
-	const length = Math.hypot(dx, dy)
+	let length = Math.hypot(dx, dy)
+	// Any key takes over from the walk to the pin (#2084).
+	if (length) autoWalk.value = false
+	else if (autoWalk.value && walkTo.value) {
+		dx = walkTo.value.x - me.x
+		dy = walkTo.value.y - me.y
+		length = Math.hypot(dx, dy)
+		if (length < 0.1) {
+			autoWalk.value = false
+			length = 0
+		} else if (length < SPEED * dt) {
+			dx /= SPEED * dt
+			dy /= SPEED * dt
+			length = Math.hypot(dx, dy)
+		}
+	}
+	const wasMoving = moving.value
 	moving.value = length > 0
+	// Stopped: the last step goes out too, so the server knows where I really stand.
+	if (wasMoving && !length) call(`${API}.guest_move`, { x: me.x, y: me.y }).catch(() => {})
 	if (length && dt) {
-		const next = clamp(me.x + (dx / length) * SPEED * dt, me.y + (dy / length) * SPEED * dt)
+		const step = Math.min(1, length) / length
+		const next = clamp(me.x + dx * step * SPEED * dt, me.y + dy * step * SPEED * dt)
 		me.x = next.x
 		me.y = next.y
 		if (now - lastSent > MOVE_EVERY_MS) {
@@ -485,6 +596,23 @@ onBeforeUnmount(() => {
 .guest-map__layer--blur {
 	filter: blur(10px) saturate(0.7) brightness(0.9);
 	transform: scale(1.03);
+}
+.guest-path {
+	stroke: #fff;
+	stroke-width: 3;
+	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+	animation: guest-path 900ms linear infinite;
+}
+@keyframes guest-path {
+	to { stroke-dashoffset: -10; }
+}
+.guest-pin {
+	color: rgb(217, 119, 6);
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+	animation: guest-pin 1200ms ease-in-out infinite;
+}
+@keyframes guest-pin {
+	50% { transform: translateY(-15%); }
 }
 .guest-chip {
 	top: 0;

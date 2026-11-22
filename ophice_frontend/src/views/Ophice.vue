@@ -398,6 +398,13 @@
 			@open="(cockpit) => emit('open-cockpit', cockpit)"
 		/>
 		</div>
+		<GuestInviteMenu
+			v-if="guestInvite"
+			:key="guestInvite.guest.user"
+			:guest="guestInvite.guest"
+			:at="guestInvite.at"
+			@close="guestInvite = null"
+		/>
 		<ChatWithMenu v-if="chatWith" :key="chatWith.person.user" :person="chatWith.person" :at="chatWith.at" @close="chatWith = null" />
 	</div>
 </template>
@@ -411,6 +418,7 @@ import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
 import CockpitBar from "../components/CockpitBar.vue"
 import GuestChat from "../components/GuestChat.vue"
+import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1237,6 +1245,8 @@ const PEOPLE_REFRESH_MS = 15000
 const people = ref([])
 const hideDetails = ref(false)
 const chatWith = ref(null)
+// Inviting a guest to a customer meeting (#2084): { guest, at }.
+const guestInvite = ref(null)
 const showPeople = ref(readFlag(PEOPLE_KEY, true))
 let peopleTimer = null
 let peopleSoon = null
@@ -1290,9 +1300,9 @@ async function setHideDetails(hide) {
 
 function openChatWith(person, event) {
 	if (!person?.user || person.user === me.value?.user) return
-	// A guest (#2082): no Raven; inviting them to a customer meeting comes with #2084.
+	// A guest (#2082): no Raven; they can be invited to a customer meeting (#2084).
 	if (person.guest) {
-		toast({ title: __("{0} is a guest. Meet them in the guest area.", [person.full_name]), icon: "user-plus" })
+		guestInvite.value = { guest: person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
 		return
 	}
 	// A chip on the map: the list knows more (what they work on).
@@ -1544,6 +1554,16 @@ async function voteBatch(notice, choice) {
 }
 
 const NOTICE_EVENTS = [
+	[
+		"ophice_guest_invite_answer",
+		(m) =>
+			toast({
+				title: m?.accepted
+					? __("{0} accepted and is on the way to {1}.", [m.guest, m.area_title])
+					: __("{0} declined the invite to {1}.", [m.guest, m.area_title]),
+				icon: m?.accepted ? "check" : "x",
+			}),
+	],
 	["ophice_guest_chat", (payload) => onGuestChat(payload)],
 	["ophice_area_batches", onAreaBatches],
 	["ophice_burn_notice", upsertNotice],

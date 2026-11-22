@@ -2946,3 +2946,22 @@ The chat could not be copied.,Der Chat konnte nicht kopiert werden.
 "Not so fast, please.",Bitte nicht so schnell.
 Step into the area to chat.,"Gehen Sie in den Bereich, um zu chatten."
 This space has no guest chat.,Dieser Bereich hat keinen Gast-Chat.
+Invite {0},{0} einladen
+Invited to {0} by {1}. Waiting for the answer.,Von {1} nach {0} eingeladen. Wartet auf Antwort.
+On the way to {0} (invited by {1}).,Unterwegs nach {0} (eingeladen von {1}).
+In {0} (invited by {1}).,In {0} (eingeladen von {1}).
+Take the invite back,Einladung zurücknehmen
+Invite to a customer meeting:,Zu einer Kundenbesprechung einladen:
+No customer meeting areas yet. Map editors can draw one.,Noch keine Kundenbesprechungsbereiche. Kartenbearbeiter können einen anlegen.
+{0} is invited to {1}.,{0} ist nach {1} eingeladen.
+{0} accepted and is on the way to {1}.,{0} hat angenommen und ist unterwegs nach {1}.
+{0} declined the invite to {1}.,{0} hat die Einladung nach {1} abgelehnt.
+{0} invites you to {1},{0} lädt Sie nach {1} ein
+A dotted line will show you the way; your chip walks there by itself. Use the arrow keys to walk yourself.,Eine gepunktete Linie zeigt Ihnen den Weg; Ihr Chip geht von selbst dorthin. Mit den Pfeiltasten gehen Sie selbst.
+Decline,Ablehnen
+Accept,Annehmen
+On the way to {0} · arrow keys to walk yourself,"Unterwegs nach {0} · Pfeiltasten, um selbst zu gehen"
+Follow the dotted line to {0},Folgen Sie der gepunkteten Linie nach {0}
+This guest has left.,Dieser Gast ist gegangen.
+Guests can only be invited to a customer meeting area.,Gäste können nur in einen Kundenbesprechungsbereich eingeladen werden.
+This invite is no longer open.,Diese Einladung ist nicht mehr offen.

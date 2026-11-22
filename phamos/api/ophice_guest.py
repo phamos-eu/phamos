@@ -115,9 +115,24 @@ def guest_area():
 
 
 def allowed_areas(guest_id):
-	"""The areas this guest may stand in: the guest area (invites add more, #2084)."""
+	"""The areas this guest may stand in: the guest area, plus the customer meeting area of an
+	accepted invite (#2084)."""
 	area = guest_area()
-	return [area] if area else []
+	areas = [area] if area else []
+	invite = _invite(guest_id)
+	if invite and invite["status"] in ("accepted", "arrived"):
+		meeting = next((a for a in ophice._areas() if a.name == invite["area"]), None)
+		if meeting:
+			areas.append(meeting)
+	return areas
+
+
+def _corridor(guest_id):
+	"""The way to the pin while walking there (#2084): a band along the straight line, this guest only."""
+	invite = _invite(guest_id)
+	if invite and invite["status"] == "accepted" and invite.get("corridor"):
+		return invite["corridor"]
+	return None
 
 
 def _inside(area, x, y):
@@ -125,16 +140,34 @@ def _inside(area, x, y):
 	return area.x <= cx <= area.x + area.width and area.y <= cy <= area.y + area.height
 
 
-def clamp_to(areas, x, y):
-	"""The nearest position whose chip centre lies inside one of the areas."""
-	best = None
+def clamp_to(areas, x, y, corridor=None):
+	"""The nearest position whose chip centre lies inside one of the areas (or the corridor)."""
+	x, y = float(x), float(y)
+	px, py = x + 0.5, y + 0.5
+	candidates = []
 	for area in areas:
-		cx = min(max(float(x) + 0.5, area.x), area.x + area.width)
-		cy = min(max(float(y) + 0.5, area.y), area.y + area.height)
-		distance = (cx - x - 0.5) ** 2 + (cy - y - 0.5) ** 2
-		if best is None or distance < best[0]:
-			best = (distance, round(cx - 0.5, 2), round(cy - 0.5, 2))
-	return (best[1], best[2]) if best else (float(x), float(y))
+		candidates.append((min(max(px, area.x), area.x + area.width), min(max(py, area.y), area.y + area.height)))
+	if corridor:
+		candidates.append(_onto_band(corridor, px, py))
+	if not candidates:
+		return x, y
+	cx, cy = min(candidates, key=lambda c: (c[0] - px) ** 2 + (c[1] - py) ** 2)
+	return round(cx - 0.5, 2), round(cy - 0.5, 2)
+
+
+def _onto_band(corridor, px, py):
+	"""The nearest point within `radius` of the segment from -> to (chip centres)."""
+	ax, ay = corridor["from"]
+	bx, by = corridor["to"]
+	dx, dy = bx - ax, by - ay
+	length = dx * dx + dy * dy
+	t = 0.0 if not length else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length))
+	qx, qy = ax + t * dx, ay + t * dy
+	distance = ((px - qx) ** 2 + (py - qy) ** 2) ** 0.5
+	radius = corridor.get("radius", CORRIDOR_RADIUS)
+	if distance <= radius:
+		return px, py
+	return qx + (px - qx) * radius / distance, qy + (py - qy) * radius / distance
 
 
 def _rect(area):
@@ -257,7 +290,7 @@ def guest_space():
 	areas = allowed_areas(guest_id)
 	me = frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
 	if isinstance(me, dict):
-		x, y = clamp_to(areas, me["x"], me["y"])
+		x, y = clamp_to(areas, me["x"], me["y"], _corridor(guest_id))
 	else:
 		spot = ophice._free_spot(areas[0], GUEST_PREFIX + guest_id) if areas else ophice._spawn()
 		x, y = spot["x"], spot["y"]
@@ -280,6 +313,8 @@ def guest_space():
 		"expires_in": max(0, round(entry["expires"] - time.time())),
 		# The meeting and chat where I stand (#2083); the page asks every second.
 		"room": _chat_for_guest(guest_id, chip, areas),
+		# An invite to a customer meeting (#2084): its pin and the way there.
+		"invite": _invite_for_guest(guest_id),
 	}
 
 
@@ -289,8 +324,9 @@ def guest_move(x, y):
 	guest_id, entry = _require_guest()
 	if _throttled(guest_id):
 		return None
-	x, y = clamp_to(allowed_areas(guest_id), frappe.utils.flt(x), frappe.utils.flt(y))
+	x, y = clamp_to(allowed_areas(guest_id), frappe.utils.flt(x), frappe.utils.flt(y), _corridor(guest_id))
 	_put(guest_id, entry, x, y, publish_event=ophice.EVENT_MOVE)
+	_check_arrival(guest_id, x, y)
 	return {"x": x, "y": y}
 
 
@@ -301,6 +337,7 @@ def guest_leave():
 	if not guest_id:
 		return False
 	frappe.cache.hdel(GUEST_CACHE_KEY, guest_id)
+	frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
 	frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
 	ophice._publish(ophice.EVENT_LEAVE, {"user": GUEST_PREFIX + guest_id})
 	_set_cookie("", 1)
@@ -443,3 +480,111 @@ def send_guest_chat(area, text):
 	"""Employees: write into the guest chat of the area I stand in."""
 	doc = _employee_area(area)
 	return _add_message(doc, frappe.session.user, frappe.utils.get_fullname(frappe.session.user), text, guest=False)
+
+
+# --- Invites to a customer meeting (#2084). An employee invites a guest; a pin is set in the
+# customer meeting area. When the guest accepts, a corridor along the straight line from where
+# they stand to the pin opens for them only; their chip walks there by itself (they can take over).
+# On arrival the corridor closes; the guest stays free to move in the guest area and that room.
+# Kept in Redis next to the guest session; it ends with the visit.
+
+INVITE_CACHE_KEY = "phamos_ophice_guest_invites"
+CORRIDOR_RADIUS = 0.75
+EVENT_INVITE_ANSWER = "ophice_guest_invite_answer"
+
+
+def _invite(guest_id):
+	invite = frappe.cache.hget(INVITE_CACHE_KEY, guest_id)
+	return invite if isinstance(invite, dict) else None
+
+
+def _guest_of(guest):
+	"""The guest id of a chip "guest:<id>" with a live session, or a clear error."""
+	guest_id = (guest or "").removeprefix(GUEST_PREFIX)
+	entry = frappe.cache.hget(GUEST_CACHE_KEY, guest_id) if guest_id else None
+	if not isinstance(entry, dict) or entry.get("expires", 0) < time.time():
+		frappe.throw(_("This guest has left."))
+	return guest_id, entry
+
+
+def _invite_for_guest(guest_id):
+	invite = _invite(guest_id)
+	if not invite:
+		return None
+	return {k: invite.get(k) for k in ("status", "by_name", "area", "area_title", "pin", "corridor")}
+
+
+@frappe.whitelist()
+def get_customer_rooms(guest):
+	"""Employees: where I can invite this guest, and the invite that is open for them."""
+	ophice._require_user()
+	guest_id, entry = _guest_of(guest)
+	rooms = [{"name": a.name, "title": a.title} for a in ophice._areas() if a.kind == "Customer meeting"]
+	return {"guest": entry["name"], "rooms": rooms, "invite": _invite_for_guest(guest_id)}
+
+
+@frappe.whitelist(methods=["POST"])
+def invite_guest(guest, area):
+	"""Employees: invite a guest to a customer meeting area. A pin is set there; the guest decides."""
+	ophice._require_user()
+	guest_id, entry = _guest_of(guest)
+	room = ophice._area(area)
+	if room.kind != "Customer meeting":
+		frappe.throw(_("Guests can only be invited to a customer meeting area."))
+	pin = ophice._free_spot(room, GUEST_PREFIX + guest_id)
+	invite = {
+		"status": "pending",
+		"area": room.name,
+		"area_title": room.title,
+		"pin": {"x": pin["x"], "y": pin["y"]},
+		"by": frappe.session.user,
+		"by_name": frappe.utils.get_fullname(frappe.session.user),
+		"created": time.time(),
+	}
+	frappe.cache.hset(INVITE_CACHE_KEY, guest_id, invite)
+	return _invite_for_guest(guest_id)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_invite(guest):
+	"""Employees: take an invite back. A guest on the way is pulled back to where they may be."""
+	ophice._require_user()
+	guest_id, _entry = _guest_of(guest)
+	frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
+	return True
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def answer_invite(accept):
+	"""A guest accepts or declines. Accept opens the corridor from where they stand to the pin."""
+	guest_id, entry = _require_guest()
+	invite = _invite(guest_id)
+	if not invite or invite["status"] != "pending":
+		frappe.throw(_("This invite is no longer open."))
+	accepted = frappe.utils.cint(accept) == 1
+	if accepted:
+		me = frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id) or {}
+		start = (float(me.get("x", invite["pin"]["x"])) + 0.5, float(me.get("y", invite["pin"]["y"])) + 0.5)
+		end = (invite["pin"]["x"] + 0.5, invite["pin"]["y"] + 0.5)
+		invite.update({"status": "accepted", "corridor": {"from": start, "to": end, "radius": CORRIDOR_RADIUS}})
+		frappe.cache.hset(INVITE_CACHE_KEY, guest_id, invite)
+	else:
+		frappe.cache.hdel(INVITE_CACHE_KEY, guest_id)
+	frappe.publish_realtime(
+		EVENT_INVITE_ANSWER,
+		{"guest": entry["name"], "accepted": accepted, "area_title": invite["area_title"]},
+		user=invite["by"],
+	)
+	return _invite_for_guest(guest_id) if accepted else None
+
+
+def _check_arrival(guest_id, x, y):
+	"""Arrived in the customer meeting area: the corridor closes."""
+	invite = _invite(guest_id)
+	if not invite or invite["status"] != "accepted":
+		return
+	room = next((a for a in ophice._areas() if a.name == invite["area"]), None)
+	if room and _inside(room, x, y):
+		invite["status"] = "arrived"
+		invite.pop("corridor", None)
+		frappe.cache.hset(INVITE_CACHE_KEY, guest_id, invite)
