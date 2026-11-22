@@ -27,6 +27,29 @@
 		>
 			<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
+			<!-- Meeting tiles (#2091): into the big tile; back to the standard arrangement. -->
+			<button
+				v-if="snapped && !big"
+				type="button"
+				class="flex-shrink-0 rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+				:title="__('Make it the big tile')"
+				data-testid="meeting-enlarge"
+				@pointerdown.stop
+				@click="$emit('enlarge')"
+			>
+				<FeatherIcon name="maximize-2" class="h-4 w-4" />
+			</button>
+			<button
+				v-if="snapped"
+				type="button"
+				class="flex-shrink-0 rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+				:title="__('Standard arrangement of video, chat and map')"
+				data-testid="meeting-reset-layout"
+				@pointerdown.stop
+				@click="$emit('reset-layout')"
+			>
+				<FeatherIcon name="layout" class="h-4 w-4" />
+			</button>
 			<!-- Float (#2075): call and chat in a small window on top of everything, which can be pulled
 			     out of the browser. Where the browser has it, this comes first (PM, 2026-11-22). -->
 			<button
@@ -200,7 +223,7 @@
 			@joined="giveKeysBack"
 			@stolen="giveKeysBack"
 		/>
-		<template v-if="!fullscreen && !maximized && !pip && !dock">
+		<template v-if="!fullscreen && !maximized && !pip && !dock && !snapped">
 			<span
 				v-for="corner in CORNERS"
 				:key="corner"
@@ -224,6 +247,10 @@ import PipTip from "./PipTip.vue"
 import { canFloat } from "../utils/pip.js"
 
 const props = defineProps({
+	/** In the meeting's tiles (#2091): the title bar drags it onto another tile, no free resizing. */
+	snapped: { type: Boolean, default: false },
+	/** In the big tile (no "make big" button then). */
+	big: { type: Boolean, default: true },
 	/** { title, jitsi_domain, jitsi_room } */
 	area: { type: Object, required: true },
 	displayName: { type: String, default: "" },
@@ -246,7 +273,7 @@ const props = defineProps({
 	/** Laid over its spot in the mini map (#2075): { left, top, width, height } px; it follows it. */
 	dock: { type: Object, default: null },
 })
-const emit = defineEmits(["leave", "update:rect", "popout", "bring-back", "float"])
+const emit = defineEmits(["leave", "update:rect", "popout", "bring-back", "float", "drop", "enlarge", "reset-layout"])
 const PIP = { width: "100%", height: "58vh", borderRadius: "0" }
 const dockStyle = computed(() =>
 	props.dock.hidden
@@ -296,8 +323,11 @@ const FILL = { left: "0px", top: "0px", width: "100%", height: "100%" }
 
 const px = computed(() => {
 	const { width, height } = props.bounds
-	const w = Math.max(MIN_W, Math.min(width, props.rect.w * width))
-	const h = Math.max(MIN_H, Math.min(height, props.rect.h * height))
+	// In a tile (#2091) the tile decides the size, also below the free window's minimum.
+	const minW = props.snapped ? 160 : MIN_W
+	const minH = props.snapped ? 120 : MIN_H
+	const w = Math.max(minW, Math.min(width, props.rect.w * width))
+	const h = Math.max(minH, Math.min(height, props.rect.h * height))
 	return {
 		x: Math.max(0, Math.min(width - w, props.rect.x * width)),
 		y: Math.max(0, Math.min(height - h, props.rect.y * height)),
@@ -310,6 +340,9 @@ const box = computed(() => ({
 	top: `${px.value.y}px`,
 	width: `${px.value.w}px`,
 	height: `${px.value.h}px`,
+	...(dragShift.value
+		? { transform: `translate(${dragShift.value.dx}px, ${dragShift.value.dy}px)`, opacity: 0.85, zIndex: 60 }
+		: {}),
 }))
 
 // --- Move (title bar) and resize (corners): pointer drags, the frame's iframe ignores the
@@ -331,10 +364,18 @@ function start(kind, event) {
 	window.addEventListener("pointercancel", stop)
 }
 
+// Snapped (#2091): the window follows the pointer while dragged, then snaps into the tile it was
+// dropped on (the page swaps the tiles).
+const dragShift = ref(null)
+
 function onMove(event) {
 	if (!drag) return
 	const dx = event.clientX - drag.startX
 	const dy = event.clientY - drag.startY
+	if (props.snapped && drag.kind === "move") {
+		dragShift.value = { dx, dy }
+		return
+	}
 	const { width, height } = props.bounds
 	let { x, y, w, h } = drag.from
 	if (drag.kind === "move") {
@@ -355,7 +396,11 @@ function onMove(event) {
 	emit("update:rect", { x: x / width, y: y / height, w: w / width, h: h / height })
 }
 
-function stop() {
+function stop(event) {
+	if (props.snapped && drag?.kind === "move" && dragShift.value && event?.clientX !== undefined) {
+		emit("drop", { x: event.clientX, y: event.clientY })
+	}
+	dragShift.value = null
 	drag = null
 	busy.value = false
 	window.removeEventListener("pointermove", onMove)

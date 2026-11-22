@@ -199,7 +199,9 @@
 				:area="meetingArea"
 				:display-name="me?.full_name"
 				:bounds="cockpitOpen ? viewport : view"
-				:rect="cockpitOpen ? floatRect : meetingRect || defaultMeetingRect()"
+				:rect="cockpitOpen ? floatRect : videoTileShares"
+				:snapped="!cockpitOpen"
+				:big="slotOf('video') === 'big'"
 				:floating="cockpitOpen"
 				:pip="Boolean(pipBody)"
 				:dock="cockpitOpen ? dockRects?.video : null"
@@ -212,8 +214,28 @@
 				@popout="popOut"
 				@bring-back="bringBack"
 				@float="floatMeeting"
+				@drop="(at) => dropPiece('video', at.x, at.y)"
+				@enlarge="enlarge('video')"
+				@reset-layout="resetMeetingLayout"
 			/>
 			</Teleport>
+			<!-- Meeting tiles (#2091): drag the dividers to size the tiles. -->
+			<template v-if="meetingArea && me && !cockpitOpen">
+				<div
+					class="ophice-divider ophice-divider--v absolute z-30"
+					:style="{ left: `${meetingSlots.big.x - TILE_GAP / 2 - 4}px`, top: `${STAGE_PAD}px`, height: `${meetingSlots.big.h}px` }"
+					:title="__('Drag to change the size')"
+					data-testid="tile-divider-left"
+					@pointerdown="startSplit('left', $event)"
+				/>
+				<div
+					class="ophice-divider ophice-divider--h absolute z-30"
+					:style="{ left: `${STAGE_PAD}px`, top: `${meetingSlots.bottom.y - TILE_GAP / 2 - 4}px`, width: `${meetingSlots.top.w}px` }"
+					:title="__('Drag to change the size')"
+					data-testid="tile-divider-split"
+					@pointerdown="startSplit('split', $event)"
+				/>
+			</template>
 			<StatusMenu
 				v-if="statusOpen && me"
 				:class="statusAt ? 'fixed z-50' : 'absolute right-6 top-6 z-40'"
@@ -251,6 +273,29 @@
 				}"
 				data-testid="meeting-column"
 			>
+				<!-- Meeting tiles (#2091): the chat's grip and "make big". -->
+				<div v-if="!cockpitOpen && !pipBody" class="-mb-1 flex items-center gap-1" data-testid="chat-tile-bar">
+					<button
+						type="button"
+						class="ophice-tile-grip"
+						:title="__('Drag onto another tile')"
+						data-testid="chat-tile-grip"
+						@pointerdown="startTileDrag('chat', $event)"
+					>
+						<FeatherIcon name="move" class="h-3.5 w-3.5" />
+					</button>
+					<span class="flex-1" />
+					<button
+						v-if="slotOf('chat') !== 'big'"
+						type="button"
+						class="ophice-tile-grip"
+						:title="__('Make it the big tile')"
+						data-testid="chat-enlarge"
+						@click="enlarge('chat')"
+					>
+						<FeatherIcon name="maximize-2" class="h-3.5 w-3.5" />
+					</button>
+				</div>
 				<!-- In the mini map the map shows who is there; the chat gets the room. -->
 				<MeetingHuddle
 					v-if="!(cockpitOpen && dockRects?.chat)"
@@ -332,7 +377,7 @@
 				@pointermove="camera().onPointerMove"
 				@pointerup="camera().onPointerUp"
 				@pointercancel="camera().onPointerUp"
-				@click.capture="camera().onClickCapture"
+				@click.capture="onViewportClickCapture"
 				@wheel="onViewportWheel"
 			>
 			<div
@@ -558,6 +603,19 @@
 					@change="(place) => setLayout({ fit: false, ...place })"
 				/>
 			</div>
+			<!-- Meeting tiles (#2091): the map's grip, to drop it onto another tile. -->
+			<button
+				v-if="meetingArea && !cockpitOpen"
+				type="button"
+				class="ophice-tile-grip absolute left-1.5 top-1.5 z-30"
+				:title="__('Drag onto another tile')"
+				data-no-pan
+				data-testid="map-tile-grip"
+				@pointerdown="startTileDrag('map', $event)"
+				@click.stop
+			>
+				<FeatherIcon name="move" class="h-3.5 w-3.5" />
+			</button>
 			<!-- Zoom (#2089): per person, remembered in this browser. -->
 			<div
 				class="ophice-zoom absolute z-30 flex items-center gap-0.5 rounded-lg border border-outline-gray-2 bg-surface-white/95 p-0.5 text-xs shadow"
@@ -803,11 +861,7 @@ const canvasStyle = computed(() => ({
 	height: `${camera().size.value.height}px`,
 	transform: camera().transform.value,
 }))
-const viewportStyle = computed(() =>
-	meetingArea.value
-		? { left: `${STAGE_PAD}px`, bottom: `${STAGE_PAD}px`, width: `${miniView.value.width}px`, height: `${miniView.value.height}px` }
-		: {}
-)
+const viewportStyle = computed(() => (meetingArea.value ? { ...rectStyle(tileRect("map")), ...tileShift("map") } : {}))
 
 // Adjust panel (#2089): the image's place and width in tiles, nudged in half tiles.
 const IMAGE_FIELDS = [
@@ -877,6 +931,15 @@ function onViewportDown(event) {
 	camera().onPointerDown(event)
 }
 
+/** A click (not a drag) on the small map in a meeting makes it the big tile (#2091). */
+function onViewportClickCapture(event) {
+	camera().onClickCapture(event)
+	if (event.defaultPrevented || !meetingArea.value || props.cockpitOpen) return
+	if (slotOf("map") === "big" || event.target.closest?.("[data-no-pan]")) return
+	event.stopPropagation()
+	enlarge("map")
+}
+
 /** Scroll pans, Ctrl/⌘ + scroll zooms; not inside a scrolling panel (a chat) over the map. */
 function onViewportWheel(event) {
 	if (event.target.closest?.("[data-no-pan]") && !(event.ctrlKey || event.metaKey)) return
@@ -893,9 +956,141 @@ const backgroundLayout = ref({ ...FITTED })
 // The map's camera (#2089): the big map fills the stage, in a meeting the mini map sits at the
 // bottom left; each has its own zoom, remembered in this browser.
 const gridSize = () => ({ cols: me.value?.cols || 40, rows: me.value?.rows || 25 })
+// --- Meeting tiles (#2091): video, chat and map snap into three tiles, one big on the right and
+// two on the left, as the cockpits' record pages snap their panels. A click on the small map (or
+// "make big") swaps it into the big tile; a drag by the title bar or grip drops a piece onto
+// another tile; the dividers set the sizes. Per person, remembered in this browser.
+const MEETING_LAYOUT_KEY = "phamos_ophice_meeting_layout"
+const MEETING_PIECES = ["video", "chat", "map"]
+const MEETING_SLOTS = ["big", "top", "bottom"]
+const DEFAULT_MEETING_LAYOUT = { big: "video", top: "chat", bottom: "map", left: 0.3, split: 0.62 }
+const TILE_GAP = 12
+function readMeetingLayout() {
+	try {
+		const stored = JSON.parse(localStorage.getItem(MEETING_LAYOUT_KEY) || "null")
+		const pieces = stored && MEETING_SLOTS.map((slot) => stored[slot])
+		if (pieces && [...pieces].sort().join() === [...MEETING_PIECES].sort().join()) {
+			return {
+				...DEFAULT_MEETING_LAYOUT,
+				...stored,
+				left: Math.min(0.6, Math.max(0.15, Number(stored.left) || DEFAULT_MEETING_LAYOUT.left)),
+				split: Math.min(0.85, Math.max(0.15, Number(stored.split) || DEFAULT_MEETING_LAYOUT.split)),
+			}
+		}
+	} catch {
+		// broken or private window: the standard arrangement
+	}
+	return { ...DEFAULT_MEETING_LAYOUT }
+}
+const meetingLayout = ref(readMeetingLayout())
+function setMeetingLayout(change, save = true) {
+	meetingLayout.value = { ...meetingLayout.value, ...change }
+	if (!save) return
+	try {
+		localStorage.setItem(MEETING_LAYOUT_KEY, JSON.stringify(meetingLayout.value))
+	} catch {
+		// private window: lasts until the reload
+	}
+}
+function resetMeetingLayout() {
+	setMeetingLayout({ ...DEFAULT_MEETING_LAYOUT })
+}
+/** The three tiles in the stage, px. */
+const meetingSlots = computed(() => {
+	const width = view.width || 1200
+	const height = view.height || 800
+	const pad = STAGE_PAD
+	const leftW = Math.round(Math.max(240, Math.min(width - 420, width * meetingLayout.value.left)))
+	const innerH = height - pad * 2 - TILE_GAP
+	const topH = Math.round(Math.max(140, Math.min(innerH - 140, innerH * meetingLayout.value.split)))
+	return {
+		big: { x: pad + leftW + TILE_GAP, y: pad, w: width - pad * 2 - leftW - TILE_GAP, h: height - pad * 2 },
+		top: { x: pad, y: pad, w: leftW, h: topH },
+		bottom: { x: pad, y: pad + topH + TILE_GAP, w: leftW, h: innerH - topH },
+	}
+})
+function slotOf(piece) {
+	return MEETING_SLOTS.find((slot) => meetingLayout.value[slot] === piece) || "big"
+}
+function tileRect(piece) {
+	return meetingSlots.value[slotOf(piece)]
+}
+function swapPieces(a, b) {
+	if (!a || !b || a === b) return
+	const slotA = slotOf(a)
+	const slotB = slotOf(b)
+	setMeetingLayout({ [slotA]: b, [slotB]: a })
+	// The map changed size: keep my chip in view.
+	nextTick(() => me.value && miniCam.place(me.value.x, me.value.y))
+}
+function enlarge(piece) {
+	swapPieces(piece, meetingLayout.value.big)
+}
+/** Dropped at a point (client px): it takes that tile, the piece there takes its old one. */
+function dropPiece(piece, clientX, clientY) {
+	const box = stage.value?.getBoundingClientRect()
+	if (!box) return
+	const x = clientX - box.left
+	const y = clientY - box.top
+	const slot = MEETING_SLOTS.find((name) => {
+		const r = meetingSlots.value[name]
+		return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
+	})
+	if (slot) swapPieces(piece, meetingLayout.value[slot])
+}
+// Dragging the chat or the map by its grip (the video has its title bar).
+const tileDrag = reactive({ piece: null, dx: 0, dy: 0 })
+function startTileDrag(piece, event) {
+	if (event.button !== 0) return
+	event.preventDefault()
+	event.stopPropagation()
+	const start = { x: event.clientX, y: event.clientY }
+	const onMove = (e) => {
+		tileDrag.piece = piece
+		tileDrag.dx = e.clientX - start.x
+		tileDrag.dy = e.clientY - start.y
+	}
+	const onUp = (e) => {
+		window.removeEventListener("pointermove", onMove)
+		window.removeEventListener("pointerup", onUp)
+		if (tileDrag.piece) dropPiece(piece, e.clientX, e.clientY)
+		tileDrag.piece = null
+	}
+	window.addEventListener("pointermove", onMove)
+	window.addEventListener("pointerup", onUp)
+}
+function tileShift(piece) {
+	return tileDrag.piece === piece
+		? { transform: `translate(${tileDrag.dx}px, ${tileDrag.dy}px)`, opacity: 0.85, zIndex: 60 }
+		: {}
+}
+// The dividers: between the left tiles and the big one, and between the two left tiles.
+function startSplit(kind, event) {
+	if (event.button !== 0) return
+	event.preventDefault()
+	const box = stage.value.getBoundingClientRect()
+	const onMove = (e) => {
+		if (kind === "left") {
+			setMeetingLayout({ left: Math.min(0.6, Math.max(0.15, (e.clientX - box.left - STAGE_PAD) / box.width)) }, false)
+		} else {
+			const innerH = box.height - STAGE_PAD * 2 - TILE_GAP
+			setMeetingLayout({ split: Math.min(0.85, Math.max(0.15, (e.clientY - box.top - STAGE_PAD) / innerH)) }, false)
+		}
+	}
+	const onUp = () => {
+		window.removeEventListener("pointermove", onMove)
+		window.removeEventListener("pointerup", onUp)
+		setMeetingLayout({})
+	}
+	window.addEventListener("pointermove", onMove)
+	window.addEventListener("pointerup", onUp)
+}
+const rectStyle = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
+
+// The map's tile in a meeting is its camera's view.
 const miniView = computed(() => {
-	const { cols, rows } = gridSize()
-	return { width: miniWidth.value, height: Math.round((miniWidth.value * rows) / cols) }
+	const r = tileRect("map")
+	return { width: Math.max(0, r.w), height: Math.max(0, r.h) }
 })
 const mainCam = useMapCamera({
 	view,
@@ -1811,15 +2006,16 @@ function closeMeetingPip() {
 }
 
 // Left column of the meeting view: the area chat fills it down to the mini map.
-const areaChatStyle = computed(() => {
-	const miniHeight = me.value ? miniView.value.height : 0
-	return {
-		left: `${STAGE_PAD}px`,
-		top: `${STAGE_PAD}px`,
-		width: `${miniView.value.width}px`,
-		bottom: `${miniHeight + STAGE_PAD * 2}px`,
-	}
+// The video's tile as shares of the stage, as the meeting window takes its place.
+const videoTileShares = computed(() => {
+	const r = tileRect("video")
+	const width = view.width || 1
+	const height = view.height || 1
+	return { x: r.x / width, y: r.y / height, w: r.w / width, h: r.h / height }
 })
+
+// The chat (with the people of the meeting) in its tile (#2091).
+const areaChatStyle = computed(() => ({ ...rectStyle(tileRect("chat")), ...tileShift("chat") }))
 
 // --- People list (#2063) and "chat with" (list or map).
 
@@ -2650,6 +2846,57 @@ onBeforeUnmount(() => {
 	.ophice-notice-icon--new {
 		animation: none;
 	}
+}
+/* Meeting tiles (#2091): grips and dividers. */
+.ophice-tile-grip {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 0.375rem;
+	background: rgba(255, 255, 255, 0.9);
+	color: var(--ink-gray-6, #6b7280);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	cursor: grab;
+	touch-action: none;
+}
+.ophice-tile-grip:hover {
+	color: var(--ink-gray-9, #111827);
+}
+.ophice-divider {
+	touch-action: none;
+}
+.ophice-divider::after {
+	content: "";
+	position: absolute;
+	border-radius: 999px;
+	background: var(--outline-gray-3, #d1d5db);
+	opacity: 0;
+	transition: opacity 120ms;
+}
+.ophice-divider:hover::after {
+	opacity: 1;
+}
+.ophice-divider--v {
+	width: 8px;
+	cursor: col-resize;
+}
+.ophice-divider--v::after {
+	left: 3px;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+}
+.ophice-divider--h {
+	height: 8px;
+	cursor: row-resize;
+}
+.ophice-divider--h::after {
+	top: 3px;
+	left: 0;
+	right: 0;
+	height: 2px;
 }
 .ophice-zoom__button {
 	display: flex;
