@@ -73,6 +73,14 @@
 							<span class="truncate">
 								{{ person.full_name }}<span v-if="person.user === me" class="text-ink-gray-5"> ({{ __("you") }})</span>
 							</span>
+							<!-- An external guest (#2082) -->
+							<span
+								v-if="person.guest"
+								class="flex-shrink-0 rounded-full bg-amber-600 px-1.5 text-[10px] font-semibold leading-4 text-white"
+								data-testid="person-guest"
+							>
+								{{ __("Guest") }}
+							</span>
 							<!-- The cockpit they are in right now (#2065). -->
 							<img
 								v-if="person.cockpit?.logo"

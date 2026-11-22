@@ -2912,3 +2912,25 @@ A meeting room for guests: employees invite a guest from the guest area to come 
 Guests,Gäste
 "External guests can be here. The guest chat, kept only for a short while, comes soon.","Hier können externe Gäste sein. Der Gast-Chat, nur kurz gespeichert, kommt bald."
 There is already a guest area: {0}.,Es gibt schon einen Gastbereich: {0}.
+phamos Ophice,phamos Ophice
+Move with WASD or the arrow keys,Mit WASD oder den Pfeiltasten bewegen
+Welcome to the phamos Ophice,Willkommen im phamos Ophice
+Come in and meet us in {0}.,Kommen Sie herein und treffen Sie uns in {0}.
+Nobody can welcome guests at the moment. Please come back later.,Gerade kann niemand Gäste empfangen. Bitte kommen Sie später wieder.
+First and last name,Vor- und Nachname
+Drag your chip to the entrance to come in,"Ziehen Sie Ihren Chip zum Eingang, um hereinzukommen"
+Your chip: drag it to the entrance,Ihr Chip: zum Eingang ziehen
+Tell us your name first.,Bitte zuerst Ihren Namen angeben.
+Coming in…,Sie kommen herein …
+"Privacy: we use your name and where your chip stands only for this visit. Chats are not stored for long. Video runs through Jitsi. Your visit ends when you close this page, after 12 hours at the latest.","Datenschutz: Ihren Namen und den Ort Ihres Chips verwenden wir nur für diesen Besuch. Chats werden nicht lange gespeichert. Video läuft über Jitsi. Ihr Besuch endet, wenn Sie diese Seite schließen, spätestens nach 12 Stunden."
+Something went wrong. Please try again.,Etwas ist schiefgegangen. Bitte versuchen Sie es noch einmal.
+Almost: drop your chip right on the entrance.,Fast: Lassen Sie Ihren Chip genau auf dem Eingang los.
+{0} is a guest. Meet them in the guest area.,{0} ist ein Gast. Treffen Sie den Gast im Gastbereich.
+Guest · {0},Gast · {0}
+Guest,Gast
+Your visit has ended. Please come in again.,Ihr Besuch ist beendet. Bitte kommen Sie erneut herein.
+Please tell us your name.,Bitte nennen Sie uns Ihren Namen.
+That did not work. Please drag your chip to the entrance again.,Das hat nicht geklappt. Bitte ziehen Sie Ihren Chip noch einmal zum Eingang.
+Ophice has no guest area at the moment.,Das Ophice hat gerade keinen Gastbereich.
+Ophice is full right now. Please try again in a few minutes.,Das Ophice ist gerade voll. Bitte versuchen Sie es in ein paar Minuten noch einmal.
+You are logged in: please use Ophice as an employee.,Sie sind angemeldet: Bitte nutzen Sie das Ophice mit Ihrem Konto.

@@ -3,6 +3,7 @@
 
 """Ophice slice 1 (#2054): my own chip's remembered position and the dummy chips."""
 
+import json
 from unittest.mock import patch
 
 import frappe
@@ -477,6 +478,8 @@ class OphiceAreaTestCase(FrappeTestCase):
 
 
 	def test_every_area_gets_its_own_color(self):
+		# Independent of the spaces on the site's map (rolled back in tearDown).
+		frappe.db.delete(ophice.AREA_DOCTYPE)
 		hues = []
 		for i in range(5):
 			name = ophice.save_area(f"Room {i}", f"https://meet.jit.si/ColorRoom{i}", i * 3, 0, 2, 2)
@@ -968,3 +971,78 @@ class OphiceGuestAreaTestCase(_OphiceRoomBase):
 		frappe.set_user(self.B)
 		a = next(p for p in ophice.get_people()["people"] if p["user"] == self.A)
 		self.assertEqual(a["area"], "Lobby")  # A stands at 1,1
+
+
+class OphiceGuestEntryTestCase(_OphiceRoomBase):
+	"""Guest entry (#2082): human check, a session without an account, only inside the guest area,
+	only the chips there; employees see "guest" chips and list rows."""
+
+	def setUp(self):
+		super().setUp()
+		from phamos.api import ophice_guest
+
+		self.g = ophice_guest
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.cache.delete_value(ophice_guest.GUEST_CACHE_KEY)
+		frappe.set_user(self.A)
+		ophice.save_area("Lobby", "https://jitsi.example.org/Lobby", 10, 10, 4, 3, kind="Guest")
+		frappe.set_user("Guest")
+		frappe.local.ophice_guest_token = None
+
+	def tearDown(self):
+		frappe.local.ophice_guest_token = None
+		frappe.cache.delete_value(self.g.GUEST_CACHE_KEY)
+		super().tearDown()
+
+	def _check(self):
+		check = self.g.start_check()
+		path = [[i / 10 * check["door"], i * 120] for i in range(11)]
+		return check, path
+
+	def _enter(self, name="Ada Guest"):
+		check, path = self._check()
+		# A person takes a moment; the test does not wait for it.
+		with patch.object(self.g, "CHECK_MIN_SECONDS", 0):
+			return self.g.enter(name, check["challenge"], check["door"], json.dumps(path))
+
+	def test_the_human_check(self):
+		check, path = self._check()  # too fast
+		with self.assertRaises(frappe.ValidationError):
+			self.g.enter("Ada", check["challenge"], check["door"], json.dumps(path))
+		with patch.object(self.g, "CHECK_MIN_SECONDS", 0):
+			check, path = self._check()
+			with self.assertRaises(frappe.ValidationError):  # not at the entrance
+				self.g.enter("Ada", check["challenge"], abs(check["door"] - 0.5), json.dumps(path))
+			with self.assertRaises(frappe.ValidationError):  # used once already
+				self.g.enter("Ada", check["challenge"], check["door"], json.dumps(path))
+			check, _path = self._check()
+			with self.assertRaises(frappe.ValidationError):  # set, not dragged
+				self.g.enter("Ada", check["challenge"], check["door"], json.dumps([[check["door"], 0]]))
+		with self.assertRaises(frappe.PermissionError):
+			self.g.guest_space()  # no session yet
+
+	def test_inside_the_guest_area_only_and_seeing_only_it(self):
+		space = self._enter()
+		me = space["me"]
+		self.assertTrue(me["guest"] and me["user"].startswith("guest:"))
+		self.assertTrue(10 <= me["x"] + 0.5 <= 14 and 10 <= me["y"] + 0.5 <= 13)
+		moved = self.g.guest_move(0, 0)
+		self.assertEqual((moved["x"], moved["y"]), (9.5, 9.5))  # stopped at the corner
+		# A stands far away, B inside the guest area.
+		self._put(self.B, 11, 11)
+		users = {c["user"] for c in self.g.guest_space()["others"]}
+		self.assertEqual(users, {self.B})
+
+	def test_employees_see_the_guest(self):
+		self._enter("Ada Guest")
+		frappe.set_user(self.A)
+		row = ophice.get_people()["people"][0]
+		self.assertTrue(row["guest"])
+		self.assertEqual((row["full_name"], row["area"]), ("Ada Guest", "Lobby"))
+		chips = [c for c in ophice.get_space()["others"] if c.get("guest")]
+		self.assertEqual(len(chips), 1)
+
+	def test_no_guest_area_no_entry(self):
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		with self.assertRaises(frappe.ValidationError):
+			self._enter()

@@ -29,10 +29,12 @@
 		</svg>
 		<span
 			class="chip-figure__ring relative inline-flex rounded-full"
-			:class="{ 'chip-figure__ring--mine': ring }"
+			:class="{ 'chip-figure__ring--mine': ring, 'chip-figure__ring--guest': guest }"
 			:style="{ '--ring-h': ringHue }"
 		>
 			<UserAvatar :name="user" :label="label" :image="image" size="lg" />
+			<!-- An external guest (#2082) -->
+			<span v-if="guest" class="chip-figure__guest absolute" data-testid="chip-guest">{{ __("Guest") }}</span>
 			<!-- Working in a cockpit (#2073): its icon, small, at the bottom right. -->
 			<img
 				v-if="badge?.logo"
@@ -56,6 +58,7 @@
 <script setup>
 import { computed } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import { __ } from "@spa/utils/i18n.js"
 import { ringHue as hueOf } from "../utils/ophiceColor.js"
 
 const props = defineProps({
@@ -74,6 +77,8 @@ const props = defineProps({
 	flying: { type: Boolean, default: false },
 	/** Away and the page closed: greyed out. */
 	offline: { type: Boolean, default: false },
+	/** An external guest (#2082): a dashed ring and a "Guest" tag. */
+	guest: { type: Boolean, default: false },
 	/** The cockpit the person works in: { logo, title }, or null. */
 	badge: { type: Object, default: null },
 	/** The hue of the meeting area the chip stands in, or null. */
@@ -139,6 +144,26 @@ const ringHue = computed(() => hueOf(props.user))
 .chip-figure__ring--mine {
 	box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(37, 99, 235), 0 0 0 7px rgba(0, 0, 0, 0.55),
 		0 0 12px 7px rgba(59, 130, 246, 0.6);
+}
+/* Guests: a dashed amber ring and a small tag under the chip. */
+.chip-figure__ring--guest {
+	box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(217, 119, 6), 0 0 0 6px rgba(0, 0, 0, 0.5);
+	outline: 2px dashed #fff;
+	outline-offset: 2px;
+}
+.chip-figure__guest {
+	left: 50%;
+	bottom: -14px;
+	transform: translateX(-50%);
+	z-index: 1;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: rgb(217, 119, 6);
+	color: #fff;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 1.5;
+	white-space: nowrap;
 }
 .chip-figure__badge {
 	right: -6px;

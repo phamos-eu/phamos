@@ -9,6 +9,8 @@ const router = createRouter({
 	routes: [
 		{ path: "/", name: "Map", component: Empty },
 		{ path: "/open/:path(.*)*", name: "Cockpit", component: Empty },
+		// Guests (#2082): App.vue shows the guest page instead of the office.
+		{ path: "/guest", name: "Guest", component: Empty },
 		{ path: "/:pathMatch(.*)*", redirect: { name: "Map" } },
 	],
 })

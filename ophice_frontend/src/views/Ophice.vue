@@ -281,7 +281,13 @@
 					class="ophice-chip ophice-chip--remote absolute flex cursor-pointer items-center justify-center"
 					:style="chipStyle(other)"
 					@click="openChatWith(other, $event)"
-					:title="other.offline ? __('{0} (away, page closed)', [other.full_name]) : other.full_name"
+					:title="
+						other.guest
+							? __('Guest · {0}', [other.full_name])
+							: other.offline
+								? __('{0} (away, page closed)', [other.full_name])
+								: other.full_name
+					"
 					data-testid="other-chip"
 				>
 					<span v-if="beams[other.user]" :key="beams[other.user]" class="ophice-beam" aria-hidden="true" />
@@ -297,6 +303,7 @@
 							:image="other.user_image"
 							:moving="Boolean(other.moving)"
 							:offline="Boolean(other.offline)"
+							:guest="Boolean(other.guest)"
 							:area-hue="other.offline ? null : areaAt(other)?.color_hue"
 							:badge="other.offline ? null : cockpitOf[other.user]"
 						/>
@@ -766,7 +773,8 @@ function onKeyup(event) {
 function nearestInRange() {
 	let best = null
 	for (const other of others.value) {
-		if (other.offline) continue
+		// Guests (#2082) talk in the guest area's chat and meeting, not in encounters.
+		if (other.offline || other.guest) continue
 		const distance = distanceTo(other)
 		if (distance < ENCOUNTER_DISTANCE && (!best || distance < best.distance)) best = { other, distance }
 	}
@@ -1247,6 +1255,11 @@ async function setHideDetails(hide) {
 
 function openChatWith(person, event) {
 	if (!person?.user || person.user === me.value?.user) return
+	// A guest (#2082): no Raven; inviting them to a customer meeting comes with #2084.
+	if (person.guest) {
+		toast({ title: __("{0} is a guest. Meet them in the guest area.", [person.full_name]), icon: "user-plus" })
+		return
+	}
 	// A chip on the map: the list knows more (what they work on).
 	const known = people.value.find((p) => p.user === person.user)
 	chatWith.value = { person: known || person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }

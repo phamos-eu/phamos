@@ -13,6 +13,10 @@ no_cache = 1
 
 
 def get_context(context):
+	# The guest entry (#2082): open to everyone, with a small boot of its own.
+	if _is_guest_page():
+		return _guest_context()
+
 	if frappe.session.user == "Guest":
 		frappe.local.flags.redirect_location = "/login?redirect-to=/ophice"
 		raise frappe.Redirect
@@ -27,6 +31,32 @@ def get_context(context):
 	boot = get_boot()
 	context.boot = frappe.as_json(boot)
 	context.theme_color = theme_color(boot)
+	context.site_name = frappe.local.site
+	return context
+
+
+def _is_guest_page():
+	path = (getattr(frappe.local, "request", None) and frappe.request.path) or ""
+	return path.rstrip("/") == "/ophice/guest"
+
+
+def _guest_context():
+	"""What the guest page needs: language and its words, nothing about the office or the user."""
+	from phamos.www.spa_boot import NEUTRAL_THEME_COLOR, spa_translations
+
+	lang = frappe.local.lang or "en"
+	boot = {
+		"guest": True,
+		"lang": lang,
+		"__messages": spa_translations(lang),
+		"site_name": frappe.local.site,
+		"csrf_token": frappe.sessions.get_csrf_token(),
+		"sysdefaults": {"time_format": "HH:mm", "date_format": "dd.mm.yyyy"},
+	}
+	context = frappe._dict()
+	context.csrf_token = boot["csrf_token"]
+	context.boot = frappe.as_json(boot)
+	context.theme_color = NEUTRAL_THEME_COLOR
 	context.site_name = frappe.local.site
 	return context
 

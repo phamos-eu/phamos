@@ -281,6 +281,11 @@ def _start_spot(user):
 	start = _start_space()
 	if not start:
 		return _spawn()
+	return _free_spot(start, user)
+
+
+def _free_spot(start, user):
+	"""A free spot inside an area (not on top of anyone), or its middle when it is full (#2072, #2082)."""
 	taken = [(c["x"], c["y"]) for c in _online(exclude=user)]
 	spots = []
 	y = start.y
@@ -1740,7 +1745,10 @@ def get_people():
 			person["in_chat"] = row.user in chatting
 		people.append(person)
 	people.sort(key=lambda p: (not p["online"], p["user"] != me, (p["full_name"] or "").lower()))
-	return {"people": people, "hide_details": _hides_details(me)}
+	# Guests on the map (#2082): first, so nobody overlooks a visitor.
+	from phamos.api.ophice_guest import online_guests
+
+	return {"people": online_guests() + people, "hide_details": _hides_details(me)}
 
 
 @frappe.whitelist(methods=["POST"])

@@ -3,7 +3,12 @@
 		Ophice (#2070, #2073): the map is always loaded; a cockpit opens over it in a frame and
 		stays loaded when I go back to the map, so I return to where I was.
 	-->
-	<div class="relative h-full min-h-0">
+	<!-- Guests (#2082): their own page, nothing of the employees' Ophice is loaded. -->
+	<div v-if="isGuest" class="h-full min-h-0">
+		<GuestView />
+		<Toasts />
+	</div>
+	<div v-else class="relative h-full min-h-0">
 		<Ophice :cockpit-open="frameVisible" :open-route="openRoute" @open-cockpit="openCockpit" />
 		<CockpitFrame
 			v-if="frameSrc"
@@ -25,7 +30,10 @@ import { useRoute, useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import Ophice from "./views/Ophice.vue"
 import CockpitFrame from "./components/CockpitFrame.vue"
+import GuestView from "./views/GuestView.vue"
 
+// Decided before anything loads: a guest page must never call the employees' API.
+const isGuest = globalThis.location.pathname.replace(/\/$/, "") === "/ophice/guest"
 const route = useRoute()
 const router = useRouter()
 const window = globalThis.window
