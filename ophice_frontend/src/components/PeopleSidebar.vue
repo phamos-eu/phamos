@@ -33,9 +33,6 @@
 			<!-- The shortcut under the icon, as Phriend shows its own under the ball -->
 			<span class="people__keys" data-testid="people-search-keys">{{ findShortcut }}</span>
 		</button>
-		<span class="flex flex-col items-center text-[10px] tabular-nums text-ink-gray-5" :title="__('{0} online', [onlineCount])">
-			<FeatherIcon name="users" class="h-3.5 w-3.5" />{{ onlineCount }}
-		</span>
 		<!-- A click on a chip opens the list too: from there a click starts a chat. -->
 		<div
 			v-for="person in stripPeople"
@@ -77,7 +74,6 @@
 	>
 		<div class="flex items-center gap-2 px-3 pb-2 pt-3">
 			<span class="text-sm font-semibold">{{ __("People") }}</span>
-			<span class="text-xs text-ink-gray-5">{{ __("{0} online", [onlineCount]) }}</span>
 			<button
 				v-if="!meeting"
 				type="button"
@@ -259,7 +255,6 @@ onBeforeUnmount(() => {
 defineExpose({ openSearch, fold })
 
 const query = ref("")
-const onlineCount = computed(() => props.people.filter((p) => p.online).length)
 const shown = computed(() => {
 	const q = query.value.trim().toLowerCase()
 	if (!q) return props.people
