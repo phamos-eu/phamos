@@ -458,8 +458,11 @@ def heartbeat(x, y):
 
 
 @frappe.whitelist(methods=["POST"])
-def move(x, y):
-	"""Tell the others where my chip is now. Only for a chip that is present (heartbeat first)."""
+def move(x, y, lift=0):
+	"""Tell the others where my chip is now. Only for a chip that is present (heartbeat first).
+
+	`lift`: the chip was lifted out of a meeting space (Leave or Esc), the others see it carried.
+	"""
 	_require_user()
 	user = frappe.session.user
 	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
@@ -468,6 +471,8 @@ def move(x, y):
 	entry.update({"x": _clamp(x, _cols()), "y": _clamp(y, _rows()), "ts": time.time()})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, entry)
 	message = {"user": user, "x": entry["x"], "y": entry["y"]}
+	if frappe.utils.cint(lift):
+		message["lift"] = 1
 	_publish(EVENT_MOVE, message)
 	return message
 

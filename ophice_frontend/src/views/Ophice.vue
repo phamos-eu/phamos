@@ -300,6 +300,7 @@
 						'ophice-perimeter--me': chip.mine,
 						'ophice-perimeter--contact': chip.contact,
 						'ophice-chip--remote': !chip.mine,
+						'ophice-chip--lift': lifts[chip.user],
 					}"
 					:style="perimeterStyle(chip)"
 					:data-testid="chip.mine ? 'my-perimeter' : 'other-perimeter'"
@@ -309,6 +310,7 @@
 					v-for="other in others"
 					:key="other.user"
 					class="ophice-chip ophice-chip--remote absolute flex cursor-pointer items-center justify-center"
+					:class="{ 'ophice-chip--lift': lifts[other.user] }"
 					:style="chipStyle(other)"
 					@click="openChatWith(other, $event)"
 					:title="
@@ -321,10 +323,11 @@
 					data-testid="other-chip"
 				>
 					<span v-if="beams[other.user]" :key="beams[other.user]" class="ophice-beam" aria-hidden="true" />
+					<span v-if="lifts[other.user]" :key="`shadow-${lifts[other.user]}`" class="ophice-lift-shadow" aria-hidden="true" />
 					<span
-						:key="`chip-${beams[other.user] || 0}`"
+						:key="`chip-${beams[other.user] || 0}-${lifts[other.user] || 0}`"
 						class="inline-flex"
-						:class="{ 'ophice-beam-drop': beams[other.user] }"
+						:class="{ 'ophice-beam-drop': beams[other.user], 'ophice-lift': lifts[other.user] }"
 						:style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }"
 					>
 						<ChipFigure
@@ -378,16 +381,19 @@
 				</Teleport>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
+					:class="{ 'ophice-chip--lift': lifts[me.user] }"
 					:style="chipStyle(me)"
 					:title="__('{0}: click to set your availability', [me.full_name])"
 					data-testid="my-chip"
 					@click="toggleStatus($event)"
 				>
 					<span v-if="beams[me.user]" :key="beams[me.user]" class="ophice-beam" aria-hidden="true" data-testid="beam" />
+					<span v-if="lifts[me.user]" :key="`shadow-${lifts[me.user]}`" class="ophice-lift-shadow" aria-hidden="true" />
 					<span
-						:key="`chip-${beams[me.user] || 0}`"
+						:key="`chip-${beams[me.user] || 0}-${lifts[me.user] || 0}`"
 						class="inline-flex"
-						:class="{ 'ophice-beam-drop': beams[me.user] }"
+						:class="{ 'ophice-beam-drop': beams[me.user], 'ophice-lift': lifts[me.user] }"
+						:data-testid="lifts[me.user] ? 'my-chip-lifted' : undefined"
 						:style="{ '--chip-scale': chipScale, transform: `scale(${chipScale})` }"
 					>
 						<ChipFigure
@@ -479,7 +485,7 @@
 					:status="chip.status"
 					:now="clock"
 					:style="tagStyle(chip)"
-					:class="{ 'ophice-chip--remote': chip.user !== me.user }"
+					:class="{ 'ophice-chip--remote': chip.user !== me.user, 'ophice-chip--lift': lifts[chip.user] }"
 				/>
 			</div>
 				<!-- Adjust (#2089): the image's outline with move and resize handles, on top of everything. -->
@@ -608,6 +614,7 @@ import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { dropSpotOutside } from "../utils/ophiceDrop.js"
 import {
 	CALL_DEFAULT,
 	callBox,
@@ -1280,6 +1287,78 @@ function playBeam(user) {
 	}, BEAM_MS)
 }
 
+// --- Lifted out of a meeting space (Leave, Esc): picked up, carried over the border, set down
+// just outside. user -> start time while it plays; the others see it from the move's lift flag.
+
+const LIFT_MS = 900
+// The server's move limit counts per 5 seconds (MOVE_WINDOW in phamos/api/ophice.py).
+const LIFT_RETRY_MS = 5000
+const lifts = reactive({})
+let lifting = false
+
+function playLift(user) {
+	const started = Date.now()
+	lifts[user] = started
+	setTimeout(() => {
+		if (lifts[user] === started) delete lifts[user]
+	}, LIFT_MS)
+}
+
+/** Set my chip down just outside the meeting space I left; it stays put when there is no room. */
+function dropOut(area) {
+	if (!me.value || areaAt(me.value)?.name !== area.name) return
+	// Left in the middle of a jump or while hovering: back on the ground first, so other chips
+	// count as obstacles again (blocked() ignores them in the air) and the jump doesn't go on.
+	jump = null
+	jumping.value = false
+	doubleJumped.value = false
+	flying.value = false
+	spaceHeld = false
+	const spot = dropSpotOutside(area, me.value, {
+		cols: me.value.cols,
+		rows: me.value.rows,
+		isFree: (x, y) => !blocked(x, y),
+		otherAreas: areas.value.filter((a) => a.name !== area.name && MEETING_KINDS.includes(a.kind || "Meeting")),
+	})
+	if (!spot) return
+	// Keys held while it is carried do nothing: the chip is in a hand, not walking.
+	held.clear()
+	tapped.clear()
+	lifting = true
+	// The mini map grows back to the full map first; the carry starts once the chip stands at
+	// its old spot on the full map, or it would fly in from where the mini map had it.
+	nextTick(() =>
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => {
+				setTimeout(() => (lifting = false), LIFT_MS)
+				if (!me.value) return
+				playLift(me.value.user)
+				moveTo(spot.x, spot.y)
+				clearTimeout(sendTimer)
+				sendTimer = null
+				lastSent = performance.now()
+				sendLift(spot)
+				scheduleSave()
+				checkEncounters()
+				leaveMeetingIfOutside()
+			})
+		)
+	)
+}
+
+/**
+ * Tell the others about the lift. Walking stays well under the server's move limit, but a lost
+ * request would leave me standing in the meeting for them: one more try after the limit's window.
+ */
+function sendLift(spot, retry = true) {
+	// Walked on meanwhile: the normal moves have told them already, an old spot would pull me back.
+	const stillThere = () => me.value && round(me.value.x) === round(spot.x) && round(me.value.y) === round(spot.y)
+	const again = () => retry && setTimeout(() => stillThere() && sendLift(spot, false), LIFT_RETRY_MS)
+	call(`${API}.move`, { x: round(spot.x), y: round(spot.y), lift: 1 })
+		.then((sent) => sent || again())
+		.catch(again)
+}
+
 function upsertOther(chip) {
 	if (!chip?.user || chip.user === me.value?.user) return
 	if (chip.beam) playBeam(chip.user)
@@ -1299,6 +1378,8 @@ function onRemoteMove(message) {
 	// A move from someone not on my grid yet (missed their join): ask for the full picture.
 	if (!other) return message?.user && message.user !== me.value?.user ? refreshOthers() : null
 	lastSeen.set(other.user, Date.now())
+	// Only a lift that changes the place: a resent lift (its first answer got lost) plays once.
+	if (message.lift && (other.x !== message.x || other.y !== message.y)) playLift(other.user)
 	other.x = message.x
 	other.y = message.y
 	other.moving = true
@@ -1745,6 +1826,8 @@ function leaveMeeting(byChoice) {
 	meetingArea.value = null
 	// A "Not saved" chat burns once nobody is left in the area (#2062).
 	if (left) call(`${API}.leave_area`, { area: left.name }).catch(() => {})
+	// Left by choice while still standing inside: lifted out, so nobody sees me in the meeting.
+	if (byChoice && left) dropOut(left)
 }
 
 // The space's colour around the meeting's people and chat (#2078), as around the meeting window.
@@ -2546,7 +2629,7 @@ let jump = null // { dir: [x, y], left: tiles still to cover, doubled }
 let lastDir = [1, 0]
 
 function startJump() {
-	if (jump || !me.value) return
+	if (jump || lifting || !me.value) return
 	jump = { dir: lastDir, left: JUMP_DISTANCE, doubled: false }
 	jumping.value = true
 	doubleJumped.value = false
@@ -2610,7 +2693,7 @@ function tick(now) {
 		dx += DIRECTIONS[key][0]
 		dy += DIRECTIONS[key][1]
 	}
-	if ((!keys.size && !jump) || !me.value) {
+	if ((!keys.size && !jump) || !me.value || lifting) {
 		frame = null
 		moving.value = false
 		if (sendTimer) sendMove()
@@ -2892,6 +2975,50 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
 	.ophice-beam,
 	.ophice-beam-drop {
+		animation-duration: 1ms;
+	}
+}
+/* Lifted out of a meeting space: the outer box carries the chip over the border (after the
+   lift, before the set-down), the inner one rises, holds and settles with a soft squash; the
+   shadow stays on the ground and shrinks while the chip is up. Compositor-only. */
+.ophice-chip--lift.ophice-chip--lift {
+	transition: transform 520ms cubic-bezier(0.45, 0, 0.35, 1) 200ms;
+}
+.ophice-lift {
+	transform-origin: 50% 100%;
+	animation: ophice-lift 900ms linear both;
+}
+@keyframes ophice-lift {
+	0% { transform: translateY(0) scale(var(--chip-scale)); animation-timing-function: ease-out; }
+	22% { transform: translateY(-45%) scale(calc(var(--chip-scale) * 1.12)); }
+	52% { transform: translateY(-60%) scale(calc(var(--chip-scale) * 1.12)); }
+	80% { transform: translateY(-8%) scale(calc(var(--chip-scale) * 1.04)); animation-timing-function: ease-in; }
+	90% { transform: translateY(0) scale(calc(var(--chip-scale) * 1.06), calc(var(--chip-scale) * 0.9)); animation-timing-function: ease-out; }
+	100% { transform: translateY(0) scale(var(--chip-scale)); }
+}
+.ophice-lift-shadow {
+	position: absolute;
+	bottom: 4%;
+	left: 50%;
+	width: 60%;
+	height: 14%;
+	pointer-events: none;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.28);
+	animation: ophice-lift-shadow 900ms ease-in-out both;
+}
+@keyframes ophice-lift-shadow {
+	0% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+	22%, 80% { opacity: 0.35; transform: translateX(-50%) scale(0.55); }
+	90% { opacity: 0.9; transform: translateX(-50%) scale(1.1); }
+	100% { opacity: 0; transform: translateX(-50%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.ophice-chip--lift.ophice-chip--lift {
+		transition: none;
+	}
+	.ophice-lift,
+	.ophice-lift-shadow {
 		animation-duration: 1ms;
 	}
 }
