@@ -1268,9 +1268,9 @@ def _current_batch(area, create):
 	people = list(dict.fromkeys([frappe.session.user, *_people_in(area)]))
 	known = {p.user for p in batch.participants}
 	new = [user for user in people if user not in known]
-	changed = bool(new) or batch.status == "Ending"
 	for user in new:
 		batch.append("participants", {"user": user})
+	changed = _sync_inside(batch, people) or batch.status == "Ending"
 	if batch.status == "Ending":
 		batch.status = "Open"
 		batch.grace_until = None
@@ -1278,8 +1278,24 @@ def _current_batch(area, create):
 		batch.save(ignore_permissions=True)
 	if new:
 		_ensure_members(frappe.get_doc("Raven Channel", batch.raven_channel), new, admin=frappe.session.user, silent=True)
+	if changed:
 		_notify_batch(batch)
 	return batch
+
+
+def _sync_inside(batch, people):
+	"""Joined and Left events for the timeline: compare who stands in the area with who did.
+	True when something changed (the caller saves)."""
+	inside = set(people)
+	changed = False
+	for row in batch.participants:
+		now_in = row.user in inside
+		if bool(row.inside) == now_in:
+			continue
+		row.inside = 1 if now_in else 0
+		batch.append("events", {"user": row.user, "event": "Joined" if now_in else "Left", "at": now_datetime()})
+		changed = True
+	return changed
 
 
 def _seconds_until(value):
@@ -1308,7 +1324,23 @@ def _batch_row(batch, user, messages=True):
 		"burn_votes": votes.count("Burn"),
 	}
 	if messages:
-		row["messages"] = _messages(batch.raven_channel) if batch.raven_channel else []
+		rows = _messages(batch.raven_channel) if batch.raven_channel else []
+		for message in rows:
+			message["at_in"] = _seconds_until(message["creation"])
+		row["messages"] = rows
+		# Messages and who joined or left, in time order (#2066).
+		events = [
+			{
+				"type": "event",
+				"name": e.name,
+				"user": e.user,
+				"event": e.event,
+				"creation": str(e.at),
+				"at_in": _seconds_until(e.at),
+			}
+			for e in batch.events
+		]
+		row["timeline"] = sorted([{"type": "message", **m} for m in rows] + events, key=lambda r: get_datetime(r["creation"]))
 	return row
 
 
@@ -1377,6 +1409,7 @@ def send_area_message(area, text):
 		).insert(ignore_permissions=True)
 		row = _message_row(message)
 		after_commit = True
+	row["at_in"] = 0
 	payload = {"area": doc.name, "batch": batch.name if batch else None, "message": row}
 	for person in {user, *_people_in(doc)}:
 		frappe.publish_realtime(EVENT_AREA_MESSAGE, payload, user=person, after_commit=after_commit)
@@ -1397,13 +1430,15 @@ def leave_area(area):
 	if not area or not frappe.db.exists(AREA_DOCTYPE, area):
 		return False
 	doc = _area(area)
-	if _people_in(doc, exclude=frappe.session.user):
-		return False
 	name = _running_batch_name(doc.name)
 	if not name:
 		return False
 	batch = frappe.get_doc(BATCH_DOCTYPE, name)
-	if batch.status != "Open":
+	still_inside = _people_in(doc, exclude=frappe.session.user)
+	if _sync_inside(batch, still_inside):
+		batch.save(ignore_permissions=True)
+		_notify_batch(batch)
+	if still_inside or batch.status != "Open":
 		return False
 	_start_ending(batch)
 	return True
@@ -1490,7 +1525,12 @@ def _settle_batches():
 		batch = frappe.get_doc(BATCH_DOCTYPE, name)
 		if not frappe.db.exists(AREA_DOCTYPE, batch.area):
 			_burn_batch(batch)
-		elif not _people_in(_area(batch.area)):
+			continue
+		people = _people_in(_area(batch.area))
+		if _sync_inside(batch, people):
+			batch.save(ignore_permissions=True)
+			_notify_batch(batch)
+		if not people:
 			_start_ending(batch)
 	for name in frappe.get_all(BATCH_DOCTYPE, filters={"status": "Ending", "grace_until": ("<=", now)}, pluck="name"):
 		batch = frappe.get_doc(BATCH_DOCTYPE, name)

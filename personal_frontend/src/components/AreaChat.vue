@@ -131,18 +131,34 @@
 						</template>
 					</div>
 				</div>
-				<div
-					v-for="message in batch.messages"
-					:key="message.name"
-					class="flex flex-col"
-					:class="message.owner === me ? 'items-end' : 'items-start'"
-				>
-					<span v-if="message.owner !== me" class="text-[11px] text-ink-gray-5">{{ nameIn(batch, message.owner) }}</span>
-					<span
-						class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
-						:class="message.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
-					>{{ message.text }}</span>
-				</div>
+				<template v-for="item in batch.timeline || batch.messages" :key="item.name">
+					<!-- Someone joined or left the meeting (#2066). -->
+					<p
+						v-if="item.type === 'event'"
+						class="flex items-center justify-center gap-1 text-[11px] text-ink-gray-5"
+						data-testid="area-chat-event"
+					>
+						<FeatherIcon :name="item.event === 'Joined' ? 'log-in' : 'log-out'" class="h-3 w-3" />
+						{{
+							item.event === "Joined"
+								? item.user === me
+									? __("You joined the room")
+									: __("{0} joined the room", [nameIn(batch, item.user)])
+								: item.user === me
+									? __("You left the room")
+									: __("{0} left the room", [nameIn(batch, item.user)])
+						}}
+						· {{ timeOf(item) }}
+					</p>
+					<div v-else class="flex flex-col" :class="item.owner === me ? 'items-end' : 'items-start'">
+						<span v-if="item.owner !== me" class="text-[11px] text-ink-gray-5">{{ nameIn(batch, item.owner) }}</span>
+						<span
+							class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
+							:class="item.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
+						>{{ item.text }}</span>
+						<span class="mt-0.5 text-[10px] text-ink-gray-4" data-testid="area-chat-time">{{ timeOf(item) }}</span>
+					</div>
+				</template>
 			</template>
 
 			<!-- Confidential: only what came in while this page is open. -->
@@ -157,6 +173,7 @@
 					class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 					:class="message.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
 				>{{ message.text }}</span>
+				<span class="mt-0.5 text-[10px] text-ink-gray-4">{{ timeOf(message) }}</span>
 			</div>
 		</div>
 
@@ -248,6 +265,12 @@ function at(seconds) {
 	return seconds == null ? null : new Date(loadedAt.value + seconds * 1000)
 }
 
+/** "14:02" (or "Mon 14:02") on this browser's clock; a message pushed live is stamped on arrival. */
+function timeOf(item) {
+	const date = item._at ? new Date(item._at) : at(item.at_in ?? 0)
+	return clockTime(date, new Date(now.value))
+}
+
 function when(batch) {
 	const start = at(batch.started_in)
 	return start ? clockTime(start, new Date(now.value)) : ""
@@ -335,6 +358,7 @@ async function load() {
 
 function add(message, batchName) {
 	if (!message?.name) return
+	message = { ...message, _at: Date.now() }
 	if (!batchName) {
 		if (!live.value.some((m) => m.name === message.name)) live.value.push(message)
 		scrollDown()
@@ -343,7 +367,10 @@ function add(message, batchName) {
 	const batch = batches.value.find((b) => b.name === batchName)
 	// A batch this page doesn't know yet (the meeting just started): fetch it whole.
 	if (!batch) return load()
-	if (!batch.messages.some((m) => m.name === message.name)) batch.messages.push(message)
+	if (!batch.messages.some((m) => m.name === message.name)) {
+		batch.messages.push(message)
+		batch.timeline?.push({ type: "message", ...message })
+	}
 	scrollDown()
 }
 

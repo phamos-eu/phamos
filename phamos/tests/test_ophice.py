@@ -702,6 +702,20 @@ class OphiceAreaChatTestCase(_OphiceRoomBase):
 		ophice._settle_batches()
 		self.assertFalse(frappe.db.exists(ophice.BATCH_DOCTYPE, batch.name))
 
+	def test_timeline_shows_who_joined_and_left(self):
+		area, batch = self._meeting("Saved")
+		# B walks out while A stays.
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
+		frappe.set_user(self.B)
+		self.assertFalse(ophice.leave_area(area))
+		frappe.set_user(self.A)
+		timeline = ophice.get_area_chat(area)["batches"][0]["timeline"]
+		self.assertEqual(
+			[(t["type"], t.get("user") or t.get("owner"), t.get("event")) for t in timeline],
+			[("event", self.A, "Joined"), ("event", self.B, "Joined"), ("message", self.A, None), ("event", self.B, "Left")],
+		)
+		self.assertTrue(all("at_in" in t for t in timeline))
+
 	def test_confidential_stores_nothing(self):
 		area = self._area("Confidential")
 		before = frappe.db.count("Raven Message")

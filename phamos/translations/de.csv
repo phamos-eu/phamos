@@ -2847,3 +2847,7 @@ Vote Keep or Burn.,Stimmen Sie für Behalten oder Verbrennen.
 This chat no longer exists.,Diesen Chat gibt es nicht mehr.
 Only the people who were in this meeting can decide about its chat.,"Nur wer bei dieser Besprechung dabei war, kann über ihren Chat entscheiden."
 {0} (you),{0} (Sie)
+{0} joined the room,{0} ist dazugekommen
+{0} left the room,{0} ist gegangen
+You joined the room,Sie sind dazugekommen
+You left the room,Sie sind gegangen
