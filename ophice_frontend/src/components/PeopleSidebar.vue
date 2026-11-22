@@ -30,6 +30,8 @@
 			@click.stop="openSearch()"
 		>
 			<FeatherIcon name="search" class="h-4 w-4" />
+			<!-- The shortcut under the icon, as Phriend shows its own under the ball -->
+			<span class="people__keys" data-testid="people-search-keys">{{ findShortcut }}</span>
 		</button>
 		<span class="flex flex-col items-center text-[10px] tabular-nums text-ink-gray-5" :title="__('{0} online', [onlineCount])">
 			<FeatherIcon name="users" class="h-3.5 w-3.5" />{{ onlineCount }}
@@ -87,7 +89,7 @@
 				<FeatherIcon :name="pinned ? 'chevrons-left' : 'chevrons-right'" class="h-4 w-4" />
 			</button>
 		</div>
-		<div class="px-3 pb-2">
+		<div class="relative px-3 pb-2">
 			<input
 				ref="search"
 				v-model="query"
@@ -97,6 +99,11 @@
 				data-testid="people-search"
 				@keydown.esc.stop.prevent="query ? (query = '') : fold()"
 			/>
+			<kbd
+				v-if="!query"
+				class="people__keys people__keys--field pointer-events-none absolute right-5 top-1/2 -translate-y-[calc(50%+4px)]"
+				data-testid="people-search-field-keys"
+			>{{ findShortcut }}</kbd>
 		</div>
 		<ul class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
 			<li v-for="person in shown" :key="person.user">
@@ -216,7 +223,8 @@ const stripPeople = computed(() => (props.meeting ? outside.value : props.people
 const unfolded = ref(false)
 const root = ref(null)
 const search = ref(null)
-const findShortcut = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘ F" : "Ctrl + F"
+// Written as Phriend writes its own shortcut: "⌘F" on a Mac, "Ctrl+F" elsewhere.
+const findShortcut = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘F" : "Ctrl+F"
 
 function unfold() {
 	if (folded.value) unfolded.value = true
@@ -300,6 +308,28 @@ function lineOf(person) {
 </script>
 
 <style scoped>
+/* The shortcut, as under the Phriend ball: small, muted, a little brighter on hover. */
+.people__keys {
+	margin-top: 1px;
+	padding: 0 4px;
+	border-radius: 5px;
+	font-size: 10px;
+	line-height: 14px;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	color: var(--ink-gray-5);
+	opacity: 0.8;
+	font-family: inherit;
+}
+button:hover > .people__keys {
+	opacity: 1;
+	color: var(--ink-gray-7);
+}
+.people__keys--field {
+	margin-top: 0;
+	background: var(--surface-white);
+	border: 1px solid var(--outline-gray-2);
+}
 .people--over {
 	animation: people-unfold 140ms ease-out;
 }
