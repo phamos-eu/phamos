@@ -33,6 +33,15 @@
 			:style="{ '--ring-h': ringHue }"
 		>
 			<UserAvatar :name="user" :label="label" :image="image" size="lg" />
+			<!-- Working in a cockpit (#2073): its icon, small, at the bottom right. -->
+			<img
+				v-if="badge?.logo"
+				:src="badge.logo"
+				:alt="badge.title || ''"
+				:title="badge.title || ''"
+				class="chip-figure__badge absolute rounded"
+				data-testid="chip-cockpit"
+			/>
 			<!-- Standing in a meeting area (#2067): a frame and glow in the area's colour. -->
 			<span
 				v-if="areaHue !== null && areaHue !== undefined && areaHue !== ''"
@@ -65,6 +74,8 @@ const props = defineProps({
 	flying: { type: Boolean, default: false },
 	/** Away and the page closed: greyed out. */
 	offline: { type: Boolean, default: false },
+	/** The cockpit the person works in: { logo, title }, or null. */
+	badge: { type: Object, default: null },
 	/** The hue of the meeting area the chip stands in, or null. */
 	areaHue: { type: [Number, String], default: null },
 })
@@ -128,6 +139,14 @@ const ringHue = computed(() => hueOf(props.user))
 .chip-figure__ring--mine {
 	box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(37, 99, 235), 0 0 0 7px rgba(0, 0, 0, 0.55),
 		0 0 12px 7px rgba(59, 130, 246, 0.6);
+}
+.chip-figure__badge {
+	right: -6px;
+	bottom: -6px;
+	width: 45%;
+	height: 45%;
+	z-index: 1;
+	box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 /* In a meeting area: an outer frame in the area's colour with a soft glow, outside the ring. */
 .chip-figure__area {

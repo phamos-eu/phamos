@@ -879,6 +879,8 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 	def setUp(self):
 		super().setUp()
 		frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
+		# Independent of the spaces on the site's map; the rollback in tearDown brings them back.
+		frappe.db.delete(ophice.AREA_DOCTYPE)
 		frappe.set_user(self.A)
 		self.start = ophice.save_area("Entrance", "", 20, 10, 3, 2, kind="Start")
 
@@ -925,3 +927,14 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 			frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
 			me = ophice.get_space()["me"]
 			self.assertGreaterEqual(ophice.math.hypot(me["x"] - 20, me["y"] - 10), ophice.START_SPOT_GAP)
+
+
+class OphiceCockpitBarTestCase(FrappeTestCase):
+	"""Shortcut bar (#2073): the cockpits I may open, with icons, Personal Cockpit first."""
+
+	def test_personal_cockpit_first_with_logos(self):
+		frappe.set_user("Administrator")
+		cockpits = ophice.get_cockpits()
+		self.assertEqual(cockpits[0]["route"], "/personal-cockpit")
+		self.assertTrue(all(c["logo"].startswith("/assets/phamos/manifest/") for c in cockpits))
+		self.assertNotIn("/ophice", [c["route"] for c in cockpits])

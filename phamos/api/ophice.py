@@ -1888,6 +1888,18 @@ def _cockpit_tiles():
 	return tiles
 
 
+@frappe.whitelist()
+def get_cockpits():
+	"""The cockpits I may open from Ophice's shortcut bar (#2073): the Apps screen's, with their
+	icons, Personal Cockpit first."""
+	_require_user()
+	from phamos.www.spa_boot import user_cockpits
+
+	tiles = _cockpit_tiles()
+	cockpits = [{**c, "title": _(c["title"]), "logo": tiles.get(c["route"], {}).get("logo", "")} for c in user_cockpits()]
+	return sorted(cockpits, key=lambda c: c["route"] != "/personal-cockpit")
+
+
 @frappe.whitelist(methods=["POST"])
 def cockpit_heartbeat(route):
 	"""I am looking at the cockpit at `route` (its base route, e.g. /sales-cockpit)."""

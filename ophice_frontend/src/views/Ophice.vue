@@ -2,15 +2,10 @@
 	<!-- Ophice (#2053, #2070): its own app at /ophice, full screen. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
 		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
-			<!-- Until the cockpits open inside Ophice (#2073): a plain link to the Personal Cockpit. -->
-			<a
-				href="/personal-cockpit"
-				class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm text-ink-gray-7 hover:bg-surface-gray-3 hover:text-ink-gray-9"
-			>
-				<FeatherIcon name="arrow-left" class="h-4 w-4" />
-				{{ __("Personal Cockpit") }}
-			</a>
-			<div class="text-base font-semibold tracking-tight">{{ __("Ophice") }}</div>
+			<div class="flex items-center gap-2 text-base font-semibold tracking-tight">
+				<img :src="OPHICE_ICON" alt="" class="h-6 w-6 rounded-md" />
+				{{ __("Ophice") }}
+			</div>
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
 			</div>
@@ -191,10 +186,18 @@
 			>
 				{{ __("Drag on the grid to mark a meeting area, click an area to edit it") }}
 			</p>
+			<!-- Shortcut bar (#2073): the cockpits, bottom centre; they open inside Ophice. -->
+			<CockpitBar
+				v-if="me && !meetingArea"
+				class="absolute bottom-3 left-1/2 z-30 -translate-x-1/2"
+				:cockpits="cockpits"
+				:open-route="openRoute"
+				@open="(cockpit) => emit('open-cockpit', cockpit)"
+			/>
 			<!-- Burn notices (#2057): bottom centre, above the grid. -->
 			<div
 				v-if="noticeList.length || batchNoticeList.length"
-				class="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex flex-col items-center gap-2"
+				class="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex flex-col items-center gap-2"
 			>
 				<BatchNotice
 					v-for="notice in batchNoticeList"
@@ -275,6 +278,7 @@
 							:moving="Boolean(other.moving)"
 							:offline="Boolean(other.offline)"
 							:area-hue="other.offline ? null : areaAt(other)?.color_hue"
+							:badge="other.offline ? null : cockpitOf[other.user]"
 						/>
 					</span>
 				</div>
@@ -313,6 +317,7 @@
 							:label="me.full_name"
 							:image="me.user_image"
 							:area-hue="areaAt(me)?.color_hue"
+							:badge="cockpitOf[me.user]"
 							ring
 							:moving="moving"
 							:jumping="jumping"
@@ -345,6 +350,7 @@ import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
+import CockpitBar from "../components/CockpitBar.vue"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -355,6 +361,36 @@ import ChatWithMenu from "../components/ChatWithMenu.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
+
+const props = defineProps({
+	/** A cockpit is in front (#2073): the keyboard belongs to it, the chip stands still. */
+	cockpitOpen: { type: Boolean, default: false },
+	/** The cockpit loaded in the frame, e.g. "/sales-cockpit" (a dot in the shortcut bar). */
+	openRoute: { type: String, default: "" },
+})
+const emit = defineEmits(["open-cockpit"])
+// Served by Frappe, not bundled.
+const OPHICE_ICON = "/assets/phamos/manifest/ophice-icon-192.png"
+
+// The cockpit someone is in (#2065), as a small icon on their chip (#2073): from the people
+// list, so only for those who show their details.
+const cockpitOf = computed(() => {
+	const map = {}
+	for (const person of people.value) {
+		if (person.online && person.cockpit?.logo) map[person.user] = person.cockpit
+	}
+	return map
+})
+
+// The cockpits for the shortcut bar (#2073), Personal Cockpit first.
+const cockpits = ref([])
+async function loadCockpits() {
+	try {
+		cockpits.value = (await call(`${API}.get_cockpits`)) || []
+	} catch {
+		cockpits.value = []
+	}
+}
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
 const DIRECTIONS = {
@@ -588,6 +624,7 @@ function isTyping(target) {
 
 function onKeydown(event) {
 	shift = event.shiftKey
+	if (props.cockpitOpen) return
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
 	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length && !document.fullscreenElement) {
 		event.preventDefault()
@@ -1558,6 +1595,7 @@ onMounted(async () => {
 	loadPeople()
 	peopleTimer = setInterval(loadPeople, PEOPLE_REFRESH_MS)
 	loadBatchNotices()
+	loadCockpits()
 })
 
 onBeforeUnmount(() => {

@@ -185,8 +185,6 @@ const BASE_ITEMS = [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
 	},
-	// Ophice (#2053): opens full screen.
-	{ name: "Ophice", label: "Ophice", icon: "grid", match: ["Ophice"] },
 	{
 		name: "ChecklistsHome",
 		label: "Checklists",
@@ -230,7 +228,6 @@ const PAGE_TITLES = {
 	ChecklistsHome: ["My Checklists", "Dashboard"],
 	Checklists: ["My Checklists", "List"],
 	ChecklistDetail: ["My Checklists", "List"],
-	Ophice: ["Ophice"],
 }
 const pageTitle = computed(
 	() => (PAGE_TITLES[route.name] || ["Personal Cockpit"]).map((part) => __(part)).join(" · ")
