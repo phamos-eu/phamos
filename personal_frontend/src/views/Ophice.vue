@@ -164,16 +164,18 @@
 				@close="statusOpen = false"
 			/>
 			<!-- The area's chat (#2062), above the mini map. -->
-			<AreaChat
-				v-if="meetingArea && me"
-				:key="meetingArea.name"
-				class="absolute z-20"
-				:style="areaChatStyle"
-				:area="meetingArea"
-				:me="me.user"
-				:name-of="nameOf"
-				:socket="socket"
-			/>
+			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
+			<div v-if="meetingArea && me" class="absolute z-20 flex flex-col gap-2" :style="areaChatStyle">
+				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
+				<AreaChat
+					:key="meetingArea.name"
+					class="min-h-0 flex-1"
+					:area="meetingArea"
+					:me="me.user"
+					:name-of="nameOf"
+					:socket="socket"
+				/>
+			</div>
 			<AreaDialog :area="areaDraft" :on-save="saveArea" :on-delete="deleteArea" @close="areaDraft = null" />
 			<p
 				v-if="editingAreas"
@@ -322,6 +324,7 @@ import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
+import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
@@ -911,6 +914,13 @@ const areaOfUser = computed(() => {
 		if (area) map[chip.user] = area
 	}
 	return map
+})
+
+// The people standing in my meeting, from the map (live, unlike the people list): me first.
+const huddle = computed(() => {
+	const name = meetingArea.value?.name
+	if (!name) return []
+	return [me.value, ...others.value].filter((chip) => chip && areaOfUser.value[chip.user]?.name === name)
 })
 
 function joinAreaIfInside() {

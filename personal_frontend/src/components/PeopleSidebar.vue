@@ -1,7 +1,7 @@
 <template>
 	<!--
-		In a meeting (#2067): only the chips. The people in my meeting come first, in a frame of the
-		area's colour; then the others, online first. Each chip shows the glow of the area it is in.
+		In a meeting (#2067): only the chips of everyone else, online first (the people in my meeting
+		huddle above the chat). Each chip shows the glow of the area it is in.
 	-->
 	<aside
 		v-if="meeting"
@@ -9,28 +9,6 @@
 		:aria-label="__('People')"
 		data-testid="people-sidebar"
 	>
-		<div
-			class="flex flex-col items-center gap-2.5 rounded-xl px-1.5 py-2"
-			:style="frameStyle(meeting)"
-			:title="__('In {0}', [meeting.title])"
-			data-testid="people-meeting"
-		>
-			<button
-				v-for="person in inMeeting"
-				:key="person.user"
-				type="button"
-				class="relative rounded-full"
-				:title="person.user === me ? __('{0} (you)', [person.full_name]) : person.full_name"
-				:disabled="person.user === me"
-				data-testid="person"
-				@click="$emit('pick', person, $event)"
-			>
-				<span class="block rounded-full" :style="chipStyle(person)">
-					<UserAvatar :name="person.user" :label="person.full_name" :image="person.user_image" size="sm" />
-				</span>
-				<span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-white" :class="dotClass(person)" />
-			</button>
-		</div>
 		<button
 			v-for="person in outside"
 			:key="person.user"
@@ -163,8 +141,7 @@ const shown = computed(() => {
 const inMeeting = computed(() => {
 	const name = props.meeting?.name
 	const here = props.people.filter((p) => p.online && props.areaOf[p.user]?.name === name)
-	// I'm always in it, first.
-	return here.sort((a, b) => (a.user === props.me ? -1 : b.user === props.me ? 1 : 0))
+	return here
 })
 const outside = computed(() => {
 	const here = new Set(inMeeting.value.map((p) => p.user))
@@ -178,14 +155,6 @@ function chipStyle(person) {
 	if (!area) return { boxShadow: `0 0 0 2px ${ring}` }
 	const glow = `hsl(${area.color_hue} 75% 50%)`
 	return { boxShadow: `0 0 0 2px ${ring}, 0 0 0 4px var(--surface-white, #fff), 0 0 0 6px ${glow}, 0 0 10px 4px hsl(${area.color_hue} 75% 50% / 0.55)` }
-}
-
-function frameStyle(area) {
-	return {
-		border: `2px solid hsl(${area.color_hue} 75% 50%)`,
-		background: `hsl(${area.color_hue} 75% 50% / 0.12)`,
-		boxShadow: `0 0 10px 2px hsl(${area.color_hue} 75% 50% / 0.35)`,
-	}
 }
 
 function dotClass(person) {
