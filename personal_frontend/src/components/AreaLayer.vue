@@ -1,14 +1,19 @@
 <template>
 	<!--
 		Meeting areas (#2060): lightly tinted rectangles with their name and the Jitsi watermark.
-		In edit mode a layer over the grid takes the pointer: drag to draw, click an area to edit.
+		In edit mode a layer over the grid takes the pointer: drag on free grid to draw, drag an area
+		to move it, drag its edge or corner to resize it, click an area to edit it.
 	-->
 	<div class="pointer-events-none absolute inset-0">
 		<div
 			v-for="area in areas"
 			:key="area.name"
 			class="area absolute flex flex-col items-center justify-center overflow-hidden rounded-md"
-			:class="{ 'area--active': area.name === activeName, 'area--editing': editing }"
+			:class="{
+				'area--active': area.name === activeName,
+				'area--editing': editing,
+				'area--lifted': gesture?.area?.name === area.name && draft,
+			}"
 			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265 }"
 			:title="area.title"
 			data-testid="meeting-area"
@@ -23,6 +28,10 @@
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
 			<span class="area__title truncate">{{ area.title }}</span>
+			<!-- Resize handles at the corners, only while editing (the layer above takes the pointer). -->
+			<template v-if="editing">
+				<span v-for="corner in CORNERS" :key="corner" class="area__handle" :class="`area__handle--${corner}`" />
+			</template>
 		</div>
 
 		<div v-if="draft" class="area area--draft absolute rounded-md" :style="rectStyle(draft)" />
@@ -30,18 +39,19 @@
 		<div
 			v-if="editing"
 			ref="layer"
-			class="pointer-events-auto absolute inset-0 cursor-crosshair"
+			class="pointer-events-auto absolute inset-0"
+			:style="{ cursor }"
 			data-testid="area-edit-layer"
 			@pointerdown="onDown"
 			@pointermove="onMove"
 			@pointerup="onUp"
-			@pointercancel="draft = null"
+			@pointercancel="cancel"
 		/>
 	</div>
 </template>
 
 <script setup>
-import { reactive, ref } from "vue"
+import { computed, reactive, ref } from "vue"
 
 const props = defineProps({
 	areas: { type: Array, default: () => [] },
@@ -52,12 +62,11 @@ const props = defineProps({
 	/** The area whose meeting I am in */
 	activeName: { type: String, default: "" },
 })
-const emit = defineEmits(["draw", "pick"])
+const emit = defineEmits(["draw", "pick", "change"])
 
 const layer = ref(null)
 const draft = ref(null)
 const failedLogos = reactive({})
-let start = null
 
 function rectStyle(rect) {
 	const t = props.tile
@@ -86,36 +95,117 @@ function rectBetween(a, b) {
 	return { x, y, width: Math.abs(a.x - b.x) + STEP, height: Math.abs(a.y - b.y) + STEP }
 }
 
+// Within this many pixels of an area's edge, a drag resizes instead of moving.
+const EDGE_PX = 8
+const CORNERS = ["nw", "ne", "sw", "se"]
+const CURSORS = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize", nw: "nwse-resize", se: "nwse-resize" }
+
+/** { kind: "draw" | "move" | "resize", area, edges, start, clientX, clientY } while the pointer is down. */
+const gesture = ref(null)
+const hover = ref(null)
+const cursor = computed(() => {
+	const hit = gesture.value || hover.value
+	if (!hit || hit.kind === "draw") return "crosshair"
+	if (hit.kind === "move") return gesture.value ? "grabbing" : "grab"
+	return CURSORS[hit.edges] || "crosshair"
+})
+
+/** What a press at this point would do: resize an area's edge, move an area, or draw. */
+function hitAt(event) {
+	const box = layer.value.getBoundingClientRect()
+	const px = event.clientX - box.left
+	const py = event.clientY - box.top
+	const t = props.tile
+	// The last area wins: it is drawn on top.
+	for (const area of [...props.areas].reverse()) {
+		const left = area.x * t
+		const top = area.y * t
+		const right = left + area.width * t
+		const bottom = top + area.height * t
+		if (px < left - EDGE_PX || px > right + EDGE_PX || py < top - EDGE_PX || py > bottom + EDGE_PX) continue
+		const edges =
+			(Math.abs(py - top) <= EDGE_PX ? "n" : Math.abs(py - bottom) <= EDGE_PX ? "s" : "") +
+			(Math.abs(px - left) <= EDGE_PX ? "w" : Math.abs(px - right) <= EDGE_PX ? "e" : "")
+		if (edges) return { kind: "resize", area, edges }
+		if (px >= left && px <= right && py >= top && py <= bottom) return { kind: "move", area }
+	}
+	return { kind: "draw" }
+}
+
+function snap(value) {
+	return Math.round(value / STEP) * STEP
+}
+
+/** The area's new rectangle for a move or resize by (dx, dy) tiles, kept inside the grid. */
+function reshape(g, dx, dy) {
+	const a = g.area
+	if (g.kind === "move") {
+		return {
+			x: Math.max(0, Math.min(props.cols - a.width, a.x + dx)),
+			y: Math.max(0, Math.min(props.rows - a.height, a.y + dy)),
+			width: a.width,
+			height: a.height,
+		}
+	}
+	let left = a.x
+	let top = a.y
+	let right = a.x + a.width
+	let bottom = a.y + a.height
+	if (g.edges.includes("w")) left = Math.max(0, Math.min(right - STEP, left + dx))
+	if (g.edges.includes("e")) right = Math.min(props.cols, Math.max(left + STEP, right + dx))
+	if (g.edges.includes("n")) top = Math.max(0, Math.min(bottom - STEP, top + dy))
+	if (g.edges.includes("s")) bottom = Math.min(props.rows, Math.max(top + STEP, bottom + dy))
+	return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
 function onDown(event) {
 	if (event.button !== 0) return
-	start = { ...tileAt(event), clientX: event.clientX, clientY: event.clientY }
+	gesture.value = { ...hitAt(event), start: tileAt(event), clientX: event.clientX, clientY: event.clientY }
 	try {
 		// Keeps the drag when the pointer leaves the grid; some pointers can't be captured.
 		layer.value.setPointerCapture(event.pointerId)
 	} catch {
-		// drawing still works while the pointer stays on the grid
+		// dragging still works while the pointer stays on the grid
 	}
 }
 
 function onMove(event) {
-	if (!start) return
-	const moved = Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY)
+	const g = gesture.value
+	if (!g) {
+		hover.value = hitAt(event)
+		return
+	}
+	const moved = Math.hypot(event.clientX - g.clientX, event.clientY - g.clientY)
 	if (moved < 4 && !draft.value) return
-	draft.value = rectBetween(start, tileAt(event))
+	if (g.kind === "draw") {
+		draft.value = rectBetween(g.start, tileAt(event))
+		return
+	}
+	const cell = props.tile
+	const dx = snap((event.clientX - g.clientX) / cell)
+	const dy = snap((event.clientY - g.clientY) / cell)
+	draft.value = reshape(g, dx, dy)
 }
 
-function onUp(event) {
-	if (!start) return
+function onUp() {
+	const g = gesture.value
+	if (!g) return
 	const rect = draft.value
-	const down = start
-	start = null
+	gesture.value = null
 	draft.value = null
-	if (rect) return emit("draw", rect)
-	// A click without dragging: edit the area under the pointer, if any.
-	const area = props.areas.find(
-		(a) => down.x >= a.x && down.x < a.x + a.width && down.y >= a.y && down.y < a.y + a.height
-	)
-	if (area) emit("pick", area)
+	if (!rect) {
+		// A click without dragging: edit the area under the pointer, if any.
+		if (g.area) emit("pick", g.area)
+		return
+	}
+	if (g.kind === "draw") return emit("draw", rect)
+	const a = g.area
+	if (rect.x !== a.x || rect.y !== a.y || rect.width !== a.width || rect.height !== a.height) emit("change", a, rect)
+}
+
+function cancel() {
+	gesture.value = null
+	draft.value = null
 }
 </script>
 
@@ -139,6 +229,34 @@ function onUp(event) {
 }
 .area--editing {
 	border-style: dashed;
+}
+/* The area being moved or resized fades; the dashed draft shows where it goes. */
+.area--lifted {
+	opacity: 0.35;
+}
+.area__handle {
+	position: absolute;
+	width: 9px;
+	height: 9px;
+	border-radius: 2px;
+	background: #fff;
+	border: 2px solid hsl(var(--area-h) 70% 35%);
+}
+.area__handle--nw {
+	left: -2px;
+	top: -2px;
+}
+.area__handle--ne {
+	right: -2px;
+	top: -2px;
+}
+.area__handle--sw {
+	left: -2px;
+	bottom: -2px;
+}
+.area__handle--se {
+	right: -2px;
+	bottom: -2px;
 }
 .area--draft {
 	background: rgba(124, 58, 237, 0.35);

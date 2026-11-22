@@ -228,6 +228,7 @@
 					:active-name="meetingArea?.name || ''"
 					@draw="(rect) => (areaDraft = { ...rect })"
 					@pick="(area) => (areaDraft = { ...area })"
+					@change="reshapeArea"
 				/>
 				<!-- Perimeters (#2056): touching circles = in conversation. Below the chips, no clicks. -->
 				<div
@@ -1049,6 +1050,16 @@ async function saveArea(values) {
 		})
 	} catch (e) {
 		throw new Error(errorText(e) || __("The area could not be saved."))
+	}
+}
+
+/** An area dragged to a new place or size in edit mode: saved at once, for everyone. */
+async function reshapeArea(area, rect) {
+	try {
+		await saveArea({ ...area, ...rect })
+	} catch (e) {
+		// The server refused (for example an overlap): the area stays where it was.
+		toast({ title: e.message, icon: "alert-circle" })
 	}
 }
 
