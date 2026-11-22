@@ -43,11 +43,8 @@ defineEmits(["pick"])
 
 const frameStyle = computed(() => {
 	const h = props.area.color_hue
-	return {
-		border: `2px solid hsl(${h} 75% 50%)`,
-		background: `hsl(${h} 75% 50% / 0.12)`,
-		boxShadow: `0 0 14px 3px hsl(${h} 75% 50% / 0.35)`,
-	}
+	// The frame itself is the column around people and chat (#2078); here only a tint.
+	return { background: `hsl(${h} 75% 50% / 0.14)` }
 })
 
 function ringStyle(person) {

@@ -6,9 +6,9 @@
 	-->
 	<div
 		ref="root"
-		class="meeting-panel absolute flex flex-col overflow-hidden rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
+		class="meeting-panel absolute flex flex-col overflow-hidden rounded-xl bg-surface-white text-ink-gray-9 shadow-xl"
 		:class="{ 'meeting-panel--busy': busy, 'meeting-panel--full': fullscreen }"
-		:style="fullscreen ? {} : maximized ? FILL : box"
+		:style="{ ...(fullscreen ? {} : maximized ? FILL : box), '--area-h': hue ?? 220 }"
 		role="region"
 		:aria-label="__('Meeting {0}', [area.title])"
 		data-testid="meeting-panel"
@@ -20,6 +20,17 @@
 		>
 			<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
+			<button
+				type="button"
+				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:title="__('Open the meeting in its own browser window')"
+				data-testid="meeting-popout"
+				@pointerdown.stop
+				@click="$emit('popout')"
+			>
+				<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+				{{ __("Own window") }}
+			</button>
 			<button
 				type="button"
 				class="flex-shrink-0 rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
@@ -40,7 +51,37 @@
 				{{ __("Leave (Esc)") }}
 			</button>
 		</header>
+		<!-- meet.jit.si ends embedded calls after 5 minutes (#2078): say so, offer the own window. -->
+		<div
+			v-if="limitHint && !hintClosed && !poppedOut"
+			class="flex flex-shrink-0 items-start gap-2 border-b border-outline-gray-2 bg-surface-amber-1 px-3 py-2 text-xs text-ink-amber-4"
+			role="status"
+			data-testid="meeting-limit-hint"
+		>
+			<FeatherIcon name="clock" class="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+			<span class="min-w-0 flex-1">
+				{{ __("Here in Ophice, meet.jit.si ends the call after 5 minutes. In its own window the meeting runs up to 1 h 35 min.") }}
+			</span>
+			<Button size="sm" variant="solid" @click="$emit('popout')">{{ __("Open in own window") }}</Button>
+			<button type="button" class="rounded p-0.5 hover:bg-surface-amber-2" :title="__('Close')" @click="hintClosed = true">
+				<FeatherIcon name="x" class="h-3.5 w-3.5" />
+			</button>
+		</div>
+		<!-- The meeting runs in its own window: no second call here. -->
+		<div
+			v-if="poppedOut"
+			class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-gray-7"
+			data-testid="meeting-popped-out"
+		>
+			<FeatherIcon name="external-link" class="h-8 w-8 text-ink-gray-5" />
+			<p>{{ __("The meeting runs in its own window.") }}</p>
+			<div class="flex flex-wrap justify-center gap-2">
+				<Button variant="subtle" @click="$emit('popout')">{{ __("Show that window") }}</Button>
+				<Button variant="ghost" @click="$emit('bring-back')">{{ __("Back into Ophice") }}</Button>
+			</div>
+		</div>
 		<VideoCall
+			v-else
 			class="min-h-0 flex-1"
 			fill
 			:domain="area.jitsi_domain"
@@ -65,7 +106,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { FeatherIcon } from "frappe-ui"
+import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import VideoCall from "./VideoCall.vue"
 
@@ -77,8 +118,15 @@ const props = defineProps({
 	bounds: { type: Object, required: true },
 	/** Position and size as shares of the stage: { x, y, w, h } (0..1), so it follows the window */
 	rect: { type: Object, required: true },
+	/** The space's colour (a hue): the window's frame (#2078). */
+	hue: { type: [Number, String], default: null },
+	/** Show the 5-minute note (embedded meet.jit.si, #2078). */
+	limitHint: { type: Boolean, default: false },
+	/** The meeting runs in its own browser window: no embedded call here. */
+	poppedOut: { type: Boolean, default: false },
 })
-const emit = defineEmits(["leave", "update:rect"])
+const emit = defineEmits(["leave", "update:rect", "popout", "bring-back"])
+const hintClosed = ref(false)
 
 const CORNERS = ["nw", "ne", "sw", "se"]
 const MIN_W = 320
@@ -203,6 +251,11 @@ function giveKeysBack() {
 </script>
 
 <style scoped>
+/* The space's colour around the meeting window (#2078), like the frame around its people and chat. */
+.meeting-panel {
+	border: 3px solid hsl(var(--area-h) 75% 50%);
+	box-shadow: 0 0 18px 4px hsl(var(--area-h) 75% 50% / 0.4), 0 10px 25px rgba(0, 0, 0, 0.25);
+}
 .meeting-panel--busy :deep(iframe) {
 	pointer-events: none;
 }

@@ -155,8 +155,13 @@
 				:display-name="me?.full_name"
 				:bounds="view"
 				:rect="meetingRect || defaultMeetingRect()"
+				:hue="meetingArea.color_hue"
+				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si'"
+				:popped-out="poppedOut === meetingArea.name"
 				@update:rect="setMeetingRect"
 				@leave="leaveMeeting(true)"
+				@popout="popOut"
+				@bring-back="bringBack"
 			/>
 			<StatusMenu
 				v-if="statusOpen && me"
@@ -168,7 +173,12 @@
 			/>
 			<!-- The area's chat (#2062), above the mini map. -->
 			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
-			<div v-if="meetingArea && me" class="absolute z-20 flex flex-col gap-2" :style="areaChatStyle">
+			<div
+				v-if="meetingArea && me"
+				class="absolute z-20 flex flex-col gap-2 rounded-2xl p-2"
+				:style="{ ...areaChatStyle, ...meetingFrameStyle }"
+				data-testid="meeting-column"
+			>
 				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
 				<AreaChat
 					:key="meetingArea.name"
@@ -1018,10 +1028,54 @@ function leaveMeetingIfOutside() {
 
 function leaveMeeting(byChoice) {
 	const left = meetingArea.value
+	poppedOut.value = null
+	meetingWindow = null
 	if (byChoice && left) meetingLeftHere = left.name
 	meetingArea.value = null
 	// A "Not saved" chat burns once nobody is left in the area (#2062).
 	if (left) call(`${API}.leave_area`, { area: left.name }).catch(() => {})
+}
+
+// The space's colour around the meeting's people and chat (#2078), as around the meeting window.
+const meetingFrameStyle = computed(() => {
+	const h = meetingArea.value?.color_hue ?? 220
+	return {
+		border: `3px solid hsl(${h} 75% 50%)`,
+		background: `hsl(${h} 75% 50% / 0.08)`,
+		boxShadow: `0 0 18px 4px hsl(${h} 75% 50% / 0.4)`,
+	}
+})
+
+// --- The meeting in its own browser window (#2078). meet.jit.si ends embedded calls after
+// 5 minutes; opened directly it runs up to 95. Ophice then drops its own call (no double join).
+
+const poppedOut = ref(null)
+let meetingWindow = null
+
+function popOut() {
+	const area = meetingArea.value
+	if (!area) return
+	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
+	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
+		meetingWindow.focus()
+		return
+	}
+	meetingWindow = window.open(url, `ophice-meeting-${area.name}`, "popup,width=1200,height=800")
+	if (!meetingWindow) {
+		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
+		return
+	}
+	poppedOut.value = area.name
+}
+
+function bringBack() {
+	try {
+		meetingWindow?.close()
+	} catch {
+		// already gone
+	}
+	meetingWindow = null
+	poppedOut.value = null
 }
 
 // Left column of the meeting view: the area chat fills it down to the mini map.
