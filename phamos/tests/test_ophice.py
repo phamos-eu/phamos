@@ -1046,3 +1046,40 @@ class OphiceGuestEntryTestCase(_OphiceRoomBase):
 		frappe.db.delete(ophice.AREA_DOCTYPE)
 		with self.assertRaises(frappe.ValidationError):
 			self._enter()
+
+
+class OphiceGuestChatTestCase(OphiceGuestEntryTestCase):
+	"""Guest chat (#2083): guests and employees in the guest area write to each other; only in
+	Redis, with an expiry; employees outside the area cannot read it."""
+
+	def tearDown(self):
+		for area in ophice._areas():
+			frappe.cache.delete(frappe.cache.make_key(self.g.CHAT_KEY_PREFIX + area.name))
+		super().tearDown()
+
+	def test_guest_and_employee_chat_in_the_guest_area(self):
+		space = self._enter("Ada Guest")
+		area = space["areas"][0]["name"]
+		self.assertEqual(space["room"]["jitsi_room"], "Lobby")
+		self._put(self.B, 11, 11)  # B stands in the guest area, A far away
+		self.sent.reset_mock()
+		self.g.guest_send("Hello, is anyone there?")
+		told = {c.kwargs.get("user") for c in self.sent.call_args_list if c.args and c.args[0] == self.g.EVENT_GUEST_CHAT}
+		self.assertEqual(told, {self.B})
+		frappe.set_user(self.B)
+		self.g.send_guest_chat(area, "Welcome, Ada!")
+		messages = self.g.get_guest_chat(area)["messages"]
+		self.assertEqual([(m["author"], m["guest"]) for m in messages], [("Ada Guest", True), ("ophice-b", False)])
+		# Only in Redis, and it runs out when nobody keeps it alive.
+		key = frappe.cache.make_key(self.g.CHAT_KEY_PREFIX + area)
+		self.assertTrue(0 < frappe.cache.ttl(key) <= self.g.CHAT_TTL)
+		self.assertFalse(frappe.db.exists("Raven Message", {"text": ("like", "%Welcome, Ada%")}))
+		# The guest sees it with the next poll.
+		frappe.set_user("Guest")
+		self.assertEqual(len(self.g.guest_space()["room"]["messages"]), 2)
+
+	def test_employees_outside_the_area_cannot_read_it(self):
+		space = self._enter()
+		frappe.set_user(self.A)  # A stands at 1,1, outside
+		with self.assertRaises(frappe.PermissionError):
+			self.g.get_guest_chat(space["areas"][0]["name"])

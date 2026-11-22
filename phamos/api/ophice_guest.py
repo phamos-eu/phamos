@@ -278,6 +278,8 @@ def guest_space():
 		"background": background.get("url") or "",
 		"background_layout": ophice._background_layout(background),
 		"expires_in": max(0, round(entry["expires"] - time.time())),
+		# The meeting and chat where I stand (#2083); the page asks every second.
+		"room": _chat_for_guest(guest_id, chip, areas),
 	}
 
 
@@ -324,3 +326,120 @@ def online_guests():
 				}
 			)
 	return rows
+
+
+# --- Guest chat (#2083): in the guest area and customer meeting areas, for everyone standing
+# there, guests and employees. Only in Redis: a list per area that expires CHAT_TTL after the
+# last person left (every read or message by someone inside keeps it alive). Never in Raven or
+# the database; saving is a mail draft in the person's own mail program.
+
+CHAT_KEY_PREFIX = "phamos_ophice_guest_chat:"
+CHAT_TTL = 10 * 60
+CHAT_KEEP = 200
+CHAT_SHOWN = 100
+CHAT_TEXT_LENGTH = 1000
+GUEST_CHAT_KINDS = ("Guest", "Customer meeting")
+EVENT_GUEST_CHAT = "ophice_guest_chat"
+
+
+def _chat_key(area_name):
+	# Frappe's list calls (rpush, lrange, ltrim) add the site prefix themselves; expire does not.
+	return CHAT_KEY_PREFIX + area_name
+
+
+def _keep_alive(area_name):
+	frappe.cache.expire(frappe.cache.make_key(_chat_key(area_name)), CHAT_TTL)
+
+
+def _read_chat(area_name):
+	key = _chat_key(area_name)
+	rows = frappe.cache.lrange(key, -CHAT_SHOWN, -1) or []
+	if rows:
+		_keep_alive(area_name)
+	messages = []
+	for raw in rows:
+		try:
+			messages.append(json.loads(frappe.safe_decode(raw)))
+		except ValueError:
+			continue
+	return messages
+
+
+def _add_message(area, owner, author, text, guest):
+	text = (text or "").strip()
+	if not text:
+		frappe.throw(_("Write something first."))
+	message = {
+		"name": frappe.generate_hash(length=12),
+		"owner": owner,
+		"author": author,
+		"guest": bool(guest),
+		"text": text[:CHAT_TEXT_LENGTH],
+		"ts": time.time(),
+	}
+	key = _chat_key(area.name)
+	frappe.cache.rpush(key, json.dumps(message))
+	frappe.cache.ltrim(key, -CHAT_KEEP, -1)
+	_keep_alive(area.name)
+	# Employees in the area get it live; guests get it with their next poll (every second).
+	for chip in ophice._online():
+		if not chip.get("guest") and _inside(area, chip["x"], chip["y"]):
+			frappe.publish_realtime(EVENT_GUEST_CHAT, {"area": area.name, "message": message}, user=chip["user"])
+	return message
+
+
+def _guest_chat_area_of(x, y, areas):
+	return next((a for a in areas if a.kind in GUEST_CHAT_KINDS and _inside(a, x, y)), None)
+
+
+def _chat_for_guest(guest_id, chip, areas):
+	"""The meeting and chat of the area the guest stands in (for guest_space)."""
+	area = _guest_chat_area_of(chip["x"], chip["y"], areas)
+	if not area:
+		return None
+	return {
+		"area": area.name,
+		"title": area.title,
+		"jitsi_domain": area.jitsi_domain,
+		"jitsi_room": area.jitsi_room,
+		"messages": _read_chat(area.name),
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def guest_send(text):
+	"""A guest writes into the chat of the area they stand in."""
+	guest_id, entry = _require_guest()
+	key = frappe.cache.make_key(f"phamos_ophice_guest_sends:{guest_id}")
+	if frappe.cache.incrby(key, 1) > 5:
+		frappe.throw(_("Not so fast, please."))
+	frappe.cache.expire(key, 5)
+	me = frappe.cache.hget(ophice.PRESENCE_CACHE_KEY, GUEST_PREFIX + guest_id)
+	area = _guest_chat_area_of(me["x"], me["y"], allowed_areas(guest_id)) if isinstance(me, dict) else None
+	if not area:
+		frappe.throw(_("Step into the area to chat."))
+	return _add_message(area, GUEST_PREFIX + guest_id, entry["name"], strip_html(text or ""), guest=True)
+
+
+def _employee_area(area_name):
+	ophice._require_user()
+	area = ophice._area(area_name)
+	if area.kind not in GUEST_CHAT_KINDS:
+		frappe.throw(_("This space has no guest chat."))
+	if not ophice._inside_area(area, frappe.session.user):
+		frappe.throw(_("Step into the area to use its chat."), frappe.PermissionError)
+	return area
+
+
+@frappe.whitelist()
+def get_guest_chat(area):
+	"""Employees: the guest chat of the guest or customer meeting area I stand in."""
+	doc = _employee_area(area)
+	return {"area": doc.name, "messages": _read_chat(doc.name)}
+
+
+@frappe.whitelist(methods=["POST"])
+def send_guest_chat(area, text):
+	"""Employees: write into the guest chat of the area I stand in."""
+	doc = _employee_area(area)
+	return _add_message(doc, frappe.session.user, frappe.utils.get_fullname(frappe.session.user), text, guest=False)

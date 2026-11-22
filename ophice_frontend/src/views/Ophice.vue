@@ -181,18 +181,16 @@
 				data-testid="meeting-column"
 			>
 				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
-				<!-- Guest and customer meeting areas get the guest chat (#2083); until then, a note. -->
-				<div
+				<!-- Guest and customer meeting areas: the guest chat, kept only for a short while (#2083). -->
+				<GuestChat
 					v-if="(meetingArea.kind || 'Meeting') !== 'Meeting'"
-					class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-outline-gray-2 bg-surface-white p-4 text-center text-sm text-ink-gray-6"
-					data-testid="guest-chat-placeholder"
-				>
-					<FeatherIcon :name="meetingArea.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-6 w-6 text-ink-gray-5" />
-					<p class="font-medium text-ink-gray-8">
-						{{ meetingArea.kind === "Guest" ? __("Guest area") : __("Customer meeting") }}
-					</p>
-					<p>{{ __("External guests can be here. The guest chat, kept only for a short while, comes soon.") }}</p>
-				</div>
+					:key="`guest-chat-${meetingArea.name}`"
+					class="min-h-0 flex-1"
+					:title="meetingArea.title"
+					:messages="guestChat.area === meetingArea.name ? guestChat.messages : []"
+					:me="me.user"
+					:on-send="sendGuestChat"
+				/>
 				<AreaChat
 					v-else
 					:key="meetingArea.name"
@@ -405,13 +403,14 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Button, call, Dropdown, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
 import CockpitBar from "../components/CockpitBar.vue"
+import GuestChat from "../components/GuestChat.vue"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1127,6 +1126,42 @@ const meetingFrameStyle = computed(() => {
 	}
 })
 
+// --- Guest chat (#2083) in guest and customer meeting areas: loaded when I step in, new messages
+// arrive over realtime (the server tells everyone standing in the area).
+
+const GUEST_API = "phamos.api.ophice_guest"
+const guestChat = reactive({ area: "", messages: [] })
+
+async function loadGuestChat(area) {
+	guestChat.area = area.name
+	guestChat.messages = []
+	try {
+		const data = await call(`${GUEST_API}.get_guest_chat`, { area: area.name })
+		if (guestChat.area === area.name) guestChat.messages = data.messages || []
+	} catch {
+		// Not inside (yet): the next message or step brings it.
+	}
+}
+
+function onGuestChat(payload) {
+	if (payload?.area !== guestChat.area || !payload.message) return
+	if (!guestChat.messages.some((m) => m.name === payload.message.name)) guestChat.messages.push(payload.message)
+}
+
+async function sendGuestChat(text) {
+	const message = await call(`${GUEST_API}.send_guest_chat`, { area: meetingArea.value.name, text })
+	onGuestChat({ area: guestChat.area, message })
+}
+
+watch(
+	() => meetingArea.value?.name,
+	() => {
+		const area = meetingArea.value
+		if (area && (area.kind || "Meeting") !== "Meeting") loadGuestChat(area)
+		else guestChat.area = ""
+	}
+)
+
 // --- The meeting in its own browser window (#2078). meet.jit.si ends embedded calls after
 // 5 minutes; opened directly it runs up to 95. Ophice then drops its own call (no double join).
 
@@ -1509,6 +1544,7 @@ async function voteBatch(notice, choice) {
 }
 
 const NOTICE_EVENTS = [
+	["ophice_guest_chat", (payload) => onGuestChat(payload)],
 	["ophice_area_batches", onAreaBatches],
 	["ophice_burn_notice", upsertNotice],
 	["ophice_save_vote", upsertNotice],

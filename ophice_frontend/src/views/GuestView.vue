@@ -87,8 +87,9 @@
 			</div>
 		</main>
 
-		<!-- Inside: the map, sharp only where I may be. -->
-		<main v-else ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<!-- Inside: the map, sharp only where I may be; the meeting and chat of my area beside it. -->
+		<main v-else class="flex min-h-0 flex-1">
+		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
 			<div class="relative overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white" :style="gridStyle" data-testid="guest-map">
 				<!-- The office, blurred -->
 				<div class="guest-map__layer guest-map__layer--blur" aria-hidden="true" />
@@ -131,6 +132,32 @@
 					</span>
 				</div>
 			</div>
+		</div>
+		<!-- The meeting and the guest chat of the area I stand in (#2083). -->
+		<aside
+			v-if="space.room"
+			class="flex w-[380px] flex-shrink-0 flex-col gap-3 border-l border-outline-gray-2 bg-surface-white p-3"
+			data-testid="guest-room"
+		>
+			<div class="overflow-hidden rounded-xl border border-outline-gray-2 bg-black" style="height: 42%">
+				<VideoCall
+					:key="space.room.area"
+					class="h-full"
+					fill
+					:domain="space.room.jitsi_domain"
+					:room="space.room.jitsi_room"
+					:display-name="me.full_name"
+				/>
+			</div>
+			<GuestChat
+				class="min-h-0 flex-1"
+				:title="space.room.title"
+				:messages="space.room.messages"
+				:me="me.user"
+				:on-send="sendChat"
+				ophice-path="/ophice/guest"
+			/>
+		</aside>
 		</main>
 	</div>
 </template>
@@ -140,6 +167,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "v
 import { call, FeatherIcon, FormControl } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import ChipFigure from "../components/ChipFigure.vue"
+import GuestChat from "../components/GuestChat.vue"
+import VideoCall from "../components/VideoCall.vue"
 
 const API = "phamos.api.ophice_guest"
 // Served by Frappe, not bundled.
@@ -352,6 +381,13 @@ function tickFrame(now) {
 		}
 	}
 	frame = requestAnimationFrame(tickFrame)
+}
+
+/** Write into my area's chat; it shows at once, the next poll brings everyone's. */
+async function sendChat(text) {
+	const message = await call(`${API}.guest_send`, { text })
+	const room = space.value?.room
+	if (room && !room.messages.some((m) => m.name === message.name)) room.messages = [...room.messages, message]
 }
 
 let pollTimer = null
