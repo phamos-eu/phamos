@@ -147,23 +147,29 @@
 			</div>
 			<!-- The meeting of the area I stand in (#2060), top right. -->
 			<!-- Meeting view (#2061): the meeting is the big window, the map shrinks to the bottom left. -->
+			<!-- The same window all along (#2075): moving it to another place in the page would restart the call. -->
+			<Teleport :to="meetingPip || 'body'" :disabled="!meetingPip">
 			<MeetingPanel
 				v-if="meetingArea"
 				ref="meetingPanel"
-				class="z-30"
+				:class="cockpitOpen ? 'z-[55]' : 'z-30'"
 				:area="meetingArea"
 				:display-name="me?.full_name"
-				:bounds="view"
-				:rect="meetingRect || defaultMeetingRect()"
+				:bounds="cockpitOpen ? viewport : view"
+				:rect="cockpitOpen ? floatRect : meetingRect || defaultMeetingRect()"
+				:floating="cockpitOpen"
+				:pip="Boolean(meetingPip)"
 				:hue="meetingArea.color_hue"
 				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si'"
 				:popped-out="poppedOut === meetingArea.name"
 				:window-closed="meetingWindowClosed"
-				@update:rect="setMeetingRect"
+				@update:rect="(rect) => (cockpitOpen ? setFloatRect(rect) : setMeetingRect(rect))"
 				@leave="leaveMeeting(true)"
 				@popout="popOut"
 				@bring-back="bringBack"
+				@float="floatMeeting"
 			/>
+			</Teleport>
 			<StatusMenu
 				v-if="statusOpen && me"
 				:class="statusAt ? 'fixed z-50' : 'absolute right-6 top-6 z-40'"
@@ -174,10 +180,12 @@
 			/>
 			<!-- The area's chat (#2062), above the mini map. -->
 			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
+			<Teleport :to="meetingPip || 'body'" :disabled="!meetingPip">
 			<div
 				v-if="meetingArea && me"
-				class="absolute z-20 flex flex-col gap-2 rounded-2xl p-2"
-				:style="{ ...areaChatStyle, ...meetingFrameStyle }"
+				class="flex flex-col gap-2 rounded-2xl p-2"
+				:class="meetingPip ? 'relative min-h-0 flex-1' : cockpitOpen ? 'fixed z-[55] shadow-2xl' : 'absolute z-20'"
+				:style="{ ...(meetingPip ? {} : cockpitOpen ? floatingColumnStyle : areaChatStyle), ...meetingFrameStyle }"
 				data-testid="meeting-column"
 			>
 				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
@@ -201,6 +209,7 @@
 					:socket="socket"
 				/>
 			</div>
+			</Teleport>
 			<AreaDialog :area="areaDraft" :on-save="saveArea" :on-delete="deleteArea" @close="areaDraft = null" />
 			<p
 				v-if="editingAreas"
@@ -439,6 +448,7 @@ import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
 import { myZone } from "../utils/ophiceTime.js"
+import { openFloatingWindow } from "../utils/pip.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1157,6 +1167,7 @@ function leaveMeetingIfOutside() {
 
 function leaveMeeting(byChoice) {
 	const left = meetingArea.value
+	closeMeetingPip()
 	// Leaving the space ends the call, also in its own window (PM, 2026-11-22).
 	if (poppedOut.value) closeMeetingWindow()
 	poppedOut.value = null
@@ -1267,6 +1278,68 @@ function closeMeetingWindow() {
 function bringBack() {
 	closeMeetingWindow()
 	poppedOut.value = null
+}
+
+// --- The meeting over an open cockpit (#2075): the same window and column, fixed to the browser
+// window (bottom right by default, placement kept), or in a floating window on top of everything.
+
+const viewport = reactive({ width: window.innerWidth, height: window.innerHeight })
+window.addEventListener("resize", () => {
+	viewport.width = window.innerWidth
+	viewport.height = window.innerHeight
+})
+const FLOAT_RECT_KEY = "phamos_ophice_meeting_float_rect"
+function defaultFloatRect() {
+	const w = Math.min(460, viewport.width * 0.4)
+	const h = Math.min(320, viewport.height * 0.45)
+	return { x: (viewport.width - w - 16) / viewport.width, y: (viewport.height - h - 16) / viewport.height, w: w / viewport.width, h: h / viewport.height }
+}
+function storedFloatRect() {
+	try {
+		const rect = JSON.parse(localStorage.getItem(FLOAT_RECT_KEY) || "null")
+		if (rect && ["x", "y", "w", "h"].every((k) => Number.isFinite(rect[k]) && rect[k] >= 0 && rect[k] <= 1)) return rect
+	} catch {
+		// private window
+	}
+	return null
+}
+const floatRectStored = ref(storedFloatRect())
+const floatRect = computed(() => floatRectStored.value || defaultFloatRect())
+function setFloatRect(rect) {
+	floatRectStored.value = rect
+	try {
+		localStorage.setItem(FLOAT_RECT_KEY, JSON.stringify(rect))
+	} catch {
+		// private window: the placement lasts until the reload
+	}
+}
+// People and chat to the left of the floating call, bottom-aligned with it.
+const FLOAT_COLUMN_W = 320
+const floatingColumnStyle = computed(() => {
+	const r = floatRect.value
+	const left = r.x * viewport.width
+	const bottom = (r.y + r.h) * viewport.height
+	const height = Math.min(440, viewport.height - 32)
+	return {
+		left: `${Math.max(8, left - FLOAT_COLUMN_W - 12)}px`,
+		top: `${Math.max(8, bottom - height)}px`,
+		width: `${FLOAT_COLUMN_W}px`,
+		height: `${height}px`,
+	}
+})
+
+const meetingPip = ref(null)
+async function floatMeeting() {
+	// The call moves into the floating window: Jitsi joins again there (an iframe that moves restarts).
+	meetingPip.value = await openFloatingWindow({
+		width: 480,
+		height: 760,
+		onClose: () => (meetingPip.value = null),
+	})
+}
+function closeMeetingPip() {
+	meetingPip.value?.ownerDocument?.defaultView?.close()
+	meetingPip.value = null
 }
 
 // Left column of the meeting view: the area chat fills it down to the mini map.

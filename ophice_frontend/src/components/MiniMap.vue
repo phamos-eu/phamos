@@ -163,6 +163,7 @@ import { computed, onBeforeUnmount, reactive, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { ringHue } from "../utils/ophiceColor.js"
+import { canFloat, openFloatingWindow } from "../utils/pip.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -282,45 +283,25 @@ window.addEventListener("resize", keepInView)
 onBeforeUnmount(() => {
 	window.removeEventListener("resize", keepInView)
 	window.removeEventListener("pointermove", onDrag)
-	pipWindow?.close()
+	floatBody?.ownerDocument?.defaultView?.close()
 })
 
 // --- Float: Document Picture-in-Picture, a small window on top of everything (Chrome, Edge,
 // newer Firefox; not Safari). The same element moves into it; closing it brings it back.
 
-const canFloat = typeof window !== "undefined" && "documentPictureInPicture" in window
 const floatTarget = ref(null)
-let pipWindow = null
+let floatBody = null
 
 async function float() {
-	try {
-		pipWindow = await window.documentPictureInPicture.requestWindow({ width: WIDTH + 24, height: 420 })
-	} catch {
-		return
-	}
-	// The page's styles, so the map looks the same in there.
-	for (const sheet of [...document.styleSheets]) {
-		try {
-			const style = pipWindow.document.createElement("style")
-			style.textContent = [...sheet.cssRules].map((rule) => rule.cssText).join("\n")
-			pipWindow.document.head.appendChild(style)
-		} catch {
-			if (sheet.href) {
-				const link = pipWindow.document.createElement("link")
-				link.rel = "stylesheet"
-				link.href = sheet.href
-				pipWindow.document.head.appendChild(link)
-			}
-		}
-	}
-	pipWindow.document.body.className = document.body.className
-	pipWindow.document.documentElement.dataset.theme = document.documentElement.dataset.theme || ""
-	pipWindow.document.body.style.margin = "0"
-	pipWindow.addEventListener("pagehide", () => {
-		floatTarget.value = null
-		pipWindow = null
+	floatBody = await openFloatingWindow({
+		width: WIDTH + 24,
+		height: 420,
+		onClose: () => {
+			floatTarget.value = null
+			floatBody = null
+		},
 	})
-	floatTarget.value = pipWindow.document.body
+	floatTarget.value = floatBody
 }
 </script>
 

@@ -6,9 +6,16 @@
 	-->
 	<div
 		ref="root"
-		class="meeting-panel absolute flex flex-col overflow-hidden rounded-xl bg-surface-white text-ink-gray-9 shadow-xl"
-		:class="{ 'meeting-panel--busy': busy, 'meeting-panel--full': fullscreen }"
-		:style="{ ...(fullscreen ? {} : maximized ? FILL : box), '--area-h': hue ?? 220 }"
+		class="meeting-panel flex flex-col overflow-hidden rounded-xl bg-surface-white text-ink-gray-9 shadow-xl"
+		:class="{
+			'meeting-panel--busy': busy,
+			'meeting-panel--full': fullscreen,
+			// Over an open cockpit (#2075) it is fixed to the window; in the floating window it fills it.
+			fixed: floating && !pip,
+			relative: pip,
+			absolute: !floating && !pip,
+		}"
+		:style="{ ...(pip ? PIP : fullscreen ? {} : maximized ? FILL : box), '--area-h': hue ?? 220 }"
 		role="region"
 		:aria-label="__('Meeting {0}', [area.title])"
 		data-testid="meeting-panel"
@@ -20,6 +27,19 @@
 		>
 			<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
+			<!-- Float (#2075): call and chat in a small window on top of everything. -->
+			<button
+				v-if="canFloat && !pip"
+				type="button"
+				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:title="__('Float: call and chat in a small window on top of everything')"
+				data-testid="meeting-float"
+				@pointerdown.stop
+				@click="$emit('float')"
+			>
+				<FeatherIcon name="layers" class="h-3.5 w-3.5" />
+				{{ __("Float") }}
+			</button>
 			<!-- Chrome's picture-in-picture (#2078): how to keep the video on top. -->
 			<button
 				v-if="CHROMIUM"
@@ -177,7 +197,7 @@
 			@joined="giveKeysBack"
 			@stolen="giveKeysBack"
 		/>
-		<template v-if="!fullscreen && !maximized">
+		<template v-if="!fullscreen && !maximized && !pip">
 			<span
 				v-for="corner in CORNERS"
 				:key="corner"
@@ -197,6 +217,7 @@ import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import VideoCall from "./VideoCall.vue"
 import PipTip from "./PipTip.vue"
+import { canFloat } from "../utils/pip.js"
 
 const props = defineProps({
 	/** { title, jitsi_domain, jitsi_room } */
@@ -214,8 +235,13 @@ const props = defineProps({
 	poppedOut: { type: Boolean, default: false },
 	/** That window was closed by hand (the person is out of the call). */
 	windowClosed: { type: Boolean, default: false },
+	/** Over an open cockpit (#2075): fixed to the browser window instead of the map's stage. */
+	floating: { type: Boolean, default: false },
+	/** In the floating (picture-in-picture) window: fills its upper part, no moving or resizing. */
+	pip: { type: Boolean, default: false },
 })
-const emit = defineEmits(["leave", "update:rect", "popout", "bring-back"])
+const emit = defineEmits(["leave", "update:rect", "popout", "bring-back", "float"])
+const PIP = { width: "100%", height: "58vh", borderRadius: "0" }
 const hintClosed = ref(false)
 
 // Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was
@@ -274,7 +300,7 @@ const box = computed(() => ({
 let drag = null
 
 function start(kind, event) {
-	if (event.button !== 0 || fullscreen.value || maximized.value) return
+	if (event.button !== 0 || fullscreen.value || maximized.value || props.pip) return
 	event.preventDefault()
 	drag = { kind, startX: event.clientX, startY: event.clientY, from: { ...px.value }, target: event.currentTarget }
 	busy.value = true
