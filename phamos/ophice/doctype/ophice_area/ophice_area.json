@@ -32,12 +32,12 @@
   },
   {
    "default": "Meeting",
-   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one.",
+   "description": "Meeting: whoever stops inside joins its meeting and chat. Start: where chips are beamed in when people come in (#2072); only one. Guest: where external guests arrive and stay (#2080); only one. Customer meeting: where employees meet guests they invited (#2080).",
    "fieldname": "kind",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Kind",
-   "options": "Meeting\nStart"
+   "options": "Meeting\nStart\nGuest\nCustomer meeting"
   },
   {
    "description": "https://<allowed Jitsi server>/<room>, for example https://meet.jit.si/OurStandup",
@@ -116,7 +116,7 @@
    "fieldname": "section_chat",
    "fieldtype": "Section Break",
    "label": "Area chat",
-   "depends_on": "eval:doc.kind != 'Start'"
+   "depends_on": "eval:doc.kind == 'Meeting'"
   },
   {
    "default": "Saved",
@@ -125,7 +125,7 @@
    "fieldtype": "Select",
    "label": "Chat mode",
    "options": "Saved\nNot saved\nConfidential",
-   "depends_on": "eval:doc.kind != 'Start'"
+   "depends_on": "eval:doc.kind == 'Meeting'"
   },
   {
    "description": "Private Raven channel of the area chat (Saved and Not saved).",
@@ -137,7 +137,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 19:00:00.000000",
+ "modified": "2026-11-22 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",

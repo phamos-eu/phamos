@@ -181,7 +181,20 @@
 				data-testid="meeting-column"
 			>
 				<MeetingHuddle :area="meetingArea" :people="huddle" :me="me.user" @pick="(person, event) => openChatWith(person, event)" />
+				<!-- Guest and customer meeting areas get the guest chat (#2083); until then, a note. -->
+				<div
+					v-if="(meetingArea.kind || 'Meeting') !== 'Meeting'"
+					class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-outline-gray-2 bg-surface-white p-4 text-center text-sm text-ink-gray-6"
+					data-testid="guest-chat-placeholder"
+				>
+					<FeatherIcon :name="meetingArea.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-6 w-6 text-ink-gray-5" />
+					<p class="font-medium text-ink-gray-8">
+						{{ meetingArea.kind === "Guest" ? __("Guest area") : __("Customer meeting") }}
+					</p>
+					<p>{{ __("External guests can be here. The guest chat, kept only for a short while, comes soon.") }}</p>
+				</div>
 				<AreaChat
+					v-else
 					:key="meetingArea.name"
 					class="min-h-0 flex-1"
 					:area="meetingArea"
@@ -429,6 +442,8 @@ const SEND_MOVE_EVERY_MS = 120
 // Another chip's legs kick until this long after its last move arrived.
 const REMOTE_MOVING_MS = 250
 const API = "phamos.api.ophice"
+// Spaces with a meeting (#2060, #2081): stop inside and you join it.
+const MEETING_KINDS = ["Meeting", "Guest", "Customer meeting"]
 // Encounters (#2056): closer than this (centres, tiles) opens the chat; farther than the second
 // closes it again, so standing right at the edge does not flicker.
 // Each chip's perimeter has half the encounter distance as radius: two touching circles = in range.
@@ -992,7 +1007,7 @@ function areaAt(chip) {
 	// Meeting spaces only: the start space (#2072) has no meeting, chat or glow.
 	return (
 		areas.value.find(
-			(a) => (a.kind || "Meeting") === "Meeting" && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
+			(a) => MEETING_KINDS.includes(a.kind || "Meeting") && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
 		) || null
 	)
 }

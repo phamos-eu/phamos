@@ -94,7 +94,12 @@ AREA_TITLE_LENGTH = 60
 # Areas are drawn in half tiles (#2067).
 AREA_STEP = 0.5
 # Kinds of space (#2072): a meeting, or the start space where chips are beamed in.
-AREA_KINDS = ("Meeting", "Start")
+AREA_KINDS = ("Meeting", "Start", "Guest", "Customer meeting")
+# Kinds with a meeting: whoever stops inside joins it (#2060, #2081). Guest and Customer meeting
+# are also where external guests may be (#2080).
+MEETING_KINDS = ("Meeting", "Guest", "Customer meeting")
+# Only one of each of these on the map.
+SINGLE_KINDS = ("Start", "Guest")
 # Coming in (#2072): first visit of the day, or back after this long. Last visit per user in Redis.
 ARRIVAL_GAP_SECONDS = 5 * 60
 LAST_SEEN_CACHE_KEY = "phamos_ophice_last_seen"
@@ -1231,10 +1236,13 @@ def save_area(title, meeting_url="", x=0, y=0, width=1, height=1, name=None, cha
 	title = (title or "").strip()[:AREA_TITLE_LENGTH]
 	if not title:
 		frappe.throw(_("Give the area a name."))
-	if kind == "Start":
-		other = frappe.db.get_value(AREA_DOCTYPE, {"kind": "Start", "name": ("!=", name or "")}, "title")
+	if kind in SINGLE_KINDS:
+		other = frappe.db.get_value(AREA_DOCTYPE, {"kind": kind, "name": ("!=", name or "")}, "title")
 		if other:
-			frappe.throw(_("There is already a start space: {0}.").format(other))
+			if kind == "Start":
+				frappe.throw(_("There is already a start space: {0}.").format(other))
+			frappe.throw(_("There is already a guest area: {0}.").format(other))
+	if kind == "Start":
 		domain = room = ""
 	else:
 		domain, room = _parse_meeting_url(meeting_url)
@@ -1702,7 +1710,7 @@ def get_people():
 	)
 	online = {c["user"]: c for c in _online()}
 	# Only meeting spaces say where someone is; standing in the start space is just "around".
-	areas = [a for a in _areas() if a.kind == "Meeting"]
+	areas = [a for a in _areas() if a.kind in MEETING_KINDS]
 	working = _working_on([u.user for u in users if u.user == me or not _hides_details(u.user)])
 	cockpits = _cockpits_now()
 	chatting = _in_encounter([u.user for u in users if u.user in online])

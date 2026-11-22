@@ -2904,3 +2904,11 @@ Closes the separate window and continues the call here.,Schließt das separate F
 Here meet.jit.si ends the call after 5 minutes.,Hier beendet meet.jit.si den Anruf nach 5 Minuten.
 Leaving,Verlassen
 "Walk out of the space or press ""Leave"": the separate window closes and the call ends.","Verlassen Sie den Bereich oder drücken Sie ""Verlassen"": Das separate Fenster schließt sich und der Anruf endet."
+Guest area,Gastbereich
+Customer meeting,Kundenbesprechung
+External guests arrive here through the guest link and can only move inside it. Employees walk in and out freely and meet them in its meeting. There is only one guest area.,Externe Gäste kommen über den Gast-Link hier an und können sich nur darin bewegen. Mitarbeitende gehen frei hinein und hinaus und treffen sie in der Besprechung des Bereichs. Es gibt nur einen Gastbereich.
+A meeting room for guests: employees invite a guest from the guest area to come here.,Ein Besprechungsraum für Gäste: Mitarbeitende laden einen Gast aus dem Gastbereich hierher ein.
+"Chat: the guest chat, kept only for a short while (comes with the guest chat).","Chat: der Gast-Chat, nur kurz gespeichert (kommt mit dem Gast-Chat)."
+Guests,Gäste
+"External guests can be here. The guest chat, kept only for a short while, comes soon.","Hier können externe Gäste sein. Der Gast-Chat, nur kurz gespeichert, kommt bald."
+There is already a guest area: {0}.,Es gibt schon einen Gastbereich: {0}.

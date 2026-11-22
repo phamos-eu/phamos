@@ -938,3 +938,33 @@ class OphiceCockpitBarTestCase(FrappeTestCase):
 		self.assertEqual(cockpits[0]["route"], "/personal-cockpit")
 		self.assertTrue(all(c["logo"].startswith("/assets/phamos/manifest/") for c in cockpits))
 		self.assertNotIn("/ophice", [c["route"] for c in cockpits])
+
+
+class OphiceGuestAreaTestCase(_OphiceRoomBase):
+	"""Guest and customer meeting areas (#2081): one guest area, any number of customer meeting
+	areas, both with a meeting; for employees they work like meeting spaces."""
+
+	def setUp(self):
+		super().setUp()
+		# Independent of the spaces on the site's map; the rollback in tearDown brings them back.
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.set_user(self.A)
+
+	def test_one_guest_area_and_many_customer_meeting_areas(self):
+		guest = ophice.save_area("Lobby", "https://jitsi.example.org/Lobby", 0, 0, 4, 3, kind="Guest")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Second lobby", "https://jitsi.example.org/Lobby2", 10, 0, 2, 2, kind="Guest")
+		# Changing the guest area itself is fine.
+		ophice.save_area("Lobby", "https://jitsi.example.org/Lobby", 0, 0, 5, 3, name=guest, kind="Guest")
+		ophice.save_area("Room 1", "https://jitsi.example.org/Room1", 10, 0, 2, 2, kind="Customer meeting")
+		ophice.save_area("Room 2", "https://jitsi.example.org/Room2", 13, 0, 2, 2, kind="Customer meeting")
+		kinds = sorted(a.kind for a in ophice._areas())
+		self.assertEqual(kinds, ["Customer meeting", "Customer meeting", "Guest"])
+
+	def test_they_need_a_meeting_and_show_where_people_are(self):
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("No link", "", 0, 0, 2, 2, kind="Customer meeting")
+		ophice.save_area("Lobby", "https://jitsi.example.org/Lobby", 0, 0, 4, 3, kind="Guest")
+		frappe.set_user(self.B)
+		a = next(p for p in ophice.get_people()["people"] if p["user"] == self.A)
+		self.assertEqual(a["area"], "Lobby")  # A stands at 1,1

@@ -14,6 +14,7 @@
 				'area--editing': editing,
 				'area--lifted': gesture?.area?.name === area.name && draft,
 				'area--start': area.kind === 'Start',
+				'area--guests': area.kind === 'Guest' || area.kind === 'Customer meeting',
 			}"
 			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265 }"
 			:title="area.title"
@@ -31,6 +32,11 @@
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
 			<span class="area__title truncate">{{ area.title }}</span>
+			<!-- Where external guests can be (#2081): a marker everyone sees. -->
+			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
+				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-3 w-3" />
+				{{ area.kind === "Guest" ? __("Guests") : __("Customers") }}
+			</span>
 			<!-- Resize handles at the corners, only while editing (the layer above takes the pointer). -->
 			<template v-if="editing">
 				<span v-for="corner in CORNERS" :key="corner" class="area__handle" :class="`area__handle--${corner}`" />
@@ -56,6 +62,7 @@
 <script setup>
 import { computed, reactive, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	areas: { type: Array, default: () => [] },
@@ -239,6 +246,23 @@ function cancel() {
 	height: auto;
 	color: #fff;
 	filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+}
+/* Guest and customer meeting areas: a double edge, so it is clear guests can be here. */
+.area--guests {
+	border-style: double;
+	border-width: 4px;
+}
+.area__guests {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.92);
+	color: hsl(var(--area-h) 70% 25%);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1.6;
 }
 .area--active {
 	background: hsl(var(--area-h) 70% 42% / 0.45);

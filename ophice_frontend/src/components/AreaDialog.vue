@@ -6,7 +6,7 @@
 	<Dialog v-model="open" :options="{ title: area?.name ? __('Edit space') : __('New space'), size: 'md' }">
 		<template #body-content>
 			<form class="space-y-3" @submit.prevent="save">
-				<div class="flex gap-1 rounded-lg bg-surface-gray-2 p-1" role="radiogroup" :aria-label="__('Kind of space')">
+				<div class="grid grid-cols-2 gap-1 rounded-lg bg-surface-gray-2 p-1" role="radiogroup" :aria-label="__('Kind of space')">
 					<button
 						v-for="option in KINDS"
 						:key="option.kind"
@@ -29,10 +29,11 @@
 					:maxlength="60"
 					autofocus
 				/>
-				<p v-if="kind === 'Start'" class="text-xs text-ink-gray-5">
-					{{ __("People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space.") }}
+				<p v-if="KIND_HINTS[kind]" class="text-xs text-ink-gray-5" data-testid="area-kind-hint">
+					{{ KIND_HINTS[kind] }}
 				</p>
-				<template v-else>
+				<!-- Every kind but Start has a meeting. -->
+				<template v-if="kind !== 'Start'">
 				<FormControl
 					v-model="url"
 					:label="__('Jitsi meeting URL')"
@@ -41,7 +42,11 @@
 				<p class="text-xs text-ink-gray-5">
 					{{ __("Whoever stops inside the area joins this meeting, with microphone and camera off.") }}
 				</p>
+				<p v-if="kind !== 'Meeting'" class="text-xs text-ink-gray-5">
+					{{ __("Chat: the guest chat, kept only for a short while (comes with the guest chat).") }}
+				</p>
 				<FormControl
+					v-if="kind === 'Meeting'"
 					v-model="chatMode"
 					type="select"
 					:label="__('Chat')"
@@ -90,7 +95,15 @@ const open = computed({
 const KINDS = [
 	{ kind: "Meeting", icon: "video", label: __("Meeting") },
 	{ kind: "Start", icon: "log-in", label: __("Start") },
+	{ kind: "Guest", icon: "user-plus", label: __("Guest area") },
+	{ kind: "Customer meeting", icon: "briefcase", label: __("Customer meeting") },
 ]
+// What each kind does (#2072, #2081).
+const KIND_HINTS = {
+	Start: __("People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space."),
+	Guest: __("External guests arrive here through the guest link and can only move inside it. Employees walk in and out freely and meet them in its meeting. There is only one guest area."),
+	"Customer meeting": __("A meeting room for guests: employees invite a guest from the guest area to come here."),
+}
 const kind = ref("Meeting")
 const title = ref("")
 const url = ref("")
