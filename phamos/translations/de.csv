@@ -2675,6 +2675,8 @@ Stars,Sterne
 Times Put Off,Mal verschoben
 Live Since,Live seit
 Phriend Feedback,Phriend-Rückmeldung
+Results for “{0}”,Ergebnisse für „{0}“
+Search only for “{0}”,Nur nach „{0}“ suchen
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
 Ophice,Ophice
 "Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen (zweimal: Doppelsprung, halten: fliegen)"

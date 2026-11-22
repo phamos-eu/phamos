@@ -17,6 +17,10 @@
 		{{ search_box(search_action, lang, book=book, query=query) }}
 	</div>
 
+	{%- if query and corrected_query %}
+	{#- Typos (#2049): searched with the closest words; one click searches the spelling as typed. -#}
+	<p class="wp-docs-corrected">{{ _("Results for “{0}”").format(corrected_query) | e }} · <a href="{{ exact_url | e }}">{{ _("Search only for “{0}”").format(query) | e }}</a></p>
+	{%- endif %}
 	{%- if query %}
 	<p class="wp-docs-results-count" role="status">
 		{%- if too_short %}{{ _("Please enter at least 2 characters.") }}

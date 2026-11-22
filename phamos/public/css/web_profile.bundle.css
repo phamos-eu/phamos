@@ -859,3 +859,5 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-docs-hit-where { display: block; margin-top: 2px; color: var(--wp-muted); font-size: 13px; }
 .wp-docs-hit-snippet { margin: 6px 0 0; color: var(--wp-ink-2); font-size: 14px; line-height: 1.55; }
 .wp-docs-hit-snippet mark { padding: 0 2px; border-radius: 3px; background: #fff3bf; color: inherit; }
+.wp-docs-corrected { margin: 0 0 6px; color: var(--wp-ink); font-size: 15px; }
+.wp-docs-corrected a { color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 3px; }

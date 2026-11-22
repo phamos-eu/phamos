@@ -6,11 +6,15 @@
 Books (title, summary) and shown pages (title, plain text in Bookstack Page.search_text) of
 books with "Publish on website". Every word of the query must match; title hits rank before
 text hits. Used by the results page (www/documentation/search) and the suggestions while typing.
+
+Typos (#2049): a word without an exact hit is also searched as its closest words from the published
+documentation ("artikle" → "artikel"); exact hits rank first. ``exact=True`` switches that off.
 """
 
 from __future__ import annotations
 
 import re
+import string
 
 import frappe
 from frappe.query_builder import Case, Criterion
@@ -27,19 +31,27 @@ SNIPPET_CHARS = 90
 ROW_LIMIT = 200  # pages read per search; the count and the order don't depend on it
 
 
-def search_url(lang, query="", book_slug=None):
+def search_url(lang, query="", book_slug=None, exact=False):
 	from urllib.parse import urlencode
 
 	params = {"q": query} if query else {}
 	if book_slug:
 		params["book"] = book_slug
+	if exact:
+		params["exact"] = 1
 	return docs.search_path(lang) + (f"?{urlencode(params)}" if params else "")
 
 
+# Stripped from both ends of a word: "Artikel," is "Artikel", not a typo of it (review of !1295).
+_PUNCTUATION = "".join(sorted(set(string.punctuation + "„“”‚‘’«»‹›…–—·")))
+
+
 def words_of(query) -> list[str]:
-	"""The query's words, at most MAX_WORDS, each at least MIN_LENGTH characters."""
+	"""The query's words without surrounding punctuation, at most MAX_WORDS, each at least
+	MIN_LENGTH characters."""
 	query = (query or "").strip()[:MAX_LENGTH]
-	return [w for w in query.split() if len(w) >= MIN_LENGTH][:MAX_WORDS]
+	words = (w.strip(_PUNCTUATION) for w in query.split())
+	return [w for w in words if len(w) >= MIN_LENGTH][:MAX_WORDS]
 
 
 def _like(word):
@@ -47,45 +59,135 @@ def _like(word):
 	return "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30) -> dict:
-	"""{"books": [...], "pages": [...], "words": [...]}: books first, then pages, title hits first."""
+# --- typos (#2049) ---------------------------------------------------------------------------------
+
+_WORD = re.compile(r"[^\W\d_]{3,}")
+_UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def _norm(word):
+	"""Compared without case and with umlauts spelt out: "Mass" == "Maß", "Aenderung" == "Änderung"."""
+	return word.lower().translate(_UMLAUTS)
+
+
+def vocabulary(book=None) -> dict:
+	"""{normalised word: (most used spelling, number of pages, all spellings)} of the published
+	documentation, or of one book for a search limited to it (cached)."""
+	if book:
+		return docs._cached(f"vocabulary:{book.name}", lambda: _load_vocabulary([book]))
+	return docs._cached("vocabulary", lambda: _load_vocabulary(docs.published_books()))
+
+
+def _load_vocabulary(books):
+	counts: dict = {}
+	rows = frappe.get_all(
+		"Bookstack Page",
+		filters={"book": ["in", [b.name for b in books] or [""]], "html": ["is", "set"]},
+		fields=["title", "search_text"],
+	)
+	texts = [f"{r.title or ''} {r.search_text or ''}" for r in rows] + [b.title for b in books]
+	for text in texts:
+		for word in set(w.lower() for w in _WORD.findall(text)):
+			counts[word] = counts.get(word, 0) + 1
+	# "masse" and "maße" share the key "masse"; both stay known spellings, so neither is "corrected"
+	# into the other (review of !1295).
+	spellings: dict = {}
+	for word, n in counts.items():
+		spellings.setdefault(_norm(word), []).append((n, word))
+	return {
+		key: (max(found)[1], max(found)[0], tuple(sorted(w for _, w in found)))
+		for key, found in spellings.items()
+	}
+
+
+def corrections(word, vocab=None) -> list[str]:
+	"""Closest words of the documentation for a word that has no exact hit, most used first.
+
+	A word that appears (also inside a longer word, as the search matches) is not corrected.
+	Distance: 1 mistake for words of up to 5 letters, 2 for longer ones; swapped letters count once.
+	"""
+	try:
+		from rapidfuzz import process
+		from rapidfuzz.distance import DamerauLevenshtein
+	except ImportError:
+		# installed with ERPNext (rapidfuzz~=3.12), not a phamos dependency: without it the search
+		# still works, just without typo tolerance (review of !1295)
+		return []
+
+	vocab = vocabulary() if vocab is None else vocab
+	key = _norm(word)
+	if len(key) < 3:
+		return []
+	if key in vocab:
+		# a known spelling stays as typed; a spelt-out umlaut gets the real one: "aenderung" → "änderung"
+		return [] if word.lower() in vocab[key][2] else [vocab[key][0]]
+	if any(key in candidate for candidate in vocab):
+		return []
+	allowed = 1 if len(key) <= 5 else 2
+	found = process.extract(key, list(vocab), scorer=DamerauLevenshtein.distance, score_cutoff=allowed, limit=12)
+	ranked = sorted(found, key=lambda match: (match[1], -vocab[match[0]][1]))
+	return [vocab[match[0]][0] for match in ranked[:3]]
+
+
+def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30, exact=False) -> dict:
+	"""{"books", "pages", "total", "words", "corrected"}: books first, then pages; exact hits and
+	title hits first. ``corrected`` is {typed word: [corrections]} for words searched with typos."""
 	words = words_of(query)
 	books = docs.published_books(lang)
 	if book_slug:
 		books = [b for b in books if b.slug == book_slug]
 	if not words or not books:
-		return {"books": [], "pages": [], "words": words}
+		return {"books": [], "pages": [], "words": words, "corrected": {}}
+
+	# a search in one book corrects with that book's words: another book's word would give no hits
+	vocab = None if exact else vocabulary(books[0] if book_slug else None)
+	corrected = {}
+	if not exact:
+		for w in words:
+			found = corrections(w, vocab)
+			if found:
+				corrected[w] = found
+	variants = {w: [w, *corrected.get(w, [])] for w in words}
 
 	def matches(text):
 		text = (text or "").lower()
-		return all(w.lower() in text for w in words)
+		return all(any(v.lower() in text for v in variants[w]) for w in words)
 
 	book_hits = [] if book_slug else [b for b in books if matches(f"{b.title} {b.summary}")]
 
 	by_name = {b.name: b for b in books}
 	page = frappe.qb.DocType("Bookstack Page")
 	chapter = frappe.qb.DocType("Bookstack Chapter")
+	def any_variant(w, field):
+		return Criterion.any([field.like(_like(v)) for v in variants[w]])
+
 	found = Criterion.all([
 		page.book.isin(list(by_name)),
 		page.html.isnotnull() & (page.html != ""),
-		*[page.title.like(_like(w)) | page.search_text.like(_like(w)) for w in words],
+		*[any_variant(w, page.title) | any_variant(w, page.search_text) for w in words],
 	])
-	# Counted on their own and ordered in the database: the list is cut at 200 rows, and both the
-	# count and the title hits must not depend on which 200 came back (review of !1291).
+	# Counted on their own and ordered in the database: the list is cut at ROW_LIMIT rows, and the
+	# count and the order must not depend on which rows came back (review of !1291). Order: pages with
+	# the words as typed, then pages with the words in the title, then by title.
 	total = frappe.qb.from_(page).select(Count("*")).where(found).run()[0][0]
-	title_first = Case().when(Criterion.all([page.title.like(_like(w)) for w in words]), 0).else_(1)
+	exact_first = Case().when(
+		Criterion.all([page.title.like(_like(w)) | page.search_text.like(_like(w)) for w in words]), 0
+	).else_(1)
+	title_first = Case().when(Criterion.all([any_variant(w, page.title) for w in words]), 0).else_(1)
 	rows = (
 		frappe.qb.from_(page)
 		.left_join(chapter).on(chapter.name == page.chapter)
 		.select(page.name, page.slug, page.title, page.book, page.search_text, chapter.title.as_("chapter_title"))
 		.where(found)
+		.orderby(exact_first)
 		.orderby(title_first)
 		.orderby(page.title)
 		.limit(ROW_LIMIT)
 	).run(as_dict=True)
 
-	# Rows come ordered from the database (title hits first, then by title); a snippet is built only
-	# for the rows that are shown, not for every row read (review of !1291).
+	every_variant = [v for w in words for v in variants[w]]
+	# Rows come ordered from the database (exact words first, then title hits, then by title); a
+	# snippet is built only for the rows that are shown, not for every row read (review of !1291).
 	pages = []
 	for r in rows[:limit]:
 		book = by_name[r.book]
@@ -94,10 +196,15 @@ def search(query, lang=docs.DEFAULT_LANGUAGE, book_slug=None, limit=30) -> dict:
 			"url": docs.page_url(book.slug, r.slug, lang),
 			"book_title": book.title,
 			"chapter_title": r.chapter_title,
-			"snippet": snippet(r.search_text, words),
+			"snippet": snippet(r.search_text, every_variant),
 			"in_title": matches(r.title),
 		})
-	return {"books": book_hits, "pages": pages, "total": total, "words": words}
+	return {"books": book_hits, "pages": pages, "total": total, "words": words, "corrected": corrected}
+
+
+def corrected_query(query, corrected) -> str:
+	"""The query with every corrected word replaced by its best correction, for the note."""
+	return " ".join(corrected[w][0] if w in corrected else w for w in words_of(query))
 
 
 def snippet(text, words) -> str:
