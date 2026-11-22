@@ -1334,6 +1334,8 @@ function playBeam(user) {
 // just outside. user -> start time while it plays; the others see it from the move's lift flag.
 
 const LIFT_MS = 900
+// The server's move limit counts per 5 seconds (MOVE_WINDOW in phamos/api/ophice.py).
+const LIFT_RETRY_MS = 5000
 const lifts = reactive({})
 let lifting = false
 
@@ -1378,13 +1380,26 @@ function dropOut(area) {
 				clearTimeout(sendTimer)
 				sendTimer = null
 				lastSent = performance.now()
-				call(`${API}.move`, { x: round(spot.x), y: round(spot.y), lift: 1 }).catch(() => {})
+				sendLift(spot)
 				scheduleSave()
 				checkEncounters()
 				leaveMeetingIfOutside()
 			})
 		)
 	)
+}
+
+/**
+ * Tell the others about the lift. Walking stays well under the server's move limit, but a lost
+ * request would leave me standing in the meeting for them: one more try after the limit's window.
+ */
+function sendLift(spot, retry = true) {
+	// Walked on meanwhile: the normal moves have told them already, an old spot would pull me back.
+	const stillThere = () => me.value && round(me.value.x) === round(spot.x) && round(me.value.y) === round(spot.y)
+	const again = () => retry && setTimeout(() => stillThere() && sendLift(spot, false), LIFT_RETRY_MS)
+	call(`${API}.move`, { x: round(spot.x), y: round(spot.y), lift: 1 })
+		.then((sent) => sent || again())
+		.catch(again)
 }
 
 function upsertOther(chip) {
