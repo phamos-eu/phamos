@@ -10,6 +10,7 @@
 		:class="{
 			'meeting-panel--busy': busy,
 			'meeting-panel--full': fullscreen,
+			'meeting-panel--tile': snapped,
 			// Over an open cockpit (#2075) it is fixed to the window; in the floating window it fills it.
 			fixed: dock || (floating && !pip),
 			relative: pip && !dock,
@@ -466,6 +467,12 @@ function giveKeysBack() {
 </script>
 
 <style scoped>
+/* In a meeting tile (#2091) the tile glows; the window has no frame of its own. */
+.meeting-panel--tile {
+	border: 0 !important;
+	box-shadow: none !important;
+	border-radius: 0 0 0.6rem 0.6rem !important;
+}
 .step {
 	display: flex;
 	flex-shrink: 0;

@@ -2,20 +2,20 @@
 	<!--
 		People (#2063, #2091). Folded: a strip of chips at the side, with status (dot, away / be right
 		back), place (the glow of the space) and cockpit (icon) still readable. A click on the strip
-		unfolds the full list over the map; the search icon (or Cmd/Ctrl+F) unfolds it with the search
+		unfolds the full list, which pushes the map aside; the search icon (or Cmd/Ctrl+F) unfolds it with the search
 		field focused. It folds back when my chip moves, on a click outside, when the window loses
 		focus, or with Esc (PM, 2026-11-22). The handle keeps it open (remembered in this browser).
 		In a meeting it shows the people outside the meeting.
 	-->
 	<div
 		ref="root"
-		class="relative z-30 h-full flex-shrink-0"
-		:class="folded ? 'w-16' : 'w-64'"
+		class="people relative z-30 h-full flex-shrink-0"
+		:class="folded && !unfolded ? 'w-16' : 'w-64'"
 		data-testid="people-sidebar"
 		:data-folded="folded ? '1' : '0'"
 	>
 	<aside
-		v-if="folded"
+		v-if="folded && !unfolded"
 		class="flex h-full w-16 cursor-pointer flex-col items-center gap-2 overflow-y-auto border-r border-outline-gray-2 bg-surface-white py-2"
 		:aria-label="__('People')"
 		:title="__('Open the people list')"
@@ -67,8 +67,7 @@
 	<!-- The full list: in the page when kept open, over the map while the strip is hovered. -->
 	<aside
 		v-if="!folded || unfolded"
-		class="flex w-64 flex-col border-r border-outline-gray-2 bg-surface-white text-ink-gray-9"
-		:class="folded ? 'people--over absolute inset-y-0 left-0 z-40 shadow-2xl' : 'h-full'"
+		class="flex h-full w-64 flex-col border-r border-outline-gray-2 bg-surface-white text-ink-gray-9"
 		:aria-label="__('People')"
 		data-testid="people-list"
 	>
@@ -325,18 +324,13 @@ button:hover > .people__keys {
 	background: var(--surface-white);
 	border: 1px solid var(--outline-gray-2);
 }
-.people--over {
-	animation: people-unfold 140ms ease-out;
-}
-@keyframes people-unfold {
-	from {
-		opacity: 0;
-		transform: translateX(-12px);
-	}
+/* Unfolded, the list takes its own room: the map moves aside (PM, 2026-11-22). */
+.people {
+	transition: width 160ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-	.people--over {
-		animation: none;
+	.people {
+		transition: none;
 	}
 }
 </style>

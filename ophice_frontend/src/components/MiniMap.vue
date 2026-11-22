@@ -71,14 +71,14 @@
 				v-show="open.map || !meeting"
 				class="mini-map__view relative flex-shrink-0 cursor-pointer overflow-hidden rounded-lg"
 				:style="mapStyle"
-				:title="__('Back to the map')"
+				:title="SWITCH_HINT"
 				data-testid="mini-map-map"
 				@pointerdown="cam.onPointerDown"
 				@pointermove="cam.onPointerMove"
 				@pointerup="cam.onPointerUp"
 				@pointercancel="cam.onPointerUp"
 				@click.capture="cam.onClickCapture"
-				@click="$emit('fullscreen')"
+				@dblclick="$emit('fullscreen')"
 				@wheel.prevent="cam.onWheel"
 			>
 				<div
@@ -112,7 +112,11 @@
 						<span v-if="me" class="mini-map__chip mini-map__chip--me absolute rounded-full" :style="chipStyle(me, 'rgb(37,99,235)')" :title="__('You')" />
 					</div>
 				</div>
-				<div class="absolute bottom-1 right-1 flex gap-0.5" @click.stop @pointerdown.stop>
+				<!-- Back to the map by a double click (PM, 2026-11-22); a faint hint says so. -->
+				<div class="mini-map__hint pointer-events-none absolute inset-x-0 bottom-1.5 text-center" data-testid="mini-map-hint">
+					{{ SWITCH_HINT }}
+				</div>
+				<div class="absolute bottom-1 right-1 flex gap-0.5" @click.stop @dblclick.stop @pointerdown.stop>
 					<button type="button" class="mini-map__zoom" :title="__('Zoom out')" data-testid="mini-map-zoom-out" @click="cam.zoomBy(1 / 1.25)">
 						<FeatherIcon name="minus" class="h-3 w-3" />
 					</button>
@@ -306,6 +310,7 @@ function reply(ping) {
 
 // Served by Frappe, not bundled.
 const OPHICE_ICON = "/assets/phamos/manifest/ophice-icon-192.png"
+const SWITCH_HINT = window.matchMedia?.("(pointer: coarse)").matches ? __("Double-tap to switch") : __("Double-click to switch")
 const WIDTH = 280
 const MIN_W = 240
 const MIN_H = 220
@@ -618,6 +623,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.mini-map__hint {
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	color: rgba(255, 255, 255, 0.85);
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+	opacity: 0.75;
+}
 .mini-map__canvas--spring {
 	transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
