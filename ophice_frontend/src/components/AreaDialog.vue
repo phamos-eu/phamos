@@ -115,6 +115,7 @@ const KIND_HINTS = {
 	"Customer meeting": __("A meeting room for guests: employees invite a guest from the guest area to come here."),
 	Cockpit: __("Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional."),
 }
+const kind = ref("Meeting")
 const cockpit = ref("")
 const cockpitOptions = ref([])
 async function loadCockpits() {
@@ -127,7 +128,6 @@ async function loadCockpits() {
 	}
 }
 watch(kind, (value) => value === "Cockpit" && loadCockpits(), { immediate: true })
-const kind = ref("Meeting")
 const title = ref("")
 const url = ref("")
 const chatMode = ref("Saved")
