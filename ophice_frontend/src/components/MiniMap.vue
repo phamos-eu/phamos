@@ -180,16 +180,24 @@
 				data-testid="mini-map-chat-slot"
 			/>
 			</div>
-			<!-- Resize: drag the corner. Tall = a side bar, wide = a bar (PM, 2026-11-22). -->
-			<span
-				v-if="!floatTarget"
-				class="mini-map__resize mini-map__resize--se"
-				:title="__('Drag to resize')"
-				data-testid="mini-map-resize"
-				@pointerdown.stop="startResize('se', $event)"
-			/>
-			<span v-if="!floatTarget" class="mini-map__resize mini-map__resize--ne" :title="__('Drag to resize')" @pointerdown.stop="startResize('ne', $event)" />
+			<!-- Resize from any corner. Tall = a side bar, wide = a bar (PM, 2026-11-22). -->
+			<template v-if="!floatTarget">
+				<span
+					v-for="corner in CORNERS"
+					:key="corner"
+					class="mini-map__resize"
+					:class="`mini-map__resize--${corner}`"
+					:title="__('Drag to resize')"
+					:data-testid="`mini-map-resize-${corner}`"
+					@pointerdown.stop="startResize(corner, $event)"
+				/>
+			</template>
 		</div>
+	</Teleport>
+	<!-- While moving or resizing: catches the pointer, so the cockpit page and the call (embedded
+	     pages, which swallow mouse moves) cannot make the panel jump. -->
+	<Teleport to="body">
+		<div v-if="grabbing" class="fixed inset-0 z-[80]" :style="{ cursor: grabbing }" data-testid="mini-map-grab-layer" />
 	</Teleport>
 </template>
 
@@ -309,8 +317,10 @@ function keepInView() {
 }
 
 function startDrag(event) {
-	if (floatTarget.value || event.button !== 0) return
+	if (props.floatTarget || event.button !== 0) return
+	event.preventDefault()
 	drag = { x: event.clientX - pos.x, y: event.clientY - pos.y }
+	grabbing.value = "grabbing"
 	window.addEventListener("pointermove", onDrag)
 	window.addEventListener("pointerup", endDrag, { once: true })
 }
@@ -322,6 +332,7 @@ function onDrag(event) {
 }
 function endDrag() {
 	drag = null
+	grabbing.value = ""
 	window.removeEventListener("pointermove", onDrag)
 	try {
 		localStorage.setItem(POS_KEY, JSON.stringify({ x: pos.x, y: pos.y }))
@@ -370,31 +381,52 @@ const panelStyle = computed(() => ({
 	...(props.meeting ? { height: `${size.h}px` } : { maxHeight: `${window.innerHeight - 16}px` }),
 }))
 
+const CORNERS = ["nw", "ne", "sw", "se"]
+const CURSORS = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" }
+// Set while moving or resizing: the cursor of the layer that catches the pointer.
+const grabbing = ref("")
 let resize = null
+
 function startResize(corner, event) {
 	if (event.button !== 0) return
 	event.preventDefault()
-	resize = { corner, x: event.clientX, y: event.clientY, from: { ...size, top: pos.y } }
+	resize = { corner, x: event.clientX, y: event.clientY, from: { x: pos.x, y: pos.y, w: size.w, h: size.h } }
+	grabbing.value = CURSORS[corner]
 	window.addEventListener("pointermove", onResize)
 	window.addEventListener("pointerup", endResize, { once: true })
 }
+
 function onResize(event) {
 	if (!resize) return
+	const { corner, from } = resize
 	const dx = event.clientX - resize.x
 	const dy = event.clientY - resize.y
-	size.w = Math.max(MIN_W, Math.min(window.innerWidth - pos.x - 4, resize.from.w + dx))
-	if (resize.corner === "se") {
-		size.h = Math.max(MIN_H, Math.min(window.innerHeight - pos.y - 4, resize.from.h + dy))
-	} else {
-		// Top edge: the bottom stays where it is.
-		const bottom = resize.from.top + resize.from.h
-		const top = Math.max(4, Math.min(bottom - MIN_H, resize.from.top + dy))
-		pos.y = top
-		size.h = bottom - top
+	const maxRight = window.innerWidth - 4
+	const maxBottom = window.innerHeight - 4
+	let { x, y, w, h } = from
+	if (corner.includes("e")) w = Math.min(maxRight - x, Math.max(MIN_W, from.w + dx))
+	if (corner.includes("w")) {
+		// The right edge stays put.
+		const right = from.x + from.w
+		x = Math.max(4, Math.min(right - MIN_W, from.x + dx))
+		w = right - x
 	}
+	if (corner.includes("s")) h = Math.min(maxBottom - y, Math.max(MIN_H, from.h + dy))
+	if (corner.includes("n")) {
+		// The bottom edge stays put.
+		const bottom = from.y + from.h
+		y = Math.max(4, Math.min(bottom - MIN_H, from.y + dy))
+		h = bottom - y
+	}
+	pos.x = x
+	pos.y = y
+	size.w = w
+	size.h = h
 }
+
 function endResize() {
 	resize = null
+	grabbing.value = ""
 	window.removeEventListener("pointermove", onResize)
 	try {
 		localStorage.setItem(SIZE_KEY, JSON.stringify({ w: size.w, h: size.h }))
@@ -464,25 +496,29 @@ onBeforeUnmount(() => {
 }
 .mini-map__resize {
 	position: absolute;
-	right: 0;
-	width: 14px;
-	height: 14px;
+	width: 16px;
+	height: 16px;
 	z-index: 2;
 }
-.mini-map__resize--se {
-	bottom: 0;
+.mini-map__resize--nw {
+	left: 0;
+	top: 0;
 	cursor: nwse-resize;
-	background: linear-gradient(135deg, transparent 50%, var(--outline-gray-4, #999) 50%, transparent 60%, transparent 70%, var(--outline-gray-4, #999) 70%, transparent 80%);
 }
 .mini-map__resize--ne {
+	right: 0;
 	top: 0;
 	cursor: nesw-resize;
 }
-.mini-map__ping--new {
-	animation: mini-map-ping 1.2s ease-out 2;
+.mini-map__resize--sw {
+	left: 0;
+	bottom: 0;
+	cursor: nesw-resize;
 }
-@keyframes mini-map-ping {
-	0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
-	100% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+.mini-map__resize--se {
+	right: 0;
+	bottom: 0;
+	cursor: nwse-resize;
+	background: linear-gradient(135deg, transparent 50%, var(--outline-gray-4, #999) 50%, transparent 60%, transparent 70%, var(--outline-gray-4, #999) 70%, transparent 80%);
 }
 </style>
