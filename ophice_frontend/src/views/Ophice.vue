@@ -357,7 +357,8 @@
 					:sending="bubble.sending"
 					:video="bubble.user === videoUser ? bubble.video : null"
 					:display-name="me.full_name"
-					:style="bubbleStyle(bubble)"
+					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
+					@pointerdown.capture="raise(`chat:${bubble.user}`)"
 					@send="(text, done) => sendMessage(bubble, text, done)"
 					@close="closeBubble(bubble.user)"
 				/>
@@ -389,21 +390,57 @@
 						/>
 					</span>
 				</div>
-				<!-- Chat notices at their space (#2066), burn notices next to my chip (#2057). -->
+				<!--
+					Chat notices at their space (#2066): they pop up for a moment, then shrink to a small
+					bubble on the space's top right corner; a click opens them again (PM, 2026-11-22).
+					Burn notices next to my chip (#2057). Whatever was clicked last is in front.
+				-->
 				<template v-if="!meetingArea">
-					<BatchNotice
-						v-for="notice in batchNoticeList"
-						:key="`batch-${notice.name}`"
-						class="ophice-notice absolute z-30"
-						:style="noticeAtArea(notice)"
-						:notice="notice"
-						:now="clock"
-						:busy="batchBusy[notice.name] || ''"
-						data-testid="notice-at-area"
-						@vote="(choice) => voteBatch(notice, choice)"
-						@dismiss="dismissedBatches.add(notice.name)"
-					/>
-					<div v-if="noticeList.length" class="absolute z-30 flex flex-col gap-2" :style="noticeAtMe" data-testid="notice-at-me">
+					<template v-for="notice in batchNoticeList" :key="`batch-${notice.name}`">
+						<div
+							v-if="noticeOpen[notice.name]"
+							class="ophice-notice absolute"
+							:style="{ ...noticeAtArea(notice), zIndex: zOf(`batch:${notice.name}`) }"
+							data-testid="notice-at-area"
+							@pointerdown="raise(`batch:${notice.name}`)"
+						>
+							<BatchNotice
+								:notice="notice"
+								:now="clock"
+								:busy="batchBusy[notice.name] || ''"
+								@vote="(choice) => voteBatch(notice, choice)"
+								@dismiss="dismissedBatches.add(notice.name)"
+							/>
+							<button
+								type="button"
+								class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-outline-gray-2 bg-surface-white text-ink-gray-6 shadow hover:text-ink-gray-9"
+								:title="__('Make small')"
+								data-testid="notice-shrink"
+								@click.stop="shrinkNotice(notice.name)"
+							>
+								<FeatherIcon name="minimize-2" class="h-3 w-3" />
+							</button>
+						</div>
+						<button
+							v-else
+							type="button"
+							class="ophice-notice-bubble absolute flex items-center justify-center rounded-full text-ink-white shadow-lg"
+							:class="notice.vote_until && !notice.my_vote ? 'bg-amber-600' : 'bg-surface-gray-7'"
+							:style="bubbleAtArea(notice)"
+							:title="__('Chat of {0}', [notice.area_title])"
+							data-testid="notice-bubble"
+							@click="openNotice(notice.name)"
+						>
+							<FeatherIcon :name="notice.vote_until && !notice.my_vote ? 'users' : 'message-square'" class="h-3.5 w-3.5" />
+						</button>
+					</template>
+					<div
+						v-if="noticeList.length"
+						class="absolute flex flex-col gap-2"
+						:style="{ ...noticeAtMe, zIndex: zOf('burn') }"
+						data-testid="notice-at-me"
+						@pointerdown="raise('burn')"
+					>
 						<BurnNotice
 							v-for="notice in noticeList"
 							:key="notice.encounter"
@@ -759,6 +796,45 @@ function noticeBox(left, top, bottomEdge) {
 		top: `${Math.max(4, y)}px`,
 	}
 }
+// --- Which pop-up on the map is in front (PM, 2026-11-22): the one clicked or opened last.
+// Chat bubbles, chat notices and burn notices share one order (z 21–39, below menus and dialogs).
+
+const frontOrder = ref([])
+function raise(key) {
+	frontOrder.value = [...frontOrder.value.filter((k) => k !== key), key].slice(-18)
+}
+function zOf(key) {
+	const index = frontOrder.value.indexOf(key)
+	return index < 0 ? 20 : 21 + index
+}
+
+// Chat notices: open for a moment when they come, then a bubble at their space.
+const NOTICE_OPEN_MS = 6000
+const noticeOpen = reactive({})
+const noticeTimers = {}
+function openNotice(name, forMs = 0) {
+	noticeOpen[name] = true
+	raise(`batch:${name}`)
+	clearTimeout(noticeTimers[name])
+	if (forMs) noticeTimers[name] = setTimeout(() => shrinkNotice(name), forMs)
+}
+function shrinkNotice(name) {
+	clearTimeout(noticeTimers[name])
+	noticeOpen[name] = false
+}
+function bubbleAtArea(notice) {
+	const area = areas.value.find((a) => a.name === notice.area)
+	if (!area) return { right: "8px", bottom: "8px", width: "24px", height: "24px", zIndex: 15 }
+	const t = tile.value
+	return {
+		left: `${(area.x + area.width) * t - 12}px`,
+		top: `${area.y * t - 12}px`,
+		width: "24px",
+		height: "24px",
+		zIndex: 15,
+	}
+}
+
 function noticeAtArea(notice) {
 	const area = areas.value.find((a) => a.name === notice.area)
 	if (!area) return { right: "8px", bottom: "8px" }
@@ -1736,6 +1812,19 @@ const dismissedBatches = reactive(new Set())
 // The area I'm in shows its batches in its own chat; the rest come here.
 const batchNoticeList = computed(() =>
 	batchNotices.value.filter((n) => n.area !== meetingArea.value?.name && !dismissedBatches.has(n.name))
+)
+// Chat notices pop up when they come (or change: a vote started), then shrink (see openNotice).
+const seenNotices = new Set()
+watch(
+	() => batchNoticeList.value.map((n) => `${n.name}:${n.status}:${n.vote_until || ""}`),
+	(keys) => {
+		// New, or changed (a vote started): pop up once more.
+		for (const key of keys) {
+			if (seenNotices.has(key)) continue
+			seenNotices.add(key)
+			openNotice(key.split(":")[0], NOTICE_OPEN_MS)
+		}
+	}
 )
 
 async function loadBatchNotices() {
