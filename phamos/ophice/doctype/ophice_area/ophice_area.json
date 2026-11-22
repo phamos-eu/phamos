@@ -128,7 +128,7 @@
   },
   {
    "default": "Saved",
-   "description": "Saved: history kept (can be burned). Not saved: deleted when the last person leaves. Confidential: never stored, only live.",
+   "description": "Saved: history kept (can be burned). Not saved: deleted 10 minutes after the room empties, unless someone saves it. Confidential: never stored, only live.",
    "fieldname": "chat_mode",
    "fieldtype": "Select",
    "label": "Chat mode",

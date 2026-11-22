@@ -2776,7 +2776,7 @@ Confidential,Vertraulich
 "Never stored. Only people in the room see it, only now.","Nie gespeichert. Nur wer gerade im Raum ist, sieht es, und nur jetzt."
 The chat could not be loaded.,Der Chat konnte nicht geladen werden.
 "Saved: history is kept, can be burned","Gespeichert: Verlauf bleibt, kann verbrannt werden"
-Not saved: deleted when the last person leaves,"Nicht gespeichert: gelöscht, wenn die letzte Person geht"
+"Not saved: deleted 10 minutes after the room empties, unless someone saves it","Nicht gespeichert: 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn"
 "Confidential: never stored, only live","Vertraulich: nie gespeichert, nur live"
 Unknown chat mode.,Unbekannter Chat-Modus.
 Step into the area to use its chat.,"Betreten Sie den Bereich, um seinen Chat zu nutzen."

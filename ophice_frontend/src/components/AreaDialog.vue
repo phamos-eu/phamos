@@ -65,7 +65,7 @@
 					:label="__('Chat')"
 					:options="[
 						{ label: __('Saved: history is kept, can be burned'), value: 'Saved' },
-						{ label: __('Not saved: deleted when the last person leaves'), value: 'Not saved' },
+						{ label: __('Not saved: deleted 10 minutes after the room empties, unless someone saves it'), value: 'Not saved' },
 						{ label: __('Confidential: never stored, only live'), value: 'Confidential' },
 					]"
 					data-testid="area-chat-mode-select"
