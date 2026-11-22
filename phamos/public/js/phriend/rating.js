@@ -38,7 +38,9 @@ export function picks_html(__, kind) {
 export function rating_item(phriend, req) {
 	const __ = phriend.__;
 	const csrf = () => phriend.host.csrf_token();
-	const html = `<div class="rate-q">${question_text(__, req, phriend.host.issue_url)}</div>${picks_html(__, req.kind)}
+	// a closure, so a host whose issue_url uses `this` keeps it (AI review of !1298)
+	const issue_url = phriend.host.issue_url ? (name) => phriend.host.issue_url(name) : null;
+	const html = `<div class="rate-q">${question_text(__, req, issue_url)}</div>${picks_html(__, req.kind)}
 		<div class="rate-foot"><button type="button" class="link" data-decline>${escape_html(__("No thanks"))}</button></div>`;
 
 	const send = async (rating, comment) => {

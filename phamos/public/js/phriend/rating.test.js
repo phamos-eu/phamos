@@ -18,6 +18,11 @@ describe("rating a fix (#2014)", () => {
 		const text = question_text(__, { kind: "Stars", round: "First impression", title: "Search", subject: "ISS-1" }, url)
 		expect(text).toContain('<a href="/app/issue/ISS-1" target="_blank" rel="noopener">“Search”</a>')
 		expect(question_text(__, { kind: "Stars", title: "Search", subject: "ISS-1" })).not.toContain("<a")
+		expect(question_text(__, { kind: "Stars", title: "Search" }, url)).not.toContain("<a")
+	})
+	it("escapes the report link", () => {
+		const text = question_text(__, { kind: "Stars", title: "Search", subject: "ISS-1" }, () => '/x?a=1&b="2"')
+		expect(text).toContain('href="/x?a=1&amp;b=&quot;2&quot;"')
 	})
 	it("offers thumbs for bugs and five stars for improvements", () => {
 		expect((picks_html(__, "Thumbs").match(/class="pick"/g) || []).length).toBe(2)
