@@ -1,45 +1,47 @@
 <template>
 	<!--
 		People (#2063, #2091). Folded: a strip of chips at the side, with status (dot, away / be right
-		back), place (the glow of the space) and cockpit (icon) still readable. Hovering the strip
-		unfolds the full list over the map; the handle keeps it open (remembered in this browser).
-		In a meeting it stays folded and shows the people outside the meeting.
+		back), place (the glow of the space) and cockpit (icon) still readable. A click on the strip
+		unfolds the full list over the map; the search icon (or Cmd/Ctrl+F) unfolds it with the search
+		field focused. It folds back when my chip moves, on a click outside, when the window loses
+		focus, or with Esc (PM, 2026-11-22). The handle keeps it open (remembered in this browser).
+		In a meeting it shows the people outside the meeting.
 	-->
 	<div
+		ref="root"
 		class="relative z-30 h-full flex-shrink-0"
 		:class="folded ? 'w-16' : 'w-64'"
 		data-testid="people-sidebar"
 		:data-folded="folded ? '1' : '0'"
-		@mouseenter="hoverIn"
-		@mouseleave="hoverOut"
 	>
 	<aside
 		v-if="folded"
-		class="flex h-full w-16 flex-col items-center gap-2 overflow-y-auto border-r border-outline-gray-2 bg-surface-white py-2"
+		class="flex h-full w-16 cursor-pointer flex-col items-center gap-2 overflow-y-auto border-r border-outline-gray-2 bg-surface-white py-2"
 		:aria-label="__('People')"
+		:title="__('Open the people list')"
 		data-testid="people-strip"
+		@click="unfold()"
 	>
 		<button
-			v-if="!meeting"
 			type="button"
 			class="flex flex-col items-center rounded-lg px-1.5 py-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-			:title="__('Keep the people list open')"
-			data-testid="people-pin"
-			@click="$emit('pin', true)"
+			:title="__('Find a person ({0})', [findShortcut])"
+			data-testid="people-search-open"
+			@click.stop="openSearch()"
 		>
-			<FeatherIcon name="users" class="h-4 w-4" />
-			<span class="text-[10px] tabular-nums">{{ onlineCount }}</span>
+			<FeatherIcon name="search" class="h-4 w-4" />
 		</button>
-		<button
+		<span class="flex flex-col items-center text-[10px] tabular-nums text-ink-gray-5" :title="__('{0} online', [onlineCount])">
+			<FeatherIcon name="users" class="h-3.5 w-3.5" />{{ onlineCount }}
+		</span>
+		<!-- A click on a chip opens the list too: from there a click starts a chat. -->
+		<div
 			v-for="person in stripPeople"
 			:key="person.user"
-			type="button"
 			class="relative flex-shrink-0 rounded-full"
 			:class="{ 'opacity-50': !person.online }"
 			:title="`${person.full_name} · ${lineOf(person).text}`"
-			:disabled="person.user === me"
 			data-testid="person"
-			@click="$emit('pick', person, $event)"
 		>
 			<span class="block rounded-full" :style="chipStyle(person)">
 				<UserAvatar :name="person.user" :label="person.full_name" :image="person.user_image" size="sm" />
@@ -61,11 +63,11 @@
 				class="absolute -bottom-1 -left-1 h-3.5 w-3.5 rounded ring-2 ring-surface-white"
 				data-testid="person-cockpit-badge"
 			/>
-		</button>
+		</div>
 	</aside>
 	<!-- The full list: in the page when kept open, over the map while the strip is hovered. -->
 	<aside
-		v-if="!folded || hovering"
+		v-if="!folded || unfolded"
 		class="flex w-64 flex-col border-r border-outline-gray-2 bg-surface-white text-ink-gray-9"
 		:class="folded ? 'people--over absolute inset-y-0 left-0 z-40 shadow-2xl' : 'h-full'"
 		:aria-label="__('People')"
@@ -87,12 +89,13 @@
 		</div>
 		<div class="px-3 pb-2">
 			<input
+				ref="search"
 				v-model="query"
 				type="search"
 				class="form-input h-7 w-full rounded border-outline-gray-2 bg-surface-gray-2 px-2 text-xs text-ink-gray-9"
 				:placeholder="__('Find a person')"
 				data-testid="people-search"
-				@keydown.esc.stop.prevent="query ? (query = '') : $event.target.blur()"
+				@keydown.esc.stop.prevent="query ? (query = '') : fold()"
 			/>
 		</div>
 		<ul class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
@@ -181,7 +184,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import WorkingOnCard from "./WorkingOnCard.vue"
@@ -209,17 +212,43 @@ defineEmits(["pick", "hide", "auto-cockpit", "pin"])
 // Folded: the strip of chips; in a meeting always (the people there huddle above the chat).
 const folded = computed(() => Boolean(props.meeting) || !props.pinned)
 const stripPeople = computed(() => (props.meeting ? outside.value : props.people))
-// Unfold after a short hover, fold back a moment after the mouse left (no flicker on the way past).
-const hovering = ref(false)
-let hoverTimer = null
-function hoverIn() {
-	clearTimeout(hoverTimer)
-	if (folded.value) hoverTimer = setTimeout(() => (hovering.value = true), 150)
+// Unfolded over the map by a click, the search icon or Cmd/Ctrl+F (#2091).
+const unfolded = ref(false)
+const root = ref(null)
+const search = ref(null)
+const findShortcut = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘ F" : "Ctrl + F"
+
+function unfold() {
+	if (folded.value) unfolded.value = true
 }
-function hoverOut() {
-	clearTimeout(hoverTimer)
-	hoverTimer = setTimeout(() => (hovering.value = false), 300)
+/** Open the list with the search field focused (search icon, Cmd/Ctrl+F). */
+function openSearch() {
+	unfolded.value = true
+	nextTick(() => {
+		search.value?.focus()
+		search.value?.select()
+	})
 }
+/** Fold back to the strip: my chip moved, a click outside, the window lost focus, Esc. */
+function fold() {
+	if (!unfolded.value) return
+	unfolded.value = false
+	query.value = ""
+	search.value?.blur()
+}
+function onPointerDownOutside(event) {
+	if (unfolded.value && root.value && !root.value.contains(event.target)) fold()
+}
+onMounted(() => {
+	document.addEventListener("pointerdown", onPointerDownOutside, true)
+	window.addEventListener("blur", fold)
+})
+onBeforeUnmount(() => {
+	document.removeEventListener("pointerdown", onPointerDownOutside, true)
+	window.removeEventListener("blur", fold)
+})
+
+defineExpose({ openSearch, fold })
 
 const query = ref("")
 const onlineCount = computed(() => props.people.filter((p) => p.online).length)

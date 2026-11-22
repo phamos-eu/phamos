@@ -104,6 +104,7 @@
 		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
 		<PeopleSidebar
 			v-if="me"
+			ref="peopleSidebar"
 			:pinned="showPeople"
 			@pin="setPeoplePinned"
 			:people="people"
@@ -1107,6 +1108,12 @@ function isTyping(target) {
 function onKeydown(event) {
 	shift = event.shiftKey
 	if (props.cockpitOpen) return
+	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
+	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
+		event.preventDefault()
+		peopleSidebar.value?.openSearch()
+		return
+	}
 	// Adjust (#2089): arrow keys move the image (1 px, with Shift half a tile), not the chip.
 	if (adjustingBackground.value && imageBox.value && ARROWS[event.key] && !isTyping(event.target)) {
 		event.preventDefault()
@@ -1138,6 +1145,8 @@ function onKeydown(event) {
 		spaceHeld = true
 		if (event.repeat) return
 		backFromStatus()
+		// Moving my chip folds the people list back (#2091).
+		peopleSidebar.value?.fold()
 		if (!jump && !flying.value) startJump()
 		else if (jump && !jump.doubled) doubleJump()
 		return
@@ -1146,6 +1155,7 @@ function onKeydown(event) {
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
 	backFromStatus()
+	peopleSidebar.value?.fold()
 	held.add(key)
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
@@ -1837,6 +1847,7 @@ watch(
 
 // Kept open (#2091); folded to the chips by default.
 const showPeople = ref(readFlag(PEOPLE_KEY, false))
+const peopleSidebar = ref(null)
 let peopleTimer = null
 let peopleSoon = null
 
