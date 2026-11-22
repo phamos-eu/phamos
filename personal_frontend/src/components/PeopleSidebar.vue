@@ -42,8 +42,19 @@
 						/>
 					</span>
 					<span class="min-w-0 flex-1">
-						<span class="block truncate text-sm">
-							{{ person.full_name }}<span v-if="person.user === me" class="text-ink-gray-5"> ({{ __("you") }})</span>
+						<span class="flex items-center gap-1 text-sm">
+							<span class="truncate">
+								{{ person.full_name }}<span v-if="person.user === me" class="text-ink-gray-5"> ({{ __("you") }})</span>
+							</span>
+							<!-- The cockpit they are in right now (#2065). -->
+							<img
+								v-if="person.cockpit?.logo"
+								:src="person.cockpit.logo"
+								:alt="person.cockpit.title"
+								:title="__('In {0}', [person.cockpit.title])"
+								class="h-4 w-4 flex-shrink-0 rounded"
+								data-testid="person-cockpit"
+							/>
 						</span>
 						<span class="flex items-center gap-1 truncate text-xs text-ink-gray-5">
 							<FeatherIcon v-if="lineOf(person).icon" :name="lineOf(person).icon" class="h-3 w-3 flex-shrink-0" />

@@ -98,6 +98,9 @@ EVENT_AREA_BURNED = "ophice_area_burned"
 # People list (#2063): everyone sees who is around; each user can hide their details.
 HIDE_KEY = "phamos_ophice_hide_details"
 RECENT_CHATS = 5
+# Which cockpit someone is in (#2065): a heartbeat from every cockpit tab while it is visible.
+COCKPIT_CACHE_KEY = "phamos_ophice_cockpits"
+COCKPIT_TTL = 75
 # The server sees moves a moment late: a chip this close to the edge still counts as inside.
 AREA_SLACK = 0.5
 
@@ -1353,6 +1356,7 @@ def get_people():
 	online = {c["user"]: c for c in _online()}
 	areas = _areas()
 	working = _working_on([u.user for u in users if u.user == me or not _hides_details(u.user)])
+	cockpits = _cockpits_now()
 	chatting = _in_encounter([u.user for u in users if u.user in online])
 	people = []
 	for row in users:
@@ -1371,6 +1375,7 @@ def get_people():
 			"in_chat": False,
 			# What they work on now (#2064): the Implementation, the issue only as a detail.
 			"working_on": working.get(row.user),
+			"cockpit": cockpits.get(row.user) if (row.user == me or not hidden) else None,
 		}
 		if chip and (not hidden or row.user == me):
 			cx, cy = chip["x"] + 0.5, chip["y"] + 0.5
@@ -1389,6 +1394,7 @@ def set_hide_details(hide=0):
 	hide = frappe.utils.cint(hide)
 	if hide:
 		frappe.defaults.set_user_default(HIDE_KEY, "1", frappe.session.user)
+		frappe.cache.hdel(COCKPIT_CACHE_KEY, frappe.session.user)
 	else:
 		frappe.defaults.clear_user_default(HIDE_KEY, frappe.session.user)
 	return bool(hide)
@@ -1512,4 +1518,50 @@ def _working_on(users):
 			if url and str(url).startswith("https://"):
 				card["issue"] = {"title": title or row.gitlab_issue, "url": url}
 		result[row.user_id] = card
+	return result
+
+
+# --- The cockpit someone is in (#2065).
+#
+# Every cockpit page sends cockpit_heartbeat while its tab is visible; the Redis hash keeps the
+# latest one per user for COCKPIT_TTL seconds. Nothing in the database, no history; users who
+# hide their details are not recorded at all.
+
+
+def _cockpit_tiles():
+	"""route → {title, logo} from the Apps screen tiles."""
+	from phamos.cockpits.settings import COCKPITS
+
+	tiles = {}
+	for tile in frappe.get_hooks("add_to_apps_screen", app_name="phamos"):
+		route = tile.get("route")
+		if route in COCKPITS:
+			tiles[route] = {"route": route, "title": _(tile.get("title") or route), "logo": tile.get("logo") or ""}
+	return tiles
+
+
+@frappe.whitelist(methods=["POST"])
+def cockpit_heartbeat(route):
+	"""I am looking at the cockpit at `route` (its base route, e.g. /sales-cockpit)."""
+	if frappe.session.user == "Guest":
+		return False
+	user = frappe.session.user
+	if route not in _cockpit_tiles() or _hides_details(user):
+		frappe.cache.hdel(COCKPIT_CACHE_KEY, user)
+		return False
+	frappe.cache.hset(COCKPIT_CACHE_KEY, user, {"route": route, "ts": time.time()})
+	return True
+
+
+def _cockpits_now():
+	"""user → {route, title, logo} for cockpit tabs seen within COCKPIT_TTL."""
+	tiles = _cockpit_tiles()
+	now = time.time()
+	result = {}
+	for user, entry in (frappe.cache.hgetall(COCKPIT_CACHE_KEY) or {}).items():
+		user = frappe.safe_decode(user)
+		if not isinstance(entry, dict) or now - entry.get("ts", 0) > COCKPIT_TTL or entry.get("route") not in tiles:
+			frappe.cache.hdel(COCKPIT_CACHE_KEY, user)
+			continue
+		result[user] = tiles[entry["route"]]
 	return result

@@ -723,3 +723,26 @@ class OphiceWorkingOnTestCase(FrappeTestCase):
 		self.assertEqual(card["project_name"], "Ophice working on")
 		self.assertTrue(card["url"].startswith("/app/implementation/"))
 		self.assertNotIn("Private goal text", str(card))
+
+
+class OphiceCockpitTestCase(_OphiceRoomBase):
+	"""The cockpit someone is in (#2065): live only, never for those who hide their details."""
+
+	def tearDown(self):
+		frappe.cache.hdel(ophice.COCKPIT_CACHE_KEY, self.A)
+		super().tearDown()
+
+	def test_heartbeat_shows_the_cockpit_icon(self):
+		frappe.set_user(self.A)
+		self.assertFalse(ophice.cockpit_heartbeat("/not-a-cockpit"))
+		self.assertTrue(ophice.cockpit_heartbeat("/sales-cockpit"))
+		frappe.set_user(self.B)
+		a = next(p for p in ophice.get_people()["people"] if p["user"] == self.A)
+		self.assertEqual(a["cockpit"]["route"], "/sales-cockpit")
+		self.assertTrue(a["cockpit"]["logo"])
+		frappe.set_user(self.A)
+		ophice.set_hide_details(1)
+		self.assertFalse(ophice.cockpit_heartbeat("/sales-cockpit"))
+		frappe.set_user(self.B)
+		a = next(p for p in ophice.get_people()["people"] if p["user"] == self.A)
+		self.assertIsNone(a["cockpit"])
