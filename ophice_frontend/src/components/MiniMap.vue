@@ -535,8 +535,22 @@ watch(
 	},
 	{ immediate: true }
 )
+// In the floating window (#2075, PM: "keep the snapping and folding there"): its own resizes count
+// too, so the call and chat stay on their spots and the tall/wide layout follows the window.
+let floatWindow = null
+watch(
+	() => props.floatTarget,
+	(body) => {
+		floatWindow?.removeEventListener("resize", report)
+		floatWindow = body?.ownerDocument?.defaultView || null
+		floatWindow?.addEventListener("resize", report)
+		nextTick(report)
+	},
+	{ immediate: true }
+)
 onBeforeUnmount(() => {
 	observer.disconnect()
+	floatWindow?.removeEventListener("resize", report)
 	emit("slots", null)
 })
 </script>
