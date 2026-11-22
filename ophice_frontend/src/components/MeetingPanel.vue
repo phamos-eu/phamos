@@ -51,7 +51,7 @@
 				@pointerdown.stop
 				@click="pipTip = !pipTip"
 			>
-				<FeatherIcon name="copy" class="h-3.5 w-3.5" />
+				<PopOutIcon class="h-3.5 w-3.5" />
 				{{ __("On top") }}
 			</button>
 			<button
@@ -214,6 +214,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { Button, FeatherIcon } from "frappe-ui"
+import PopOutIcon from "./PopOutIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import VideoCall from "./VideoCall.vue"
 import PipTip from "./PipTip.vue"

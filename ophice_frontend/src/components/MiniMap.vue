@@ -38,18 +38,9 @@
 					@pointerdown.stop
 					@click="float"
 				>
-					<FeatherIcon name="copy" class="h-3.5 w-3.5" />
+					<PopOutIcon class="h-3.5 w-3.5" />
 				</button>
-				<button
-					type="button"
-					class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-					:title="__('Back to the map, full screen (the cockpit stays open)')"
-					data-testid="mini-map-fullscreen"
-					@pointerdown.stop
-					@click="$emit('fullscreen')"
-				>
-					<FeatherIcon name="maximize-2" class="h-3.5 w-3.5" />
-				</button>
+				<!-- No extra "back to the map" button (PM, 2026-11-22): a click on the map goes there. -->
 			</header>
 
 			<div class="flex min-h-0 flex-1 gap-1.5 p-1.5" :class="wide ? 'flex-row' : 'flex-col'">
@@ -240,6 +231,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue"
 import { FeatherIcon } from "frappe-ui"
+import PopOutIcon from "./PopOutIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat } from "../utils/pip.js"

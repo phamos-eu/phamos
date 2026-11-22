@@ -10,7 +10,7 @@
 		data-testid="pip-tip"
 	>
 		<div class="flex items-center gap-2">
-			<FeatherIcon name="copy" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
+			<PopOutIcon class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="flex-1 text-sm font-medium text-ink-gray-9">{{ __("Keep the video on top") }}</span>
 			<button type="button" class="rounded p-0.5 text-ink-gray-5 hover:bg-surface-gray-2" :title="__('Close')" @click="$emit('close')">
 				<FeatherIcon name="x" class="h-3.5 w-3.5" />
@@ -28,6 +28,7 @@
 
 <script setup>
 import { Button, FeatherIcon } from "frappe-ui"
+import PopOutIcon from "./PopOutIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 
 defineEmits(["close"])
