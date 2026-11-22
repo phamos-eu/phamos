@@ -148,7 +148,7 @@
 									? __("You left the room")
 									: __("{0} left the room", [nameIn(batch, item.user)])
 						}}
-						· {{ timeOf(item) }}
+						· <span :title="exactTime(item)">{{ timeOf(item) }}</span>
 					</p>
 					<div v-else class="flex flex-col" :class="item.owner === me ? 'items-end' : 'items-start'">
 						<span v-if="item.owner !== me" class="text-[11px] text-ink-gray-5">{{ nameIn(batch, item.owner) }}</span>
@@ -156,7 +156,7 @@
 							class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 							:class="item.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
 						>{{ item.text }}</span>
-						<span class="mt-0.5 text-[10px] text-ink-gray-4" data-testid="area-chat-time">{{ timeOf(item) }}</span>
+						<span class="mt-0.5 text-[10px] text-ink-gray-4" :title="exactTime(item)" data-testid="area-chat-time">{{ timeOf(item) }}</span>
 					</div>
 				</template>
 			</template>
@@ -173,7 +173,7 @@
 					class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 					:class="message.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
 				>{{ message.text }}</span>
-				<span class="mt-0.5 text-[10px] text-ink-gray-4">{{ timeOf(message) }}</span>
+				<span class="mt-0.5 text-[10px] text-ink-gray-4" :title="exactTime(message)">{{ timeOf(message) }}</span>
 			</div>
 		</div>
 
@@ -201,7 +201,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Button, call, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { clockTime, relativeTime } from "../utils/ophiceTime.js"
+import { clockTime, relativeTime, withinMinutes } from "../utils/ophiceTime.js"
 
 const props = defineProps({
 	/** { name, title, chat_mode } */
@@ -265,10 +265,25 @@ function at(seconds) {
 	return seconds == null ? null : new Date(loadedAt.value + seconds * 1000)
 }
 
-/** "14:02" (or "Mon 14:02") on this browser's clock; a message pushed live is stamped on arrival. */
+// Up to this age a line says "in the last 15/30/… minutes"; older ones show their time (PM, 2026-11-22).
+const RELATIVE_MINUTES = 90
+
+function dateOf(item) {
+	// A message pushed live is stamped on arrival; loaded ones count from the server's "seconds ago".
+	return item._at ? new Date(item._at) : at(item.at_in ?? 0)
+}
+
+/** "in the last 15 minutes" (15-minute steps) for 90 minutes, then the time as System Settings format it. */
 function timeOf(item) {
-	const date = item._at ? new Date(item._at) : at(item.at_in ?? 0)
-	return clockTime(date, new Date(now.value))
+	const date = dateOf(item)
+	const current = new Date(now.value)
+	if (current - date < RELATIVE_MINUTES * 60000) return withinMinutes(date, current)
+	return clockTime(date, current)
+}
+
+/** The exact time, on hover. */
+function exactTime(item) {
+	return clockTime(dateOf(item), new Date(0))
 }
 
 function when(batch) {

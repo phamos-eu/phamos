@@ -70,7 +70,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { Button, FeatherIcon, FormControl } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { myZone, toLocalInput } from "../utils/ophiceTime.js"
+import { fromLocalInput, myZone, toLocalInput, tomorrowAt } from "../utils/ophiceTime.js"
 
 const props = defineProps({
 	/** My current status or null */
@@ -92,17 +92,11 @@ const inMinutes = (minutes) => () => {
 	d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0)
 	return d
 }
-const tomorrowAt = (hour) => () => {
-	const d = new Date()
-	d.setDate(d.getDate() + 1)
-	d.setHours(hour, 0, 0, 0)
-	return d
-}
 const quicks = [
 	{ label: __("30 min"), at: inMinutes(30) },
 	{ label: __("1 hour"), at: inMinutes(60) },
 	{ label: __("2 hours"), at: inMinutes(120) },
-	{ label: __("Tomorrow 9:00"), at: tomorrowAt(9) },
+	{ label: __("Tomorrow 9:00"), at: () => tomorrowAt(9) },
 ]
 
 const kind = ref(props.status?.kind || "")
@@ -124,9 +118,9 @@ async function save() {
 	error.value = ""
 	let until = ""
 	if (kind.value === "away") {
-		// The browser reads the input as local time; toISOString() makes it an instant in UTC.
-		const date = new Date(backAt.value)
-		if (!backAt.value || Number.isNaN(date.getTime())) {
+		// The input is on the viewer's clock (their Frappe time zone); toISOString() makes it UTC.
+		const date = fromLocalInput(backAt.value)
+		if (!date || Number.isNaN(date.getTime())) {
 			error.value = __("Please say when you will be back.")
 			return
 		}
