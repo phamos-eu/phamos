@@ -846,6 +846,8 @@ class OphiceWorkingOnTestCase(FrappeTestCase):
 				"task_in_timesheet_record": "Task is optional",
 				"percent_billable": "75",
 				"custom_implementation": self.implementation,
+				# Mandatory custom field (phamos/phamos/custom/project.json); enforced on version-15.
+				"project_owner": "Administrator",
 			}
 		).insert(ignore_permissions=True).name
 
