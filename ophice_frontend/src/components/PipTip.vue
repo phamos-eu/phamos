@@ -1,7 +1,7 @@
 <template>
 	<!--
-		How to keep a call on top (#2078): Chrome's own picture-in-picture on a video, by right-click
-		or with Google's extension and its shortcut. Ophice cannot start it itself (the call runs on
+		How to keep a call on top (#2078): Chrome's own picture-in-picture on a video, by right-click.
+		Ophice cannot start it itself (the call runs on
 		Jitsi's page), so it explains it. Chrome and Edge only.
 	-->
 	<div
@@ -20,12 +20,6 @@
 		<p>
 			{{ __("The video then floats above all windows, also when you go back to another tab or app.") }}
 		</p>
-		<p class="flex flex-wrap items-center gap-1">
-			{{ __("Shortcut") }}
-			<kbd class="rounded border border-outline-gray-3 bg-surface-gray-2 px-1.5 py-0.5 font-mono text-[11px]">{{ shortcut }}</kbd>
-			{{ __("with") }}
-			<a :href="EXTENSION_URL" target="_blank" rel="noopener" class="text-ink-blue-3 underline">{{ __("Google's Picture-in-Picture extension") }}</a>
-		</p>
 		<div class="flex justify-end">
 			<Button size="sm" variant="subtle" data-testid="pip-tip-ok" @click="$emit('close')">{{ __("Got it") }}</Button>
 		</div>
@@ -38,8 +32,4 @@ import { __ } from "@spa/utils/i18n.js"
 
 defineEmits(["close"])
 
-// Google's own extension (Chrome Web Store); its default shortcut is Alt+P, Option+P on a Mac.
-const EXTENSION_URL = "https://chromewebstore.google.com/detail/hkgfoiooedgoejojocmhlaklaeopbecg"
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
-const shortcut = isMac ? "⌥ P" : "Alt + P"
 </script>

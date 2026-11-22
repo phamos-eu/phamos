@@ -83,19 +83,88 @@
 		</div>
 		<PipTip v-if="pipTip" class="absolute right-3 top-12 z-20" @close="closePipTip" />
 		<!-- The meeting runs in its own window: no second call here. -->
+		<!--
+			The meeting runs in its own window (#2078): this space explains how to find it again, keep
+			it visible, bring it back or leave. People land here after chatting in Ophice.
+		-->
 		<div
 			v-if="poppedOut"
-			class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-gray-7"
+			class="min-h-0 flex-1 overflow-y-auto p-5 text-sm text-ink-gray-8"
 			data-testid="meeting-popped-out"
 		>
-			<FeatherIcon name="external-link" class="h-8 w-8 text-ink-gray-5" />
-			<p>{{ __("The meeting runs in its own window.") }}</p>
-			<p v-if="CHROMIUM" class="max-w-xs text-xs text-ink-gray-5">
-				{{ __("Tip: right-click a video there and choose \"Picture in picture\" to keep it on top of all windows.") }}
-			</p>
-			<div class="flex flex-wrap justify-center gap-2">
-				<Button variant="subtle" @click="$emit('popout')">{{ __("Show that window") }}</Button>
-				<Button variant="ghost" @click="$emit('bring-back')">{{ __("Back into Ophice") }}</Button>
+			<div class="mx-auto flex max-w-md flex-col gap-4">
+				<div class="flex items-start gap-3">
+					<span
+						class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
+						:style="{ background: `hsl(${hue ?? 220} 75% 50% / 0.15)`, color: `hsl(${hue ?? 220} 75% 35%)` }"
+					>
+						<FeatherIcon :name="windowClosed ? 'alert-circle' : 'external-link'" class="h-5 w-5" />
+					</span>
+					<div>
+						<p class="text-base font-semibold text-ink-gray-9">
+							{{ windowClosed ? __("The meeting window was closed") : __("Your call runs in its own window") }}
+						</p>
+						<p class="text-ink-gray-6">
+							{{
+								windowClosed
+									? __("Open it again, or continue the call here in Ophice.")
+									: __("You are still in the meeting of {0}. Video and sound are in the separate browser window.", [area.title])
+							}}
+						</p>
+					</div>
+				</div>
+
+				<div class="flex flex-wrap gap-2">
+					<Button variant="solid" data-testid="meeting-show-window" @click="$emit('popout')">
+						<template #prefix><FeatherIcon name="external-link" class="h-4 w-4" /></template>
+						{{ windowClosed ? __("Open it again") : __("Show that window") }}
+					</Button>
+					<Button variant="subtle" data-testid="meeting-bring-back" @click="$emit('bring-back')">
+						<template #prefix><FeatherIcon name="corner-down-left" class="h-4 w-4" /></template>
+						{{ __("Back into Ophice") }}
+					</Button>
+				</div>
+
+				<ol v-if="!windowClosed" class="space-y-3">
+					<li class="flex gap-3">
+						<span class="step">1</span>
+						<div>
+							<p class="font-medium text-ink-gray-9">{{ __("Can't find the call?") }}</p>
+							<p class="text-ink-gray-6">
+								{{ __("Click \"Show that window\": it comes to the front.") }}
+								{{ isMac ? __("Or press {0} to switch between the browser's windows.", ["⌘ `"]) : __("Or press {0} to switch windows.", ["Alt + Tab"]) }}
+							</p>
+						</div>
+					</li>
+					<li v-if="CHROMIUM" class="flex gap-3">
+						<span class="step">2</span>
+						<div>
+							<p class="font-medium text-ink-gray-9">{{ __("Keep the video visible while you work here") }}</p>
+							<p class="text-ink-gray-6">
+								{{ __("In the call's window, right-click a person's video and choose \"Picture in picture\". If a small menu of the call opens first, right-click again. The video then floats above all windows, also over Ophice.") }}
+							</p>
+						</div>
+					</li>
+					<li class="flex gap-3">
+						<span class="step">{{ CHROMIUM ? 3 : 2 }}</span>
+						<div>
+							<p class="font-medium text-ink-gray-9">{{ __("Back into Ophice") }}</p>
+							<p class="text-ink-gray-6">
+								{{ __("Closes the separate window and continues the call here.") }}
+								{{ area.jitsi_domain === "meet.jit.si" ? __("Here meet.jit.si ends the call after 5 minutes.") : "" }}
+							</p>
+						</div>
+					</li>
+					<li class="flex gap-3">
+						<span class="step">{{ CHROMIUM ? 4 : 3 }}</span>
+						<div>
+							<p class="font-medium text-ink-gray-9">{{ __("Leaving") }}</p>
+							<p class="text-ink-gray-6">
+								{{ __("Walk out of the space or press \"Leave\": the separate window closes and the call ends.") }}
+							</p>
+						</div>
+					</li>
+				</ol>
 			</div>
 		</div>
 		<VideoCall
@@ -143,12 +212,15 @@ const props = defineProps({
 	limitHint: { type: Boolean, default: false },
 	/** The meeting runs in its own browser window: no embedded call here. */
 	poppedOut: { type: Boolean, default: false },
+	/** That window was closed by hand (the person is out of the call). */
+	windowClosed: { type: Boolean, default: false },
 })
 const emit = defineEmits(["leave", "update:rect", "popout", "bring-back"])
 const hintClosed = ref(false)
 
 // Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was
 // closed once; the "On top" button brings it back.
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 const CHROMIUM = Boolean(navigator.userAgentData?.brands?.some((b) => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand)))
 const PIP_TIP_KEY = "phamos_ophice_pip_tip_seen"
 function seen() {
@@ -273,7 +345,22 @@ function exitFill() {
 	maximized.value = false
 	return true
 }
-defineExpose({ exitFill })
+/** The window's place on the screen (px), to open the meeting's own window right over it. */
+function screenRect() {
+	const box = root.value?.getBoundingClientRect()
+	if (!box) return null
+	// The browser's own bars above the page (tabs, address bar); the sides have no frame to speak of.
+	const top = window.screenY + Math.max(0, window.outerHeight - window.innerHeight)
+	const left = window.screenX + Math.max(0, (window.outerWidth - window.innerWidth) / 2)
+	return {
+		left: Math.round(left + box.left),
+		top: Math.round(top + box.top),
+		width: Math.round(box.width),
+		height: Math.round(box.height),
+	}
+}
+
+defineExpose({ exitFill, screenRect })
 
 onMounted(() => document.addEventListener("fullscreenchange", onFullscreenChange))
 onBeforeUnmount(() => {
@@ -291,6 +378,19 @@ function giveKeysBack() {
 </script>
 
 <style scoped>
+.step {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 999px;
+	background: hsl(var(--area-h) 75% 50% / 0.15);
+	color: hsl(var(--area-h) 75% 35%);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
 /* The space's colour around the meeting window (#2078), like the frame around its people and chat. */
 .meeting-panel {
 	border: 3px solid hsl(var(--area-h) 75% 50%);

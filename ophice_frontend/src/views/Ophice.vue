@@ -158,6 +158,7 @@
 				:hue="meetingArea.color_hue"
 				:limit-hint="meetingArea.jitsi_domain === 'meet.jit.si'"
 				:popped-out="poppedOut === meetingArea.name"
+				:window-closed="meetingWindowClosed"
 				@update:rect="setMeetingRect"
 				@leave="leaveMeeting(true)"
 				@popout="popOut"
@@ -1028,8 +1029,9 @@ function leaveMeetingIfOutside() {
 
 function leaveMeeting(byChoice) {
 	const left = meetingArea.value
+	// Leaving the space ends the call, also in its own window (PM, 2026-11-22).
+	if (poppedOut.value) closeMeetingWindow()
 	poppedOut.value = null
-	meetingWindow = null
 	if (byChoice && left) meetingLeftHere = left.name
 	meetingArea.value = null
 	// A "Not saved" chat burns once nobody is left in the area (#2062).
@@ -1050,31 +1052,56 @@ const meetingFrameStyle = computed(() => {
 // 5 minutes; opened directly it runs up to 95. Ophice then drops its own call (no double join).
 
 const poppedOut = ref(null)
+// Closed by hand (the x of that window): the person is out of the call until they open it again.
+const meetingWindowClosed = ref(false)
 let meetingWindow = null
+let windowWatch = null
 
 function popOut() {
 	const area = meetingArea.value
 	if (!area) return
 	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
+		// Brings it to the front once; only picture-in-picture keeps a video in front.
 		meetingWindow.focus()
 		return
 	}
-	meetingWindow = window.open(url, `ophice-meeting-${area.name}`, "popup,width=1200,height=800")
+	// Opened right over the meeting window, same size. After that it shows another site, and the
+	// browser no longer lets Ophice move it.
+	const at = meetingPanel.value?.screenRect?.()
+	const place = at
+		? `left=${at.left},top=${at.top},width=${Math.max(480, at.width)},height=${Math.max(360, at.height)}`
+		: "width=1200,height=800"
+	meetingWindow = window.open(url, `ophice-meeting-${area.name}`, `popup,${place}`)
 	if (!meetingWindow) {
 		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
 		return
 	}
 	poppedOut.value = area.name
+	meetingWindowClosed.value = false
+	clearInterval(windowWatch)
+	windowWatch = setInterval(() => {
+		if (meetingWindow?.closed) {
+			meetingWindowClosed.value = true
+			clearInterval(windowWatch)
+		}
+	}, 1000)
 }
 
-function bringBack() {
+/** Close the meeting's own window, if Ophice opened it (lost after a reload of Ophice). */
+function closeMeetingWindow() {
+	clearInterval(windowWatch)
 	try {
 		meetingWindow?.close()
 	} catch {
 		// already gone
 	}
 	meetingWindow = null
+	meetingWindowClosed.value = false
+}
+
+function bringBack() {
+	closeMeetingWindow()
 	poppedOut.value = null
 }
 
@@ -1434,6 +1461,8 @@ function heartbeat() {
 
 // On tab close the component never unmounts: tell the server with a request that outlives the page.
 function leaveOnPagehide() {
+	// Ophice closes: the call in its own window ends with it.
+	if (poppedOut.value) closeMeetingWindow()
 	try {
 		fetch(`/api/method/${API}.leave`, {
 			method: "POST",
