@@ -30,7 +30,7 @@
 				:variant="statusOpen ? 'solid' : 'subtle'"
 				:title="__('Set a status: be right back, or away until a time')"
 				data-testid="status-button"
-				@click="statusOpen = !statusOpen"
+				@click="toggleStatus()"
 			>
 				<template #prefix>
 					<FeatherIcon :name="me.status?.kind === 'away' ? 'moon' : me.status ? 'coffee' : 'check-circle'" class="h-4 w-4" />
@@ -155,7 +155,8 @@
 			/>
 			<StatusMenu
 				v-if="statusOpen && me"
-				class="absolute right-6 top-6 z-40"
+				:class="statusAt ? 'fixed z-50' : 'absolute right-6 top-6 z-40'"
+				:style="statusAt ? statusMenuStyle : null"
 				:status="me.status"
 				:on-save="saveStatus"
 				@close="statusOpen = false"
@@ -263,10 +264,11 @@
 					@close="closeBubble(bubble.user)"
 				/>
 				<div
-					class="ophice-chip absolute flex items-center justify-center"
+					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:style="chipStyle(me)"
-					:title="me.full_name"
+					:title="__('{0}: click to set your availability', [me.full_name])"
 					data-testid="my-chip"
+					@click="toggleStatus($event)"
 				>
 					<span class="inline-flex" :style="{ transform: `scale(${chipScale})` }">
 						<ChipFigure
@@ -1032,6 +1034,21 @@ let nowTimer = null
 
 const AWAY_GRACE_MS = 3600 * 1000
 const statusOpen = ref(false)
+// Where the status menu opens: next to my chip when I click it, else under the header button.
+const statusAt = ref(null)
+const statusMenuStyle = computed(() => ({
+	left: `${Math.max(8, Math.min(window.innerWidth - 336, statusAt.value.x + 12))}px`,
+	top: `${Math.max(8, Math.min(window.innerHeight - 380, statusAt.value.y + 12))}px`,
+}))
+
+function toggleStatus(event) {
+	if (statusOpen.value) {
+		statusOpen.value = false
+		return
+	}
+	statusAt.value = event ? { x: event.clientX, y: event.clientY } : null
+	statusOpen.value = true
+}
 // For "back in 20 minutes": a slow clock is enough.
 const clock = ref(Date.now())
 const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
