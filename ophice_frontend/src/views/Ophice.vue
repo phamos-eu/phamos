@@ -1410,7 +1410,11 @@ function rectPx(rect) {
 watch(
 	() => props.cockpitOpen,
 	(open) => {
-		if (!open) dockRects.value = null
+		if (open) return
+		dockRects.value = null
+		// Back in the office (PM, 2026-11-22): the floating window closes and call and chat come
+		// back onto the map. A meeting in its own browser window (the long one, #2078) stays there.
+		if (pipBody.value) closeMeetingPip()
 	}
 )
 
