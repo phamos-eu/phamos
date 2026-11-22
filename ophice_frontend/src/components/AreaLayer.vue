@@ -33,15 +33,6 @@
 				<FeatherIcon :name="COCKPIT_SYMBOLS[area.cockpit]" class="area__cockpit-symbol" />
 			</span>
 			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-img" />
-			<!-- Guest and customer spaces (#2081): bold, in the cockpit icon's style (PM, 2026-11-22). -->
-			<span
-				v-else-if="area.kind === 'Guest' || area.kind === 'Customer meeting'"
-				class="area__cockpit-icon area__guest-icon"
-				:style="{ '--tile': `hsl(${area.color_hue ?? 265} 70% 36%)` }"
-				data-testid="area-guest-icon"
-			>
-				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="area__cockpit-symbol" />
-			</span>
 			<img
 				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
@@ -54,7 +45,7 @@
 			<span class="area__title truncate">{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
-				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-3 w-3" />
+				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-4 w-4" />
 				{{ area.kind === "Guest" ? __("Guests") : __("Customers") }}
 			</span>
 			<!-- Resize handles at the corners, only while editing (the layer above takes the pointer). -->
@@ -287,11 +278,6 @@ function cancel() {
 	background: color-mix(in srgb, var(--tile) 55%, transparent);
 	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.3);
 }
-/* Guests and customers stay bold: an almost solid tile. */
-.area__guest-icon {
-	background: color-mix(in srgb, var(--tile) 88%, transparent);
-	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 1px 4px rgba(0, 0, 0, 0.45);
-}
 .area__cockpit-symbol {
 	width: 55%;
 	height: 55%;
@@ -318,17 +304,21 @@ function cancel() {
 	border-style: double;
 	border-width: 4px;
 }
+/* "Guests" / "Customers": white on the space itself, no pill, a bit bigger and centred
+   (PM, 2026-11-22: the marker inverted). The halo keeps it readable on any map. */
 .area__guests {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
-	padding: 0 6px;
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.92);
-	color: hsl(var(--area-h) 70% 25%);
-	font-size: 10px;
-	font-weight: 600;
-	line-height: 1.6;
+	justify-content: center;
+	align-self: center;
+	gap: 4px;
+	margin-top: 2px;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1.3;
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8), 0 0 8px hsl(var(--area-h) 70% 20% / 0.8);
+	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
 }
 .area--active {
 	background: hsl(var(--area-h) 70% 42% / 0.45);
