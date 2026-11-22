@@ -1421,7 +1421,8 @@ function onRemoteMove(message) {
 	// A move from someone not on my grid yet (missed their join): ask for the full picture.
 	if (!other) return message?.user && message.user !== me.value?.user ? refreshOthers() : null
 	lastSeen.set(other.user, Date.now())
-	if (message.lift) playLift(other.user)
+	// Only a lift that changes the place: a resent lift (its first answer got lost) plays once.
+	if (message.lift && (other.x !== message.x || other.y !== message.y)) playLift(other.user)
 	other.x = message.x
 	other.y = message.y
 	other.moving = true
