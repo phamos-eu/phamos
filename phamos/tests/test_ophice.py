@@ -571,6 +571,8 @@ class _OphiceRoomBase(FrappeTestCase):
 					{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
 				).insert(ignore_permissions=True)
 				user.add_roles("Raven User")
+		# A may change the map (#2071); B may not.
+		frappe.get_doc("User", self.A).add_roles(ophice.MAP_EDITOR_ROLE)
 		if not frappe.get_all("Raven Workspace", limit=1):
 			frappe.get_doc({"doctype": "Raven Workspace", "workspace_name": "Ophice Test", "type": "Public"}).insert(
 				ignore_permissions=True
@@ -849,3 +851,23 @@ class OphiceAppTestCase(FrappeTestCase):
 		self.assertTrue(ophice.check_app_permission())
 		frappe.set_user("Guest")
 		self.assertFalse(ophice.check_app_permission())
+
+
+class OphiceMapEditorTestCase(_OphiceRoomBase):
+	"""Map editor role (#2071): only map editors change spaces and the background."""
+
+	def test_only_map_editors_change_the_map(self):
+		area = self._area("Saved")  # A is a map editor
+		frappe.set_user(self.A)
+		self.assertTrue(ophice.get_space()["can_edit_map"])
+		frappe.set_user(self.B)
+		self.assertFalse(ophice.get_space()["can_edit_map"])
+		with self.assertRaises(frappe.PermissionError):
+			ophice.save_area("Mine", "https://jitsi.example.org/Mine", 10, 10, 2, 2)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.delete_area(area)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.set_background_layout(fit=0, scale=120)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.remove_background()
+		self.assertTrue(frappe.db.exists(ophice.AREA_DOCTYPE, area))

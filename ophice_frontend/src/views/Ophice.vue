@@ -38,9 +38,9 @@
 				</template>
 				{{ me.status?.kind === "away" ? __("Away") : me.status ? __("Be right back") : __("Available") }}
 			</Button>
-			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. -->
+			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. Map editors only (#2071). -->
 			<Button
-				v-if="me"
+				v-if="canEditMap"
 				:variant="editingAreas ? 'solid' : 'subtle'"
 				:title="__('Draw and edit meeting areas, for everyone')"
 				:aria-pressed="editingAreas"
@@ -58,7 +58,7 @@
 				@change="uploadBackground"
 			/>
 			<Button
-				v-if="me"
+				v-if="canEditMap"
 				variant="subtle"
 				:loading="backgroundBusy"
 				:title="__('Upload an image as the background of Ophice, for everyone')"
@@ -68,7 +68,7 @@
 				{{ __("Background") }}
 			</Button>
 			<Button
-				v-if="me && background"
+				v-if="canEditMap && background"
 				:variant="adjustingBackground ? 'solid' : 'subtle'"
 				:title="__('Size and position of the background image on the grid, for everyone')"
 				:aria-pressed="adjustingBackground"
@@ -78,7 +78,7 @@
 				{{ __("Adjust") }}
 			</Button>
 			<Button
-				v-if="me && background"
+				v-if="canEditMap && background"
 				variant="ghost"
 				:disabled="backgroundBusy"
 				:title="__('Remove the background, for everyone')"
@@ -453,6 +453,8 @@ const background = ref("")
 const FITTED = { fit: true, scale: 100, x: 50, y: 50 }
 const backgroundLayout = ref({ ...FITTED })
 const adjustingBackground = ref(false)
+// The map tools (spaces, background) are for map editors (#2071); the server checks it too.
+const canEditMap = ref(false)
 let layoutTimer = null
 
 // Live for me while dragging; saved (and sent to everyone) a moment after the last change.
@@ -1499,6 +1501,7 @@ onMounted(async () => {
 		background.value = data.background || ""
 		backgroundLayout.value = data.background_layout || { ...FITTED }
 		setAreas(data.areas)
+		canEditMap.value = Boolean(data.can_edit_map)
 		for (const notice of data.notices || []) upsertNotice(notice)
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {

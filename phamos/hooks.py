@@ -596,6 +596,7 @@ fixtures = [
             "name", "in", [
                 "Bookstack User",
                 "Bookstack Manager",
+                "Ophice Map Editor",
             ]
         ]
     ]},

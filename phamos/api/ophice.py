@@ -129,6 +129,21 @@ def check_app_permission():
 	return frappe.get_cached_value("User", frappe.session.user, "user_type") == "System User"
 
 
+# Who may change the map (#2071): spaces and the background. Everyone else only uses it.
+MAP_EDITOR_ROLE = "Ophice Map Editor"
+
+
+def can_edit_map(user=None):
+	user = user or frappe.session.user
+	return user == "Administrator" or MAP_EDITOR_ROLE in frappe.get_roles(user)
+
+
+def _require_map_editor():
+	_require_user()
+	if not can_edit_map():
+		frappe.throw(_("Only Ophice map editors can change the map."), frappe.PermissionError)
+
+
 def _require_user():
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in to use Ophice."), frappe.PermissionError)
@@ -241,6 +256,8 @@ def get_space():
 		"background": _background().get("url") or "",
 		"background_layout": _background_layout(_background()),
 		"areas": _areas(),
+		# The map tools and the Debug menu are only shown to map editors (#2071).
+		"can_edit_map": can_edit_map(user),
 	}
 
 
@@ -459,7 +476,7 @@ def _background_layout(value):
 @frappe.whitelist(methods=["POST"])
 def set_background_layout(fit=1, scale=100, x=50, y=50):
 	"""Size and position of the background image on the grid, for everyone."""
-	_require_user()
+	_require_map_editor()
 	value = _background()
 	if not value.get("url"):
 		frappe.throw(_("Upload a background first."))
@@ -518,7 +535,7 @@ def _store_background(content, filename):
 @frappe.whitelist(methods=["POST"])
 def upload_background():
 	"""Upload an image (multipart field "file") as Ophice's background, for everyone."""
-	_require_user()
+	_require_map_editor()
 	upload = frappe.request.files.get("file") if frappe.request else None
 	if not upload:
 		frappe.throw(_("Choose an image first."))
@@ -530,7 +547,7 @@ def upload_background():
 @frappe.whitelist(methods=["POST"])
 def remove_background():
 	"""Back to the plain grid, for everyone."""
-	_require_user()
+	_require_map_editor()
 	_set_background({})
 
 
@@ -1125,8 +1142,8 @@ def _overlaps(name, x, y, width, height):
 
 @frappe.whitelist(methods=["POST"])
 def save_area(title, meeting_url, x, y, width, height, name=None, chat_mode="Saved"):
-	"""Create or change a meeting area, for everyone (any Ophice user may, like the background)."""
-	_require_user()
+	"""Create or change a meeting area, for everyone (map editors only, #2071)."""
+	_require_map_editor()
 	if chat_mode not in CHAT_MODES:
 		frappe.throw(_("Unknown chat mode."))
 	title = (title or "").strip()[:AREA_TITLE_LENGTH]
@@ -1166,7 +1183,7 @@ def save_area(title, meeting_url, x, y, width, height, name=None, chat_mode="Sav
 @frappe.whitelist(methods=["POST"])
 def delete_area(name):
 	"""Remove a meeting area, for everyone."""
-	_require_user()
+	_require_map_editor()
 	if frappe.db.exists(AREA_DOCTYPE, name):
 		# Its chat goes with it: the batches only make sense inside the area.
 		for batch in frappe.get_all(BATCH_DOCTYPE, filters={"area": name}, pluck="name"):
