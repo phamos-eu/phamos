@@ -27,22 +27,23 @@
 		>
 			<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ area.title }}</span>
-			<!-- Float (#2075): call and chat in a small window on top of everything. -->
+			<!-- Float (#2075): call and chat in a small window on top of everything, which can be pulled
+			     out of the browser. Where the browser has it, this comes first (PM, 2026-11-22). -->
 			<button
 				v-if="canFloat && !pip && !dock"
 				type="button"
-				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-				:title="__('Float: call and chat in a small window on top of everything')"
+				class="flex flex-shrink-0 items-center gap-1 rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs font-medium text-ink-gray-8 hover:bg-surface-gray-3 hover:text-ink-gray-9"
+				:title="__('Float: call and chat in a small window on top of everything, also outside the browser')"
 				data-testid="meeting-float"
 				@pointerdown.stop
 				@click="$emit('float')"
 			>
-				<FeatherIcon name="layers" class="h-3.5 w-3.5" />
+				<PopOutIcon class="h-3.5 w-3.5" />
 				{{ __("Float") }}
 			</button>
-			<!-- Chrome's picture-in-picture (#2078): how to keep the video on top. -->
+			<!-- Without Float: Chrome's own picture-in-picture on a video (#2078), explained. -->
 			<button
-				v-if="CHROMIUM"
+				v-if="CHROMIUM && !canFloat"
 				type="button"
 				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:class="{ 'bg-surface-gray-2 text-ink-gray-9': pipTip }"
@@ -258,8 +259,8 @@ const dockStyle = computed(() =>
 )
 const hintClosed = ref(false)
 
-// Picture-in-picture on a video is Chrome's (and Edge's) own. The tip opens by itself until it was
-// closed once; the "On top" button brings it back.
+// Picture-in-picture on a video is Chrome's (and Edge's) own. Only where Float is missing (PM,
+// 2026-11-22): the tip then opens by itself until it was closed once; "On top" brings it back.
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 const CHROMIUM = Boolean(navigator.userAgentData?.brands?.some((b) => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand)))
 const PIP_TIP_KEY = "phamos_ophice_pip_tip_seen"
@@ -270,7 +271,7 @@ function seen() {
 		return false
 	}
 }
-const pipTip = ref(CHROMIUM && !seen())
+const pipTip = ref(CHROMIUM && !canFloat && !seen())
 function closePipTip() {
 	pipTip.value = false
 	try {
