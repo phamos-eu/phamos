@@ -35,6 +35,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, strip_html
 
+from phamos.cockpits.settings import COCKPITS as _COCKPITS
+
 # One shared world for everyone; the frontend draws exactly this grid.
 COLS = 40
 ROWS = 25
@@ -91,6 +93,8 @@ MAX_AREAS = 50
 # Every area gets its own random color (PM, 2026-11-22): a hue, at least this far from the others.
 AREA_HUE_GAP = 30
 AREA_TITLE_LENGTH = 60
+# The app icon colours of the cockpits (phamos/cockpits/settings.py), for cockpit spaces (#2076).
+COCKPIT_COLORS = {route: color for route, (_prefix, color) in _COCKPITS.items()}
 # Areas are drawn in half tiles (#2067).
 AREA_STEP = 0.5
 # Kinds of space (#2072): a meeting, or the start space where chips are beamed in.
@@ -1220,6 +1224,9 @@ def _areas():
 			tile = tiles.get(area.cockpit) or {}
 			area.cockpit_logo = tile.get("logo", "")
 			area.cockpit_title = tile.get("title", "")
+			# The tile colour of its icon: the map draws the icon from colour + symbol, so the tile
+			# can be see-through while the symbol stays solid (PM, 2026-11-22).
+			area.cockpit_color = COCKPIT_COLORS.get(area.cockpit, "")
 		if area.color_hue is None or area.color_hue == "":
 			area.color_hue = int(hashlib.md5(area.name.encode()).hexdigest(), 16) % 360
 	return areas

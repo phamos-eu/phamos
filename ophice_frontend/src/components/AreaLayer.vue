@@ -23,7 +23,16 @@
 			<!-- The start space (#2072): where people are beamed in; no meeting, so no Jitsi logo. -->
 			<FeatherIcon v-if="area.kind === 'Start'" name="log-in" class="area__start-icon" />
 			<!-- A cockpit space (#2076): the cockpit's app icon -->
-			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-icon" />
+			<span
+				v-else-if="area.kind === 'Cockpit' && COCKPIT_SYMBOLS[area.cockpit] && area.cockpit_color"
+				class="area__cockpit-icon"
+				:style="{ '--tile': area.cockpit_color }"
+				:title="area.cockpit_title || ''"
+				data-testid="area-cockpit-icon"
+			>
+				<FeatherIcon :name="COCKPIT_SYMBOLS[area.cockpit]" class="area__cockpit-symbol" />
+			</span>
+			<img v-else-if="area.kind === 'Cockpit' && area.cockpit_logo" :src="area.cockpit_logo" alt="" class="area__cockpit-img" />
 			<img
 				v-else-if="!failedLogos[area.jitsi_domain]"
 				:src="`https://${area.jitsi_domain}/images/watermark.svg`"
@@ -76,6 +85,19 @@ const props = defineProps({
 	activeName: { type: String, default: "" },
 })
 const emit = defineEmits(["draw", "pick", "change"])
+
+// The symbol of each cockpit's app icon; keep in step with spa_shared/scripts/generate_app_manifests.py.
+const COCKPIT_SYMBOLS = {
+	"/personal-cockpit": "user",
+	"/human-resources-cockpit": "users",
+	"/sales-cockpit": "trending-up",
+	"/accounting-cockpit": "book-open",
+	"/project-management-cockpit": "clipboard",
+	"/software-development-cockpit": "code",
+	"/general-management-cockpit": "compass",
+	"/team-cockpit": "flag",
+	"/implementation-cockpit": "layers",
+}
 
 const layer = ref(null)
 const draft = ref(null)
@@ -242,14 +264,33 @@ function cancel() {
 	border: 2.5px dotted rgba(255, 255, 255, 0.95);
 	box-shadow: 0 0 14px 3px rgba(186, 230, 253, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.6);
 }
-/* A bit bigger, but see-through, so it marks the space without sitting on it like a sticker
-   (PM, 2026-11-22). A thin light edge keeps it readable on any map. */
+/* The cockpit's icon, drawn from its tile colour and symbol (PM, 2026-11-22): the tile is
+   see-through so it marks the space without sitting on it like a sticker; the white symbol stays
+   solid so it reads well. */
 .area__cockpit-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 50%;
+	max-width: 40px;
+	aspect-ratio: 1;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--tile) 55%, transparent);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.area__cockpit-symbol {
+	width: 55%;
+	height: 55%;
+	color: #fff;
+	stroke-width: 2.5;
+	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+}
+/* Fallback for a cockpit without a known symbol: its picture, see-through. */
+.area__cockpit-img {
 	width: 50%;
 	max-width: 40px;
 	border-radius: 8px;
 	opacity: 0.65;
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .area__start-icon {
 	width: 40%;
