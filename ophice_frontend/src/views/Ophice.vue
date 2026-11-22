@@ -468,7 +468,7 @@
 		<CockpitBar
 			v-if="me"
 			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
-			:cockpits="cockpits"
+			:cockpits="barCockpits"
 			:open-route="openRoute"
 			@open="openCockpit"
 		/>
@@ -559,6 +559,13 @@ async function loadCockpits() {
 		cockpits.value = []
 	}
 }
+
+// A cockpit with its own space on the map is reached there, so it leaves the shortcut bar
+// (PM, 2026-11-22). The full list stays: stopping in a space still checks it.
+const barCockpits = computed(() => {
+	const placed = new Set(areas.value.filter((a) => a.kind === "Cockpit" && a.cockpit).map((a) => a.cockpit))
+	return cockpits.value.filter((c) => !placed.has(c.route))
+})
 
 // Positions are in tile units (floats): the grid is drawn, but movement is free.
 const DIRECTIONS = {
