@@ -10,6 +10,14 @@ app_license = "AGPL-3.0"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits will open inside it.
+	{
+		"name": "ophice",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_app_permission",
+	},
 	{
 		"name": "personal_cockpit",
 		"logo": "/assets/phamos/manifest/personal-icon-192.png",
@@ -177,6 +185,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/ophice", "to_route": "ophice"},
+    {"from_route": "/ophice/<path:app_path>", "to_route": "ophice"},
     {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
     {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},

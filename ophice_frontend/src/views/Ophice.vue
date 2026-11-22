@@ -1,14 +1,15 @@
 <template>
-	<!-- Ophice (#2053): a full-screen page outside the cockpit shell. -->
+	<!-- Ophice (#2053, #2070): its own app at /ophice, full screen. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
 		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
-			<router-link
-				:to="{ name: 'TodosPlan' }"
+			<!-- Until the cockpits open inside Ophice (#2073): a plain link to the Personal Cockpit. -->
+			<a
+				href="/personal-cockpit"
 				class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm text-ink-gray-7 hover:bg-surface-gray-3 hover:text-ink-gray-9"
 			>
 				<FeatherIcon name="arrow-left" class="h-4 w-4" />
-				{{ __("Back to cockpit") }}
-			</router-link>
+				{{ __("Personal Cockpit") }}
+			</a>
 			<div class="text-base font-semibold tracking-tight">{{ __("Ophice") }}</div>
 			<div class="ml-auto text-sm text-ink-gray-5">
 				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}

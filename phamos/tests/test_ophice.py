@@ -831,3 +831,21 @@ class OphiceCockpitTestCase(_OphiceRoomBase):
 		frappe.set_user(self.B)
 		a = next(p for p in ophice.get_people()["people"] if p["user"] == self.A)
 		self.assertIsNone(a["cockpit"])
+
+
+class OphiceAppTestCase(FrappeTestCase):
+	"""Ophice as an app of its own (#2070): on the Apps screen and at /ophice for System Users."""
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_app_permission_and_route(self):
+		from phamos.hooks import add_to_apps_screen, website_route_rules
+
+		tile = next(t for t in add_to_apps_screen if t["name"] == "ophice")
+		self.assertEqual(tile["route"], "/ophice")
+		self.assertIn({"from_route": "/ophice", "to_route": "ophice"}, website_route_rules)
+		frappe.set_user("Administrator")
+		self.assertTrue(ophice.check_app_permission())
+		frappe.set_user("Guest")
+		self.assertFalse(ophice.check_app_permission())

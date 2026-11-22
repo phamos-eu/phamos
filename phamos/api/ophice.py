@@ -121,6 +121,14 @@ AWAY_MAX_DAYS = 14
 AWAY_GRACE_SECONDS = 3600
 
 
+def check_app_permission():
+	"""Ophice on the Apps screen (#2070): for the people who may use it, every System User, as
+	when it was a page of the Personal Cockpit."""
+	if frappe.session.user == "Guest":
+		return False
+	return frappe.get_cached_value("User", frappe.session.user, "user_type") == "System User"
+
+
 def _require_user():
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Please log in to use Ophice."), frappe.PermissionError)

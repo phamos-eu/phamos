@@ -17,8 +17,13 @@ import TasksHome from "./views/TasksHome.vue"
 import TodosPlan from "./views/TodosPlan.vue"
 import spaConfig from "./config"
 import TodosFocus from "./views/TodosFocus.vue"
-import Ophice from "./views/Ophice.vue"
 import { ensureFocusLoaded } from "./focusStore.js"
+
+/** A full page load of another app (not a route of this one); cancels the navigation here. */
+function leaveFor(url) {
+	window.location.replace(url)
+	return false
+}
 
 const router = createSpaRouter({
 	config: spaConfig,
@@ -47,10 +52,10 @@ const router = createSpaRouter({
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },
-		// Ophice (#2053): full screen, without the cockpit shell (App.vue reads meta.standalone).
-		{ path: "/ophice", name: "Ophice", component: Ophice, meta: { standalone: true } },
-		// The first name of the page (#2054): old links still arrive.
-		{ path: "/space", redirect: { name: "Ophice" } },
+		// Ophice moved to its own app at /ophice (#2070); old links (and its first name, /space)
+		// load the page there. (The component is never shown: beforeEnter leaves first.)
+		{ path: "/ophice", name: "Ophice", component: TodosFocus, beforeEnter: () => leaveFor("/ophice") },
+		{ path: "/space", component: TodosFocus, beforeEnter: () => leaveFor("/ophice") },
 	],
 })
 
