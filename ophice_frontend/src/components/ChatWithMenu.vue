@@ -90,7 +90,8 @@ function errorText(e) {
 
 // Raven keeps times in the server's zone without one: read as local is close enough for "2 days ago".
 function ago(value) {
-	const date = new Date(String(value).replace(" ", "T"))
+	// An ISO instant with its offset (phamos.api.ophice._as_instant).
+	const date = new Date(String(value))
 	return Number.isNaN(date.getTime()) ? "" : relativeTime(date)
 }
 

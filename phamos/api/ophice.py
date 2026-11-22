@@ -2050,6 +2050,17 @@ def set_hide_details(hide=0):
 	return bool(hide)
 
 
+def _as_instant(value):
+	"""A stored time (the site's system time zone, no zone attached) as an ISO instant with its
+	offset, so the browser computes "5 minutes ago" right in any time zone (AI review of !1301)."""
+	if not value:
+		return ""
+	moment = get_datetime(value)
+	if moment.tzinfo is None:
+		moment = moment.replace(tzinfo=ZoneInfo(frappe.utils.get_system_timezone()))
+	return moment.isoformat()
+
+
 @frappe.whitelist()
 def get_chat_options(user):
 	"""Where I can chat with `user`: our direct message (if any) and our latest shared channels."""
@@ -2098,13 +2109,15 @@ def get_chat_options(user):
 			# Issue and area chats describe themselves ("ISS-…: subject"); others go by their name.
 			"label": (r.channel_description or r.channel_name or "").strip()[:80],
 			"type": r.type,
-			"last_message_at": str(r.last_message_timestamp or ""),
+			"last_message_at": _as_instant(r.last_message_timestamp),
 			"url": channel_url(r.workspace, r.name),
 		}
 		for r in rows
 	]
 	return {
-		"dm": {"url": f"/raven/dm-channel/{dm.name}", "last_message_at": str(dm.last_message_timestamp or "")} if dm else None,
+		"dm": {"url": f"/raven/dm-channel/{dm.name}", "last_message_at": _as_instant(dm.last_message_timestamp)}
+		if dm
+		else None,
 		"chats": chats,
 	}
 

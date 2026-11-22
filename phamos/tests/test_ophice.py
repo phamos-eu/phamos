@@ -4,6 +4,7 @@
 """Ophice slice 1 (#2054): my own chip's remembered position and the dummy chips."""
 
 import json
+from unittest import skipUnless
 from unittest.mock import patch
 
 import frappe
@@ -16,6 +17,11 @@ from phamos.api import ophice
 def _read_encounter(encounter):
 	"""What the session user sees of an encounter (the party check included)."""
 	return ophice._encounter_payload(ophice._require_party(encounter, ("Open", "Parting")))
+
+
+# Encounters, status and every room test use Raven (users, private channels); the CI site has no
+# Raven, like for the Issue chat tests (test_issue_chat).
+NEEDS_RAVEN = skipUnless("raven" in frappe.get_installed_apps(), "Raven is not installed")
 
 class OphiceTestCase(FrappeTestCase):
 	def setUp(self):
@@ -139,6 +145,7 @@ class OphicePresenceTestCase(FrappeTestCase):
 			ophice.heartbeat(1, 1)
 
 
+@NEEDS_RAVEN
 class OphiceEncounterTestCase(FrappeTestCase):
 	"""Slice 3 (#2056): two chips that meet get a temporary private Raven channel."""
 
@@ -530,6 +537,7 @@ class OphiceAreaTestCase(FrappeTestCase):
 		self.assertEqual((area.x, area.y, area.width, area.height), (2.5, 4.5, 1.5, 0.5))
 
 
+@NEEDS_RAVEN
 class OphiceStatusTestCase(FrappeTestCase):
 	"""Be right back / Away (#2053): a note, and a return time as an instant in UTC."""
 
@@ -589,6 +597,7 @@ class OphiceStatusTestCase(FrappeTestCase):
 		self.assertEqual(chips[0]["status"]["note"], "Lunch")
 
 
+@NEEDS_RAVEN
 class _OphiceRoomBase(FrappeTestCase):
 	"""Two Raven users on the grid and a test Jitsi server, realtime patched out."""
 
@@ -1576,3 +1585,17 @@ class OphicePhriendPlaceTestCase(_OphiceRoomBase):
 		frappe.set_user(self.B)  # not a map editor
 		with self.assertRaises(frappe.PermissionError):
 			ophice.save_area("Mine", "", 9, 9, 1, 1, kind="Phriend")
+
+
+class OphiceInstantTestCase(FrappeTestCase):
+	"""Times for "x minutes ago" carry their offset (AI review of !1301): the browser must not read
+	the site's local time as its own."""
+
+	def test_stored_times_become_instants(self):
+		from datetime import datetime
+		from zoneinfo import ZoneInfo
+
+		with patch.object(ophice.frappe.utils, "get_system_timezone", return_value="Europe/Berlin"):
+			value = ophice._as_instant("2026-11-22 10:00:00")
+		self.assertEqual(datetime.fromisoformat(value), datetime(2026, 11, 22, 9, 0, tzinfo=ZoneInfo("UTC")))
+		self.assertEqual(ophice._as_instant(None), "")
