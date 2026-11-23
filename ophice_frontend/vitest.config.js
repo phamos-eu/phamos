@@ -15,7 +15,9 @@ export default defineConfig({
 	test: {
 		include: ["src/**/*.test.js"],
 		environment: "node",
-		// Component tests: the client build of the .vue file, still without a DOM.
+		// Component tests: the client build of the .vue file, still without a DOM. A docblock
+		// (`@vitest-environment`) would not switch the build in Vitest 2. Vitest 3 deprecates
+		// environmentMatchGlobs (use test.projects then); Vitest 4 removes it.
 		environmentMatchGlobs: [["src/components/**/*.test.js", "./src/test/nodeClientEnvironment.js"]],
 	},
 })

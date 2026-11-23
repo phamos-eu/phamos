@@ -36,7 +36,7 @@ async function runSetup(props) {
 	return { state, scope }
 }
 
-describe("MiniMap setup (Ophice over a cockpit, #2074)", () => {
+describe("MiniMap setup (Ophice over a cockpit, #2109)", () => {
 	beforeEach(() => {
 		vi.resetModules()
 		vi.spyOn(console, "warn").mockImplementation(() => {})
@@ -54,6 +54,8 @@ describe("MiniMap setup (Ophice over a cockpit, #2074)", () => {
 		scope.stop()
 	})
 
+	// Also guards storedSize(): if SIZE_KEY ever moved below it, its catch would hide the error and
+	// fall back to the default (tall) size, so `wide` would be false here.
 	it("sets up in a meeting with a wide panel, where the panel's height also limits the tile", async () => {
 		localStorage.setItem("phamos_ophice_mini_map_size", JSON.stringify({ w: 900, h: 300 }))
 		const me = { name: "me", x: 3, y: 4 }
