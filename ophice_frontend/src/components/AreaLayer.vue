@@ -95,7 +95,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { isCutOff } from "../utils/ophiceView.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
@@ -118,8 +118,13 @@ function peekTitle(area, event) {
 	const rect = label.getBoundingClientRect()
 	peek.value = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
 }
-// Editing, or the map moving under the mouse: no stale name left floating.
+// Editing, new spaces, or the map moving under the mouse (keys walk and pan, the wheel zooms):
+// no stale name left floating where the label no longer is.
 watch(() => [props.editing, props.areas], () => (peek.value = null))
+const dropPeek = () => (peek.value = null)
+const PEEK_ENDERS = ["keydown", "wheel", "pointerdown", "blur"]
+onMounted(() => PEEK_ENDERS.forEach((name) => window.addEventListener(name, dropPeek, { passive: true })))
+onBeforeUnmount(() => PEEK_ENDERS.forEach((name) => window.removeEventListener(name, dropPeek)))
 const emit = defineEmits(["draw", "pick", "change"])
 
 // The symbol of each cockpit's app icon; keep in step with spa_shared/scripts/generate_app_manifests.py.
