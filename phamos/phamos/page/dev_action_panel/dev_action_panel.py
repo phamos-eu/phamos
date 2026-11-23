@@ -747,10 +747,24 @@ def get_matching_names(doctype, filters):
 
 
 def _sql_like(value, pattern):
-    """MariaDB LIKE, as the column filters get it: % and _ anywhere, case-insensitive.
-    (frappe.utils.data.sql_like only knows a leading / trailing % and is case-sensitive.)"""
-    regex = "".join(".*" if c == "%" else "." if c == "_" else re.escape(c) for c in cstr(pattern))
-    return re.fullmatch(regex, value, re.IGNORECASE | re.DOTALL) is not None
+    """MariaDB LIKE, as the column filters get it: % and _ anywhere, \\% and \\_ literal,
+    case-insensitive. (frappe.utils.data.sql_like only knows a leading / trailing % and is
+    case-sensitive.) A run of % becomes one .*, so a pattern like %%%%x cannot make the regex
+    backtrack for long."""
+    chars, parts, i = cstr(pattern), [], 0
+    while i < len(chars):
+        c = chars[i]
+        if c == "\\" and i + 1 < len(chars):
+            parts.append(re.escape(chars[i + 1]))
+            i += 2
+            continue
+        if c == "%":
+            if not parts or parts[-1] != ".*":
+                parts.append(".*")
+        else:
+            parts.append("." if c == "_" else re.escape(c))
+        i += 1
+    return re.fullmatch("".join(parts), value, re.IGNORECASE | re.DOTALL) is not None
 
 
 def _family_label(fieldname):

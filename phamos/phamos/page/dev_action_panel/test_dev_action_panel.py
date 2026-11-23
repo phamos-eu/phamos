@@ -393,6 +393,10 @@ class TestDevActionPanelIssueList(_DapTestCase):
 		)
 		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "_"]), {parent, *children})
 		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent.upper()]), {parent, *children})
+		# A run of % is one wildcard; \% and \_ are literal.
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", "%" * 40 + parent[-3:]]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent + "\\%"]), set())
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "\\_"]), set())
 		self.assertEqual(self._matching(["gitlab_parent_issue", "not like", f"%{parent}%"]), {standalone})
 		self.assertEqual(self._matching(["gitlab_child_issue", "like", f"%{children[0]}%"]), {children[0]})
 		self.assertEqual(
