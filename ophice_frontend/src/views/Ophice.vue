@@ -652,20 +652,26 @@
 					/>
 				</div>
 					<!--
-					Off the visible map (PM, 2026-11-22): a glowing marker at the edge, in the direction of
-					the person or the meeting point. A click looks there.
+					Off the visible map (PM, 2026-11-22, 2026-11-23): a marker at the edge for everyone, in
+					their direction, smaller the farther away; the selected and meeting points glow. A click
+					looks there.
 					-->
+					<div
+						v-for="marker in edgeMarkers"
+						:key="marker.key"
+						class="ophice-edge-at absolute"
+						:style="{ left: `${marker.x}px`, top: `${marker.y}px`, transform: `scale(${marker.scale})` }"
+					>
 					<button
-					v-for="marker in edgeMarkers"
-					:key="marker.key"
-					type="button"
-					class="ophice-edge absolute"
-					:class="{ 'ophice-edge--pin': marker.kind === 'pin' }"
-					:style="{ left: `${marker.x}px`, top: `${marker.y}px`, '--pin-hue': marker.hue }"
-					:title="marker.title"
-					data-no-pan
-					data-testid="edge-marker"
-					@click.stop="lookAt(marker.items[0])"
+						type="button"
+						class="ophice-edge"
+						:class="{ 'ophice-edge--pin': marker.kind === 'pin', 'ophice-edge--picked': marker.picked }"
+						:style="{ '--pin-hue': marker.hue, '--ring-hue': marker.kind === 'person' ? ringHue(marker.items[0].person.user) : 0 }"
+						:title="marker.title"
+						:data-scale="marker.scale.toFixed(2)"
+						data-no-pan
+						data-testid="edge-marker"
+						@click.stop="lookAt(marker.items[0])"
 					>
 					<span class="ophice-edge__arrow" :style="{ transform: `rotate(${marker.angle}deg)` }" aria-hidden="true" />
 					<span class="ophice-edge__face">
@@ -679,7 +685,8 @@
 						/>
 					</span>
 					<span v-if="marker.items.length > 1" class="ophice-edge__count">{{ marker.items.length }}</span>
-					</button>
+				</button>
+				</div>
 				<!-- A small map switches on a double click (#2091); a faint hint says so. -->
 			<div
 				v-if="inTiles"
@@ -2290,9 +2297,14 @@ function onViewportClick(event) {
 	if (!event.metaKey && !event.ctrlKey && !event.shiftKey) clearSelection()
 }
 
-// Edge markers: for the selected people, the ones glowing right now and the meeting points.
+// Edge markers: everyone off the visible map (PM, 2026-11-23), and the meeting points. The
+// selected and the ones glowing right now stand out. The farther away, the smaller the marker.
 const EDGE_MARGIN = 24
 const EDGE_GROUP_PX = 30
+// Tiles beyond the edge at which a marker reaches its smallest size.
+const EDGE_FAR_TILES = 30
+const EDGE_MIN_SCALE = 0.45
+const EDGE_MIN_SCALE_PICKED = 0.75
 
 const edgeMarkers = computed(() => {
 	if (!me.value || meetingArea.value || !tile.value) return []
@@ -2300,32 +2312,56 @@ const edgeMarkers = computed(() => {
 	const height = view.height
 	if (!width || !height) return []
 	const targets = []
-	for (const user of new Set([...selectedUsers.value, ...Object.keys(glows)])) {
-		const chip = chipOnMap(user)
-		if (chip) targets.push({ key: user, kind: "person", x: chip.x + 0.5, y: chip.y + 0.5, person: chip, title: chip.full_name })
+	for (const chip of others.value) {
+		if (chip.offline) continue
+		const picked = selectedSet.value.has(chip.user) || Boolean(glows[chip.user])
+		targets.push({ key: chip.user, kind: "person", x: chip.x + 0.5, y: chip.y + 0.5, person: chip, picked, title: chip.full_name })
 	}
 	for (const pin of visiblePins.value) {
 		targets.push({ key: `pin:${pin.by}`, kind: "pin", x: pin.x + 0.5, y: pin.y + 0.5, hue: ringHue(pin.by), title: __("Meeting point · {0}", [pin.by_name]) })
 	}
 	const cx = width / 2
 	const cy = height / 2
-	const markers = []
+	const placed = []
 	for (const target of targets) {
 		const at = mainCam.toView(target.x, target.y)
 		if (at.x >= 0 && at.x <= width && at.y >= 0 && at.y <= height) continue
 		const dx = at.x - cx
 		const dy = at.y - cy
 		// Along the line from the middle of the view to them, up to the edge.
-		const scale = Math.min((cx - EDGE_MARGIN) / Math.max(Math.abs(dx), 1e-6), (cy - EDGE_MARGIN) / Math.max(Math.abs(dy), 1e-6))
-		const x = cx + dx * scale
-		const y = cy + dy * scale
-		const near = markers.find((m) => m.kind === target.kind && Math.hypot(m.x - x, m.y - y) < EDGE_GROUP_PX)
+		const reach = Math.min((cx - EDGE_MARGIN) / Math.max(Math.abs(dx), 1e-6), (cy - EDGE_MARGIN) / Math.max(Math.abs(dy), 1e-6))
+		const x = cx + dx * reach
+		const y = cy + dy * reach
+		// How far beyond the edge, in tiles: the farther, the smaller.
+		const far = Math.hypot(at.x - x, at.y - y) / tile.value
+		const min = target.picked || target.kind === "pin" ? EDGE_MIN_SCALE_PICKED : EDGE_MIN_SCALE
+		const scale = Math.max(min, 1 - ((1 - min) * far) / EDGE_FAR_TILES)
+		placed.push({ ...target, at: { x, y }, angle: (Math.atan2(dy, dx) * 180) / Math.PI, far, scale })
+	}
+	// The picked and the nearest first: they lead a group of markers that meet at the edge.
+	placed.sort((a, b) => Number(Boolean(b.picked)) - Number(Boolean(a.picked)) || a.far - b.far)
+	const markers = []
+	for (const target of placed) {
+		const near = markers.find((m) => m.kind === target.kind && Math.hypot(m.x - target.at.x, m.y - target.at.y) < EDGE_GROUP_PX * Math.max(m.scale, target.scale))
 		if (near) {
 			near.items.push(target)
+			near.scale = Math.max(near.scale, target.scale)
+			near.picked = near.picked || target.picked
 			near.title = near.items.map((item) => item.title).join(", ")
 			continue
 		}
-		markers.push({ key: target.key, kind: target.kind, x, y, angle: (Math.atan2(dy, dx) * 180) / Math.PI, hue: target.hue, title: target.title, items: [target] })
+		markers.push({
+			key: target.key,
+			kind: target.kind,
+			x: target.at.x,
+			y: target.at.y,
+			angle: target.angle,
+			hue: target.hue,
+			scale: target.scale,
+			picked: Boolean(target.picked),
+			title: target.title,
+			items: [target],
+		})
 	}
 	return markers
 })
@@ -3447,21 +3483,41 @@ onBeforeUnmount(() => {
 	box-shadow: 0 0 0 2px #3b82f6, 0 0 12px 3px rgb(59 130 246 / 0.5);
 }
 /* At the edge of the view: where someone (or a meeting point) is, off the visible map. */
-.ophice-edge {
+/* Placed on the edge and sized by distance; the button inside pulses on its own. */
+.ophice-edge-at {
 	z-index: 25;
 	width: 36px;
 	height: 36px;
 	margin: -18px 0 0 -18px;
+	transition: transform 200ms ease-out;
+}
+/* Everyone: a quiet ring in their own colour. */
+.ophice-edge {
+	position: relative;
+	width: 36px;
+	height: 36px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: 9999px;
 	background: var(--surface-white, #fff);
+	color: hsl(var(--ring-hue) 80% 40%);
+	opacity: 0.9;
+	box-shadow: 0 0 0 2px hsl(var(--ring-hue) 80% 45%), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+.ophice-edge:hover {
+	opacity: 1;
+}
+/* Selected or just picked: glowing and pulsing. */
+.ophice-edge--picked {
 	color: #2563eb;
+	opacity: 1;
 	box-shadow: 0 0 0 2px #3b82f6, 0 0 16px 5px rgb(59 130 246 / 0.55);
 	animation: ophice-edge 1400ms ease-in-out infinite;
 }
 .ophice-edge--pin {
+	opacity: 1;
+	animation: ophice-edge 1400ms ease-in-out infinite;
 	color: hsl(var(--pin-hue) 80% 40%);
 	box-shadow: 0 0 0 2px hsl(var(--pin-hue) 80% 45%), 0 0 16px 5px hsl(var(--pin-hue) 80% 50% / 0.55);
 }
@@ -3476,9 +3532,12 @@ onBeforeUnmount(() => {
 	right: 0;
 	top: 50%;
 	margin-top: -6px;
-	border-left: 9px solid #3b82f6;
+	border-left: 9px solid hsl(var(--ring-hue) 80% 45%);
 	border-top: 6px solid transparent;
 	border-bottom: 6px solid transparent;
+}
+.ophice-edge--picked .ophice-edge__arrow::after {
+	border-left-color: #3b82f6;
 }
 .ophice-edge--pin .ophice-edge__arrow::after {
 	border-left-color: hsl(var(--pin-hue) 80% 45%);
