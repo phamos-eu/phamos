@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
@@ -744,6 +746,13 @@ def get_matching_names(doctype, filters):
     return [name for name in frappe.get_all(doctype, filters=filters, pluck="name") if name in allowed]
 
 
+def _sql_like(value, pattern):
+    """MariaDB LIKE, as the column filters get it: % and _ anywhere, case-insensitive.
+    (frappe.utils.data.sql_like only knows a leading / trailing % and is case-sensitive.)"""
+    regex = "".join(".*" if c == "%" else "." if c == "_" else re.escape(c) for c in cstr(pattern))
+    return re.fullmatch(regex, value, re.IGNORECASE | re.DOTALL) is not None
+
+
 def _family_label(fieldname):
     return "GitLab Parent Issue" if fieldname == "gitlab_parent_issue" else "GitLab Child Issue"
 
@@ -757,6 +766,9 @@ def _family_matches(issue, row):
     else:
         value = issue.name if issue.parent_issue else None
     operator, wanted = cstr(row[2]).lower(), row[3]
+    if operator in ("like", "not like"):
+        matched = _sql_like(cstr(value), wanted)
+        return matched if operator == "like" else not matched
     if operator == "is":
         return compare(value, "is", cstr(wanted))
     if operator in ("in", "not in"):

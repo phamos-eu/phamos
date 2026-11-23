@@ -384,6 +384,21 @@ class TestDevActionPanelIssueList(_DapTestCase):
 			self._matching(["gitlab_parent_issue", "=", parent], ["gitlab_child_issue", "is", "set"]), set(children)
 		)
 
+	def test_gitlab_family_filters_match_like_as_sql_does(self):
+		# % and _ anywhere, case-insensitive, like the column filters (MariaDB LIKE).
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", f"%{parent}%"]), {parent, *children})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "like", f"{parent[:2]}%{parent[-2:]}"]), {parent, *children}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "_"]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent.upper()]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "not like", f"%{parent}%"]), {standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "like", f"%{children[0]}%"]), {children[0]})
+		self.assertEqual(
+			self._matching(["gitlab_child_issue", "not like", f"%{children[0]}%"]), {parent, standalone, children[1]}
+		)
+
 	def test_gitlab_family_filters_refuse_conditions_they_cannot_answer(self):
 		self.assertRaises(
 			frappe.ValidationError,
