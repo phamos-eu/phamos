@@ -2,10 +2,9 @@
 	<!-- The encounter chat of two chips that met (#2056), above (or below) the two of them; the
 	     parent places it through the style attribute. -->
 	<div
-		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
+		class="encounter-bubble absolute z-20 flex w-72 flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="video ? 'w-96' : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
@@ -13,6 +12,19 @@
 		<header class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
 			<UserAvatar :name="peer.user" :label="peer.full_name" :image="peer.user_image" size="xs" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ peer.full_name }}</span>
+			<!-- The call opens as its own Jitsi window (#2108): embedded, meet.jit.si ends it after
+			     5 minutes. Both open the same room, so whoever clicks first waits for the other. -->
+			<button
+				v-if="video"
+				type="button"
+				class="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+				:title="__('Open the video call with {0} in its own window', [firstName])"
+				data-testid="open-call"
+				@click="emit('call')"
+			>
+				<FeatherIcon name="video" class="h-3.5 w-3.5" />
+				{{ __("Video call") }}
+			</button>
 			<button
 				type="button"
 				class="flex-shrink-0 rounded px-1.5 py-0.5 text-xs text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
@@ -22,17 +34,6 @@
 				{{ __("Esc to close") }}
 			</button>
 		</header>
-
-		<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
-		<VideoCall
-			v-if="video"
-			:domain="video.domain"
-			:room="video.room"
-			:display-name="displayName"
-			@joined="keepChatFocus"
-			@stolen="keepChatFocus"
-			@toggled="input?.focus()"
-		/>
 
 		<div ref="list" class="max-h-48 min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm">
 			<p v-if="loading" class="text-ink-gray-5">{{ __("Opening the chat…") }}</p>
@@ -61,7 +62,6 @@
 				:maxlength="2000"
 				:aria-busy="sending || undefined"
 				@keydown="onInputKeydown"
-				@focus="chatActive = true"
 			/>
 		</form>
 	</div>
@@ -70,7 +70,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
-import VideoCall from "./VideoCall.vue"
+import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -84,10 +84,8 @@ const props = defineProps({
 	sending: { type: Boolean, default: false },
 	/** { domain, room } of the call, or null */
 	video: { type: Object, default: null },
-	/** My name in the call */
-	displayName: { type: String, default: "" },
 })
-const emit = defineEmits(["send", "close"])
+const emit = defineEmits(["send", "close", "call"])
 
 const draft = ref("")
 const list = ref(null)
@@ -118,18 +116,6 @@ watch(
 	},
 	{ immediate: true }
 )
-
-// Jitsi's frame may take the focus by itself (on load, on join). Give it back: to the chat if
-// the user was in it, otherwise to Ophice, so the keys move the chip again.
-const chatActive = ref(false)
-function keepChatFocus() {
-	if (document.activeElement?.tagName !== "IFRAME") return
-	if (chatActive.value) input.value?.focus()
-	else {
-		document.activeElement.blur()
-		window.focus()
-	}
-}
 
 defineExpose({
 	focus: () => input.value?.focus(),

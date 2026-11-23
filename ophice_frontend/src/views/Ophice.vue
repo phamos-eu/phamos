@@ -438,13 +438,13 @@
 					:loading="bubble.loading"
 					:error="bubble.error"
 					:sending="bubble.sending"
-					:video="bubble.user === videoUser ? bubble.video : null"
-					:display-name="me.full_name"
+					:video="bubble.video"
 					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
 					data-no-pan
 					@pointerdown.capture="raise(`chat:${bubble.user}`)"
 					@send="(text, done) => sendMessage(bubble, text, done)"
 					@close="closeBubble(bubble.user)"
+					@call="openEncounterCall(bubble)"
 				/>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
@@ -664,6 +664,7 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { encounterCallUrl, encounterCallWindowName } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -752,7 +753,6 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 384
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -1472,20 +1472,32 @@ const dismissed = new Set()
 const encounterByUser = new Map()
 const bubbleList = computed(() => Object.values(bubbles))
 
-// Video (#2059): one call at a time, with the nearest person whose chat is open.
-const videoUser = computed(() => {
-	// One call at a time: an area's meeting wins over the encounter call (#2060).
-	if (!me.value || meetingArea.value) return null
-	let best = null
-	for (const bubble of Object.values(bubbles)) {
-		if (!bubble.video) continue
-		const other = others.value.find((o) => o.user === bubble.user)
-		if (!other) continue
-		const distance = Math.hypot(other.x - me.value.x, other.y - me.value.y)
-		if (!best || distance < best.distance) best = { user: bubble.user, distance }
+// Video (#2059, #2108): the call opens as its own Jitsi window, never embedded. meet.jit.si
+// ends embedded calls after 5 minutes. The window stays open when the two walk apart: the call
+// is the person's own from then on.
+const callWindows = {}
+function openEncounterCall(bubble) {
+	const url = encounterCallUrl(bubble.video, me.value?.full_name || "")
+	if (!url) return
+	const name = encounterCallWindowName(bubble.video)
+	const open = callWindows[name]
+	if (open && !open.closed) {
+		open.focus()
+		return
 	}
-	return best?.user || null
-})
+	const win = window.open(url, name, "popup,width=1200,height=800")
+	if (!win) {
+		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
+		return
+	}
+	// The call page must not steer Ophice's tab (reverse tabnabbing).
+	try {
+		win.opener = null
+	} catch {
+		// some browsers do not allow it
+	}
+	callWindows[name] = win
+}
 
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el
@@ -1498,13 +1510,11 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	// With the video call the bubble is wider and about 200px taller (#2059).
-	const withVideo = bubble.user === videoUser.value
-	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	const width = BUBBLE_WIDTH
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 520 : 270)) {
+	if (top * t < 270) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
