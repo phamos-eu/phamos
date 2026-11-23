@@ -239,6 +239,36 @@ class TestPhriend(FrappeTestCase):
 		self.assertIsNone(boot.phriend)
 		self.assertEqual(boot.versions, {})  # only Phriend needs them
 
+	def test_website_boots_phriend_for_desk_users_only(self, _enqueue):
+		# the website has no Desk boot: get_web_boot carries the flag and the versions (#2104)
+		boot = api.get_web_boot()
+		self.assertEqual(boot["enabled"], 1)
+		self.assertTrue(boot["versions"].get("phamos"))
+		# Phriend's words in the user's language, as the cockpits have them
+		frappe.local.lang = "de"
+		try:
+			self.assertEqual(api.get_web_boot()["messages_key"], f"de:{boot['versions']['phamos']}")
+			self.assertEqual(api.get_web_translations().get("Something else"), "Etwas anderes")
+		finally:
+			frappe.local.lang = "en"
+		self.assertEqual(api.get_web_boot()["messages_key"], "")
+		# the Allowed role and the switch count as in Desk
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertIsNone(api.get_web_boot())
+		self.set_settings(allowed_role=None, enabled=0)
+		self.assertIsNone(api.get_web_boot())
+		# a portal login never gets it, even with no Allowed role (PM, 2026-11-23)
+		self.set_settings(enabled=1)
+		portal = frappe.get_doc(
+			{"doctype": "User", "email": "phriend-portal@example.com", "first_name": "Portal", "send_welcome_email": 0}
+		).insert(ignore_permissions=True)
+		self.assertEqual(portal.user_type, "Website User")
+		frappe.set_user(portal.name)
+		self.assertIsNone(api.get_web_boot())
+		self.assertEqual(api.get_web_translations(), {})
+		frappe.set_user("Guest")
+		self.assertIsNone(api.get_web_boot())
+
 	def test_badge_counts_open_reports_by_record_doctype_or_page(self, _enqueue):
 		on_record = self.report()  # about User Administrator
 		self.report(ref_docname="Guest")  # another User
