@@ -2042,6 +2042,15 @@ def cockpit_choices():
 	return sorted(_cockpit_tiles().values(), key=lambda c: c["title"])
 
 
+@frappe.whitelist()
+def new_meeting_url():
+	"""Map editors: a ready meeting URL for a new space (#2094), on the site's Jitsi server with an
+	unguessable room like the encounters get. The space creator fills it in; it stays editable."""
+	_require_map_editor()
+	domain = str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/").lower()
+	return f"https://{domain}/{_new_jitsi_room()}"
+
+
 @frappe.whitelist(methods=["POST"])
 def set_hide_details(hide=0):
 	"""Show or hide what I am doing (place, chat, work, cockpit) in the people list."""
