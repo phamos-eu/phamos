@@ -2810,7 +2810,7 @@ The chats could not be loaded.,Die Chats konnten nicht geladen werden.
 The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
 Open the Implementation,Implementation öffnen
 Working on,Arbeitet an
-"{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+"{0}: click for your timesheet timer and availability","{0}: Klicken für Ihren Zeiterfassungs-Timer und Ihre Verfügbarkeit"
 Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
 Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
 Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
@@ -3054,3 +3054,4 @@ Not on the map right now.,Gerade nicht auf der Karte.
 The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
 {0} set a meeting point,{0} hat einen Treffpunkt gesetzt
 Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+Availability,Verfügbarkeit

@@ -1,1 +1,10 @@
 @import "@spa/main.css";
+
+/*
+ * frappe-ui dialogs (HeadlessUI portal, z-10 inside) above Ophice's floating panels: the menu on
+ * my chip (z-50) opens the timesheet dialogs (#2101), and the meeting window and chats go up to z-[61].
+ */
+#headlessui-portal-root {
+	position: relative;
+	z-index: 70;
+}
