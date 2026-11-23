@@ -1,9 +1,10 @@
 <template>
 	<!--
-		Go to (PM, 2026-11-22): a click flies my chip there. Holding ⌘ (Ctrl elsewhere) while the
-		pointer is on the button, or a ⌘-click, opens a small menu: Fly or Beam.
+		Go to (PM, 2026-11-22): a click flies my chip there. Pressing ⌘ (Ctrl elsewhere) while the
+		pointer is on the button, or a ⌘-click, opens a small menu: Fly or Beam. It stays open while
+		⌘ is held, wherever the pointer goes, and folds away when ⌘ is let go (PM, 2026-11-23).
 	-->
-	<div class="relative inline-flex" @mouseenter="hovered = true" @mouseleave="leave">
+	<div class="relative inline-flex" @mouseenter="hovered = true" @mouseleave="hovered = false">
 		<Button
 			size="sm"
 			variant="subtle"
@@ -62,31 +63,27 @@ const modKey = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 
 const hovered = ref(false)
 const focused = ref(false)
-const modHeld = ref(false)
-// Once open, it stays open until the pointer leaves, so ⌘ can be let go before choosing.
-const stuck = ref(false)
-const open = computed(() => !props.disabled && (stuck.value || (modHeld.value && (hovered.value || focused.value))))
+// Opened with ⌘ on the button; open until ⌘ is let go.
+const shown = ref(false)
+const open = computed(() => !props.disabled && shown.value)
 
 function onKey(event) {
-	modHeld.value = event.metaKey || event.ctrlKey
-	if (modHeld.value && (hovered.value || focused.value)) stuck.value = true
+	const held = event.metaKey || event.ctrlKey
+	if (!held) shown.value = false
+	else if (event.type === "keydown" && (hovered.value || focused.value)) shown.value = true
 }
 function onBlur() {
-	modHeld.value = false
-}
-function leave() {
-	hovered.value = false
-	stuck.value = false
+	shown.value = false
 }
 function onClick(event) {
 	if (event.metaKey || event.ctrlKey) {
-		stuck.value = true
+		shown.value = true
 		return
 	}
 	go("fly")
 }
 function go(mode) {
-	stuck.value = false
+	shown.value = false
 	emit("go", mode)
 }
 

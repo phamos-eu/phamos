@@ -993,11 +993,12 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 		again = ophice.get_space()
 		self.assertFalse(again["beam_in"])
 		self.assertEqual((again["me"]["x"], again["me"]["y"]), (5.0, 5.0))
-		# Reloaded (the page left first): beamed in again, but at the spot it had (PM, 2026-11-22).
-		ophice.leave()
+		# Reloaded right after a step (the page left first, with its spot; the delayed save had not
+		# gone out yet): beamed in again, at the spot it stood on (PM, 2026-11-22, 2026-11-23).
+		ophice.leave(6, 5)
 		reload = ophice.get_space()
 		self.assertTrue(reload["beam_in"])
-		self.assertEqual((reload["me"]["x"], reload["me"]["y"]), (5.0, 5.0))
+		self.assertEqual((reload["me"]["x"], reload["me"]["y"]), (6.0, 5.0))
 		self.assertTrue(ophice.heartbeat(5, 5).get("beam"))
 		# The chip dropped off the map (laptop asleep): the next heartbeat beams it in.
 		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.A)

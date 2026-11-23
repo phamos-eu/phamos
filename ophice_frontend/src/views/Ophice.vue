@@ -2812,10 +2812,12 @@ function leaveOnPagehide() {
 	// Ophice closes: the call in its own window ends with it.
 	if (poppedOut.value) closeMeetingWindow()
 	try {
+		// With the spot it stands on: the delayed save may not have gone out yet (PM, 2026-11-23).
 		fetch(`/api/method/${API}.leave`, {
 			method: "POST",
 			keepalive: true,
-			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "" },
+			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "", "Content-Type": "application/json" },
+			body: JSON.stringify(me.value ? { x: round(me.value.x), y: round(me.value.y) } : {}),
 		})
 	} catch {
 		// The presence TTL removes the chip anyway.
@@ -3226,7 +3228,7 @@ onBeforeUnmount(() => {
 	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)
-	if (me.value) call(`${API}.leave`).catch(() => {})
+	if (me.value) call(`${API}.leave`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
 	if (frame) cancelAnimationFrame(frame)
 	resizeObserver?.disconnect()
 	if (saveTimer) {

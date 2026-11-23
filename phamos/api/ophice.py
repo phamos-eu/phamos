@@ -486,10 +486,16 @@ def move(x, y, lift=0, beam=0):
 
 
 @frappe.whitelist(methods=["POST"])
-def leave():
-	"""I closed the page: my chip disappears for everyone right away."""
+def leave(x=None, y=None):
+	"""I closed the page: my chip disappears for everyone right away.
+
+	`x`, `y`: where it stood. Saved here, since the page saves only a moment after the last
+	step and a quick reload would otherwise beam the chip in at an older spot (PM, 2026-11-23).
+	"""
 	_require_user()
 	user = frappe.session.user
+	if x is not None and y is not None:
+		save_my_position(x, y)
 	frappe.cache.hdel(PRESENCE_CACHE_KEY, user)
 	status = _status_of(user)
 	if status and status["kind"] == "away":
