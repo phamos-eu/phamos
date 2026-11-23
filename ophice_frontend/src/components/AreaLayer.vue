@@ -49,7 +49,13 @@
 				@error="failedLogos[area.jitsi_domain] = true"
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
-			<span v-if="area.kind !== 'Phriend'" class="area__title truncate">{{ area.title }}</span>
+			<span
+				v-if="area.kind !== 'Phriend'"
+				class="area__title truncate"
+				data-testid="area-title"
+				@mouseenter="peekTitle(area, $event)"
+				@mouseleave="peek = null"
+			>{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
 				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-5 w-5" />
@@ -62,6 +68,17 @@
 		</div>
 
 		<div v-if="draft" class="area area--draft absolute rounded-md" :style="rectStyle(draft)" />
+
+		<!-- A cut-off name in full while the mouse is on it (#2096), over the label, outside the
+			 area's clipping. -->
+		<Teleport to="body">
+			<span
+				v-if="peek"
+				class="area__title area__title--peek"
+				:style="{ left: `${peek.x}px`, top: `${peek.y}px`, '--area-h': peek.hue }"
+				data-testid="area-title-peek"
+			>{{ peek.title }}</span>
+		</Teleport>
 
 		<div
 			v-if="editing"
@@ -78,7 +95,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue"
+import { computed, reactive, ref, watch } from "vue"
+import { isCutOff } from "../utils/ophiceView.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -91,6 +109,17 @@ const props = defineProps({
 	/** The area whose meeting I am in */
 	activeName: { type: String, default: "" },
 })
+
+// The full name of a cut-off space name, while the mouse is on it (#2096).
+const peek = ref(null)
+function peekTitle(area, event) {
+	const label = event.currentTarget
+	if (props.editing || !isCutOff(label)) return
+	const rect = label.getBoundingClientRect()
+	peek.value = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
+}
+// Editing, or the map moving under the mouse: no stale name left floating.
+watch(() => [props.editing, props.areas], () => (peek.value = null))
 const emit = defineEmits(["draw", "pick", "change"])
 
 // The symbol of each cockpit's app icon; keep in step with spa_shared/scripts/generate_app_manifests.py.
@@ -406,7 +435,9 @@ function cancel() {
 	opacity: 0.9;
 	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
+/* Takes the mouse (the layer does not) so a cut-off name can show in full (#2096). */
 .area__title {
+	pointer-events: auto;
 	max-width: 95%;
 	padding: 1px 6px;
 	border-radius: 4px;
@@ -414,5 +445,15 @@ function cancel() {
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1.4;
+}
+.area__title--peek {
+	position: fixed;
+	z-index: 60;
+	max-width: 24rem;
+	transform: translate(-50%, -50%);
+	color: #fff;
+	white-space: nowrap;
+	pointer-events: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 </style>
