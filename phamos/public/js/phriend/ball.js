@@ -244,7 +244,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
    (bubble.js), so border and shadow run round the tail too. Each one lands a little off (--jx,
    --jy, --jr: the jitter), tilting round its tail. Half up, half to the side (PM, 2026-11-21):
    the tail's tip just over Phriend's scalp, above the eyes, leaning in; always in front of
-   Phriend, never behind it. */
+   Phriend, never behind it. The tilt is only on the way in: a shown bubble always rests
+   horizontal, so it is easy to read (PM, 2026-11-23, #2095). */
 .bubble {
 	position: absolute; z-index: 3; bottom: 76px; right: 36px; width: max-content; max-width: 260px;
 	padding: 8px 12px; color: var(--ph-text); font-size: 13px; line-height: 1.4;
@@ -252,7 +253,7 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	opacity: 0; transform: translate(var(--jx), calc(var(--jy) + 6px)) rotate(var(--jr));
 	transition: opacity 0.2s, transform 0.2s; pointer-events: none; cursor: auto;
 }
-.bubble.show { opacity: 1; transform: translate(var(--jx), var(--jy)) rotate(var(--jr)); pointer-events: auto; }
+.bubble.show { opacity: 1; transform: translate(var(--jx), var(--jy)) rotate(0deg); pointer-events: auto; }
 .bubble .shape { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none;
 	filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.15)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.08)); }
 :host([data-theme="dark"]) .bubble .shape { filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55)); }
@@ -335,6 +336,17 @@ export class Ball {
 		this.menu = this.shadow.querySelector(".menu");
 		this.bubble_content = this.bubble.querySelector(".content");
 		this.bubble_shape = this.bubble.querySelector(".shape");
+		// The outline follows the bubble's size (#2095): a bubble that came up while Phriend was
+		// hidden (pinned off screen on Ophice) measured 0 × 0 and stayed without its background.
+		if (typeof ResizeObserver !== "undefined") {
+			this._bubble_size = "";
+			new ResizeObserver(() => {
+				const size = `${this.bubble.offsetWidth}x${this.bubble.offsetHeight}`;
+				if (size === this._bubble_size) return;
+				this._bubble_size = size;
+				if (this.bubble_showing()) this.draw_bubble(false);
+			}).observe(this.bubble);
+		}
 		this.badge = this.shadow.querySelector(".badge");
 		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
@@ -440,7 +452,11 @@ export class Ball {
 			right: "auto",
 			bottom: "auto",
 		});
-		this.root.classList.toggle("flip", spot.left < 260); // keep the speech bubble on screen
+		const flip = spot.left < 260; // keep the speech bubble on screen
+		if (flip !== this.root.classList.contains("flip")) {
+			this.root.classList.toggle("flip", flip);
+			if (this.bubble_showing()) this.draw_bubble(false); // the tail moves to the other side
+		}
 	}
 
 	clamp_into_view() {
