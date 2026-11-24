@@ -33,9 +33,16 @@ function load_script(src) {
 
 async function start() {
 	if (!is_desk_user() || window.phriend_web_boot !== undefined) return;
+	// A page that mounts Phriend on its own (Desk, a cockpit) keeps its ball: never a second one.
+	if (document.getElementById("phriend-root")) return;
 	window.phriend_web_boot = null; // once per page
 	const src = asset_url(APP_BUNDLE);
-	if (!src) return;
+	if (!src) {
+		// Frappe's base template boots every website page with assets_json; a page that doesn't
+		// gets no ball, and says why
+		console.warn(`Phriend: ${APP_BUNDLE} missing in frappe.boot.assets_json`);
+		return;
+	}
 	const response = await fetch(`/api/method/${BOOT_METHOD}`, {
 		credentials: "same-origin",
 		headers: { Accept: "application/json" },
