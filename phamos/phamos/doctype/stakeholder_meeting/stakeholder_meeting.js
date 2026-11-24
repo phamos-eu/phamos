@@ -7,24 +7,71 @@ frappe.ui.form.on("Stakeholder Meeting", {
 			filters: { implementation: frm.doc.implementation, status: ["!=", "Cancelled"] },
 		}));
 	},
+
+	implementation(frm) {
+		// Show attendees and chapter reviews right away instead of after the first save.
+		if (frm.is_new()) {
+			frm.call("fetch_from_implementation");
+		}
+	},
 });
 
 frappe.ui.form.on("Stakeholder Meeting Chapter Review", {
-	scope_change(frm, cdt, cdn) {
+	progress(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
+		if (row.progress === "Complete" && !row.chapter_status_after) {
+			frappe.model.set_value(cdt, cdn, "chapter_status_after", "Completed");
+		}
+	},
 
-		// Only pre-fill once, the first time this row's Scope Change is checked,
-		// so re-checking it after unchecking never clobbers manual edits.
-		if (!row.scope_change || row.proposed_chapter_title || !row.current_revision) {
+	chapter(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.chapter || !frm.doc.implementation) {
 			return;
 		}
 
-		frappe.db.get_doc("Implementation Chapter Revision", row.current_revision).then((revision) => {
-			frappe.model.set_value(cdt, cdn, "proposed_chapter_title", revision.chapter_title);
-			frappe.model.set_value(cdt, cdn, "proposed_chapter_introduction", revision.chapter_introduction);
-			frappe.model.set_value(cdt, cdn, "proposed_full_chapter_description", revision.full_chapter_description);
-			frappe.model.set_value(cdt, cdn, "proposed_planned_start", revision.planned_start);
-			frappe.model.set_value(cdt, cdn, "proposed_target_date", revision.target_date);
+		frappe
+			.call({
+				method: "phamos.phamos.doctype.stakeholder_meeting.stakeholder_meeting.get_chapter_review_row",
+				args: { implementation: frm.doc.implementation, chapter: row.chapter },
+			})
+			.then((r) => {
+				if (r.message && locals[cdt][cdn]) {
+					const values = { ...r.message };
+					delete values.chapter;
+					frappe.model.set_value(cdt, cdn, values);
+				}
+			});
+	},
+
+	scope_change(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.scope_change || !row.chapter) {
+			return;
+		}
+
+		// Pre-fill from the Chapter, only into fields that are still empty, so
+		// re-checking Scope Change never overwrites manual edits.
+		const fields = {
+			proposed_chapter_title: "chapter_title",
+			proposed_chapter_introduction: "chapter_introduction",
+			proposed_full_chapter_description: "full_chapter_description",
+			proposed_planned_start: "planned_start",
+			proposed_target_date: "target_date",
+		};
+		frappe.db.get_value("Implementation Chapter", row.chapter, Object.values(fields)).then((r) => {
+			const chapter = r.message || {};
+			const current = locals[cdt][cdn];
+			if (!current) {
+				return;
+			}
+			const values = {};
+			for (const [proposed, source] of Object.entries(fields)) {
+				if (!current[proposed] && chapter[source]) {
+					values[proposed] = chapter[source];
+				}
+			}
+			frappe.model.set_value(cdt, cdn, values);
 		});
 	},
 });
