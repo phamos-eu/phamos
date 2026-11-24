@@ -21,7 +21,7 @@ from phamos.phriend import feedback as phriend_feedback
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend import voice as phriend_voice
-from phamos.phriend.boot import is_for_user
+from phamos.phriend.boot import is_for_user, web_boot
 from phamos.phriend.gitlab_issues import link_created
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
@@ -411,6 +411,29 @@ def _may_read(doctype, name=None):
 		# an unknown DocType or record: nothing to say about it
 		frappe.clear_last_message()
 		return False
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_web_boot():
+	"""Whether the Phriend ball shows on the website pages, and what it needs (#2104).
+
+	The website has no Desk boot: phriend_web.bundle.js asks here, and only for users whose
+	`system_user` cookie says Desk user. None for everyone Phriend is not for, Guests included
+	(a stale cookie after logout must not raise an error).
+	"""
+	return web_boot()
+
+
+@frappe.whitelist(methods=["GET"])
+def get_web_translations():
+	"""Phriend's words in the user's language, for the website pages (#2104): the table the
+	cockpits boot with. Fetched once per language and phamos version; empty when Phriend is not
+	for the user."""
+	from phamos.www.spa_boot import spa_translations
+
+	if not web_boot():
+		return {}
+	return spa_translations(frappe.local.lang)
 
 
 @frappe.whitelist()
