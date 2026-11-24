@@ -64,16 +64,18 @@ def reporter_user(doc):
 
 
 def logged_in_reporter(doc):
-	"""The Desk user who reported the Issue through a logged-in path, or None.
+	"""The Desk user who created the Issue while logged in, or None.
 
-	Only a Phriend report made on this system (the reporter was logged in) or an Issue a staff user
-	created in Desk counts. `raised_by` of an e-mail is the unchecked From header and could be forged,
-	so it never makes an Issue internal (AI review on !1314). Reports forwarded from another system
-	(phriend_source_system) don't count either: that system vouches for its reporter, not us.
+	Only the Issue's `owner` counts: Frappe sets it from the session, so a caller cannot choose it.
+	A Phriend report made on this system is inserted in the reporter's session, so its owner is the
+	reporter. Fields a caller can send (`raised_by`, the From header of an e-mail, and
+	`phriend_reported_by`) never make an Issue internal (AI review on !1314). E-mail Issues are
+	inserted by the system (owner Administrator), and reports forwarded from another system
+	(phriend_source_system) are vouched for by that system, not by us: neither counts.
 	"""
 	if doc.get("phriend_source_system"):
 		return None
-	user = doc.get("phriend_reported_by") or doc.owner
+	user = doc.owner
 	if not user or user in ("Guest", "Administrator"):
 		return None
 	if not frappe.db.get_value("User", user, "enabled"):
