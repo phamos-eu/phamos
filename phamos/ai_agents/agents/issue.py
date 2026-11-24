@@ -63,6 +63,24 @@ def reporter_user(doc):
 	return user if frappe.db.get_value("User", user, "enabled") else None
 
 
+def logged_in_reporter(doc):
+	"""The Desk user who reported the Issue through a logged-in path, or None.
+
+	Only a Phriend report made on this system (the reporter was logged in) or an Issue a staff user
+	created in Desk counts. `raised_by` of an e-mail is the unchecked From header and could be forged,
+	so it never makes an Issue internal (AI review on !1314). Reports forwarded from another system
+	(phriend_source_system) don't count either: that system vouches for its reporter, not us.
+	"""
+	if doc.get("phriend_source_system"):
+		return None
+	user = doc.get("phriend_reported_by") or doc.owner
+	if not user or user in ("Guest", "Administrator"):
+		return None
+	if not frappe.db.get_value("User", user, "enabled"):
+		return None
+	return user if is_desk_user(user) else None
+
+
 def is_desk_user(user):
 	return bool(user) and frappe.db.get_value("User", user, "user_type") == "System User"
 
@@ -86,8 +104,8 @@ def model_allowed(doc, settings=None):
 	Returns {"allowed", "reason", "customer", "page"}. Order:
 	1. a report from an excluded page (HR, salary, leave) never goes
 	2. an Issue of a Customer goes only when that Customer has "AI processing allowed" (signed AVV)
-	3. no Customer, reported by a phamos Desk user: internal, goes
-	4. no Customer, external or unknown sender: does not go
+	3. no Customer, reported by a phamos Desk user through a logged-in path: internal, goes
+	4. no Customer, any other sender (also a staff address in an e-mail's From): does not go
 	"""
 	settings = settings or frappe.get_cached_doc(SETTINGS)
 	page = doc.get("phriend_ref_doctype")
@@ -103,7 +121,7 @@ def model_allowed(doc, settings=None):
 			"customer": customer,
 			"page": page,
 		}
-	if is_desk_user(reporter_user(doc)):
+	if logged_in_reporter(doc):
 		return {"allowed": True, "reason": INTERNAL, "customer": None, "page": page}
 	return {"allowed": False, "reason": UNKNOWN_SENDER, "customer": None, "page": page}
 
@@ -177,13 +195,14 @@ def sender_text(doc, reporter):
 
 
 def brief_lines(ctx):
-	gate = ctx.analysis.get("gate") or model_allowed(ctx.doc)
+	# No gate result means the check failed: say so instead of deciding again here (fail closed).
+	gate = ctx.analysis.get("gate")
 	reporter = ctx.analysis.get("reporter")
 	return [
 		_("First look at {0}").format(ctx.doc.name),
 		_("Sender: {0}").format(sender_text(ctx.doc, reporter)),
 		_("Source: {0}").format(source_text(ctx.doc)),
-		gate_text(gate),
+		gate_text(gate) if gate else _("AI model not used: the check could not run."),
 	]
 
 

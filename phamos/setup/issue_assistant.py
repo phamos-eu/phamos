@@ -174,7 +174,8 @@ def ensure_agent(user, bot):
 				"phase": "Extract",
 				"order": 10,
 				"handler": "check_gate",
-				"on_fail": "Continue",
+				# fail closed: without a gate decision no later skill (the model, #2113) may run
+				"on_fail": "Stop Run",
 				"description": "Assigns the assistant and a Desk-user reporter, and decides whether the Issue may go to "
 				"the AI model: sensitive page, the Customer's \"AI processing allowed\", internal or unknown sender.",
 			}

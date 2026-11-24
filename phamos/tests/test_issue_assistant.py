@@ -151,8 +151,36 @@ class TestGate(IssueAssistantTestCase):
 		self.assertEqual((gate["allowed"], gate["reason"]), (True, assistant.CUSTOMER_ALLOWED))
 
 	def test_internal_desk_user_goes(self):
-		doc = self.issue(raised_by=DESK_USER)
+		doc = self.issue(raised_by=DESK_USER, phriend_reported_by=DESK_USER)
 		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.INTERNAL)
+
+	def test_issue_created_in_desk_by_staff_goes(self):
+		frappe.set_user(DESK_USER)
+		doc = self.issue(raised_by=DESK_USER)
+		frappe.set_user("Administrator")
+		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.INTERNAL)
+
+	def test_staff_address_in_an_email_is_not_internal(self):
+		# an e-mail Issue is inserted by the system; its From header could be forged
+		doc = self.issue(raised_by=DESK_USER)
+		self.assertEqual(doc.owner, "Administrator")
+		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.UNKNOWN_SENDER)
+
+	def test_forwarded_report_is_not_internal(self):
+		doc = self.issue(raised_by=DESK_USER, phriend_reported_by=DESK_USER, phriend_source_system="Other ERPNext")
+		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.UNKNOWN_SENDER)
+
+	def test_failed_gate_fails_closed(self):
+		doc = self.issue(raised_by=DESK_USER, phriend_reported_by=DESK_USER)
+		with patch.object(assistant, "model_allowed", side_effect=RuntimeError("boom")), patch(
+			"phamos.ai_agents.runner.frappe.log_error"
+		):
+			run = self.run_assistant(doc)
+		self.assertIn(frappe._("AI model not used: the check could not run."), run.summary)
+		self.assertEqual(
+			frappe.db.get_value("AI Skill", {"agent": setup.ASSISTANT_NAME, "handler": "check_gate"}, "on_fail"),
+			"Stop Run",
+		)
 
 	def test_unknown_sender_does_not_go(self):
 		doc = self.issue(raised_by="someone@unknown.example")
