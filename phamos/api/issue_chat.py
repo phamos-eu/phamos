@@ -466,6 +466,38 @@ def ensure_chat(doc):
 	return get_chat(doc)
 
 
+
+def post_bot_message(doc, bot_name, html):
+	"""Post a bot's message in the record's chat, opening the chat first when it has none (#2111).
+
+	For background jobs: no session user is needed. The record's owner and assignees join as with
+	"Start chat"; the bot joins too, so its message shows as a member's. Returns the message name, or
+	None when the record chat is off.
+	"""
+	_require_chat_doctype(doc.doctype)
+	if not is_enabled():
+		return None
+	frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+	channel = find_channel(doc.doctype, doc.name, for_update=True)
+	if not channel:
+		channel = _create_channel(doc)
+		_ensure_members(channel, _record_users(doc))
+		_post_link_message(channel.name, doc, _("Chat about {0}: {1}").format(doc.name, _doc_title(doc)))
+	bot = frappe.get_doc("Raven Bot", bot_name)
+	if bot.raven_user and not frappe.db.exists(
+		"Raven Channel Member", {"channel_id": channel.name, "user_id": bot.raven_user}
+	):
+		member = frappe.get_doc(
+			{"doctype": "Raven Channel Member", "channel_id": channel.name, "user_id": bot.raven_user}
+		)
+		member.flags.ignore_system_message = True
+		member.insert(ignore_permissions=True)
+	message = bot.send_message(channel.name, html)
+	if bot.raven_user:
+		# Raven shows the message's owner as its sender; the background job runs as the assistant's user
+		frappe.db.set_value("Raven Message", message, "owner", bot.raven_user, update_modified=False)
+	return message
+
 def _create_channel(doc):
 	workspace = _resolve_workspace()
 	channel = frappe.get_doc(
