@@ -152,6 +152,7 @@ class TestGate(IssueAssistantTestCase):
 
 	def test_internal_desk_user_goes(self):
 		# a Phriend report is inserted in the reporter's session, so they are its owner
+		self.addCleanup(frappe.set_user, "Administrator")
 		frappe.set_user(DESK_USER)
 		doc = self.issue(raised_by=DESK_USER, phriend_reported_by=DESK_USER, phriend_type="Bug")
 		frappe.set_user("Administrator")
@@ -163,6 +164,7 @@ class TestGate(IssueAssistantTestCase):
 		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.UNKNOWN_SENDER)
 
 	def test_issue_created_in_desk_by_staff_goes(self):
+		self.addCleanup(frappe.set_user, "Administrator")
 		frappe.set_user(DESK_USER)
 		doc = self.issue(raised_by=DESK_USER)
 		frappe.set_user("Administrator")
