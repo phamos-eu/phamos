@@ -11,10 +11,17 @@ export function encounterCallUrl(video, displayName = "") {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""
-	let url = `https://${domain}/${encodeURIComponent(room)}`
 	// Jitsi reads settings from the fragment as JSON values; the fragment never reaches a server.
-	if (displayName) url += `#userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`
-	return url
+	// Whoever opens the call wants to talk: mic and camera on, straight in without the pre-join
+	// screen (#2108). The browser still asks once for the permission to use them.
+	const settings = [
+		"config.startWithAudioMuted=false",
+		"config.startWithVideoMuted=false",
+		"config.prejoinConfig.enabled=false",
+		"config.prejoinPageEnabled=false",
+	]
+	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)
+	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
 }
 
 /** Window name of the call: opening it again brings the same window back. */
