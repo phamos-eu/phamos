@@ -319,6 +319,29 @@ const MINUTES = [5, 15, 30, 60]
 const ICONS = { walkup: "user", message: "message-circle", meeting: "message-square", reminder: "clock" }
 const POS_KEY = "phamos_ophice_mini_map_pos"
 
+// --- Size (kept in this browser) and layout
+// Declared before `tile`: useMapCamera's watches read the tile while this setup runs, so `wide`
+// must exist by then (it didn't: "Cannot access 'T' before initialization" on production).
+
+function storedSize() {
+	try {
+		const size = JSON.parse(localStorage.getItem(SIZE_KEY) || "null")
+		if (size && Number.isFinite(size.w) && Number.isFinite(size.h)) return size
+	} catch {
+		// private window
+	}
+	return { w: 320, h: 640 }
+}
+const size = reactive(storedSize())
+const floatSize = reactive({ w: 0, h: 0 })
+const panelHeight = computed(() => (props.floatTarget ? floatSize.h : props.meeting ? size.h : 2000))
+const wide = computed(() => {
+	if (!props.meeting) return false
+	const w = props.floatTarget ? floatSize.w : size.w
+	const h = props.floatTarget ? floatSize.h : size.h
+	return w > h * 1.3
+})
+
 // The map fills the width of its column; its height follows the office's shape.
 const mapWidth = ref(WIDTH - 12)
 const tile = computed(() => {
@@ -456,26 +479,6 @@ function float() {
 	emit("float")
 }
 
-// --- Size (kept in this browser) and layout
-
-function storedSize() {
-	try {
-		const size = JSON.parse(localStorage.getItem(SIZE_KEY) || "null")
-		if (size && Number.isFinite(size.w) && Number.isFinite(size.h)) return size
-	} catch {
-		// private window
-	}
-	return { w: 320, h: 640 }
-}
-const size = reactive(storedSize())
-const floatSize = reactive({ w: 0, h: 0 })
-const panelHeight = computed(() => (props.floatTarget ? floatSize.h : props.meeting ? size.h : 2000))
-const wide = computed(() => {
-	if (!props.meeting) return false
-	const w = props.floatTarget ? floatSize.w : size.w
-	const h = props.floatTarget ? floatSize.h : size.h
-	return w > h * 1.3
-})
 // Which parts are open (kept in this browser).
 const OPEN_KEY = "phamos_ophice_mini_map_open"
 function storedOpen() {
