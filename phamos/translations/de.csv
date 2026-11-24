@@ -3036,3 +3036,18 @@ End {0}'s visit?,Besuch von {0} beenden?
 Send out,Hinausschicken
 Send out of Ophice,Aus dem Ophice schicken
 {0} has left Ophice.,{0} hat das Ophice verlassen.
+AI processing allowed,KI-Verarbeitung erlaubt
+Issue Assistant Settings,Einstellungen Anfrage-Assistent
+Assistant User,Assistent-Benutzer
+Excluded Pages,Ausgeschlossene Seiten
+First look at {0},Erster Blick auf {0}
+Sender: {0},Absender: {0}
+Phriend report forwarded from {0},"Phriend-Meldung, weitergeleitet von {0}"
+Created in ERPNext,In ERPNext angelegt
+AI model not used: reported from a sensitive page ({0}).,KI-Modell nicht genutzt: gemeldet von einer sensiblen Seite ({0}).
+AI model not used: AI processing is not allowed for customer {0}.,KI-Modell nicht genutzt: KI-Verarbeitung ist für Kunde {0} nicht erlaubt.
+AI model not used: the sender is not known as a customer or a phamos user.,KI-Modell nicht genutzt: Der Absender ist weder als Kunde noch als phamos-Benutzer bekannt.
+AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt werden: Kunde {0} erlaubt KI-Verarbeitung.
+AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
+The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
+AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
