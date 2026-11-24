@@ -135,7 +135,12 @@ app_include_js = [
 # Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
 # `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
 web_include_css = ["web_profile.bundle.css"]
-web_include_js = ["web_profile.bundle.js"]
+web_include_js = [
+	"web_profile.bundle.js",
+	# Phriend for Desk users on the website pages (#2104): a small loader; the ball loads only
+	# when the server says Phriend is for the user
+	"phriend_web.bundle.js",
+]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
