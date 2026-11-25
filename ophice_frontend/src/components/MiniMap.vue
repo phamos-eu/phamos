@@ -5,8 +5,8 @@
 		stack under the map; wide, they sit side by side (PM, 2026-11-22). The call and chat themselves
 		are laid over the spots kept free here (a moved video window would restart the call).
 		"Float" (Chrome, Edge, newer Firefox) puts all of it in a small window on top of everything.
-		Docked (#2155): laid over its spot at the bottom of the cockpit's sidebar, at the sidebar's
-		width. Dragged out by its header it hovers; dropped back on the sidebar it docks again.
+		Docked (#2155): laid over the cockpit's right sidebar, which opens for it. Dragged out by its
+		header it hovers (the sidebar closes); dropped back on the right edge it docks again.
 	-->
 	<Teleport :to="floatTarget || 'body'" :disabled="!floatTarget">
 		<div
@@ -288,7 +288,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat } from "../utils/pip.js"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
-import { DROP_TARGET_HEIGHT, isOverDock } from "@spa/utils/ophiceDock.js"
+import { isOverDock } from "@spa/utils/ophiceDock.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -308,12 +308,12 @@ const props = defineProps({
 	/** The floating window's body when it floats (Ophice opens it, so the call can go along). */
 	floatTarget: { type: Object, default: null },
 	/**
-	 * The spot in the cockpit's sidebar (#2155), in this page's coordinates:
-	 * { left, top, width, height, bottom, max }. Null: no sidebar to dock in, the map hovers.
+	 * The cockpit's right sidebar (#2155): { rect }, rect = { left, top, width, height, bottom } in
+	 * this page's coordinates, null while the sidebar is closed. Null: no dock, the map hovers.
 	 */
 	dock: { type: Object, default: null },
 })
-const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "dock-size"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "dock-want"])
 
 // Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
 const drafts = reactive({})
@@ -339,7 +339,7 @@ const MINUTES = [5, 15, 30, 60]
 const ICONS = { walkup: "user", message: "message-circle", meeting: "message-square", reminder: "clock" }
 const POS_KEY = "phamos_ophice_mini_map_pos"
 
-// --- Docked in the cockpit's sidebar (#2155), kept in this browser; docked unless taken out.
+// --- Docked in the cockpit's right sidebar (#2155), kept in this browser; docked unless taken out.
 // Declared before the size and layout below: they read it while this setup runs (see #2109).
 
 const DOCKED_KEY = "phamos_ophice_mini_map_docked"
@@ -360,7 +360,7 @@ function setDocked(on) {
 		// private window: the choice lasts until the reload
 	}
 }
-// Being dragged (hovering): the sidebar shows its spot as a drop target.
+// Being dragged (hovering): the cockpit shows a drop strip on its right edge.
 const moving = ref(false)
 
 // --- Size (kept in this browser) and layout
@@ -378,13 +378,11 @@ function storedSize() {
 }
 const size = reactive(storedSize())
 const floatSize = reactive({ w: 0, h: 0 })
-// Docked: as tall as the sidebar allows, never less than a useful map.
-const dockMax = computed(() => Math.max(160, props.dock?.max || 0))
 const panelHeight = computed(() =>
-	props.floatTarget ? floatSize.h : isDocked.value ? dockMax.value : props.meeting ? size.h : 2000
+	props.floatTarget ? floatSize.h : isDocked.value ? props.dock.rect?.height || 2000 : props.meeting ? size.h : 2000
 )
 const wide = computed(() => {
-	// Docked, it is as narrow as the sidebar: always tall.
+	// Docked, it is as narrow as the right sidebar: always tall.
 	if (!props.meeting || isDocked.value) return false
 	const w = props.floatTarget ? floatSize.w : size.w
 	const h = props.floatTarget ? floatSize.h : size.h
@@ -529,9 +527,9 @@ function endDrag(event) {
 	grabbing.value = ""
 	moving.value = false
 	window.removeEventListener("pointermove", onDrag)
-	// Let go over the sidebar's spot: docked; anywhere else: it hovers there. Without a sidebar
-	// (collapsed) the choice stays as it was.
-	if (moved && props.dock) setDocked(isOverDock(event.clientX, event.clientY, props.dock))
+	// Let go over the drop strip: docked; anywhere else: it hovers there. In a cockpit without a
+	// dock the choice stays as it was.
+	if (moved && props.dock) setDocked(isOverDock(event.clientX, event.clientY, props.dock.rect))
 	try {
 		localStorage.setItem(POS_KEY, JSON.stringify({ x: pos.x, y: pos.y }))
 	} catch {
@@ -576,15 +574,12 @@ function toggle(part) {
 const fixedHeight = computed(() => props.meeting && (open.video || open.chat))
 
 const panelStyle = computed(() => {
-	const dock = props.dock
 	if (isDocked.value) {
-		// Held at the spot's bottom: growing (a new ping) goes up, the spot follows.
-		return {
-			left: `${dock.left}px`,
-			bottom: `${Math.max(0, window.innerHeight - dock.bottom)}px`,
-			width: `${dock.width}px`,
-			...(fixedHeight.value ? { height: `${dockMax.value}px` } : { maxHeight: `${dockMax.value}px` }),
-		}
+		const rect = props.dock.rect
+		// The sidebar is still opening: out of sight until its place is known.
+		if (!rect) return { ...hoverStyle.value, visibility: "hidden" }
+		// The whole sidebar: the map on top, pings (or the call and chat) below it.
+		return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
 	}
 	return hoverStyle.value
 })
@@ -664,10 +659,7 @@ function rectOf(el) {
 	if (!r.width || !r.height) return { hidden: true }
 	return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
-// The panel's height, for the spot in the sidebar.
-const panelOuter = ref(0)
 function report() {
-	if (root.value) panelOuter.value = root.value.offsetHeight
 	if (mapColumn.value) mapWidth.value = mapColumn.value.clientWidth
 	if (props.floatTarget && root.value) {
 		floatSize.w = root.value.clientWidth
@@ -706,15 +698,12 @@ watch(
 	},
 	{ immediate: true }
 )
-// The spot in the sidebar (#2155): the panel's height while docked, a drop target while it is
-// dragged, nothing while it hovers. Ophice passes it on to the cockpit's sidebar.
+// The right sidebar (#2155): open while docked, a drop strip while the map is dragged, closed
+// while it hovers. Ophice passes it on to the cockpit.
 watch(
-	() => {
-		const target = moving.value && !isDocked.value && Boolean(props.dock)
-		return { height: isDocked.value ? panelOuter.value : target ? DROP_TARGET_HEIGHT : 0, target }
-	},
+	() => ({ docked: isDocked.value, target: moving.value && !isDocked.value && Boolean(props.dock) }),
 	(want, before) => {
-		if (want.height !== before?.height || want.target !== before?.target) emit("dock-size", want)
+		if (want.docked !== before?.docked || want.target !== before?.target) emit("dock-want", want)
 	},
 	{ immediate: true }
 )
@@ -722,7 +711,7 @@ onBeforeUnmount(() => {
 	observer.disconnect()
 	floatWindow?.removeEventListener("resize", report)
 	emit("slots", null)
-	emit("dock-size", { height: 0, target: false })
+	emit("dock-want", { docked: false, target: false })
 })
 </script>
 

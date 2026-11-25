@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { DOCK_RECT, DOCK_SIZE, DROP_TARGET_HEIGHT, dockMessage, inOphiceFrame, isOverDock, rectInParent } from "./ophiceDock.js"
+import { DOCK_RECT, DOCK_SIZE, dockMessage, inOphiceFrame, isOverDock, rectInParent } from "./ophiceDock.js"
 
-// The mini map's dock in the cockpit sidebar (#2155): the frame and Ophice talk by postMessage.
+// The mini map's dock, a right sidebar in the cockpit (#2155): the frame and Ophice talk by postMessage.
 
 describe("inOphiceFrame", () => {
 	it("is true only in the frame Ophice marked", () => {
@@ -46,20 +46,20 @@ describe("rectInParent", () => {
 })
 
 describe("isOverDock", () => {
-	const dock = { left: 8, top: 600, width: 192, height: 0, bottom: 760 }
+	// The right sidebar (or its drop strip) of a 1280 px wide cockpit.
+	const rect = { left: 992, top: 0, width: 288, height: 800, bottom: 800 }
 
-	it("docks when let go over the sidebar's spot", () => {
-		expect(isOverDock(100, 740, dock)).toBe(true)
-		// The drop target reaches up even while the spot is still empty.
-		expect(isOverDock(100, dock.bottom - DROP_TARGET_HEIGHT, dock)).toBe(true)
+	it("docks when let go over the right sidebar", () => {
+		expect(isOverDock(1100, 400, rect)).toBe(true)
+		// A little short of it still counts.
+		expect(isOverDock(980, 400, rect)).toBe(true)
 	})
 
-	it("hovers when let go over the cockpit page or high up in the sidebar", () => {
-		expect(isOverDock(600, 740, dock)).toBe(false)
-		expect(isOverDock(100, 200, dock)).toBe(false)
+	it("hovers when let go over the cockpit page", () => {
+		expect(isOverDock(600, 400, rect)).toBe(false)
 	})
 
 	it("never docks without a spot", () => {
-		expect(isOverDock(100, 740, null)).toBe(false)
+		expect(isOverDock(1100, 400, null)).toBe(false)
 	})
 })

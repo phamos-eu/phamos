@@ -95,9 +95,6 @@
 			</button>
 		</nav>
 
-		<!-- Inside Ophice: the mini map's spot, at the sidebar's width (#2155). Collapsed, it hovers. -->
-		<OphiceDock v-if="!collapsed" />
-
 		<!-- Website users have no Desk; their cockpit puts its own footer here (#1671). -->
 		<slot v-if="$slots.footer" name="footer" :collapsed="collapsed" />
 		<div v-else class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
@@ -119,7 +116,6 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { Dropdown } from "frappe-ui"
-import OphiceDock from "@spa/components/OphiceDock.vue"
 import { openCockpit, openDesk } from "@spa/utils/appWindow.js"
 import { canOfferInstall, installApp, openInstallHint } from "@spa/installApp.js"
 import { otherCockpits } from "@spa/utils/cockpitSwitcher.js"

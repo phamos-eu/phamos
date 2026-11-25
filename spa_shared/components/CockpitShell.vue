@@ -21,6 +21,8 @@
 				<router-view />
 			</main>
 		</div>
+		<!-- Inside Ophice: the right sidebar the mini map docks in (#2155). -->
+		<OphiceDock />
 		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
 		<!-- How to install this cockpit as a desktop app, on the first visits (#1998). -->
@@ -61,6 +63,7 @@ import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 import InstallAppDialog from "@spa/components/InstallAppDialog.vue"
+import OphiceDock from "@spa/components/OphiceDock.vue"
 import { mountPhriend } from "@spa/phriend.js"
 import { startCockpitPresence, stopCockpitPresence } from "@spa/cockpitPresence.js"
 import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"

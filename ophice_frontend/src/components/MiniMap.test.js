@@ -67,10 +67,10 @@ describe("MiniMap setup (Ophice over a cockpit, #2109)", () => {
 	})
 })
 
-// Docked in the cockpit's sidebar (#2155) instead of a pop-out window.
-describe("MiniMap docked in the cockpit sidebar (#2155)", () => {
+// Docked in the cockpit's right sidebar (#2155) instead of a pop-out window.
+describe("MiniMap docked in the cockpit's right sidebar (#2155)", () => {
 	const me = { name: "me", x: 3, y: 4 }
-	const dock = { left: 8, top: 560, width: 192, height: 200, bottom: 760, max: 480 }
+	const dock = { rect: { left: 992, top: 0, width: 288, height: 800, bottom: 800 } }
 	const press = (x, y) => ({ button: 0, clientX: x, clientY: y, preventDefault() {} })
 
 	beforeEach(() => {
@@ -83,17 +83,24 @@ describe("MiniMap docked in the cockpit sidebar (#2155)", () => {
 		vi.restoreAllMocks()
 	})
 
-	it("docks by default: at the spot's place and width, held at its bottom", async () => {
+	it("docks by default and fills the right sidebar", async () => {
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock })
 		expect(state.isDocked.value).toBe(true)
-		expect(state.panelStyle.value).toMatchObject({ left: "8px", width: "192px", bottom: "40px", maxHeight: "480px" })
+		expect(state.panelStyle.value).toEqual({ left: "992px", top: "0px", width: "288px", height: "800px" })
 		scope.stop()
 	})
 
-	it("hovers when the cockpit has no sidebar to dock in", async () => {
+	it("stays out of sight while the sidebar opens", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock: { rect: null } })
+		expect(state.isDocked.value).toBe(true)
+		expect(state.panelStyle.value.visibility).toBe("hidden")
+		scope.stop()
+	})
+
+	it("hovers when the cockpit has no dock", async () => {
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock: null })
 		expect(state.isDocked.value).toBe(false)
-		expect(state.panelStyle.value.bottom).toBeUndefined()
+		expect(state.panelStyle.value.visibility).toBeUndefined()
 		scope.stop()
 	})
 
@@ -101,49 +108,46 @@ describe("MiniMap docked in the cockpit sidebar (#2155)", () => {
 		localStorage.setItem("phamos_ophice_mini_map_size", JSON.stringify({ w: 900, h: 300 }))
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, meeting: true, dock })
 		expect(state.wide.value).toBe(false)
-		expect(state.panelStyle.value).toMatchObject({ height: "480px" })
 		scope.stop()
 	})
 
-	it("comes out only once the pointer moves, hovers where it is let go, and docks again on the spot", async () => {
+	it("comes out only once the pointer moves, hovers where it is let go, and docks again on the right", async () => {
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock })
 		// A click on the header (no move) leaves it docked.
-		state.startDrag(press(60, 580))
-		state.onDrag(press(62, 581))
-		state.endDrag(press(62, 581))
+		state.startDrag(press(1050, 12))
+		state.onDrag(press(1052, 13))
+		state.endDrag(press(1052, 13))
 		expect(state.isDocked.value).toBe(true)
 
 		// Dragged out over the cockpit page: it hovers there, and that is remembered.
-		state.startDrag(press(60, 580))
+		state.startDrag(press(1050, 12))
 		state.onDrag(press(500, 300))
 		expect(state.isDocked.value).toBe(false)
 		state.endDrag(press(500, 300))
 		expect(state.isDocked.value).toBe(false)
 		expect(localStorage.getItem("phamos_ophice_mini_map_docked")).toBe("0")
 
-		// Dragged back onto the sidebar's spot: docked.
+		// Dragged back onto the drop strip: docked.
 		state.startDrag(press(500, 300))
-		state.onDrag(press(90, 740))
-		state.endDrag(press(90, 740))
+		state.onDrag(press(1100, 400))
+		state.endDrag(press(1100, 400))
 		expect(state.isDocked.value).toBe(true)
 		expect(localStorage.getItem("phamos_ophice_mini_map_docked")).toBe("1")
 		scope.stop()
 	})
 
-	it("asks for a drop target while it is dragged, and for nothing while it hovers", async () => {
-		localStorage.setItem("phamos_ophice_mini_map_docked", "0")
+	it("opens the sidebar while docked, asks for the drop strip while dragged, and closes it while hovering", async () => {
 		const emitted = []
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock }, emitted)
-		const sizes = () => emitted.filter(([name]) => name === "dock-size").map(([, size]) => size)
-		expect(sizes().at(-1)).toEqual({ height: 0, target: false })
-		state.startDrag(press(500, 300))
+		const wants = () => emitted.filter(([name]) => name === "dock-want").map(([, want]) => want)
+		expect(wants().at(-1)).toEqual({ docked: true, target: false })
+		state.startDrag(press(1050, 12))
 		state.onDrag(press(400, 300))
 		await Promise.resolve()
-		expect(sizes().at(-1)).toMatchObject({ target: true })
-		expect(sizes().at(-1).height).toBeGreaterThan(0)
+		expect(wants().at(-1)).toEqual({ docked: false, target: true })
 		state.endDrag(press(400, 300))
 		await Promise.resolve()
-		expect(sizes().at(-1)).toEqual({ height: 0, target: false })
+		expect(wants().at(-1)).toEqual({ docked: false, target: false })
 		scope.stop()
 	})
 

@@ -704,7 +704,7 @@
 			:float-target="pipBody"
 			:dock="sidebarDock"
 			@slots="(slots) => (dockRects = slots)"
-			@dock-size="setDockSize"
+			@dock-want="setDockWant"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -2236,17 +2236,18 @@ watch(
 	}
 )
 
-// --- The mini map's spot in the cockpit's sidebar (#2155). The cockpit frame says where the spot
-// is; the mini map says how tall it must be, and Ophice passes that back to the frame. Always the
-// frame that is there now: a cockpit reopened from the shortcut bar gets a new iframe.
+// --- The mini map's right sidebar in the cockpit (#2155). The cockpit frame says whether it has
+// one and where its spot is; the mini map says whether it is docked (the sidebar opens) or being
+// dragged (a drop strip shows), and Ophice passes that on to the frame. Always the frame that is
+// there now: a cockpit reopened from the shortcut bar gets a new iframe.
 const sidebarDock = ref(null)
-let dockSize = { height: 0, target: false }
+let dockWant = { docked: false, target: false }
 function cockpitFrameWindow() {
 	return document.querySelector("iframe[data-ophice-frame]")?.contentWindow || null
 }
-function sendDockSize(win) {
+function sendDockWant(win) {
 	try {
-		win?.postMessage({ type: DOCK_SIZE, ...dockSize }, window.location.origin)
+		win?.postMessage({ type: DOCK_SIZE, ...dockWant }, window.location.origin)
 	} catch {
 		// the frame is loading another page; it reports again once it is there
 	}
@@ -2254,13 +2255,15 @@ function sendDockSize(win) {
 function onDockMessage(event) {
 	const data = dockMessage(event, DOCK_RECT)
 	if (!data || !event.source || event.source !== cockpitFrameWindow()) return
-	sidebarDock.value = data.rect ? { ...data.rect, max: Number(data.max) || 0 } : null
-	// A new page in the frame starts with an empty spot: tell it the size.
-	if (data.rect && (data.height !== dockSize.height || data.target !== dockSize.target)) sendDockSize(event.source)
+	sidebarDock.value = data.available ? { rect: data.rect || null } : null
+	// A new page in the frame starts with its sidebar closed: tell it what the map wants.
+	if (data.available && (Boolean(data.docked) !== dockWant.docked || Boolean(data.target) !== dockWant.target)) {
+		sendDockWant(event.source)
+	}
 }
-function setDockSize(size) {
-	dockSize = { height: Math.round(size.height), target: Boolean(size.target) }
-	sendDockSize(cockpitFrameWindow())
+function setDockWant(want) {
+	dockWant = { docked: Boolean(want.docked), target: Boolean(want.target) }
+	sendDockWant(cockpitFrameWindow())
 }
 window.addEventListener("message", onDockMessage)
 
