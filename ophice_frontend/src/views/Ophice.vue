@@ -24,8 +24,9 @@
 			:meeting="meetingArea"
 			:area-of="areaOfUser"
 			:auto-cockpit="autoCockpit"
+			:selected="selectedUsers"
 			@auto-cockpit="setAutoCockpit"
-			@pick="(person, event) => openChatWith(person, event)"
+			@pick="onPersonClick"
 			@hide="setHideDetails"
 		/>
 		<div
@@ -173,7 +174,7 @@
 					:area="meetingArea"
 					:people="huddle"
 					:me="me.user"
-					@pick="(person, event) => openChatWith(person, event)"
+					@pick="onPersonClick"
 				/>
 				<!-- Guest and customer meeting areas: the guest chat, kept only for a short while (#2083). -->
 				<GuestChat
@@ -232,6 +233,52 @@
 					@save="saveEncounter(notice)"
 				/>
 			</div>
+			<!-- Placing a meeting point (PM, 2026-11-22): the next click on the map sets it. -->
+			<p
+				v-if="placingPin"
+				class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+				data-testid="pin-hint"
+			>
+				{{ __("Click on the map where you want to meet · Esc to cancel") }}
+			</p>
+			<!-- Selected people (PM, 2026-11-22): go to them, or set a meeting point for all. -->
+			<div
+				v-if="me && selectedUsers.length && !placingPin"
+				class="absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-sm text-ink-gray-9 shadow-xl"
+				data-no-pan
+				data-testid="selection-bar"
+			>
+				<span class="flex -space-x-1.5">
+					<span v-for="person in selectedPeople.slice(0, 5)" :key="person.user" class="rounded-full ring-2 ring-surface-white">
+						<UserAvatar :name="person.user" :label="person.full_name" :image="person.user_image" size="sm" />
+					</span>
+				</span>
+				<span class="whitespace-nowrap text-ink-gray-7" data-testid="selection-count">
+					{{ selectedUsers.length === 1 ? selectedPeople[0]?.full_name : __("{0} people", [selectedUsers.length]) }}
+				</span>
+				<GoToButton up :disabled="!selectedOnMap.length" @go="(mode) => goTo(selectedOnMap, mode)" />
+				<Button
+					size="sm"
+					variant="subtle"
+					:disabled="!selectedPeople.some((p) => !p.guest)"
+					:title="__('Set a meeting point for you and the people selected')"
+					class="whitespace-nowrap"
+					data-testid="selection-meeting-point"
+					@click="startPinPlacing(selectedUsers)"
+				>
+					<template #prefix><FeatherIcon name="map-pin" class="h-3.5 w-3.5" /></template>
+					{{ __("Meeting point") }}
+				</Button>
+				<button
+					type="button"
+					class="rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+					:title="__('Clear the selection (Esc)')"
+					data-testid="selection-clear"
+					@click="clearSelection()"
+				>
+					<FeatherIcon name="x" class="h-4 w-4" />
+				</button>
+			</div>
 			<!--
 				The map (#2089): a view onto a canvas that can be bigger than the window. Drag or scroll to
 				look around (it bounces at the edges), Ctrl/⌘ + scroll or the buttons to zoom. In a meeting
@@ -241,7 +288,10 @@
 			<div
 				v-if="me"
 				class="ophice-viewport overflow-hidden"
-				:class="meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0'"
+				:class="[
+					meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0',
+					{ 'cursor-crosshair': placingPin },
+				]"
 				:style="viewportStyle"
 				data-testid="map-viewport"
 				@pointerdown="onViewportDown"
@@ -249,6 +299,7 @@
 				@pointerup="camera().onPointerUp"
 				@pointercancel="camera().onPointerUp"
 				@click.capture="camera().onClickCapture"
+				@click="onViewportClick"
 				@dblclick="onViewportDblclick"
 				@wheel="onViewportWheel"
 			>
@@ -312,7 +363,8 @@
 					class="ophice-chip ophice-chip--remote absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[other.user] }"
 					:style="chipStyle(other)"
-					@click="openChatWith(other, $event)"
+					:data-selected="selectedSet.has(other.user) ? '1' : undefined"
+					@click="onPersonClick(other, $event)"
 					:title="
 						other.guest
 							? __('Guest · {0}', [other.full_name])
@@ -323,6 +375,9 @@
 					data-testid="other-chip"
 				>
 					<span v-if="beams[other.user]" :key="beams[other.user]" class="ophice-beam" aria-hidden="true" />
+					<!-- Found (PM, 2026-11-22): a glow when picked, a ring while selected. -->
+					<span v-if="selectedSet.has(other.user)" class="ophice-picked" aria-hidden="true" data-testid="chip-selected" />
+					<span v-if="glows[other.user]" :key="`glow-${glows[other.user]}`" class="ophice-glow" aria-hidden="true" data-testid="chip-glow" />
 					<span v-if="lifts[other.user]" :key="`shadow-${lifts[other.user]}`" class="ophice-lift-shadow" aria-hidden="true" />
 					<span
 						:key="`chip-${beams[other.user] || 0}-${lifts[other.user] || 0}`"
@@ -478,6 +533,35 @@
 						/>
 					</div>
 				</template>
+				<!-- Meeting points (PM, 2026-11-22): a bouncing pin; a click flies me there. -->
+				<div
+					v-for="pin in visiblePins"
+					:key="`pin-${pin.by}`"
+					class="ophice-pin absolute"
+					:style="pinStyle(pin)"
+					data-no-pan
+					data-testid="meeting-pin"
+				>
+					<button
+						type="button"
+						class="ophice-pin__icon"
+						:title="__('Meeting point of {0}: click to fly there', [pin.by === me.user ? __('you') : pin.by_name])"
+						@click.stop="goToPin(pin)"
+					>
+						<FeatherIcon name="map-pin" class="h-full w-full" />
+					</button>
+					<span class="ophice-pin__label">
+						{{ pin.by === me.user ? __("Your meeting point") : __("Meeting point · {0}", [pin.by_name]) }}
+						<button
+							v-if="pin.by === me.user"
+							type="button"
+							class="ml-1 rounded-full px-1 hover:bg-white/20"
+							:title="__('Remove the meeting point, for everyone')"
+							data-testid="meeting-pin-remove"
+							@click.stop="removePin()"
+						>×</button>
+					</span>
+				</div>
 				<!-- Statuses float above their chips, under the chat bubbles. -->
 				<StatusTag
 					v-for="chip in statusChips"
@@ -499,6 +583,42 @@
 					:ratio="backgroundRatio"
 					@change="(place) => setLayout({ fit: false, ...place })"
 				/>
+			</div>
+			<!--
+				Off the visible map (PM, 2026-11-22, 2026-11-23): a marker at the edge for everyone, in
+				their direction, smaller the farther away; the selected and meeting points glow. A click
+				looks there.
+			-->
+			<div
+				v-for="marker in edgeMarkers"
+				:key="marker.key"
+				class="ophice-edge-at absolute"
+				:style="{ left: `${marker.x}px`, top: `${marker.y}px`, transform: `scale(${marker.scale})` }"
+			>
+				<button
+					type="button"
+					class="ophice-edge"
+					:class="{ 'ophice-edge--pin': marker.kind === 'pin', 'ophice-edge--picked': marker.picked }"
+					:style="{ '--pin-hue': marker.hue, '--ring-hue': marker.kind === 'person' ? ringHue(marker.items[0].person.user) : 0 }"
+					:title="marker.title"
+					:data-scale="marker.scale.toFixed(2)"
+					data-no-pan
+					data-testid="edge-marker"
+					@click.stop="lookAt(marker.items[0])"
+				>
+					<span class="ophice-edge__arrow" :style="{ transform: `rotate(${marker.angle}deg)` }" aria-hidden="true" />
+					<span class="ophice-edge__face">
+						<FeatherIcon v-if="marker.kind === 'pin'" name="map-pin" class="h-4 w-4" />
+						<UserAvatar
+							v-else
+							:name="marker.items[0].person.user"
+							:label="marker.items[0].person.full_name"
+							:image="marker.items[0].person.user_image"
+							size="sm"
+						/>
+					</span>
+					<span v-if="marker.items.length > 1" class="ophice-edge__count">{{ marker.items.length }}</span>
+				</button>
 			</div>
 			<!-- A small map switches on a double click (#2091); a faint hint says so. -->
 			<div
@@ -593,7 +713,16 @@
 			:at="guestInvite.at"
 			@close="guestInvite = null"
 		/>
-		<ChatWithMenu v-if="chatWith" :key="chatWith.person.user" :person="chatWith.person" :at="chatWith.at" @close="chatWith = null" />
+		<ChatWithMenu
+			v-if="chatWith"
+			:key="chatWith.person.user"
+			:person="chatWith.person"
+			:at="chatWith.at"
+			:on-map="isOnMap(chatWith.person.user)"
+			@close="chatWith = null"
+			@go="(mode) => goTo([chatWith.person.user], mode)"
+			@pin="startPinPlacing([chatWith.person.user])"
+		/>
 	</div>
 </template>
 
@@ -613,6 +742,7 @@ import BackgroundImage from "../components/BackgroundImage.vue"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
+import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
 import {
@@ -629,6 +759,8 @@ import MeetingPanel from "../components/MeetingPanel.vue"
 import AreaChat from "../components/AreaChat.vue"
 import PeopleSidebar from "../components/PeopleSidebar.vue"
 import ChatWithMenu from "../components/ChatWithMenu.vue"
+import GoToButton from "../components/GoToButton.vue"
+import UserAvatar from "@spa/components/UserAvatar.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -1161,6 +1293,13 @@ function onKeydown(event) {
 		return
 	}
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
+	// Esc: stop placing a meeting point, then clear the selection (PM, 2026-11-22).
+	if (event.key === "Escape" && (placingPin.value || (selectedUsers.value.length && !chatWith.value))) {
+		event.preventDefault()
+		if (placingPin.value) placingPin.value = null
+		else clearSelection()
+		return
+	}
 	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length && !document.fullscreenElement) {
 		event.preventDefault()
 		if (!meetingPanel.value?.exitFill()) leaveMeeting(true)
@@ -1181,6 +1320,7 @@ function onKeydown(event) {
 		event.preventDefault()
 		spaceHeld = true
 		if (event.repeat) return
+		stopTravel(true)
 		backFromStatus()
 		// Moving my chip folds the people list back (#2091).
 		peopleSidebar.value?.fold()
@@ -1191,6 +1331,8 @@ function onKeydown(event) {
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
+	// A key takes over from Go to: the chip comes down where it is.
+	stopTravel(true)
 	backFromStatus()
 	peopleSidebar.value?.fold()
 	held.add(key)
@@ -1260,6 +1402,8 @@ function reopenDismissed() {
 
 // Leaving the window drops every held key, or the chip would keep sailing.
 function releaseAll() {
+	// A flight comes down where it is, like on a key (AI review of !1303).
+	stopTravel(true)
 	held.clear()
 	heldCount.value = 0
 	tapped.clear()
@@ -1380,6 +1524,7 @@ function onRemoteMove(message) {
 	lastSeen.set(other.user, Date.now())
 	// Only a lift that changes the place: a resent lift (its first answer got lost) plays once.
 	if (message.lift && (other.x !== message.x || other.y !== message.y)) playLift(other.user)
+	if (message.beam) playBeam(other.user)
 	other.x = message.x
 	other.y = message.y
 	other.moving = true
@@ -2155,6 +2300,343 @@ function openChatWith(person, event) {
 	chatWith.value = { person: known || person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
 }
 
+// --- Finding people (PM, 2026-11-22): a click on a person (list or map) selects them and their
+// chip glows; ⌘/Ctrl-click adds or removes one, Shift-click in the list a range. Off the visible
+// map, a marker at the edge points to them. Go to flies (or beams) my chip next to them; a
+// meeting point is a bouncing pin for me and them. Esc or a click on the empty map clears it.
+
+const GLOW_MS = 2000
+const selectedUsers = ref([])
+const selectedSet = computed(() => new Set(selectedUsers.value))
+let selectAnchor = null
+const glows = reactive({})
+
+function glow(user) {
+	const started = Date.now()
+	glows[user] = started
+	setTimeout(() => {
+		if (glows[user] === started) delete glows[user]
+	}, GLOW_MS)
+}
+
+/** The chip of someone on the map right now (not away with the page closed). */
+function chipOnMap(user) {
+	return others.value.find((o) => o.user === user && !o.offline) || null
+}
+function isOnMap(user) {
+	return Boolean(chipOnMap(user))
+}
+
+const selectedPeople = computed(() =>
+	selectedUsers.value.map((user) => people.value.find((p) => p.user === user) || others.value.find((o) => o.user === user) || { user, full_name: user })
+)
+const selectedOnMap = computed(() => selectedUsers.value.filter(isOnMap))
+
+/**
+ * A person was clicked. `order`: the users in the list's order (for Shift ranges);
+ * `options.menu` false: only select and show them (the folded strip), no chat menu.
+ */
+function onPersonClick(person, event, order = null, options = {}) {
+	// Placing a meeting point: a chip on the map only places it (onViewportClick); a click
+	// anywhere else (the list) stops placing and selects as usual.
+	if (placingPin.value) {
+		if (event?.target?.closest?.("[data-testid=other-chip]")) return
+		placingPin.value = null
+	}
+	if (!person?.user || person.user === me.value?.user) return
+	if (event?.metaKey || event?.ctrlKey) {
+		const at = selectedUsers.value.indexOf(person.user)
+		if (at >= 0) selectedUsers.value.splice(at, 1)
+		else {
+			selectedUsers.value.push(person.user)
+			glow(person.user)
+		}
+		selectAnchor = person.user
+		chatWith.value = null
+		guestInvite.value = null
+		return
+	}
+	if (event?.shiftKey && order && selectAnchor && order.includes(selectAnchor) && order.includes(person.user)) {
+		const from = order.indexOf(selectAnchor)
+		const to = order.indexOf(person.user)
+		const range = order.slice(Math.min(from, to), Math.max(from, to) + 1).filter((user) => user !== me.value?.user)
+		selectedUsers.value = [...new Set([...selectedUsers.value, ...range])]
+		range.forEach(glow)
+		chatWith.value = null
+		guestInvite.value = null
+		return
+	}
+	selectedUsers.value = [person.user]
+	selectAnchor = person.user
+	glow(person.user)
+	if (options.menu !== false) openChatWith(person, event)
+}
+
+function clearSelection() {
+	selectedUsers.value = []
+	selectAnchor = null
+}
+
+/** A click on the map: sets the meeting point while placing one; on empty ground it clears the selection. */
+function onViewportClick(event) {
+	if (placingPin.value) {
+		placePin(event)
+		return
+	}
+	if (event.target.closest?.("[data-testid=other-chip], [data-testid=my-chip], [data-no-pan], button")) return
+	if (!event.metaKey && !event.ctrlKey && !event.shiftKey) clearSelection()
+}
+
+// Edge markers: everyone off the visible map (PM, 2026-11-23), and the meeting points. The
+// selected and the ones glowing right now stand out. The farther away, the smaller the marker.
+const EDGE_MARGIN = 24
+const EDGE_GROUP_PX = 30
+// Tiles beyond the edge at which a marker reaches its smallest size.
+const EDGE_FAR_TILES = 30
+const EDGE_MIN_SCALE = 0.45
+const EDGE_MIN_SCALE_PICKED = 0.75
+
+const edgeMarkers = computed(() => {
+	if (!me.value || meetingArea.value || !tile.value) return []
+	const width = view.width
+	const height = view.height
+	if (!width || !height) return []
+	const targets = []
+	for (const chip of others.value) {
+		if (chip.offline) continue
+		const picked = selectedSet.value.has(chip.user) || Boolean(glows[chip.user])
+		targets.push({ key: chip.user, kind: "person", x: chip.x + 0.5, y: chip.y + 0.5, person: chip, picked, title: chip.full_name })
+	}
+	for (const pin of visiblePins.value) {
+		targets.push({ key: `pin:${pin.by}`, kind: "pin", x: pin.x + 0.5, y: pin.y + 0.5, hue: ringHue(pin.by), title: __("Meeting point · {0}", [pin.by_name]) })
+	}
+	const cx = width / 2
+	const cy = height / 2
+	const placed = []
+	for (const target of targets) {
+		const at = mainCam.toView(target.x, target.y)
+		if (at.x >= 0 && at.x <= width && at.y >= 0 && at.y <= height) continue
+		const dx = at.x - cx
+		const dy = at.y - cy
+		// Along the line from the middle of the view to them, up to the edge.
+		const reach = Math.min((cx - EDGE_MARGIN) / Math.max(Math.abs(dx), 1e-6), (cy - EDGE_MARGIN) / Math.max(Math.abs(dy), 1e-6))
+		const x = cx + dx * reach
+		const y = cy + dy * reach
+		// How far beyond the edge, in tiles: the farther, the smaller.
+		const far = Math.hypot(at.x - x, at.y - y) / tile.value
+		const min = target.picked || target.kind === "pin" ? EDGE_MIN_SCALE_PICKED : EDGE_MIN_SCALE
+		const scale = Math.max(min, 1 - ((1 - min) * far) / EDGE_FAR_TILES)
+		placed.push({ ...target, at: { x, y }, angle: (Math.atan2(dy, dx) * 180) / Math.PI, far, scale })
+	}
+	// The picked and the nearest first: they lead a group of markers that meet at the edge.
+	placed.sort((a, b) => Number(Boolean(b.picked)) - Number(Boolean(a.picked)) || a.far - b.far)
+	const markers = []
+	for (const target of placed) {
+		const near = markers.find((m) => m.kind === target.kind && Math.hypot(m.x - target.at.x, m.y - target.at.y) < EDGE_GROUP_PX * Math.max(m.scale, target.scale))
+		if (near) {
+			near.items.push(target)
+			near.scale = Math.max(near.scale, target.scale)
+			near.picked = near.picked || target.picked
+			near.title = near.items.map((item) => item.title).join(", ")
+			continue
+		}
+		markers.push({
+			key: target.key,
+			kind: target.kind,
+			x: target.at.x,
+			y: target.at.y,
+			angle: target.angle,
+			hue: target.hue,
+			scale: target.scale,
+			picked: Boolean(target.picked),
+			title: target.title,
+			items: [target],
+		})
+	}
+	return markers
+})
+
+/** Look at someone (or a pin) off the visible map: the view glides there; my next step brings it back. */
+function lookAt(target) {
+	const cam = camera()
+	cam.followPaused.value = true
+	cam.springing.value = true
+	cam.centerOn(target.x, target.y)
+	setTimeout(() => (cam.springing.value = false), 450)
+	if (target.person) glow(target.person.user)
+}
+
+// --- Go to: fly (with wings, over everyone) or beam (at once) to a free spot next to them.
+
+const FLY_TILES_PER_SECOND = 14
+const FLY_MIN_MS = 500
+const FLY_MAX_MS = 2600
+let travel = null
+
+function occupied(x, y) {
+	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE + 0.2)
+}
+
+/** A free spot next to these points (their middle), on the side facing me; the middle itself for a pin. */
+function spotNear(points, { first = 1.1 } = {}) {
+	const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length
+	const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length
+	const maxX = me.value.cols - 1
+	const maxY = me.value.rows - 1
+	const facing = Math.atan2(me.value.y - cy, me.value.x - cx) || 0
+	for (let radius = first; radius <= 6; radius += 0.6) {
+		const steps = radius ? 16 : 1
+		for (let k = 0; k < steps; k++) {
+			// Alternating around the side facing me: 0, +1, −1, +2, −2 …
+			const angle = facing + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * ((2 * Math.PI) / steps)
+			const x = cx + Math.cos(angle) * radius
+			const y = cy + Math.sin(angle) * radius
+			if (x < 0 || y < 0 || x > maxX || y > maxY) continue
+			if (!occupied(x, y)) return { x, y }
+		}
+	}
+	return { x: Math.max(0, Math.min(maxX, cx)), y: Math.max(0, Math.min(maxY, cy)) }
+}
+
+function goTo(users, mode = "fly") {
+	const chips = users.map(chipOnMap).filter(Boolean)
+	if (!me.value || !chips.length) {
+		toast({ title: __("Not on the map right now."), icon: "info" })
+		return
+	}
+	travelTo(spotNear(chips), mode)
+}
+
+function goToPin(pin) {
+	travelTo(spotNear([pin], { first: 0 }), "fly")
+}
+
+function travelTo(spot, mode) {
+	if (!me.value || lifting) return
+	chatWith.value = null
+	stopTravel()
+	backFromStatus()
+	peopleSidebar.value?.fold()
+	held.clear()
+	tapped.clear()
+	jump = null
+	jumping.value = false
+	if (mode === "beam") {
+		moveTo(spot.x, spot.y)
+		playBeam(me.value.user)
+		camera().place(me.value.x, me.value.y)
+		clearTimeout(sendTimer)
+		sendTimer = null
+		lastSent = performance.now()
+		call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y), beam: 1 }).catch(() => {})
+		land()
+		return
+	}
+	const from = { x: me.value.x, y: me.value.y }
+	const distance = Math.hypot(spot.x - from.x, spot.y - from.y)
+	if (distance < 0.05) return
+	lastDir = [(spot.x - from.x) / distance, (spot.y - from.y) / distance]
+	flying.value = true
+	moving.value = true
+	travel = { from, to: spot, started: performance.now(), ms: Math.max(FLY_MIN_MS, Math.min(FLY_MAX_MS, (distance / FLY_TILES_PER_SECOND) * 1000)), frame: null }
+	travel.frame = requestAnimationFrame(travelStep)
+}
+
+function travelStep(now) {
+	if (!travel || !me.value) return
+	const t = Math.min(1, (now - travel.started) / travel.ms)
+	// Ease in and out: lifts off, glides, sets down.
+	const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
+	moveTo(travel.from.x + (travel.to.x - travel.from.x) * e, travel.from.y + (travel.to.y - travel.from.y) * e)
+	camera().followChip(me.value.x, me.value.y)
+	queueMove()
+	if (t < 1) {
+		travel.frame = requestAnimationFrame(travelStep)
+		return
+	}
+	travel = null
+	moving.value = false
+	land()
+}
+
+/** A key takes over: the chip comes down where it is. */
+function stopTravel(landHere = false) {
+	if (!travel) return
+	cancelAnimationFrame(travel.frame)
+	travel = null
+	moving.value = false
+	if (landHere) land()
+}
+
+// --- Meeting points: a pin for me and the people I chose (one per person who sets it).
+
+const ARRIVED_TILES = 2
+const pins = ref([])
+// The people to meet while I choose the spot, or null.
+const placingPin = ref(null)
+
+function startPinPlacing(users) {
+	chatWith.value = null
+	placingPin.value = users.filter((user) => !people.value.find((p) => p.user === user)?.guest && !others.value.find((o) => o.user === user)?.guest)
+	if (!placingPin.value.length) placingPin.value = null
+}
+
+async function placePin(event) {
+	const users = placingPin.value
+	placingPin.value = null
+	const cam = camera()
+	if (!cam.tile.value || !me.value) return
+	const box = event.currentTarget.getBoundingClientRect()
+	const x = (event.clientX - box.left - cam.pan.x - cam.origin.value.x) / cam.tile.value - 0.5
+	const y = (event.clientY - box.top - cam.pan.y - cam.origin.value.y) / cam.tile.value - 0.5
+	try {
+		upsertPin(await call(`${API}.set_meeting_pin`, { users, x: round(x), y: round(y) }))
+	} catch (e) {
+		toast.error(errorText(e) || __("The meeting point could not be set."))
+	}
+}
+
+function upsertPin(pin) {
+	if (!pin?.by) return
+	const known = pins.value.some((p) => p.by === pin.by && p.until === pin.until)
+	pins.value = [...pins.value.filter((p) => p.by !== pin.by), pin]
+	if (!known && pin.by !== me.value?.user) toast({ title: __("{0} set a meeting point", [pin.by_name]), icon: "map-pin" })
+}
+
+function onPinRemoved(message) {
+	pins.value = pins.value.filter((p) => p.by !== message?.by)
+}
+
+async function removePin() {
+	onPinRemoved({ by: me.value?.user })
+	await call(`${API}.remove_meeting_pin`).catch(() => {})
+}
+
+function positionOf(user) {
+	return user === me.value?.user ? me.value : chipOnMap(user)
+}
+function everyoneArrived(pin) {
+	return pin.users.every((user) => {
+		const chip = positionOf(user)
+		return chip && Math.hypot(chip.x - pin.x, chip.y - pin.y) <= ARRIVED_TILES
+	})
+}
+const visiblePins = computed(() => (me.value ? pins.value.filter((pin) => pin.until * 1000 > clock.value && !everyoneArrived(pin)) : []))
+// My own pin: once everyone is there, it goes away for all.
+watch(
+	() => pins.value.find((pin) => pin.by === me.value?.user && everyoneArrived(pin)),
+	(pin) => pin && removePin()
+)
+
+function pinStyle(pin) {
+	return {
+		width: `${tile.value}px`,
+		height: `${tile.value}px`,
+		transform: `translate(${pin.x * tile.value}px, ${pin.y * tile.value}px)`,
+		"--pin-hue": ringHue(pin.by),
+	}
+}
+
 function nameOf(user) {
 	if (user === me.value?.user) return me.value.full_name
 	return others.value.find((o) => o.user === user)?.full_name || user
@@ -2436,21 +2918,33 @@ function queueMove() {
 	else if (!sendTimer) sendTimer = setTimeout(sendMove, wait)
 }
 
+let beatOnce = false
 function heartbeat() {
 	if (!me.value) return
-	call(`${API}.heartbeat`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
+	const first = !beatOnce
+	beatOnce = true
+	call(`${API}.heartbeat`, { x: round(me.value.x), y: round(me.value.y) })
+		.then((chip) => {
+			// Back on the map after dropping off (sleep, lost connection): beamed in again. The
+			// first beat after loading is the beam the page already showed.
+			if (chip?.beam && !first && me.value && !beams[me.value.user]) playBeam(me.value.user)
+		})
+		.catch(() => {})
 	pruneOthers()
 }
 
 // On tab close the component never unmounts: tell the server with a request that outlives the page.
 function leaveOnPagehide() {
+	stopTravel()
 	// Ophice closes: the call in its own window ends with it.
 	if (poppedOut.value) closeMeetingWindow()
 	try {
+		// With the spot it stands on: the delayed save may not have gone out yet (PM, 2026-11-23).
 		fetch(`/api/method/${API}.leave`, {
 			method: "POST",
 			keepalive: true,
-			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "" },
+			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "", "Content-Type": "application/json" },
+			body: JSON.stringify(me.value ? { x: round(me.value.x), y: round(me.value.y) } : {}),
 		})
 	} catch {
 		// The presence TTL removes the chip anyway.
@@ -2578,6 +3072,8 @@ const SOCKET_EVENTS = [
 	["ophice_guest_chat", onMeetingMessage],
 	["ophice_presence", upsertOther],
 	["ophice_move", onRemoteMove],
+	["ophice_pin", upsertPin],
+	["ophice_pin_removed", onPinRemoved],
 	["ophice_leave", onRemoteLeave],
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
@@ -2791,6 +3287,7 @@ onMounted(async () => {
 		canEditMap.value = Boolean(data.can_edit_map)
 		autoCockpit.value = data.auto_cockpit !== false
 		for (const notice of data.notices || []) upsertNotice(notice)
+		pins.value = data.pins || []
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("Ophice could not be loaded.")
@@ -2858,7 +3355,9 @@ onBeforeUnmount(() => {
 	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)
-	if (me.value) call(`${API}.leave`).catch(() => {})
+	// A flight still running would send moves after the leave (AI review of !1303).
+	stopTravel()
+	if (me.value) call(`${API}.leave`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
 	if (frame) cancelAnimationFrame(frame)
 	resizeObserver?.disconnect()
 	if (saveTimer) {
@@ -3049,6 +3548,166 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
 	.ophice-chip--remote {
 		transition: none;
+	}
+}
+/* Finding people (PM, 2026-11-22): the glow when picked, the ring while selected. */
+.ophice-glow {
+	position: absolute;
+	inset: -70%;
+	z-index: -1;
+	border-radius: 9999px;
+	pointer-events: none;
+	background: radial-gradient(circle, rgb(253 224 71 / 0.85) 0%, rgb(250 204 21 / 0.45) 38%, transparent 68%);
+	animation: ophice-glow 2000ms ease-out forwards;
+}
+@keyframes ophice-glow {
+	0% { opacity: 0; transform: scale(0.5); }
+	15% { opacity: 1; transform: scale(1.1); }
+	40% { transform: scale(0.92); }
+	65% { opacity: 1; transform: scale(1.06); }
+	100% { opacity: 0; transform: scale(1.2); }
+}
+.ophice-picked {
+	position: absolute;
+	inset: -3px;
+	z-index: -1;
+	border-radius: 9999px;
+	pointer-events: none;
+	box-shadow: 0 0 0 2px #3b82f6, 0 0 12px 3px rgb(59 130 246 / 0.5);
+}
+/* At the edge of the view: where someone (or a meeting point) is, off the visible map. */
+/* Placed on the edge and sized by distance; the button inside pulses on its own. */
+.ophice-edge-at {
+	z-index: 25;
+	width: 36px;
+	height: 36px;
+	margin: -18px 0 0 -18px;
+	transition: transform 200ms ease-out;
+}
+/* Everyone: a quiet ring in their own colour. */
+.ophice-edge {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	background: var(--surface-white, #fff);
+	color: hsl(var(--ring-hue) 80% 40%);
+	opacity: 0.9;
+	box-shadow: 0 0 0 2px hsl(var(--ring-hue) 80% 45%), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+.ophice-edge:hover {
+	opacity: 1;
+}
+/* Selected or just picked: glowing and pulsing. */
+.ophice-edge--picked {
+	color: #2563eb;
+	opacity: 1;
+	box-shadow: 0 0 0 2px #3b82f6, 0 0 16px 5px rgb(59 130 246 / 0.55);
+	animation: ophice-edge 1400ms ease-in-out infinite;
+}
+.ophice-edge--pin {
+	opacity: 1;
+	animation: ophice-edge 1400ms ease-in-out infinite;
+	color: hsl(var(--pin-hue) 80% 40%);
+	box-shadow: 0 0 0 2px hsl(var(--pin-hue) 80% 45%), 0 0 16px 5px hsl(var(--pin-hue) 80% 50% / 0.55);
+}
+.ophice-edge__arrow {
+	position: absolute;
+	inset: -11px;
+	pointer-events: none;
+}
+.ophice-edge__arrow::after {
+	content: "";
+	position: absolute;
+	right: 0;
+	top: 50%;
+	margin-top: -6px;
+	border-left: 9px solid hsl(var(--ring-hue) 80% 45%);
+	border-top: 6px solid transparent;
+	border-bottom: 6px solid transparent;
+}
+.ophice-edge--picked .ophice-edge__arrow::after {
+	border-left-color: #3b82f6;
+}
+.ophice-edge--pin .ophice-edge__arrow::after {
+	border-left-color: hsl(var(--pin-hue) 80% 45%);
+}
+.ophice-edge__face {
+	display: flex;
+	overflow: hidden;
+	border-radius: 9999px;
+}
+.ophice-edge__count {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 3px;
+	border-radius: 8px;
+	background: #2563eb;
+	color: #fff;
+	font-size: 10px;
+	line-height: 16px;
+	text-align: center;
+}
+@keyframes ophice-edge {
+	50% { transform: scale(1.1); }
+}
+/* Meeting point: a bouncing pin with a little shadow and its label. */
+.ophice-pin {
+	z-index: 12;
+	pointer-events: none;
+}
+.ophice-pin::before {
+	content: "";
+	position: absolute;
+	left: 28%;
+	right: 28%;
+	top: 82%;
+	height: 14%;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 0.25);
+}
+.ophice-pin__icon {
+	position: absolute;
+	left: 10%;
+	top: 0;
+	width: 80%;
+	height: 85%;
+	pointer-events: auto;
+	color: hsl(var(--pin-hue) 80% 45%);
+	filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
+	animation: ophice-pin-bounce 1100ms ease-in-out infinite;
+}
+@keyframes ophice-pin-bounce {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-40%); }
+}
+.ophice-pin__label {
+	position: absolute;
+	left: 50%;
+	top: 100%;
+	transform: translateX(-50%);
+	margin-top: 2px;
+	padding: 1px 8px;
+	border-radius: 9999px;
+	white-space: nowrap;
+	font-size: 11px;
+	line-height: 16px;
+	pointer-events: auto;
+	background: hsl(var(--pin-hue) 70% 38%);
+	color: #fff;
+	box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+	.ophice-glow,
+	.ophice-edge,
+	.ophice-pin__icon {
+		animation: none;
 	}
 }
 </style>
