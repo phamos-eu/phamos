@@ -7,7 +7,7 @@ import base64
 import binascii
 import json
 import re
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 
 import frappe
 import requests
@@ -484,6 +484,112 @@ def get_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	}
 
 
+TESTING_LABEL = "Testing on Production"
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3,8}$")
+
+
+TESTING_CACHE_KEY = "phriend:testing_on_production"
+TESTING_CACHE_SECONDS = 300  # the count may be up to 5 minutes old; failures are retried after 1
+TESTING_RETRY_SECONDS = 60
+
+
+@frappe.whitelist()
+def get_testing_on_production(route=None, ref_doctype=None, ref_docname=None):
+	"""The second (purple) badge on the ball: the open GitLab issues labelled "Testing on
+	Production" that are about where Phriend is, and that list in GitLab, which a click opens.
+
+	"About where Phriend is" is GitLab's own search (title and description) for the record's
+	DocType, or on a Desk page without one the page's title. Workspaces and cockpit pages without
+	a record have nothing to search for: no badge there. The docname is not searched: the badge
+	is per DocType.
+	Asks GitLab with the token in Phriend Settings, at most every 5 minutes per DocType or page.
+	Returns {"count", "url", "about", "color": the label's colour in GitLab, or None};
+	count 0 hides the badge.
+	"""
+	empty = {"count": 0, "url": None, "about": None, "color": None}
+	if not is_for_user():
+		return empty
+	about = _testing_search_term(route, ref_doctype)
+	if not about:
+		return empty
+	settings = _settings()
+	url, token = _gitlab_url_and_token(settings)
+	if not (url and token):
+		return empty
+	key = f"{TESTING_CACHE_KEY}:{about}"
+	cached = frappe.cache.get_value(key, expires=True)  # not kept in process memory
+	if cached is not None:
+		return cached
+	result = _testing_on_production_from_gitlab(settings, about)
+	empty["about"] = about
+	frappe.cache.set_value(
+		key, result or empty, expires_in_sec=TESTING_CACHE_SECONDS if result else TESTING_RETRY_SECONDS
+	)
+	return result or empty
+
+
+def _testing_search_term(route, ref_doctype):
+	"""What GitLab searches for: the DocType of a record, list or report, else the title of the
+	Desk page (Developer Action Panel), else None."""
+	doctype = cstr(ref_doctype).strip()
+	if doctype and frappe.db.exists("DocType", doctype):
+		return doctype
+	first = cstr(route).strip().strip("/").split("/")[0]
+	if first and "/" not in cstr(route).strip().strip("/"):
+		title = frappe.db.get_value("Page", first, "title")
+		if title:
+			return title
+	return None
+
+
+def _gitlab_search(term):
+	"""A phrase in quotes, so "Sales Invoice" doesn't also match every invoice and every sale."""
+	return f'"{term}"' if " " in term else term
+
+
+def _testing_list_url(base, project, about):
+	return f"{base.rstrip('/')}/{project.strip('/')}/-/issues/?" + urlencode(
+		[("state", "opened"), ("label_name[]", TESTING_LABEL), ("search", _gitlab_search(about))]
+	)
+
+
+def _testing_on_production_from_gitlab(settings, about):
+	"""{count, url, about, color} from GitLab, or None when GitLab can't be asked (logged, not
+	raised: a badge must never break a page)."""
+	try:
+		base, headers = _gitlab(settings)
+		project = settings.gitlab_project or DEFAULT_GITLAB_PROJECT
+		api = _project_api(base, project)
+		response = requests.get(
+			f"{api}/issues",
+			headers=headers,
+			params={"labels": TESTING_LABEL, "state": "opened", "per_page": 1, "search": _gitlab_search(about)},
+			timeout=TIMEOUT,
+		)
+		if not response.ok:
+			frappe.log_error(f"Phriend: Testing on Production count: {response.status_code} {response.text[:300]}", "Phriend")
+			return None
+		count = cint(response.headers.get("X-Total"))
+		if not count and response.json():
+			count = 1  # GitLab leaves X-Total out on very large projects; at least the badge shows
+		if not count:
+			return {"count": 0, "url": None, "about": about, "color": None}  # nothing to colour
+		color = None
+		labels = requests.get(f"{api}/labels", headers=headers, params={"search": TESTING_LABEL}, timeout=TIMEOUT)
+		if labels.ok:
+			match = next((l for l in labels.json() if l.get("name") == TESTING_LABEL), None)
+			color = match and match.get("color")
+		return {
+			"count": count,
+			"url": _testing_list_url(base, project, about),
+			"about": about,
+			"color": color if color and HEX_COLOR.match(color) else None,
+		}
+	except Exception:
+		frappe.log_error("Phriend: Testing on Production count failed", "Phriend")
+		return None
+
+
 def _built_title(page_title, route, ref_doctype, ref_docname):
 	"""The title of a report whose title step was skipped: where it was reported."""
 	if cstr(page_title).strip():
@@ -923,6 +1029,7 @@ def _set_status_label(api, headers, iid, status, current_labels):
 	if response.status_code >= 400:
 		frappe.log_error(f"Phriend: setting status {status} on issue {iid}: {response.status_code} {response.text[:500]}", "Phriend")
 		return _("GitLab answered {0}").format(response.status_code)
+	frappe.cache.delete_keys(TESTING_CACHE_KEY)  # the purple badges count status labels
 	return None
 
 

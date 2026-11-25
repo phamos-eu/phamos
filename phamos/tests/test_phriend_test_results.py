@@ -1,4 +1,4 @@
-"""Phriend: test results posted to a GitLab issue (#1939).
+"""Phriend: test results posted to a GitLab issue (#1939) and the Testing on Production badge.
 bench --site <site> run-tests --module phamos.tests.test_phriend_test_results
 """
 
@@ -165,3 +165,68 @@ class TestTestResults(PhriendCase):
 		with self.assertRaises(frappe.PermissionError):
 			api.add_test_evidence(gitlab_issue="#1", result="Passed")
 		self.assertEqual(api.get_test_target(), {"allowed": False})
+
+
+@patch("frappe.enqueue")
+class TestTestingOnProductionBadge(PhriendCase):
+	def setUp(self):
+		super().setUp()
+		frappe.cache.delete_keys(api.TESTING_CACHE_KEY)
+
+	def tearDown(self):
+		frappe.cache.delete_keys(api.TESTING_CACHE_KEY)
+		super().tearDown()
+
+	def gitlab_answers(self, get, total="3", status=200):
+		issues = response(status=status, json=[{"iid": 1}])
+		issues.headers = {"X-Total": total}
+		get.side_effect = [issues, response(json=[{"name": "Testing on Production", "color": "#5b2a86"}])]
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_counts_the_issues_about_this_doctype_and_links_that_list(self, get, _enqueue):
+		self.gitlab_answers(get)
+		result = api.get_testing_on_production(ref_doctype="Sales Invoice", ref_docname="ACC-SINV-1")
+		self.assertEqual((result["count"], result["about"], result["color"]), (3, "Sales Invoice", "#5b2a86"))
+		self.assertEqual(
+			result["url"],
+			"https://git.example.com/phamos/phamos/-/issues/?state=opened&label_name%5B%5D=Testing+on+Production"
+			"&search=%22Sales+Invoice%22",
+		)
+		params = get.call_args_list[0][1]["params"]
+		self.assertEqual(
+			(params["labels"], params["state"], params["search"]),
+			("Testing on Production", "opened", '"Sales Invoice"'),  # the phrase, not either word
+		)
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_a_desk_page_without_a_doctype_searches_for_its_title(self, get, _enqueue):
+		page = frappe.db.get_value("Page", {}, ["name", "title"], as_dict=True)
+		self.gitlab_answers(get)
+		self.assertEqual(api.get_testing_on_production(route=page.name)["about"], page.title)
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_no_badge_where_there_is_nothing_to_search_for(self, get, _enqueue):
+		for args in ({"route": "Workspaces/Home"}, {"route": "sales-cockpit/leads"}, {"ref_doctype": "No Such Type"}):
+			self.assertEqual(api.get_testing_on_production(**args)["count"], 0)
+		get.assert_not_called()
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_gitlab_is_asked_once_per_five_minutes_per_doctype(self, get, _enqueue):
+		self.gitlab_answers(get)
+		api.get_testing_on_production(ref_doctype="Sales Invoice", ref_docname="A")
+		self.assertEqual(api.get_testing_on_production(ref_doctype="Sales Invoice", ref_docname="B")["count"], 3)
+		self.assertEqual(get.call_count, 2)  # issues + label colour, the first time only
+		self.gitlab_answers(get, total="5")
+		self.assertEqual(api.get_testing_on_production(ref_doctype="Timesheet")["count"], 5)  # its own count
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_a_gitlab_failure_hides_the_badge_and_breaks_nothing(self, get, _enqueue):
+		self.gitlab_answers(get, status=403)
+		self.assertEqual(api.get_testing_on_production(ref_doctype="Sales Invoice")["count"], 0)
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_no_badge_for_people_without_phriend(self, get, _enqueue):
+		self.set_settings(allowed_role="Accounts Manager")
+		frappe.set_user("Guest")
+		self.assertEqual(api.get_testing_on_production(ref_doctype="Sales Invoice")["count"], 0)
+		get.assert_not_called()
