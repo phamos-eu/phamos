@@ -1625,6 +1625,10 @@ function stopCallDrag() {
 		// private window: the place lasts until the reload
 	}
 }
+// Ophice closed in the middle of a drag: no listeners left behind.
+onBeforeUnmount(() => {
+	if (callDrag.value) stopCallDrag()
+})
 
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el

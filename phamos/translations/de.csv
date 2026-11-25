@@ -2737,7 +2737,7 @@ The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
 Leave the meeting,Besprechung verlassen
 Leave (Esc),Verlassen (Esc)
-"The meeting URL must start with https://, for example https://meet.jit.si/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.jit.si/OurStandup."
+"The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.systemli.org/OurStandup."
 Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} verwendet werden.
 "The meeting URL needs a room name after the server, for example /OurStandup.","Die Besprechungs-URL braucht nach dem Server einen Raumnamen, zum Beispiel /OurStandup."
 Give the area a name.,Geben Sie dem Bereich einen Namen.

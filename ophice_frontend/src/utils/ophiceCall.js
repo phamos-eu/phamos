@@ -17,6 +17,7 @@ export function jitsiCallUrl(video, displayName = "") {
 		"config.startWithAudioMuted=false",
 		"config.startWithVideoMuted=false",
 		"config.prejoinConfig.enabled=false",
+		// The legacy name of the same switch, for older self-hosted Jitsi: keep both.
 		"config.prejoinPageEnabled=false",
 	]
 	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)

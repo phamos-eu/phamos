@@ -1382,7 +1382,7 @@ def _parse_meeting_url(url):
 		domain = f"{domain}:{parsed.port}"
 	room = unquote(parsed.path.strip("/"))
 	if parsed.scheme != "https" or not domain:
-		frappe.throw(_("The meeting URL must start with https://, for example https://meet.jit.si/OurStandup."))
+		frappe.throw(_("The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup."))
 	# An old meet.jit.si link (#2108): same room on the site's server; Jitsi rooms are just names.
 	if domain in LEGACY_JITSI_DOMAINS and domain not in _allowed_jitsi_domains():
 		domain = _jitsi_domain()

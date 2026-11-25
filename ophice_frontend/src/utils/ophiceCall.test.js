@@ -23,6 +23,7 @@ describe("jitsiCallUrl", () => {
 		expect(settings.get("config.startWithAudioMuted")).toBe("false")
 		expect(settings.get("config.startWithVideoMuted")).toBe("false")
 		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
+		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
 	it("works without a name and tidies the host", () => {
