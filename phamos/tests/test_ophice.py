@@ -120,6 +120,13 @@ class OphicePresenceTestCase(FrappeTestCase):
 			self.assertEqual(ophice.move(99, -1), {"user": "Administrator", "x": ophice._cols() - 1.0, "y": 0.0})
 		self.assertEqual(publish.call_args.args[0], ophice.EVENT_MOVE)
 
+	def test_move_lift_is_passed_on(self):
+		ophice.heartbeat(1, 1)
+		frappe.cache.delete_value(f"phamos_ophice_moves:{frappe.session.user}")
+		with patch.object(ophice.frappe, "publish_realtime"):
+			self.assertNotIn("lift", ophice.move(2, 2))
+			self.assertEqual(ophice.move(4, 2, lift=1)["lift"], 1)
+
 	def test_move_throttled_per_user(self):
 		ophice.heartbeat(1, 1)
 		frappe.cache.delete_value(f"phamos_ophice_moves:{frappe.session.user}")
@@ -202,7 +209,7 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {"ophice_jitsi_domain": None, "ophice_video": None}):
 			first = self._open(self.A, self.B)
 			again = self._open(self.B, self.A)
-			self.assertEqual(first["video"]["domain"], "meet.jit.si")
+			self.assertEqual(first["video"]["domain"], "meet.systemli.org")
 			self.assertRegex(first["video"]["room"], r"^ophice-[0-9a-f]{24}$")
 			self.assertEqual(again["video"], first["video"])
 		with patch.dict(frappe.conf, {"ophice_video": 0}):
@@ -480,11 +487,45 @@ class OphiceAreaTestCase(FrappeTestCase):
 		frappe.db.rollback()
 
 	def test_save_reads_the_room_from_the_url_and_shows_in_the_space(self):
-		name = ophice.save_area("Standup", " https://meet.jit.si/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
+		name = ophice.save_area("Standup", " https://meet.systemli.org/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
 		area = next(a for a in ophice.get_space()["areas"] if a.name == name)
-		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.jit.si", "FullTimeDefencesRejectOverly"))
+		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.systemli.org", "FullTimeDefencesRejectOverly"))
 		self.assertEqual((area.x, area.y, area.width, area.height), (2, 3, 4, 2))
-		self.assertEqual(area.meeting_url, "https://meet.jit.si/FullTimeDefencesRejectOverly")
+		self.assertEqual(area.meeting_url, "https://meet.systemli.org/FullTimeDefencesRejectOverly")
+
+	def test_an_old_meet_jit_si_link_keeps_its_room_on_the_site_server(self):
+		"""#2108: meet.jit.si links still work; only the server changes."""
+		name = ophice.save_area("Old link", "https://meet.jit.si/OurStandup", 2, 3, 4, 2)
+		area = frappe.get_doc("Ophice Area", name)
+		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.systemli.org", "OurStandup"))
+		self.assertEqual(area.meeting_url, "https://meet.systemli.org/OurStandup")
+
+	def test_patch_moves_areas_from_meet_jit_si_and_keeps_the_room(self):
+		"""#2108: existing areas on meet.jit.si move to the site's server, the room stays."""
+		from phamos.patches.v1_0 import ophice_areas_to_site_jitsi_server
+
+		# Room on the map for two areas; the site's own areas come back with the rollback.
+		frappe.db.delete("Ophice Area")
+		old = ophice.save_area("Before", "https://jitsi.example.org/KeptRoom", 2, 3, 4, 2)
+		other = ophice.save_area("Elsewhere", "https://jitsi.example.org/OtherRoom", 10, 3, 4, 2)
+		frappe.db.set_value(
+			"Ophice Area", old, {"jitsi_domain": "meet.jit.si", "meeting_url": "https://meet.jit.si/KeptRoom"}
+		)
+		ophice_areas_to_site_jitsi_server.execute()
+		moved = frappe.get_doc("Ophice Area", old)
+		self.assertEqual((moved.jitsi_domain, moved.jitsi_room), ("meet.systemli.org", "KeptRoom"))
+		self.assertEqual(moved.meeting_url, "https://meet.systemli.org/KeptRoom")
+		# Another allowed server is left alone.
+		self.assertEqual(frappe.db.get_value("Ophice Area", other, "jitsi_domain"), "jitsi.example.org")
+
+	def test_patch_leaves_meet_jit_si_where_the_site_allows_it(self):
+		from phamos.patches.v1_0 import ophice_areas_to_site_jitsi_server
+
+		name = ophice.save_area("Kept", "https://jitsi.example.org/StayRoom", 2, 3, 4, 2)
+		frappe.db.set_value("Ophice Area", name, "jitsi_domain", "meet.jit.si")
+		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "meet.jit.si"}):
+			ophice_areas_to_site_jitsi_server.execute()
+		self.assertEqual(frappe.db.get_value("Ophice Area", name, "jitsi_domain"), "meet.jit.si")
 
 	def test_only_allowed_jitsi_servers_and_proper_rooms(self):
 		self.assertEqual(ophice._parse_meeting_url("https://jitsi.example.org/Team_1"), ("jitsi.example.org", "Team_1"))
@@ -981,11 +1022,22 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 			if c.args and c.args[0] == ophice.EVENT_PRESENCE and c.args[1].get("user") == self.A
 		]
 		self.assertEqual(beams, [True, None])
-		# Moved away, then reloaded right after: no beam-in, the chip stays where it was.
+		# Moved away, a second tab while the chip is on the map: no beam-in, same spot.
 		ophice.save_my_position(5, 5)
 		again = ophice.get_space()
 		self.assertFalse(again["beam_in"])
 		self.assertEqual((again["me"]["x"], again["me"]["y"]), (5.0, 5.0))
+		# Reloaded right after a step (the page left first, with its spot; the delayed save had not
+		# gone out yet): beamed in again, at the spot it stood on (PM, 2026-11-22, 2026-11-23).
+		ophice.leave(6, 5)
+		reload = ophice.get_space()
+		self.assertTrue(reload["beam_in"])
+		self.assertEqual((reload["me"]["x"], reload["me"]["y"]), (6.0, 5.0))
+		self.assertTrue(ophice.heartbeat(5, 5).get("beam"))
+		# The chip dropped off the map (laptop asleep): the next heartbeat beams it in.
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.A)
+		self.assertTrue(ophice.heartbeat(5, 5).get("beam"))
+		self.assertFalse(ophice.heartbeat(5, 5).get("beam"))
 		# Back after more than five minutes: beamed in again.
 		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, self.A, ophice.time.time() - ophice.ARRIVAL_GAP_SECONDS - 5)
 		self.assertTrue(ophice.get_space()["beam_in"])
@@ -996,6 +1048,48 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 			frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
 			me = ophice.get_space()["me"]
 			self.assertGreaterEqual(ophice.math.hypot(me["x"] - 20, me["y"] - 10), ophice.START_SPOT_GAP)
+
+
+class OphiceMeetingPinTestCase(_OphiceRoomBase):
+	"""Meeting points (PM, 2026-11-22): a pin for me and the people I chose, one per setter."""
+
+	def tearDown(self):
+		frappe.cache.delete_value(ophice.PIN_CACHE_KEY)
+		for user in (self.A, self.B):
+			frappe.cache.delete_value(ophice._pin_wait_key(user))
+		super().tearDown()
+
+	def _sent_to(self, event):
+		return [c.kwargs.get("user") for c in self.sent.call_args_list if c.args and c.args[0] == event]
+
+	def test_pin_reaches_the_chosen_people_and_replaces_my_last(self):
+		frappe.set_user(self.A)
+		pin = ophice.set_meeting_pin([self.B, "Guest", "nobody@example.com"], 7, 8)
+		self.assertEqual(pin["users"], [self.A, self.B])
+		self.assertEqual((pin["x"], pin["y"]), (7.0, 8.0))
+		self.assertEqual(sorted(self._sent_to(ophice.EVENT_PIN)), sorted([self.A, self.B]))
+		frappe.set_user(self.B)
+		self.assertEqual([p["by"] for p in ophice.get_space()["pins"]], [self.A])
+		# Right away again: wait a moment (each pin notifies everyone in it; AI review of !1303).
+		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_meeting_pin([self.B], 3, 3)
+		# A new one replaces the old one; removing it tells everyone.
+		frappe.cache.delete_value(ophice._pin_wait_key(self.A))
+		ophice.set_meeting_pin([self.B], 3, 3)
+		self.assertEqual(len(ophice._pins()), 1)
+		ophice.remove_meeting_pin()
+		self.assertEqual(ophice._pins(), {})
+		self.assertIn(self.B, self._sent_to(ophice.EVENT_PIN_REMOVED))
+
+	def test_pin_needs_someone_and_expires(self):
+		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_meeting_pin([self.A], 1, 1)
+		ophice.set_meeting_pin([self.B], 1, 1)
+		frappe.cache.hset(ophice.PIN_CACHE_KEY, self.A, {**frappe.cache.hget(ophice.PIN_CACHE_KEY, self.A), "until": 1})
+		frappe.set_user(self.B)
+		self.assertEqual(ophice.get_space()["pins"], [])
 
 
 class OphiceCockpitBarTestCase(FrappeTestCase):

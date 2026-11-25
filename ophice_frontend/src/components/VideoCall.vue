@@ -1,5 +1,5 @@
 <template>
-	<!-- The video call of an encounter (#2059): Jitsi, joined muted with the camera off. -->
+	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Joined with mic and camera on (#2108). -->
 	<div
 		class="relative w-full overflow-hidden bg-surface-gray-7"
 		:class="{ 'aspect-video': !fill }"
@@ -51,14 +51,26 @@
 			>
 				<FeatherIcon :name="videoMuted ? 'video-off' : 'video'" class="h-4 w-4" />
 			</button>
+			<!-- Video quality: starts at the lowest level with video; a click steps up, after "HD" back down. -->
+			<button
+				type="button"
+				class="flex h-8 min-w-8 items-center justify-center rounded-full bg-black/60 px-2 text-[11px] font-semibold text-white shadow hover:bg-black/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+				:title="qualityTitle"
+				:aria-label="qualityTitle"
+				data-testid="video-quality"
+				@click="nextQuality"
+			>
+				{{ currentQuality.short }}
+			</button>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { JITSI_TOOLBAR_BUTTONS, QUALITY_LEVELS, nextQualityLevel, qualityLevel, qualitySync } from "../utils/ophiceCall.js"
 
 const props = defineProps({
 	/** Jitsi host, for example meet.jit.si */
@@ -77,7 +89,8 @@ const quiet = ref(false)
 const quietTimer = setTimeout(() => (quiet.value = true), 8000)
 let api = null
 let disposed = false
-// Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
+// Mic and camera start on: whoever joins a call wants to talk (#2108, replaces the start-off
+// decision of 2026-11-21). The browser still asks once for the permission. Jitsi reports every change.
 const ready = ref(false)
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
@@ -91,12 +104,33 @@ function onWindowBlur() {
 		else emit("stolen")
 	})
 }
-const audioMuted = ref(true)
-const videoMuted = ref(true)
+const audioMuted = ref(false)
+const videoMuted = ref(false)
 
 function toggle(command) {
 	api?.executeCommand(command)
 	// The chat keeps the keyboard after a click on a switch.
+	emit("toggled")
+}
+
+// Video quality: starts at 180p, the lowest level with a picture (PM, 2026-11-25); who needs
+// more steps it up. Jitsi's own values count once ours is confirmed (qualitySync).
+const QUALITY_INFO = {
+	180: { short: "LD", label: `${__("Low")} (180p)` },
+	360: { short: "SD", label: `${__("Standard")} (360p)` },
+	720: { short: "HD", label: `${__("High")} (720p)` },
+}
+const quality = ref(QUALITY_LEVELS[0])
+const currentQuality = computed(() => QUALITY_INFO[qualityLevel(quality.value)])
+const qualityTitle = computed(() =>
+	__("Video quality: {0}. Click for {1}.", [currentQuality.value.label, QUALITY_INFO[nextQualityLevel(quality.value)].label])
+)
+const qualityState = qualitySync(
+	(height) => api?.executeCommand("setVideoQuality", height),
+	(height) => (quality.value = height)
+)
+function nextQuality() {
+	qualityState.choose(nextQualityLevel(quality.value))
 	emit("toggled")
 }
 
@@ -133,12 +167,12 @@ onMounted(async () => {
 		height: "100%",
 		userInfo: { displayName: props.displayName },
 		configOverwrite: {
-			startWithAudioMuted: true,
-			startWithVideoMuted: true,
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
 			prejoinPageEnabled: false,
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
-			toolbarButtons: ["microphone", "camera", "tileview", "hangup"],
+			toolbarButtons: JITSI_TOOLBAR_BUTTONS,
 			toolbarConfig: { alwaysVisible: true },
 		},
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
@@ -151,7 +185,9 @@ onMounted(async () => {
 		// The real state, should Jitsi have ignored the start settings.
 		api?.isAudioMuted().then((muted) => (audioMuted.value = muted))
 		api?.isVideoMuted().then((muted) => (videoMuted.value = muted))
+		qualityState.start()
 	})
+	api.addListener("videoQualityChanged", ({ videoQuality }) => qualityState.reported(videoQuality))
 	api.addListener("audioMuteStatusChanged", ({ muted }) => (audioMuted.value = muted))
 	api.addListener("videoMuteStatusChanged", ({ muted }) => (videoMuted.value = muted))
 	// Hanging up inside Jitsi just leaves; the chat stays.
@@ -173,6 +209,7 @@ function dispose() {
 onBeforeUnmount(() => {
 	window.removeEventListener("blur", onWindowBlur)
 	clearTimeout(quietTimer)
+	qualityState.stop()
 	dispose()
 })
 </script>
