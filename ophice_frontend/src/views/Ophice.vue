@@ -455,6 +455,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
 							zIndex: zOf(`chat:${bubble.user}`),

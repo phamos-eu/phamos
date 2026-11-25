@@ -28,21 +28,23 @@ export function encounterCallWindowName(video) {
 	return `ophice-call-${String(video?.room || "").replace(/[^A-Za-z0-9_-]/g, "")}`
 }
 
-// --- The bubble with the embedded call (#2108): chat on the left, video on the right. It is
-// moved and resized freely within these rules:
+// --- The bubble with the embedded call (#2108): no title bar; chat (with both chips) on the left,
+// video in the middle, a slim bar of buttons on the right. It is moved and resized freely within
+// these rules:
 // - the video between 16:9 (widest) and 1:1 (tallest); the chat takes the rest of the width
 // - the chat at least 144px (half its old fixed width)
-export const CALL_HEADER = 41 // the bubble's title bar
 export const CALL_PAD = 16 // the video's inset, 8px on each side
 export const CALL_BORDER = 1 // between chat and video
+export const CALL_SIDEBAR = 41 // the button bar on the right, with its border
 export const CALL_CHAT_MIN = 144
-export const CALL_VIDEO_MIN_H = 120
-export const CALL_MIN_H = CALL_HEADER + CALL_PAD + CALL_VIDEO_MIN_H
+// The chat column needs room for the two chips, a message and the text field.
+export const CALL_MIN_H = 240
+const SIDES = CALL_BORDER + CALL_PAD + CALL_SIDEBAR
 // Tallest bubble for a width: a square video next to the smallest chat.
-export const callMaxHeight = (w) => w - CALL_BORDER - CALL_PAD - CALL_CHAT_MIN + CALL_HEADER + CALL_PAD
+export const callMaxHeight = (w) => w - SIDES - CALL_CHAT_MIN + CALL_PAD
 export const CALL_MIN_W = CALL_MIN_H - callMaxHeight(0)
-// The old fixed size: chat 288 and a 768 x 432 video.
-export const CALL_DEFAULT = { w: 288 + CALL_BORDER + CALL_PAD + 768, h: CALL_HEADER + CALL_PAD + 432 }
+// The old size: chat 288 and a 768 x 432 video.
+export const CALL_DEFAULT = { w: 288 + SIDES + 768, h: CALL_PAD + 432 }
 
 /**
  * The size shown for a wanted size, inside a stage of view.width x view.height.
@@ -53,9 +55,9 @@ export function callBox(size, view) {
 	const vh = view?.height || Infinity
 	const w = Math.max(CALL_MIN_W, Math.min(vw, size?.w || CALL_DEFAULT.w))
 	const h = Math.max(CALL_MIN_H, Math.min(vh, callMaxHeight(w), size?.h || CALL_DEFAULT.h))
-	const videoH = h - CALL_HEADER - CALL_PAD
-	const videoW = Math.max(videoH, Math.min(Math.round((videoH * 16) / 9), w - CALL_BORDER - CALL_PAD - CALL_CHAT_MIN))
-	return { w, h, videoW, videoH, chatW: w - CALL_BORDER - CALL_PAD - videoW }
+	const videoH = h - CALL_PAD
+	const videoW = Math.max(videoH, Math.min(Math.round((videoH * 16) / 9), w - SIDES - CALL_CHAT_MIN))
+	return { w, h, videoW, videoH, chatW: w - SIDES - videoW }
 }
 
 /**

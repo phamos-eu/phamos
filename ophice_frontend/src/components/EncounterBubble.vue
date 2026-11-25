@@ -5,18 +5,14 @@
 		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="inCall ? (movable ? '' : 'w-[67rem]') : 'w-72'"
+		:class="inCall ? (movable ? 'cursor-move select-none' : 'w-[67rem]') : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
+		@pointerdown="onBubbleDown"
 	>
-		<!-- With the call it can be moved by its header (#2108); the parent keeps the place. -->
-		<header
-			class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2"
-			:class="{ 'cursor-move select-none': movable }"
-			:title="movable ? __('Drag to move') : undefined"
-			@pointerdown="onHeaderDown"
-		>
+		<!-- With the call no title bar (#2108): the chips sit above the chat, the buttons on the right. -->
+		<header v-if="!inCall" class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
 			<UserAvatar :name="peer.user" :label="peer.full_name" :image="peer.user_image" size="xs" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ peer.full_name }}</span>
 			<!-- The call can move into its own Jitsi window (#2108): bigger, and no cap when the
@@ -46,6 +42,14 @@
 		     the right in the width the parent works out. -->
 		<div class="flex min-h-0" :class="inCall ? 'flex-1 flex-row' : 'flex-col'">
 			<div class="flex min-h-0 flex-col" :class="inCall ? 'min-w-0 flex-1 border-r border-outline-gray-2' : ''">
+				<!-- Both chips, as in a meeting area's huddle (#2067). -->
+				<MeetingHuddle
+					v-if="inCall && meChip"
+					class="m-2 mb-0 justify-center"
+					:area="huddleArea"
+					:people="[meChip, peer]"
+					:me="me"
+				/>
 				<div
 					ref="list"
 					class="min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm"
@@ -106,6 +110,32 @@
 					@toggled="input?.focus()"
 				/>
 			</div>
+
+			<!-- The bar on the right (#2108): own window, close; room for more later. -->
+			<div
+				v-if="inCall"
+				class="flex w-10 flex-shrink-0 flex-col items-center gap-1 border-l border-outline-gray-2 py-2"
+				data-testid="call-sidebar"
+			>
+				<button
+					type="button"
+					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+					:title="__('Open the video call with {0} in its own window', [firstName])"
+					data-testid="open-call"
+					@click="emit('call')"
+				>
+					<PopOutIcon class="h-4 w-4" />
+				</button>
+				<button
+					type="button"
+					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+					:title="__('Close the chat and walk on (Esc)')"
+					data-testid="close-call"
+					@click="emit('close')"
+				>
+					<FeatherIcon name="x" class="h-4 w-4" />
+				</button>
+			</div>
 		</div>
 		<!-- Resize by every edge and corner (#2108); the parent keeps the size. -->
 		<template v-if="movable">
@@ -133,6 +163,9 @@
 import { computed, nextTick, ref, watch } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import VideoCall from "./VideoCall.vue"
+import MeetingHuddle from "./MeetingHuddle.vue"
+import PopOutIcon from "./PopOutIcon.vue"
+import { ringHue } from "../utils/ophiceColor.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -151,8 +184,10 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** The call runs in its own window (#2108): no embedded call here. */
 	inWindow: { type: Boolean, default: false },
-	/** The header drags it (with the call, #2108). */
+	/** Moved by a press anywhere on it (with the call, #2108). */
 	movable: { type: Boolean, default: false },
+	/** My chip for the huddle: { user, full_name, user_image } */
+	meChip: { type: Object, default: null },
 	/** A drag is on: the call's frame must not take the pointer. */
 	dragging: { type: Boolean, default: false },
 	/** The video's width in px (with the call; the parent keeps 16:9 to 1:1). */
@@ -172,10 +207,13 @@ const RESIZE_HANDLES = [
 	{ kind: "se", class: "-bottom-1 -right-1 h-4 w-4 cursor-nwse-resize" },
 ]
 
-function onHeaderDown(event) {
-	if (!props.movable || event.target.closest("button")) return
+// A press anywhere moves it, except on what is there to click or type into.
+function onBubbleDown(event) {
+	if (!props.movable || event.target.closest("button, a, input, textarea, select, [data-no-drag]")) return
 	emit("move-start", event)
 }
+// The huddle's tint: the other person's colour.
+const huddleArea = computed(() => ({ title: props.peer.full_name, color_hue: ringHue(props.peer.user) }))
 
 const draft = ref("")
 const list = ref(null)

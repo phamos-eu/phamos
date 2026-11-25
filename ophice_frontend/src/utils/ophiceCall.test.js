@@ -62,9 +62,9 @@ describe("callBox", () => {
 	})
 
 	it("never lets the video get wider than 16:9; the chat takes the rest", () => {
-		const box = callBox({ w: 2000, h: 489 }, big)
+		const box = callBox({ w: 2000, h: CALL_DEFAULT.h }, big)
 		expect(box.videoW).toBe(768)
-		expect(box.chatW).toBe(2000 - 1 - 16 - 768)
+		expect(box.chatW).toBe(2000 - 1 - 16 - 41 - 768)
 	})
 
 	it("stays inside the stage", () => {
