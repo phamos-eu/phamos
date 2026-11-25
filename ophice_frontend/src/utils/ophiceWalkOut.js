@@ -15,7 +15,8 @@ export function walkedOut(start, areas, chip) {
 	return areaUnder(areas, chip)?.name !== start
 }
 
-function isTyping(el) {
+/** A field someone types in: keys there are text, never walking. */
+export function isTyping(el) {
 	const tag = el?.tagName
 	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(el?.isContentEditable)
 }

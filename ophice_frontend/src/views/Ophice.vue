@@ -750,7 +750,7 @@ import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
 import { openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
-import { areaUnder, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
+import { areaUnder, isTyping, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
@@ -1281,11 +1281,6 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
-function isTyping(target) {
-	if (!target) return false
-	const tag = target.tagName
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
-}
 
 function onKeydown(event) {
 	shift = event.shiftKey

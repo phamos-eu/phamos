@@ -459,7 +459,7 @@ const imageStyle = computed(() => {
 // While I walk, the view follows my chip (the cockpit is in front, so rarely).
 watch(
 	() => [tile.value * props.cols, tile.value * props.rows, cam.tile.value > 0],
-	() => props.me && cam.place(props.me.x + 0.5, props.me.y + 0.5),
+	([, , measured]) => measured && props.me && cam.place(props.me.x + 0.5, props.me.y + 0.5),
 	{ immediate: true }
 )
 watch(
@@ -522,6 +522,8 @@ function startDrag(event) {
 		y: event.clientY - pos.y,
 		// Docked, it only comes out once the pointer really moves: a click on the header stays a click.
 		fromDock: isDocked.value,
+		// Hovering too: only a real move can dock it (AI review of !1337).
+		moved: false,
 		startX: event.clientX,
 		startY: event.clientY,
 		grip: box ? { x: event.clientX - box.left, y: event.clientY - box.top } : { x: 24, y: 12 },
@@ -540,13 +542,15 @@ function onDrag(event) {
 		drag.x = Math.min(drag.grip.x, size.w - 24)
 		drag.y = drag.grip.y
 	}
+	if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6) return
+	drag.moved = true
 	moving.value = true
 	pos.x = event.clientX - drag.x
 	pos.y = event.clientY - drag.y
 	keepInView()
 }
 function endDrag(event) {
-	const moved = Boolean(drag && !drag.fromDock)
+	const moved = Boolean(drag?.moved)
 	drag = null
 	grabbing.value = ""
 	moving.value = false

@@ -260,3 +260,29 @@ describe("MiniMap centres on my chip (#2155)", () => {
 		scope.stop()
 	})
 })
+
+// AI review of !1337: a plain click on a hovering map's header, near the corner, must not dock it.
+describe("MiniMap: a click on a hovering header never docks (#2155)", () => {
+	const me = { name: "me", x: 3, y: 4 }
+	const press = (x, y) => ({ button: 0, clientX: x, clientY: y, preventDefault() {} })
+
+	beforeEach(() => {
+		vi.resetModules()
+		vi.spyOn(console, "warn").mockImplementation(() => {})
+		stubBrowser()
+	})
+	afterEach(() => {
+		vi.unstubAllGlobals()
+		vi.restoreAllMocks()
+	})
+
+	it("stays hovering after a click in the corner", async () => {
+		localStorage.setItem("phamos_ophice_mini_map_docked", "0")
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
+		state.startDrag(press(1100, 720))
+		state.onDrag(press(1101, 721))
+		state.endDrag(press(1101, 721))
+		expect(state.isDocked.value).toBe(false)
+		scope.stop()
+	})
+})
