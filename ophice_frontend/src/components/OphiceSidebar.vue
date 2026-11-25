@@ -24,6 +24,7 @@
 				class="ophice-side__icon"
 				:class="{ 'ml-auto': !collapsed }"
 				:title="collapsed ? __('Unfold the sidebar: names and descriptions') : __('Fold the sidebar to icons')"
+				:aria-label="collapsed ? __('Unfold the sidebar: names and descriptions') : __('Fold the sidebar to icons')"
 				:aria-expanded="!collapsed"
 				data-testid="sidebar-toggle"
 				@click="$emit('update:collapsed', !collapsed)"
@@ -66,6 +67,7 @@
 				class="ophice-side__row"
 				:class="{ 'ophice-side__row--on': statusOpen, 'ophice-side__row--icon': collapsed }"
 				:title="__('Set a status: be right back, or away until a time')"
+				:aria-label="collapsed ? `${statusLabel}. ${__('Set a status: be right back, or away until a time')}` : undefined"
 				data-testid="status-button"
 				@click="$emit('status')"
 			>
@@ -109,6 +111,7 @@
 					class="ophice-side__row"
 					:class="{ 'ophice-side__row--on': editingAreas, 'ophice-side__row--icon': collapsed }"
 					:title="__('Draw and edit meeting areas, for everyone')"
+					:aria-label="collapsed ? __('Draw and edit meeting areas, for everyone') : undefined"
 					:aria-pressed="editingAreas"
 					data-testid="areas-button"
 					@click="$emit('areas')"
@@ -125,6 +128,7 @@
 					:class="{ 'ophice-side__row--icon': collapsed }"
 					:disabled="backgroundBusy"
 					:title="__('Upload an image as the background of Ophice, for everyone')"
+					:aria-label="collapsed ? __('Upload an image as the background of Ophice, for everyone') : undefined"
 					data-testid="background-button"
 					@click="$emit('background')"
 				>
@@ -137,6 +141,7 @@
 					class="ophice-side__row"
 					:class="{ 'ophice-side__row--on': adjustingBackground, 'ophice-side__row--icon': collapsed }"
 					:title="__('Size and position of the background image on the grid, for everyone')"
+					:aria-label="collapsed ? __('Size and position of the background image on the grid, for everyone') : undefined"
 					:aria-pressed="adjustingBackground"
 					data-testid="adjust-button"
 					@click="$emit('adjust')"
@@ -152,6 +157,7 @@
 						:class="{ 'ophice-side__row--icon': collapsed }"
 						:disabled="backgroundBusy"
 						:title="__('Remove the background, for everyone')"
+						:aria-label="collapsed ? __('Remove the background, for everyone') : undefined"
 						data-testid="remove-background-button"
 						@click="$emit('remove-background')"
 					>
@@ -168,6 +174,7 @@
 						class="ophice-side__row"
 						:class="{ 'ophice-side__row--icon': collapsed }"
 						:title="__('Debug: simulate things on your own screen only')"
+						:aria-label="collapsed ? __('Debug: simulate things on your own screen only') : undefined"
 						data-testid="debug-menu"
 					>
 						<FeatherIcon name="tool" class="h-4 w-4 flex-shrink-0" />

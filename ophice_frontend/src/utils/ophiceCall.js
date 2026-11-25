@@ -84,3 +84,58 @@ export function resizeCall(from, kind, dx, dy, view) {
 		h,
 	}
 }
+
+// --- Video quality of the embedded call (PM, 2026-11-25): it starts at 180p, Jitsi's lowest level
+// that still shows video ("low bandwidth" below it turns video off). Jitsi may report others (2160).
+export const QUALITY_LEVELS = [180, 360, 720]
+
+/** The level a Jitsi value counts as: the highest one it reaches (2160 → 720, 0 → 180). */
+export function qualityLevel(height) {
+	return [...QUALITY_LEVELS].reverse().find((level) => height >= level) || QUALITY_LEVELS[0]
+}
+
+/** One level up; after the highest back to the lowest. */
+export function nextQualityLevel(height) {
+	const i = QUALITY_LEVELS.indexOf(qualityLevel(height))
+	return QUALITY_LEVELS[(i + 1) % QUALITY_LEVELS.length]
+}
+
+/**
+ * Keeps our quality and Jitsi's in step. Jitsi has no start setting for it and drops the command
+ * right after joining, so start() sends it until Jitsi reports it back, a few times at most. Until
+ * then Jitsi's own values are ignored; once the tries run out, its last value counts. After that
+ * every value Jitsi reports counts (its own toolbar may change it).
+ * @param {(height: number) => void} send  sets the quality in Jitsi
+ * @param {(height: number) => void} onValue  the quality to show
+ */
+export function qualitySync(send, onValue, { start = QUALITY_LEVELS[0], tries = 5, every = 1500 } = {}) {
+	let settled = false
+	let timer = null
+	let last = 0
+	function settle(height) {
+		settled = true
+		clearTimeout(timer)
+		if (height) onValue(height)
+	}
+	function attempt(left) {
+		if (settled) return
+		if (left <= 0) return settle(last)
+		send(start)
+		timer = setTimeout(() => attempt(left - 1), every)
+	}
+	return {
+		start: () => attempt(tries),
+		/** A value Jitsi reported (videoQualityChanged). */
+		reported(height) {
+			if (!height) return
+			last = height
+			if (settled || height === start) settle(height)
+		},
+		/** The user picked a level on our button. */
+		choose(height) {
+			settle(height)
+			send(height)
+		},
+		stop: () => clearTimeout(timer),
+	}
+}
