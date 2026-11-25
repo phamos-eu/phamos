@@ -1,5 +1,5 @@
 <template>
-	<!-- The video call of an encounter (#2059): Jitsi, joined muted with the camera off. -->
+	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Joined with mic and camera on (#2108). -->
 	<div
 		class="relative w-full overflow-hidden bg-surface-gray-7"
 		:class="{ 'aspect-video': !fill }"
@@ -77,7 +77,8 @@ const quiet = ref(false)
 const quietTimer = setTimeout(() => (quiet.value = true), 8000)
 let api = null
 let disposed = false
-// Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
+// Mic and camera start on: whoever joins a call wants to talk (#2108, replaces the start-off
+// decision of 2026-11-21). The browser still asks once for the permission. Jitsi reports every change.
 const ready = ref(false)
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
@@ -91,8 +92,8 @@ function onWindowBlur() {
 		else emit("stolen")
 	})
 }
-const audioMuted = ref(true)
-const videoMuted = ref(true)
+const audioMuted = ref(false)
+const videoMuted = ref(false)
 
 function toggle(command) {
 	api?.executeCommand(command)
@@ -133,8 +134,8 @@ onMounted(async () => {
 		height: "100%",
 		userInfo: { displayName: props.displayName },
 		configOverwrite: {
-			startWithAudioMuted: true,
-			startWithVideoMuted: true,
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
 			prejoinPageEnabled: false,
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
