@@ -1482,7 +1482,7 @@ function openEncounterCall(bubble) {
 // it. Kept per browser and user, like the meeting window's place; the place as share of the free
 // room, so it stays inside the stage at every window size. Default: centred at the top. The size
 // rules (video between 16:9 and 1:1, chat at least 144px, a dragged chat width narrows the video
-// to 4:3 at most, #2135) are in callBox / resizeCall / splitCall.
+// to 1:1 at most, #2135) are in callBox / resizeCall / splitCall.
 const CALL_POS_KEY = "phamos_ophice_call_pos"
 const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
 const callDrag = ref(null)

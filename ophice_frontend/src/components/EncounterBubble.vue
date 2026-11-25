@@ -46,7 +46,7 @@
 		<div class="flex min-h-0" :class="inCall ? 'flex-1 flex-row' : 'flex-col'">
 			<div class="relative flex min-h-0 flex-col" :class="inCall ? 'min-w-0 flex-1 border-r border-outline-gray-2' : ''">
 				<!-- The line between chat and video (#2135): drag it, or arrow keys when focused. The
-				     video gets no narrower than 4:3; the parent keeps the width. -->
+				     video gets no narrower than 1:1; the parent keeps the width. -->
 				<div
 					v-if="inCall && movable"
 					class="absolute -right-1.5 bottom-0 top-0 z-10 w-3 cursor-ew-resize focus:outline-none focus-visible:bg-outline-gray-3"

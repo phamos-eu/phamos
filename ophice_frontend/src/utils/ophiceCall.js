@@ -35,7 +35,7 @@ export function encounterCallWindowName(video) {
 // - the video between 16:9 (widest) and 1:1 (tallest); the chat takes the rest of the width
 // - the chat at least 144px (half its old fixed width)
 // - the line between chat and video can be dragged (#2135): a wider chat narrows the video down
-//   to 4:3, not further
+//   to 1:1, not further
 export const CALL_PAD = 16 // the video's inset, 8px on each side
 export const CALL_BORDER = 1 // between chat and video
 export const CALL_HEADER = 37 // the top bar, with its border
@@ -63,17 +63,14 @@ export function callBox(size, view) {
 	const videoH = h - TOP
 	const room = w - SIDES - CALL_CHAT_MIN
 	const wanted = Number.isFinite(size?.chat) ? w - SIDES - size.chat : Infinity
-	// The wanted chat narrows the video to 4:3 at most; a small bubble still squeezes it to 1:1.
-	const videoW = Math.max(
-		videoH,
-		Math.min(Math.round((videoH * 16) / 9), room, Math.max(Math.round((videoH * 4) / 3), wanted))
-	)
+	// The wanted chat narrows the video, down to square (PM, 2026-11-25).
+	const videoW = Math.max(videoH, Math.min(Math.round((videoH * 16) / 9), room, wanted))
 	return { w, h, videoW, videoH, chatW: w - SIDES - videoW }
 }
 
 /**
  * Drag the line between chat and video (#2135): the chat width as shown after moving it by dx.
- * Stored as shown, so a drag past the 4:3 limit doesn't jump back later.
+ * Stored as shown, so a drag past the 1:1 limit doesn't jump back later.
  */
 export function splitCall(size, chatW, dx, view) {
 	return callBox({ ...size, chat: Math.max(CALL_CHAT_MIN, chatW + dx) }, view).chatW

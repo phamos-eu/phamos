@@ -78,13 +78,13 @@ describe("callBox", () => {
 		expect(box.h - box.videoH).toBe(CALL_HEADER + 16)
 	})
 
-	it("a wider chat narrows the video, but not below 4:3 (#2135)", () => {
+	it("a wider chat narrows the video, but not below 1:1 (#2135)", () => {
 		const box = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 400 }, big)
 		expect(box.chatW).toBe(400)
 		expect(box.videoW).toBe(CALL_DEFAULT.w - 17 - 400)
 		const most = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 900 }, big)
-		expect(most.videoW).toBe(576) // 432 * 4 / 3
-		expect(most.chatW).toBe(CALL_DEFAULT.w - 17 - 576)
+		expect(most.videoW).toBe(432) // square
+		expect(most.chatW).toBe(CALL_DEFAULT.w - 17 - 432)
 	})
 
 	it("a narrower chat than the 16:9 video leaves stays at what is left", () => {
@@ -109,8 +109,8 @@ describe("splitCall", () => {
 		expect(splitCall(size, 288, 100, big)).toBe(388)
 	})
 
-	it("stores the 4:3 limit, not the overshoot", () => {
-		expect(splitCall(size, 288, 2000, big)).toBe(CALL_DEFAULT.w - 17 - 576)
+	it("stores the 1:1 limit, not the overshoot", () => {
+		expect(splitCall(size, 288, 2000, big)).toBe(CALL_DEFAULT.w - 17 - 432)
 	})
 })
 
