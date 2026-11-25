@@ -36,7 +36,7 @@
 				variant="subtle"
 				:title="bellTitle"
 				:aria-label="bellTitle"
-				:aria-pressed="bell !== 'muted'"
+				:aria-pressed="bell === 'on' || bell === 'blocked'"
 				data-testid="encounter-bell"
 				@click="clickBell"
 			>
@@ -1732,7 +1732,6 @@ async function focusBubble(user, text = "") {
 	if (text) bubbleRefs[user]?.insert(text)
 }
 
-// The other person started the chat (open_encounter tells this page): open it here too.
 // --- Encounter alert (#2135): someone started a chat with me. Chime, tab title while the tab is
 // hidden, browser notification while I look elsewhere. Only for me, not for the one who started it.
 
@@ -1780,12 +1779,13 @@ function alertEncounter(other) {
 // Browsers play sound only after a key press or click on the page.
 const unlockAudio = () => encounterAlert.unlock()
 
+// The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
-		// Already chatting with them (the bubble stays open behind the cockpit): no alert.
-		if (!bubbles[other.user]) alertEncounter(other)
+		// Already chatting with them (the bubble stays open behind the cockpit), or Esc closed it: no alert.
+		if (!bubbles[other.user] && !dismissed.has(other.user)) alertEncounter(other)
 		pingWalkUp(other)
 		return
 	}
