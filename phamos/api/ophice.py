@@ -971,6 +971,8 @@ def open_encounter(with_user):
 	mine, theirs = _position_of(me), _position_of(with_user)
 	if not mine or not theirs or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
 		frappe.throw(_("Move closer to chat."))
+	if _call_area_at(mine) or _call_area_at(theirs):
+		frappe.throw(_("This space has its own meeting: use its call and chat."))
 
 	pair_key = _pair_key(me, with_user)
 	_lock_pair(pair_key)
@@ -1551,6 +1553,24 @@ def _inside_area(area, user):
 	return (
 		area.x - AREA_SLACK <= cx < area.x + area.width + AREA_SLACK
 		and area.y - AREA_SLACK <= cy < area.y + area.height + AREA_SLACK
+	)
+
+
+def _call_area_at(position):
+	"""The meeting space with a call (Jitsi link) the spot lies in, or None. No encounters there:
+	the space's own call and chat would collide with an encounter's. No slack: the page posts its
+	latest spot before it asks, so this matches what the page shows."""
+	cx, cy = position[0] + 0.5, position[1] + 0.5
+	return next(
+		(
+			a
+			for a in _areas()
+			if (a.kind or "Meeting") in MEETING_KINDS
+			and a.jitsi_room
+			and a.x <= cx < a.x + a.width
+			and a.y <= cy < a.y + a.height
+		),
+		None,
 	)
 
 
