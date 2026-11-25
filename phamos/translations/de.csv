@@ -3065,4 +3065,16 @@ Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröß
 "Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
 "Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
 Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
+{0} wants to chat,{0} möchte mit Ihnen chatten
+Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
+Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
+Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
+to close,zum Schließen
+Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
+"Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Allow chat notifications,Chat-Benachrichtigungen erlauben
+Chat notifications on,Chat-Benachrichtigungen an
+Chat sound on,Chat-Ton an
+Chat notifications muted,Chat-Benachrichtigungen stumm
