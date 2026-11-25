@@ -702,7 +702,9 @@
 			:notice-count="noticeList.length + batchNoticeList.length"
 			:meeting="Boolean(meetingArea)"
 			:float-target="pipBody"
+			:dock="sidebarDock"
 			@slots="(slots) => (dockRects = slots)"
+			@dock-size="setDockSize"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -747,7 +749,8 @@ import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
-import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { openFloatingWindow } from "../utils/pip.js"
+import { DOCK_RECT, DOCK_SIZE, dockMessage } from "@spa/utils/ophiceDock.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
@@ -2013,13 +2016,11 @@ function openCockpitSpace() {
 }
 
 /**
- * Open a cockpit (shortcut bar or cockpit space). Where the browser has it, the mini map goes
- * straight into its floating window, so it can be pulled out of the browser without a second click
- * (PM, 2026-11-22). The browser only allows that right after a click or key press; walking is key
- * presses, so stopping in a cockpit space still counts. Otherwise it stays over the cockpit.
+ * Open a cockpit (shortcut bar or cockpit space). The mini map stays in the page, docked in the
+ * cockpit's sidebar (#2155); since the call is embedded (#2108) it needs no window of its own.
+ * Its "Float" button still puts it on top of other windows.
  */
 function openCockpit(cockpit) {
-	if (canFloat && !pipBody.value && navigator.userActivation?.isActive) floatAll()
 	emit("open-cockpit", cockpit)
 }
 
@@ -2234,6 +2235,35 @@ watch(
 		if (pipBody.value) closeMeetingPip()
 	}
 )
+
+// --- The mini map's spot in the cockpit's sidebar (#2155). The cockpit frame says where the spot
+// is; the mini map says how tall it must be, and Ophice passes that back to the frame.
+const sidebarDock = ref(null)
+let dockFrame = null
+let dockSize = { height: 0, target: false }
+function cockpitFrameWindow() {
+	return document.querySelector("iframe[data-ophice-frame]")?.contentWindow || null
+}
+function sendDockSize(win) {
+	try {
+		win?.postMessage({ type: DOCK_SIZE, ...dockSize }, window.location.origin)
+	} catch {
+		// the frame is loading another page; it reports again once it is there
+	}
+}
+function onDockMessage(event) {
+	const data = dockMessage(event, DOCK_RECT)
+	if (!data || !event.source || event.source !== cockpitFrameWindow()) return
+	dockFrame = event.source
+	sidebarDock.value = data.rect ? { ...data.rect, max: Number(data.max) || 0 } : null
+	// A new page in the frame starts with an empty spot: tell it the size.
+	if (data.rect && (data.height !== dockSize.height || data.target !== dockSize.target)) sendDockSize(dockFrame)
+}
+function setDockSize(size) {
+	dockSize = { height: Math.round(size.height), target: Boolean(size.target) }
+	sendDockSize(dockFrame || cockpitFrameWindow())
+}
+window.addEventListener("message", onDockMessage)
 
 const pipBody = ref(null)
 /** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
@@ -3430,6 +3460,7 @@ onBeforeUnmount(() => {
 	clearInterval(peopleTimer)
 	clearTimeout(peopleSoon)
 	window.removeEventListener("resize", onViewportResize)
+	window.removeEventListener("message", onDockMessage)
 	window.removeEventListener("keydown", onKeydown)
 	window.removeEventListener("keydown", unlockAudio, { capture: true })
 	window.removeEventListener("pointerdown", unlockAudio, { capture: true })
