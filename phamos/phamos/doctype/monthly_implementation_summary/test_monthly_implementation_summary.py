@@ -394,3 +394,113 @@ class TestMisOneWayLinks(FrappeTestCase):
 		got = {n: frappe.db.get_value("Sales Invoice", n, "custom_monthly_implementation_summary")
 			for n in ("_T-SI-BOTH", "_T-SI-SET", "_T-SI-CANC", "_T-SI-NONE")}
 		self.assertEqual(got, {"_T-SI-BOTH": "_T-MIS-A", "_T-SI-SET": "_T-MIS-X", "_T-SI-CANC": None, "_T-SI-NONE": None})
+
+
+class TestSalesOrderHoursAlert(FrappeTestCase):
+	"""Sales Order hours banner on the MIS (#1484)."""
+
+	def tearDown(self):
+		frappe.db.rollback()
+
+	def runway(self, total, delivered, so_date, today="2026-11-20"):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			so_hours_runway,
+		)
+
+		return so_hours_runway(total, delivered, so_date, today)
+
+	def test_runway_from_average_since_so_date(self):
+		# 142 days = ~4.66 months since the SO; 40 h delivered -> ~8.57 h/month; 160 h left -> ~19 months
+		r = self.runway(200, 40, "2026-07-01")
+		self.assertEqual(r["remaining_hours"], 160)
+		self.assertAlmostEqual(r["monthly_rate"], 8.57, delta=0.02)
+		self.assertGreater(r["runway_days"], 500)
+		self.assertEqual(r["level"], "orange")
+
+	def test_red_when_runway_is_four_weeks_or_less(self):
+		# 100 h in 2 months -> 50 h/month; 15 h left -> ~9 days
+		r = self.runway(115, 100, "2026-09-20")
+		self.assertLessEqual(r["runway_days"], 28)
+		self.assertEqual(r["level"], "red")
+
+	def test_young_so_counts_as_one_month(self):
+		# SO is 10 days old: rate = delivered / 1 month, not / 0.3 months
+		r = self.runway(100, 20, "2026-11-10")
+		self.assertEqual(r["monthly_rate"], 20)
+		self.assertEqual(r["level"], "orange")
+
+	def test_no_deliveries_yet_has_no_runway(self):
+		r = self.runway(200, 0, "2026-10-01")
+		self.assertIsNone(r["runway_days"])
+		self.assertEqual(r["level"], "orange")
+
+	def test_used_up_is_red(self):
+		r = self.runway(100, 100, "2026-10-01")
+		self.assertTrue(r["used_up"])
+		self.assertEqual(r["level"], "red")
+
+	def _mis_with_so_rows(self, status="Open", docstatus=1):
+		for so, date in (("_T-SO-A", "2026-07-01"), ("_T-SO-B", "2026-09-20"), ("_T-SO-DONE", "2026-01-01")):
+			frappe.get_doc({"doctype": "Sales Order", "name": so, "transaction_date": date}).db_insert()
+		mis = frappe.get_doc({
+			"doctype": "Monthly Implementation Summary", "name": "_T-MIS-SOH",
+			"docstatus": docstatus, "status": status,
+		})
+		mis.db_insert()
+		for i, (so, st, tot, deliv) in enumerate([
+			("_T-SO-A", "To Deliver and Bill", "200", "40"),
+			("_T-SO-B", "To Deliver", "115", "100"),
+			("_T-SO-DONE", "Completed", "50", "50"),
+		], start=1):
+			frappe.get_doc({
+				"doctype": "Sales Order Status", "name": f"_T-SOS-{i}", "parent": mis.name,
+				"parenttype": "Monthly Implementation Summary", "parentfield": "sales_order_status_information",
+				"idx": i, "sales_order": so, "status": st, "total_hrs": tot, "delivered_total_hrs": deliv,
+				"so_title": f"Title {i}",
+			}).db_insert()
+		return mis
+
+	def test_api_lists_only_deliverable_sales_orders(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			get_so_hours_alert,
+		)
+
+		mis = self._mis_with_so_rows()
+		with patch(f"{MOD}.getdate", side_effect=lambda d=None: frappe.utils.getdate(d or "2026-11-20")):
+			rows = get_so_hours_alert(mis.name)["rows"]
+		self.assertEqual([r["sales_order"] for r in rows], ["_T-SO-A", "_T-SO-B"])
+		self.assertEqual([r["level"] for r in rows], ["orange", "red"])
+		self.assertEqual(rows[0]["so_title"], "Title 1")
+
+	def test_api_total_adds_up_the_deliverable_sales_orders(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			get_so_hours_alert,
+		)
+
+		mis = self._mis_with_so_rows()
+		with patch(f"{MOD}.getdate", side_effect=lambda d=None: frappe.utils.getdate(d or "2026-11-20")):
+			total = get_so_hours_alert(mis.name)["total"]
+		# _T-SO-A 200/40 and _T-SO-B 115/100; the completed SO is left out
+		self.assertEqual((total["total_hours"], total["delivered_hours"], total["remaining_hours"]), (315, 140, 175))
+		# combined pace ~8.57 + ~49.9 h/month -> 175 h last about 3 months: orange
+		self.assertAlmostEqual(total["monthly_rate"], 58.5, delta=0.2)
+		self.assertEqual(total["level"], "orange")
+
+	def test_total_is_red_when_the_combined_runway_is_four_weeks_or_less(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			so_hours_total,
+		)
+
+		rows = [self.runway(115, 100, "2026-09-20"), self.runway(20, 20, "2026-10-01")]
+		total = so_hours_total(rows)
+		self.assertEqual(total["remaining_hours"], 15)
+		self.assertLessEqual(total["runway_days"], 28)
+		self.assertEqual(total["level"], "red")
+
+	def test_api_is_empty_on_a_closed_mis(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			get_so_hours_alert,
+		)
+
+		mis = self._mis_with_so_rows(status="Closed")
+		self.assertEqual(get_so_hours_alert(mis.name), {"rows": [], "total": None})
