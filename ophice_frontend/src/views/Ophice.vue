@@ -702,9 +702,7 @@
 			:notice-count="noticeList.length + batchNoticeList.length"
 			:meeting="Boolean(meetingArea)"
 			:float-target="pipBody"
-			:dock="sidebarDock"
 			@slots="(slots) => (dockRects = slots)"
-			@dock-want="setDockWant"
 			@keys-back="giveKeysToCockpit"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
@@ -751,7 +749,6 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
 import { openFloatingWindow } from "../utils/pip.js"
-import { DOCK_RECT, DOCK_SIZE, dockMessage } from "@spa/utils/ophiceDock.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
 import { areaUnder, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
@@ -2265,40 +2262,11 @@ watch(
 	}
 )
 
-// --- The mini map's right sidebar in the cockpit (#2155). The cockpit frame says whether it has
-// one and where its spot is; the mini map says whether it is docked (the sidebar opens) or being
-// dragged (a drop strip shows), and Ophice passes that on to the frame. Always the frame that is
-// there now: a cockpit reopened from the shortcut bar gets a new iframe.
-const sidebarDock = ref(null)
-let dockWant = { docked: false, target: false }
-function cockpitFrameWindow() {
-	return document.querySelector("iframe[data-ophice-frame]")?.contentWindow || null
-}
-function sendDockWant(win) {
-	try {
-		win?.postMessage({ type: DOCK_SIZE, ...dockWant }, window.location.origin)
-	} catch {
-		// the frame is loading another page; it reports again once it is there
-	}
-}
-function onDockMessage(event) {
-	const data = dockMessage(event, DOCK_RECT)
-	if (!data || !event.source || event.source !== cockpitFrameWindow()) return
-	sidebarDock.value = data.available ? { rect: data.rect || null } : null
-	// A new page in the frame starts with its sidebar closed: tell it what the map wants.
-	if (data.available && (Boolean(data.docked) !== dockWant.docked || Boolean(data.target) !== dockWant.target)) {
-		sendDockWant(event.source)
-	}
-}
+// --- The mini map (#2155) hands the keyboard back when the pointer leaves it.
 /** The pointer left the mini map: the keyboard goes back to the cockpit page. */
 function giveKeysToCockpit() {
 	document.querySelector("iframe[data-ophice-frame]")?.focus()
 }
-function setDockWant(want) {
-	dockWant = { docked: Boolean(want.docked), target: Boolean(want.target) }
-	sendDockWant(cockpitFrameWindow())
-}
-window.addEventListener("message", onDockMessage)
 
 const pipBody = ref(null)
 /** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
@@ -3495,7 +3463,6 @@ onBeforeUnmount(() => {
 	clearInterval(peopleTimer)
 	clearTimeout(peopleSoon)
 	window.removeEventListener("resize", onViewportResize)
-	window.removeEventListener("message", onDockMessage)
 	window.removeEventListener("keydown", onKeydown)
 	window.removeEventListener("keydown", unlockAudio, { capture: true })
 	window.removeEventListener("pointerdown", unlockAudio, { capture: true })

@@ -59,6 +59,8 @@ describe("MiniMap setup (Ophice over a cockpit, #2109)", () => {
 	// fall back to the default (tall) size, so `wide` would be false here.
 	it("sets up in a meeting with a wide panel, where the panel's height also limits the tile", async () => {
 		localStorage.setItem("phamos_ophice_mini_map_size", JSON.stringify({ w: 900, h: 300 }))
+		// Hovering: docked (#2155) it is always tall.
+		localStorage.setItem("phamos_ophice_mini_map_docked", "0")
 		const me = { name: "me", x: 3, y: 4 }
 		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, meeting: true })
 		expect(state.wide.value).toBe(true)
@@ -67,10 +69,10 @@ describe("MiniMap setup (Ophice over a cockpit, #2109)", () => {
 	})
 })
 
-// Docked in the cockpit's right sidebar (#2155) instead of a pop-out window.
-describe("MiniMap docked in the cockpit's right sidebar (#2155)", () => {
+// Docked in the bottom-right corner (#2155) instead of a pop-out window. The stubbed window is
+// 1280 x 800.
+describe("MiniMap docked in the bottom-right corner (#2155)", () => {
 	const me = { name: "me", x: 3, y: 4 }
-	const dock = { rect: { left: 992, top: 0, width: 288, height: 800, bottom: 800 } }
 	const press = (x, y) => ({ button: 0, clientX: x, clientY: y, preventDefault() {} })
 
 	beforeEach(() => {
@@ -83,80 +85,60 @@ describe("MiniMap docked in the cockpit's right sidebar (#2155)", () => {
 		vi.restoreAllMocks()
 	})
 
-	it("docks by default and fills the right sidebar", async () => {
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock })
+	it("docks by default: over the bottom-right corner, left of Phriend, held at the bottom", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
 		expect(state.isDocked.value).toBe(true)
-		expect(state.panelStyle.value).toEqual({ left: "992px", top: "0px", width: "288px", height: "800px" })
+		expect(state.panelStyle.value).toEqual({ left: "880px", bottom: "16px", width: "300px", maxHeight: "480px" })
 		scope.stop()
 	})
 
-	it("stays out of sight while the sidebar opens", async () => {
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock: { rect: null } })
-		expect(state.isDocked.value).toBe(true)
-		expect(state.panelStyle.value.visibility).toBe("hidden")
-		scope.stop()
-	})
-
-	it("hovers when the cockpit has no dock", async () => {
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock: null })
-		expect(state.isDocked.value).toBe(false)
-		expect(state.panelStyle.value.visibility).toBeUndefined()
-		scope.stop()
-	})
-
-	it("stays tall in a meeting while docked, even with a wide hovering size", async () => {
+	it("has a fixed height in a meeting, and stays tall even with a wide hovering size", async () => {
 		localStorage.setItem("phamos_ophice_mini_map_size", JSON.stringify({ w: 900, h: 300 }))
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, meeting: true, dock })
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, meeting: true })
 		expect(state.wide.value).toBe(false)
+		expect(state.panelStyle.value).toMatchObject({ height: "560px" })
 		scope.stop()
 	})
 
-	it("comes out only once the pointer moves, hovers where it is let go, and docks again on the right", async () => {
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock })
+	it("comes out only once the pointer moves, hovers where it is let go, and docks again in the corner", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
 		// A click on the header (no move) leaves it docked.
-		state.startDrag(press(1050, 12))
-		state.onDrag(press(1052, 13))
-		state.endDrag(press(1052, 13))
+		state.startDrag(press(950, 620))
+		state.onDrag(press(952, 621))
+		state.endDrag(press(952, 621))
 		expect(state.isDocked.value).toBe(true)
 
 		// Dragged out over the cockpit page: it hovers there, and that is remembered.
-		state.startDrag(press(1050, 12))
+		state.startDrag(press(950, 620))
 		state.onDrag(press(500, 300))
 		expect(state.isDocked.value).toBe(false)
+		expect(state.moving.value).toBe(true)
 		state.endDrag(press(500, 300))
 		expect(state.isDocked.value).toBe(false)
+		expect(state.moving.value).toBe(false)
 		expect(localStorage.getItem("phamos_ophice_mini_map_docked")).toBe("0")
 
-		// Dragged back onto the drop strip: docked.
+		// Dragged back into the corner: docked.
 		state.startDrag(press(500, 300))
-		state.onDrag(press(1100, 400))
-		state.endDrag(press(1100, 400))
+		state.onDrag(press(1100, 720))
+		state.endDrag(press(1100, 720))
 		expect(state.isDocked.value).toBe(true)
 		expect(localStorage.getItem("phamos_ophice_mini_map_docked")).toBe("1")
 		scope.stop()
 	})
 
-	it("opens the sidebar while docked, asks for the drop strip while dragged, and closes it while hovering", async () => {
-		const emitted = []
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock }, emitted)
-		const wants = () => emitted.filter(([name]) => name === "dock-want").map(([, want]) => want)
-		expect(wants().at(-1)).toEqual({ docked: true, target: false })
-		state.startDrag(press(1050, 12))
-		state.onDrag(press(400, 300))
-		await Promise.resolve()
-		expect(wants().at(-1)).toEqual({ docked: false, target: true })
-		state.endDrag(press(400, 300))
-		await Promise.resolve()
-		expect(wants().at(-1)).toEqual({ docked: false, target: false })
-		scope.stop()
-	})
-
 	it("docks with the header button", async () => {
 		localStorage.setItem("phamos_ophice_mini_map_docked", "0")
-		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, dock })
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
 		expect(state.isDocked.value).toBe(false)
 		state.setDocked(true)
 		expect(state.isDocked.value).toBe(true)
+		scope.stop()
+	})
+
+	it("hovers in the floating window", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me, floatTarget: {} })
+		expect(state.isDocked.value).toBe(false)
 		scope.stop()
 	})
 })
@@ -259,6 +241,15 @@ describe("MiniMap centres on my chip (#2155)", () => {
 		state.mapWidth.value = 180
 		await nextTick()
 		expect(offCentre(state)).toBeLessThan(1)
+		scope.stop()
+	})
+
+	it("centres my chip near the office's edge too", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me: { name: "me", x: 1, y: 23 } })
+		const at = state.cam.toView(1.5, 23.5)
+		const view = { width: state.tile.value * 40, height: state.tile.value * 25 }
+		expect(Math.abs(at.x - view.width / 2)).toBeLessThan(1)
+		expect(Math.abs(at.y - view.height / 2)).toBeLessThan(1)
 		scope.stop()
 	})
 

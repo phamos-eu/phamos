@@ -5,8 +5,8 @@
 		stack under the map; wide, they sit side by side (PM, 2026-11-22). The call and chat themselves
 		are laid over the spots kept free here (a moved video window would restart the call).
 		"Float" (Chrome, Edge, newer Firefox) puts all of it in a small window on top of everything.
-		Docked (#2155): laid over the cockpit's right sidebar, which opens for it. Dragged out by its
-		header it hovers (the sidebar closes); dropped back on the right edge it docks again.
+		Docked (#2155): a box over the bottom-right corner of the cockpit, left of Phriend. Dragged
+		out by its header it hovers; dropped back in the corner it docks again.
 	-->
 	<Teleport :to="floatTarget || 'body'" :disabled="!floatTarget">
 		<div
@@ -36,15 +36,15 @@
 					{{ noticeCount }}
 				</span>
 				<button
-					v-if="dock && !isDocked && !floatTarget"
+					v-if="!isDocked && !floatTarget"
 					type="button"
 					class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-					:title="__('Dock in the sidebar')"
+					:title="__('Dock in the corner')"
 					data-testid="mini-map-dock"
 					@pointerdown.stop
 					@click="setDocked(true)"
 				>
-					<FeatherIcon name="sidebar" class="h-3.5 w-3.5" />
+					<FeatherIcon name="corner-right-down" class="h-3.5 w-3.5" />
 				</button>
 				<button
 					v-if="canFloat && !floatTarget"
@@ -279,6 +279,15 @@
 	     pages, which swallow mouse moves) cannot make the panel jump. -->
 	<Teleport to="body">
 		<div v-if="grabbing" class="fixed inset-0 z-[80]" :style="{ cursor: grabbing }" data-testid="mini-map-grab-layer" />
+		<!-- While it is dragged: where it docks again (#2155). -->
+		<div
+			v-if="moving && !isDocked"
+			class="pointer-events-none fixed z-[59] flex items-center justify-center rounded-xl border-2 border-dashed border-outline-gray-4 bg-surface-gray-1/80 px-4 text-center text-xs text-ink-gray-6 backdrop-blur-sm"
+			:style="dropStyle"
+			data-testid="mini-map-drop-zone"
+		>
+			{{ __("Drop here to dock the map") }}
+		</div>
 	</Teleport>
 </template>
 
@@ -291,7 +300,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat } from "../utils/pip.js"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
-import { isOverDock } from "@spa/utils/ophiceDock.js"
+import { cornerBox, dropZone, isOverCorner } from "../utils/miniMapCorner.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -310,13 +319,8 @@ const props = defineProps({
 	meeting: { type: Boolean, default: false },
 	/** The floating window's body when it floats (Ophice opens it, so the call can go along). */
 	floatTarget: { type: Object, default: null },
-	/**
-	 * The cockpit's right sidebar (#2155): { rect }, rect = { left, top, width, height, bottom } in
-	 * this page's coordinates, null while the sidebar is closed. Null: no dock, the map hovers.
-	 */
-	dock: { type: Object, default: null },
 })
-const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "dock-want", "keys-back"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "keys-back"])
 
 // Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
 const drafts = reactive({})
@@ -343,7 +347,7 @@ const ICONS = { walkup: "user", message: "message-circle", meeting: "message-squ
 const POS_KEY = "phamos_ophice_mini_map_pos"
 const START_ZOOM = 2.5
 
-// --- Docked in the cockpit's right sidebar (#2155), kept in this browser; docked unless taken out.
+// --- Docked in the bottom-right corner (#2155), kept in this browser; docked unless taken out.
 // Declared before the size and layout below: they read it while this setup runs (see #2109).
 
 const DOCKED_KEY = "phamos_ophice_mini_map_docked"
@@ -355,7 +359,10 @@ function storedDocked() {
 	}
 }
 const docked = ref(storedDocked())
-const isDocked = computed(() => Boolean(docked.value && props.dock && !props.floatTarget))
+const isDocked = computed(() => Boolean(docked.value && !props.floatTarget))
+// The window's size: the corner moves with it.
+const viewport = reactive({ w: window.innerWidth, h: window.innerHeight })
+const corner = computed(() => cornerBox(viewport, { meeting: props.meeting }))
 function setDocked(on) {
 	docked.value = on
 	try {
@@ -364,8 +371,12 @@ function setDocked(on) {
 		// private window: the choice lasts until the reload
 	}
 }
-// Being dragged (hovering): the cockpit shows a drop strip on its right edge.
+// Being dragged (hovering): the corner shows where it docks again.
 const moving = ref(false)
+const dropStyle = computed(() => {
+	const zone = dropZone(viewport)
+	return { left: `${zone.left}px`, top: `${zone.top}px`, width: `${zone.width}px`, height: `${zone.height}px` }
+})
 
 // --- Size (kept in this browser) and layout
 // Declared before `tile`: useMapCamera's watches read the tile while this setup runs, so `wide`
@@ -383,7 +394,7 @@ function storedSize() {
 const size = reactive(storedSize())
 const floatSize = reactive({ w: 0, h: 0 })
 const panelHeight = computed(() =>
-	props.floatTarget ? floatSize.h : isDocked.value ? props.dock.rect?.height || 2000 : props.meeting ? size.h : 2000
+	props.floatTarget ? floatSize.h : isDocked.value ? corner.value.height || corner.value.maxHeight : props.meeting ? size.h : 2000
 )
 const wide = computed(() => {
 	// Docked, it is as narrow as the right sidebar: always tall.
@@ -418,6 +429,8 @@ const cam = useMapCamera({
 	// Zoomed in, so my chip can sit in the middle (#2155); at 1 the whole office fits and the view
 	// can't move. Someone's own zoom (stored in this browser) wins.
 	startZoom: () => START_ZOOM,
+	// Past the office's edge too, so my chip is always in the middle (PM, 2026-11-25).
+	overscroll: true,
 	pad: 0,
 	minTile: 2,
 })
@@ -538,18 +551,22 @@ function endDrag(event) {
 	grabbing.value = ""
 	moving.value = false
 	window.removeEventListener("pointermove", onDrag)
-	// Let go over the drop strip: docked; anywhere else: it hovers there. In a cockpit without a
-	// dock the choice stays as it was.
-	if (moved && props.dock) setDocked(isOverDock(event.clientX, event.clientY, props.dock.rect))
+	// Let go in the corner: docked; anywhere else: it hovers there.
+	if (moved) setDocked(isOverCorner(event.clientX, event.clientY, viewport))
 	try {
 		localStorage.setItem(POS_KEY, JSON.stringify({ x: pos.x, y: pos.y }))
 	} catch {
 		// private window: the place lasts until the reload
 	}
 }
-window.addEventListener("resize", keepInView)
+function onWindowResize() {
+	viewport.w = window.innerWidth
+	viewport.h = window.innerHeight
+	keepInView()
+}
+window.addEventListener("resize", onWindowResize)
 onBeforeUnmount(() => {
-	window.removeEventListener("resize", keepInView)
+	window.removeEventListener("resize", onWindowResize)
 	window.removeEventListener("pointermove", onDrag)
 })
 
@@ -616,11 +633,14 @@ const fixedHeight = computed(() => props.meeting && (open.video || open.chat))
 
 const panelStyle = computed(() => {
 	if (isDocked.value) {
-		const rect = props.dock.rect
-		// The sidebar is still opening: out of sight until its place is known.
-		if (!rect) return { ...hoverStyle.value, visibility: "hidden" }
-		// The whole sidebar: the map on top, pings (or the call and chat) below it.
-		return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
+		// Held at the bottom: a new ping makes it grow upwards.
+		const box = corner.value
+		return {
+			left: `${box.left}px`,
+			bottom: `${box.bottom}px`,
+			width: `${box.width}px`,
+			...(box.height ? { height: `${box.height}px` } : { maxHeight: `${box.maxHeight}px` }),
+		}
 	}
 	return hoverStyle.value
 })
@@ -739,20 +759,10 @@ watch(
 	},
 	{ immediate: true }
 )
-// The right sidebar (#2155): open while docked, a drop strip while the map is dragged, closed
-// while it hovers. Ophice passes it on to the cockpit.
-watch(
-	() => ({ docked: isDocked.value, target: moving.value && !isDocked.value && Boolean(props.dock) }),
-	(want, before) => {
-		if (want.docked !== before?.docked || want.target !== before?.target) emit("dock-want", want)
-	},
-	{ immediate: true }
-)
 onBeforeUnmount(() => {
 	observer.disconnect()
 	floatWindow?.removeEventListener("resize", report)
 	emit("slots", null)
-	emit("dock-want", { docked: false, target: false })
 })
 </script>
 
