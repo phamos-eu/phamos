@@ -13,6 +13,7 @@ from phamos.api import general_management_spa as gm
 from phamos.api import software_development_spa
 from phamos.api.issue_chat import COCKPIT_PATHS, PERSONAL_COCKPIT_PATH, record_cockpit_path
 from phamos.cockpits.settings import COCKPITS, COCKPIT_SETTINGS
+from phamos.setup import contracts as contracts_setup
 from phamos.setup import general_management as setup
 from phamos.www import general_management_spa as page
 
@@ -70,7 +71,8 @@ class TestGeneralManagementWiring(FrappeTestCase):
 			name.replace("get_software_development_settings", gm.CONFIG.settings_method_name)
 			for name in _whitelisted(software_development_spa)
 		}
-		# Plus what only this cockpit has: the company Tasks view (#1948) and appointments (#1949).
+		# Plus what only this cockpit has: the company Tasks view (#1948), appointments (#1949)
+		# and contracts (#2148).
 		own = {
 			"get_company_tasks",
 			"get_company_task",
@@ -78,6 +80,8 @@ class TestGeneralManagementWiring(FrappeTestCase):
 			"get_appointment_options",
 			"save_appointment",
 			"delete_appointment",
+			"get_contracts",
+			"get_contract_options",
 		}
 		self.assertEqual(set(_whitelisted(gm)), expected | own)
 
@@ -544,3 +548,75 @@ class TestCompanyAppointments(FrappeTestCase):
 			{"email": "test-appointments@example.com", "name": employee.employee_name, "image": None},
 			group["people"],
 		)
+
+
+class TestContracts(FrappeTestCase):
+	"""Contracts list (#2148): standard Contract, typed by Contract Type, filtered in the cockpit."""
+
+	CUSTOMER = "_Test GM Contracts Customer"
+
+	@classmethod
+	def setUpClass(cls):
+		# FrappeTestCase rolls back once per class, so the contracts are made once, not per test.
+		super().setUpClass()
+		setup.after_migrate()
+		contracts_setup.after_migrate()
+		if not frappe.db.exists("Customer", cls.CUSTOMER):
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": cls.CUSTOMER,
+					"customer_type": "Company",
+					"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}),
+				}
+			).insert(ignore_permissions=True)
+		cls.manager = _make_user(MANAGER, [setup.GENERAL_MANAGEMENT_ROLE])
+		cls.avv = cls._contract("AVV", end_date=add_days(today(), 20))
+		cls.nda = cls._contract("NDA", end_date=add_days(today(), 200))
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	@classmethod
+	def _contract(cls, contract_type, end_date):
+		return frappe.get_doc(
+			{
+				"doctype": "Contract",
+				"party_type": "Customer",
+				"party_name": cls.CUSTOMER,
+				"custom_contract_type": contract_type,
+				"start_date": today(),
+				"end_date": end_date,
+				"contract_terms": "Test terms",
+			}
+		).insert(ignore_permissions=True).name
+
+	def _names(self, **filters):
+		return {row["name"] for row in gm.get_contracts(**filters)}
+
+	def test_setup_adds_the_type_field_and_first_types(self):
+		self.assertTrue(frappe.get_meta("Contract").has_field(contracts_setup.TYPE_FIELD))
+		self.assertTrue(frappe.db.exists("Contract Type", "AVV"))
+		self.assertTrue(frappe.db.exists("Contract Type", "NDA"))
+		contracts_setup.after_migrate()
+		self.assertEqual(frappe.db.count("Contract Type", {"name": "AVV"}), 1)
+
+	def test_the_role_lists_and_filters_contracts(self):
+		frappe.set_user(self.manager)
+		self.assertIn("AVV", gm.get_contract_options()["types"])
+		self.assertTrue({self.avv, self.nda} <= self._names(party=self.CUSTOMER))
+		self.assertEqual(self._names(party=self.CUSTOMER, contract_type="AVV"), {self.avv})
+		self.assertEqual(self._names(party=self.CUSTOMER, ending_within_days=30), {self.avv})
+		self.assertEqual(self._names(party=self.CUSTOMER, status="Active"), set())
+
+	def test_needs_the_role(self):
+		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
+		with self.assertRaises(frappe.PermissionError):
+			gm.get_contracts()
+
+	def test_refuses_bad_filters(self):
+		frappe.set_user(self.manager)
+		with self.assertRaises(frappe.ValidationError):
+			gm.get_contracts(status="Signed")
+		with self.assertRaises(frappe.ValidationError):
+			gm.get_contracts(ending_within_days=-1)

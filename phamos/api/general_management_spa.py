@@ -11,6 +11,7 @@ import functools
 
 import frappe
 from frappe import _
+from frappe.utils import add_days, cint, today
 
 from phamos.api import department_cockpit as dc
 from phamos.cockpits.settings import COCKPIT_SETTINGS, COCKPITS, cockpit_window
@@ -728,3 +729,73 @@ def delete_appointment(name):
 	department_doc.set(EVENT_TABLE, [row for row in department_doc.get(EVENT_TABLE) if row.name != name])
 	_save_department_events(department_doc)
 	return {"deleted": name}
+
+
+# --- Contracts (#2148) -----------------------------------------------------------------------------
+# ERPNext's standard Contract, typed by phamos' Contract Type (AVV, NDA, ...). Read through
+# frappe.get_list, so the role's Contract rights (phamos/setup/general_management.py) apply.
+
+CONTRACT_FIELDS = (
+	"name",
+	"custom_contract_type",
+	"party_type",
+	"party_name",
+	"party_full_name",
+	"status",
+	"is_signed",
+	"start_date",
+	"end_date",
+	"docstatus",
+)
+CONTRACT_STATUSES = ("Unsigned", "Active", "Inactive")
+CONTRACT_LIMIT = 500
+
+
+@frappe.whitelist()
+@_require_access
+def get_contracts(contract_type=None, status=None, party=None, ending_within_days=None):
+	"""Contracts for the list, newest first; cancelled ones stay out.
+
+	Args:
+		contract_type: a Contract Type name, or empty for all.
+		status: Unsigned, Active or Inactive, or empty for all.
+		party: text matched against the party's ID and name.
+		ending_within_days: only contracts whose end date lies between today and today + N days.
+
+	Returns:
+		list[dict]: CONTRACT_FIELDS per contract, at most CONTRACT_LIMIT.
+	"""
+	filters = [["docstatus", "<", 2]]
+	if contract_type:
+		filters.append(["custom_contract_type", "=", contract_type])
+	if status:
+		if status not in CONTRACT_STATUSES:
+			frappe.throw(_("Unknown contract status: {0}").format(status))
+		filters.append(["status", "=", status])
+	if ending_within_days not in (None, ""):
+		days = cint(ending_within_days)
+		if days < 0:
+			frappe.throw(_("Days must not be negative."))
+		filters.append(["end_date", "between", [today(), add_days(today(), days)]])
+	or_filters = None
+	if party:
+		pattern = f"%{party}%"
+		or_filters = [["party_name", "like", pattern], ["party_full_name", "like", pattern]]
+	return frappe.get_list(
+		"Contract",
+		fields=list(CONTRACT_FIELDS),
+		filters=filters,
+		or_filters=or_filters,
+		order_by="modified desc",
+		limit_page_length=CONTRACT_LIMIT,
+	)
+
+
+@frappe.whitelist()
+@_require_access
+def get_contract_options():
+	"""What the Contracts filters offer: the contract types and the statuses."""
+	return {
+		"types": frappe.get_all("Contract Type", pluck="name", order_by="name asc"),
+		"statuses": list(CONTRACT_STATUSES),
+	}
