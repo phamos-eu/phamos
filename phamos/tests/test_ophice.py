@@ -478,23 +478,22 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 	def _grid_40_by_25(self):
 		frappe.db.set_default(ophice.GRID_KEY, json.dumps({"cols": 40, "rows": 25}))
 
-	def test_grid_keeps_its_width_on_the_image_when_squares_across_change(self):
-		"""#2139: the image stays put; more squares across make them smaller, rows only add height."""
+	def test_squares_keep_their_size_on_the_image_when_the_grid_changes(self):
+		"""#2139: the image stays put and so do the squares; more squares make the grid bigger."""
 		self._grid_40_by_25()
-		with patch.object(ophice.frappe, "publish_realtime") as publish, patch.object(ophice, "_require_map_editor"):
+		with (
+			patch.object(ophice.frappe, "publish_realtime"),
+			patch.object(ophice, "_require_map_editor"),
+			patch.object(ophice, "_areas", return_value=[]),  # the site's own areas must not block shrinking
+		):
 			ophice._store_background(self._png(), "map.png")
 			ophice.set_background_layout(0, 2, 1, 30, 1.5)
 			stored = ophice._background()["grid"]
-			ophice.set_grid(60, 30)
+			self.assertEqual(ophice.set_grid(60, 5), {"cols": 60, "rows": 5})  # 5 is the smallest
+			self.assertEqual(ophice._background()["grid"], stored)
 			layout = ophice.get_space()["background_layout"]
-			# Seen from the grid the image grows by 60/40: same place on the image, smaller squares.
-			self.assertEqual((layout["left"], layout["top"], layout["width"], layout["zoom"]), (3.0, 1.5, 45.0, 1.5))
-			self.assertEqual(ophice._background()["grid"]["x"], stored["x"])
-			self.assertEqual(ophice._background()["grid"]["tile"], round(stored["tile"] * 40 / 60, 8))
-			self.assertIn(ophice.EVENT_BACKGROUND, [c.args[0] for c in publish.call_args_list])
-			# Rows only: the squares keep their size.
-			ophice.set_grid(60, 40)
-			self.assertEqual(ophice.get_space()["background_layout"]["width"], 45.0)
+			self.assertEqual((layout["left"], layout["top"], layout["width"], layout["zoom"]), (2.0, 1.0, 30.0, 1.5))
+			self.assertEqual(ophice.set_grid(1, 1), {"cols": 5, "rows": 5})
 
 	def test_patch_converts_the_old_layout_once_and_the_map_looks_the_same(self):
 		from phamos.patches.v1_0 import ophice_grid_on_background

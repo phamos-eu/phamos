@@ -42,7 +42,7 @@ from phamos.cockpits.settings import COCKPITS as _COCKPITS
 COLS = 40
 ROWS = 25
 GRID_KEY = "phamos_ophice_grid"
-GRID_LIMITS = ((10, 120), (10, 80))
+GRID_LIMITS = ((5, 120), (5, 80))
 EVENT_GRID = "ophice_grid"
 POSITION_KEY = "phamos_ophice_position"
 DUMMIES_CONF_KEY = "ophice_dummies"
@@ -252,13 +252,9 @@ def set_grid(cols, rows):
 				_("The space {0} would be cut off. Move or shrink it first.").format(area.title),
 				title=_("Grid too small"),
 			)
-	old_cols, old_rows = _grid()
-	background = _keep_grid_width(old_cols, old_rows, cols)
 	frappe.db.set_default(GRID_KEY, json.dumps({"cols": cols, "rows": rows}, separators=(",", ":")))
 	frappe.local.ophice_grid = None
 	_publish(EVENT_GRID, {"cols": cols, "rows": rows, "by": frappe.session.user})
-	if background:
-		_save_background(background)
 	return {"cols": cols, "rows": rows}
 
 
@@ -665,7 +661,7 @@ def _background():
 
 # Where the grid lies on the image (#2139): the image is the world, the grid is placed on it.
 # Stored as "grid": {"x", "y", "tile"}, all in image widths: the grid's top left corner and the
-# size of one square. Changing the number of squares across keeps the grid's width on the image.
+# size of one square. Changing the number of squares keeps their size: the grid grows or shrinks.
 # The API still answers in squares ("layout": where the image lies, seen from the grid), so the
 # maps draw as before. It may reach beyond the grid: those parts are shown dimmed.
 # "zoom" is everyone's starting zoom (1 = the whole image fits the window).
@@ -794,17 +790,6 @@ def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
 	value["grid"] = _grid_from_box(*box)
 	value["zoom"] = _clamp_zoom(zoom)
 	return _save_background(value)
-
-
-def _keep_grid_width(cols, rows, new_cols):
-	"""Squares across change (#2139): the grid keeps its width on the image, the squares resize."""
-	value = _background()
-	if not value.get("url") or new_cols == cols:
-		return
-	grid, zoom = _grid_on_image(value, cols, rows)
-	grid["tile"] = round(grid["tile"] * cols / new_cols, 8)
-	value["grid"], value["zoom"] = grid, zoom
-	return value
 
 
 def _set_background(value):
