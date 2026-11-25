@@ -103,6 +103,17 @@ describe("createEncounterAlert", () => {
 		expect(Notify.shown).toHaveLength(1)
 	})
 
+	it("keeps the sound when resume() returns no promise (older Safari)", () => {
+		const { alert, Audio } = setup()
+		Audio.startState = "suspended"
+		Audio.prototype.resume = function () {
+			this.state = "running"
+		}
+		alert.unlock()
+		alert.notify("Anna wants to chat")
+		expect(Audio.tones).toHaveLength(2)
+	})
+
 	it("chimes while I look at the page, without title or notification", () => {
 		const { alert, doc, Notify, Audio } = setup()
 		expect(alert.notify("Anna wants to chat")).toBe(true)

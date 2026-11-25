@@ -60,8 +60,8 @@ export function createEncounterAlert({ win, doc, storage, Notify, Audio } = {}) 
 		if (!Audio) return
 		try {
 			audio = audio || new Audio()
-			// resume() is a promise and may be refused without a key press or click.
-			if (audio.state === "suspended") audio.resume().catch(() => {})
+			// resume() may be refused without a key press or click; older Safari returns no promise.
+			if (audio.state === "suspended") Promise.resolve(audio.resume()).catch(() => {})
 		} catch {
 			audio = null
 		}
