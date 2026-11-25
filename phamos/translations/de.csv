@@ -3098,6 +3098,8 @@ Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
 Chat notifications muted,Chat-Benachrichtigungen stumm
+Dock in the corner,In der Ecke andocken
+Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
 AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
 Started by hand by {0} (manual override).,Von Hand gestartet von {0} (manueller Override).
 Started by hand by {0}.,Von Hand gestartet von {0}.

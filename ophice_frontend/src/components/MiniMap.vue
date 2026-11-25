@@ -5,15 +5,21 @@
 		stack under the map; wide, they sit side by side (PM, 2026-11-22). The call and chat themselves
 		are laid over the spots kept free here (a moved video window would restart the call).
 		"Float" (Chrome, Edge, newer Firefox) puts all of it in a small window on top of everything.
+		Docked (#2155): a box over the bottom-right corner of the cockpit, left of Phriend. Dragged
+		out by its header it hovers; dropped back in the corner it docks again.
 	-->
 	<Teleport :to="floatTarget || 'body'" :disabled="!floatTarget">
 		<div
 			ref="root"
-			class="mini-map flex flex-col overflow-hidden rounded-xl border border-outline-gray-3 bg-surface-white text-ink-gray-9 shadow-2xl"
-			:class="floatTarget ? 'mini-map--floating' : 'fixed z-[60]'"
+			class="mini-map flex flex-col overflow-hidden rounded-xl border border-outline-gray-3 bg-surface-white text-ink-gray-9 outline-none focus:ring-2 focus:ring-outline-gray-4"
+			:class="floatTarget ? 'mini-map--floating' : isDocked ? 'fixed z-[60] shadow-sm' : 'fixed z-[60] shadow-2xl'"
 			:style="floatTarget ? {} : panelStyle"
 			:data-layout="wide ? 'wide' : 'tall'"
+			:data-docked="isDocked ? '1' : null"
+			tabindex="-1"
 			data-testid="mini-map"
+			@pointerenter="takeKeys"
+			@pointerleave="giveKeysBack"
 		>
 			<header
 				class="flex flex-shrink-0 select-none items-center gap-1.5 border-b border-outline-gray-2 px-2 py-1.5"
@@ -29,6 +35,17 @@
 				>
 					{{ noticeCount }}
 				</span>
+				<button
+					v-if="!isDocked && !floatTarget"
+					type="button"
+					class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+					:title="__('Dock in the corner')"
+					data-testid="mini-map-dock"
+					@pointerdown.stop
+					@click="setDocked(true)"
+				>
+					<FeatherIcon name="corner-right-down" class="h-3.5 w-3.5" />
+				</button>
 				<button
 					v-if="canFloat && !floatTarget"
 					type="button"
@@ -245,7 +262,7 @@
 			</div>
 			</div>
 			<!-- Resize from any corner. Tall = a side bar, wide = a bar (PM, 2026-11-22). -->
-			<template v-if="!floatTarget">
+			<template v-if="!floatTarget && !isDocked">
 				<span
 					v-for="corner in CORNERS"
 					:key="corner"
@@ -262,6 +279,15 @@
 	     pages, which swallow mouse moves) cannot make the panel jump. -->
 	<Teleport to="body">
 		<div v-if="grabbing" class="fixed inset-0 z-[80]" :style="{ cursor: grabbing }" data-testid="mini-map-grab-layer" />
+		<!-- While it is dragged: where it docks again (#2155). -->
+		<div
+			v-if="moving && !isDocked"
+			class="pointer-events-none fixed z-[59] flex items-center justify-center rounded-xl border-2 border-dashed border-outline-gray-4 bg-surface-gray-1/80 px-4 text-center text-xs text-ink-gray-6 backdrop-blur-sm"
+			:style="dropStyle"
+			data-testid="mini-map-drop-zone"
+		>
+			{{ __("Drop here to dock the map") }}
+		</div>
 	</Teleport>
 </template>
 
@@ -274,6 +300,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat } from "../utils/pip.js"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
+import { cornerBox, dropZone, isOverCorner } from "../utils/miniMapCorner.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -293,7 +320,7 @@ const props = defineProps({
 	/** The floating window's body when it floats (Ophice opens it, so the call can go along). */
 	floatTarget: { type: Object, default: null },
 })
-const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "keys-back"])
 
 // Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
 const drafts = reactive({})
@@ -318,6 +345,38 @@ const SIZE_KEY = "phamos_ophice_mini_map_size"
 const MINUTES = [5, 15, 30, 60]
 const ICONS = { walkup: "user", message: "message-circle", meeting: "message-square", reminder: "clock" }
 const POS_KEY = "phamos_ophice_mini_map_pos"
+const START_ZOOM = 2.5
+
+// --- Docked in the bottom-right corner (#2155), kept in this browser; docked unless taken out.
+// Declared before the size and layout below: they read it while this setup runs (see #2109).
+
+const DOCKED_KEY = "phamos_ophice_mini_map_docked"
+function storedDocked() {
+	try {
+		return localStorage.getItem(DOCKED_KEY) !== "0"
+	} catch {
+		return true
+	}
+}
+const docked = ref(storedDocked())
+const isDocked = computed(() => Boolean(docked.value && !props.floatTarget))
+// The window's size: the corner moves with it.
+const viewport = reactive({ w: window.innerWidth, h: window.innerHeight })
+const corner = computed(() => cornerBox(viewport, { meeting: props.meeting }))
+function setDocked(on) {
+	docked.value = on
+	try {
+		localStorage.setItem(DOCKED_KEY, on ? "1" : "0")
+	} catch {
+		// private window: the choice lasts until the reload
+	}
+}
+// Being dragged (hovering): the corner shows where it docks again.
+const moving = ref(false)
+const dropStyle = computed(() => {
+	const zone = dropZone(viewport)
+	return { left: `${zone.left}px`, top: `${zone.top}px`, width: `${zone.width}px`, height: `${zone.height}px` }
+})
 
 // --- Size (kept in this browser) and layout
 // Declared before `tile`: useMapCamera's watches read the tile while this setup runs, so `wide`
@@ -334,9 +393,12 @@ function storedSize() {
 }
 const size = reactive(storedSize())
 const floatSize = reactive({ w: 0, h: 0 })
-const panelHeight = computed(() => (props.floatTarget ? floatSize.h : props.meeting ? size.h : 2000))
+const panelHeight = computed(() =>
+	props.floatTarget ? floatSize.h : isDocked.value ? corner.value.height || corner.value.maxHeight : props.meeting ? size.h : 2000
+)
 const wide = computed(() => {
-	if (!props.meeting) return false
+	// Docked, it is as narrow as the right sidebar: always tall.
+	if (!props.meeting || isDocked.value) return false
 	const w = props.floatTarget ? floatSize.w : size.w
 	const h = props.floatTarget ? floatSize.h : size.h
 	return w > h * 1.3
@@ -364,6 +426,11 @@ const cam = useMapCamera({
 	grid: () => ({ cols: props.cols, rows: props.rows }),
 	image: () => imageBox.value,
 	storageKey: "phamos_ophice_zoom_cockpit_map",
+	// Zoomed in, so my chip can sit in the middle (#2155); at 1 the whole office fits and the view
+	// can't move. Someone's own zoom (stored in this browser) wins.
+	startZoom: () => START_ZOOM,
+	// Past the office's edge too, so my chip is always in the middle (PM, 2026-11-25).
+	overscroll: true,
 	pad: 0,
 	minTile: 2,
 })
@@ -386,10 +453,14 @@ const imageStyle = computed(() => {
 		? { left: `${(box.left - c.x) * t()}px`, top: `${(box.top - c.y) * t()}px`, width: `${box.width * t()}px`, height: `${box.height * t()}px` }
 		: {}
 })
-// Start on my chip; the view follows it while I walk (the cockpit is in front, so rarely).
+// My chip in the middle when the cockpit opens (the mini map is made new each time), and again
+// whenever the map's box changes size: it settles after mounting (docked width, meeting layout),
+// and a resize by hand should not lose me (PM, 2026-11-25, #2155). Zooming keeps its own point.
+// While I walk, the view follows my chip (the cockpit is in front, so rarely).
 watch(
-	() => cam.tile.value,
-	(value) => value && props.me && !cam.isPlaced() && cam.place(props.me.x, props.me.y)
+	() => [tile.value * props.cols, tile.value * props.rows, cam.tile.value > 0],
+	([, , measured]) => measured && props.me && cam.place(props.me.x + 0.5, props.me.y + 0.5),
+	{ immediate: true }
 )
 watch(
 	() => props.me && [props.me.x, props.me.y],
@@ -445,32 +516,93 @@ function keepInView() {
 function startDrag(event) {
 	if (props.floatTarget || event.button !== 0) return
 	event.preventDefault()
-	drag = { x: event.clientX - pos.x, y: event.clientY - pos.y }
+	const box = root.value?.getBoundingClientRect()
+	drag = {
+		x: event.clientX - pos.x,
+		y: event.clientY - pos.y,
+		// Docked, it only comes out once the pointer really moves: a click on the header stays a click.
+		fromDock: isDocked.value,
+		// Hovering too: only a real move can dock it (AI review of !1337).
+		moved: false,
+		startX: event.clientX,
+		startY: event.clientY,
+		grip: box ? { x: event.clientX - box.left, y: event.clientY - box.top } : { x: 24, y: 12 },
+	}
 	grabbing.value = "grabbing"
 	window.addEventListener("pointermove", onDrag)
 	window.addEventListener("pointerup", endDrag, { once: true })
 }
 function onDrag(event) {
 	if (!drag) return
+	if (drag.fromDock) {
+		if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6) return
+		// Out of the dock, at its hovering size, with the header still under the pointer.
+		drag.fromDock = false
+		docked.value = false
+		drag.x = Math.min(drag.grip.x, size.w - 24)
+		drag.y = drag.grip.y
+	}
+	if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6) return
+	drag.moved = true
+	moving.value = true
 	pos.x = event.clientX - drag.x
 	pos.y = event.clientY - drag.y
 	keepInView()
 }
-function endDrag() {
+function endDrag(event) {
+	const moved = Boolean(drag?.moved)
 	drag = null
 	grabbing.value = ""
+	moving.value = false
 	window.removeEventListener("pointermove", onDrag)
+	// Let go in the corner: docked; anywhere else: it hovers there.
+	if (moved) setDocked(isOverCorner(event.clientX, event.clientY, viewport))
 	try {
 		localStorage.setItem(POS_KEY, JSON.stringify({ x: pos.x, y: pos.y }))
 	} catch {
 		// private window: the place lasts until the reload
 	}
 }
-window.addEventListener("resize", keepInView)
+function onWindowResize() {
+	viewport.w = window.innerWidth
+	viewport.h = window.innerHeight
+	keepInView()
+}
+window.addEventListener("resize", onWindowResize)
 onBeforeUnmount(() => {
-	window.removeEventListener("resize", keepInView)
+	window.removeEventListener("resize", onWindowResize)
 	window.removeEventListener("pointermove", onDrag)
 })
+
+// --- Walking from the mini map: with the pointer on it, the arrow keys, WASD and Space walk and
+// jump my chip, as on the big map. The keys go to the page that has the focus, so the mini map
+// takes it while the pointer is on it, and hands it back to the cockpit when the pointer leaves.
+// It never takes it from a field someone types in (in the cockpit or a reply here).
+
+function isEditable(el) {
+	if (!el) return false
+	const tag = el.tagName
+	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(el.isContentEditable)
+}
+/** The focused element, looking into the cockpit's frame (same site) when that has the focus. */
+function focusedField() {
+	const active = document.activeElement
+	if (active?.tagName !== "IFRAME") return active
+	try {
+		return active.contentDocument?.activeElement || active
+	} catch {
+		return active
+	}
+}
+function takeKeys() {
+	// In the floating window the keys go to that window; moving or resizing: leave it alone.
+	if (props.floatTarget || grabbing.value || !root.value || isEditable(focusedField())) return
+	root.value.focus({ preventScroll: true })
+}
+function giveKeysBack() {
+	if (props.floatTarget || document.activeElement !== root.value) return
+	emit("keys-back")
+}
 
 // --- Float: Document Picture-in-Picture, a small window on top of everything (Chrome, Edge,
 // newer Firefox; not Safari). The same element moves into it; closing it brings it back.
@@ -503,7 +635,20 @@ function toggle(part) {
 // The panel keeps its height while the call or the chat is open; folded, it fits what is left.
 const fixedHeight = computed(() => props.meeting && (open.video || open.chat))
 
-const panelStyle = computed(() => ({
+const panelStyle = computed(() => {
+	if (isDocked.value) {
+		// Held at the bottom: a new ping makes it grow upwards.
+		const box = corner.value
+		return {
+			left: `${box.left}px`,
+			bottom: `${box.bottom}px`,
+			width: `${box.width}px`,
+			...(box.height ? { height: `${box.height}px` } : { maxHeight: `${box.maxHeight}px` }),
+		}
+	}
+	return hoverStyle.value
+})
+const hoverStyle = computed(() => ({
 	left: `${pos.x}px`,
 	top: `${pos.y}px`,
 	width: `${size.w}px`,

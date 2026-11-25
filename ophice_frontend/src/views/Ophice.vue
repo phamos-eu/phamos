@@ -703,6 +703,7 @@
 			:meeting="Boolean(meetingArea)"
 			:float-target="pipBody"
 			@slots="(slots) => (dockRects = slots)"
+			@keys-back="giveKeysToCockpit"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -747,8 +748,9 @@ import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
-import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { areaUnder, isTyping, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
@@ -1279,15 +1281,13 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
-function isTyping(target) {
-	if (!target) return false
-	const tag = target.tagName
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
-}
 
 function onKeydown(event) {
 	shift = event.shiftKey
-	if (props.cockpitOpen) return
+	// Over a cockpit only walking and jumping (#2155). The keys reach this page as long as nobody
+	// clicked into the cockpit: right after a cockpit space opened it, or with the pointer on the
+	// mini map. So a cockpit space never locks me in; walking out of it brings the map back.
+	if (props.cockpitOpen && !isWalkKey(event, DIRECTIONS)) return
 	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
 	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
 		event.preventDefault()
@@ -1388,6 +1388,9 @@ function nearestInRange() {
 /** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
 function chatOnStop() {
 	joinAreaIfInside()
+	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
+	// other person can still start one, which the mini map pings.
+	if (props.cockpitOpen) return
 	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
@@ -2013,13 +2016,11 @@ function openCockpitSpace() {
 }
 
 /**
- * Open a cockpit (shortcut bar or cockpit space). Where the browser has it, the mini map goes
- * straight into its floating window, so it can be pulled out of the browser without a second click
- * (PM, 2026-11-22). The browser only allows that right after a click or key press; walking is key
- * presses, so stopping in a cockpit space still counts. Otherwise it stays over the cockpit.
+ * Open a cockpit (shortcut bar or cockpit space). The mini map stays in the page, docked in the
+ * cockpit's sidebar (#2155); since the call is embedded (#2108) it needs no window of its own.
+ * Its "Float" button still puts it on top of other windows.
  */
 function openCockpit(cockpit) {
-	if (canFloat && !pipBody.value && navigator.userActivation?.isActive) floatAll()
 	emit("open-cockpit", cockpit)
 }
 
@@ -2234,6 +2235,33 @@ watch(
 		if (pipBody.value) closeMeetingPip()
 	}
 )
+
+// Over a cockpit, walking from the mini map out of the area I stood in when the cockpit opened
+// takes me back to the map (PM, 2026-11-25, #2155). The keys stay held, so the chip walks on there.
+// Opened outside any area: walking keeps the cockpit. Opened by a reload of /open/..., my chip
+// and the areas arrive after the cockpit: the start area is taken once both are there.
+let cockpitArea = null
+watch(
+	() => (props.cockpitOpen && me.value && areas.value.length ? areas.value : null),
+	(loaded) => {
+		cockpitArea = loaded ? areaUnder(loaded, me.value)?.name || null : null
+	},
+	{ immediate: true }
+)
+watch(
+	() => me.value && [me.value.x, me.value.y],
+	() => {
+		if (!props.cockpitOpen || !walkedOut(cockpitArea, areas.value, me.value)) return
+		cockpitArea = null
+		emit("back-to-map")
+	}
+)
+
+// --- The mini map (#2155) hands the keyboard back when the pointer leaves it.
+/** The pointer left the mini map: the keyboard goes back to the cockpit page. */
+function giveKeysToCockpit() {
+	document.querySelector("iframe[data-ophice-frame]")?.focus()
+}
 
 const pipBody = ref(null)
 /** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
