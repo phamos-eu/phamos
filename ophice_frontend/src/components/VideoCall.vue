@@ -67,6 +67,8 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** Fill the parent's height instead of keeping 16:9 (meeting view, #2061). */
 	fill: { type: Boolean, default: false },
+	/** Start with mic and camera on (encounter call, #2108); meetings start with both off. */
+	startOn: { type: Boolean, default: false },
 })
 const emit = defineEmits(["joined", "toggled", "stolen"])
 
@@ -77,7 +79,8 @@ const quiet = ref(false)
 const quietTimer = setTimeout(() => (quiet.value = true), 8000)
 let api = null
 let disposed = false
-// Mic and camera start off (decision of 2026-11-21); Jitsi reports every change.
+// Mic and camera start off in meetings (decision of 2026-11-21) and on in an encounter call
+// (#2108); Jitsi reports every change.
 const ready = ref(false)
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
@@ -91,8 +94,8 @@ function onWindowBlur() {
 		else emit("stolen")
 	})
 }
-const audioMuted = ref(true)
-const videoMuted = ref(true)
+const audioMuted = ref(!props.startOn)
+const videoMuted = ref(!props.startOn)
 
 function toggle(command) {
 	api?.executeCommand(command)
@@ -133,8 +136,8 @@ onMounted(async () => {
 		height: "100%",
 		userInfo: { displayName: props.displayName },
 		configOverwrite: {
-			startWithAudioMuted: true,
-			startWithVideoMuted: true,
+			startWithAudioMuted: !props.startOn,
+			startWithVideoMuted: !props.startOn,
 			prejoinPageEnabled: false,
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
