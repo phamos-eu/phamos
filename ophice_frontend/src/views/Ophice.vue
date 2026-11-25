@@ -782,8 +782,6 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-// Chat (288) on the left of the call video (768 x 432), #2108.
-const BUBBLE_WIDTH_VIDEO = 1056
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -1597,8 +1595,8 @@ function setCallBox({ left, top, w, h }) {
 	top = Math.max(0, Math.min(freeH, top))
 	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
 }
-// Moved by its header, resized by its edges and corners; the call's frame ignores the pointer
-// meanwhile (else Jitsi takes the moves).
+// Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
+// pointer meanwhile (else Jitsi takes the moves).
 function startCallDrag(event, kind = "move") {
 	if (event.button !== 0) return
 	event.preventDefault()
@@ -1639,13 +1637,12 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	// With the video call the bubble is wider and about 200px taller (#2059).
-	const withVideo = bubble.user === videoUser.value && !bubble.inWindow
-	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	// Only the chat sits here; with the call the bubble is on the stage (callBubbleStyle, #2108).
+	const width = BUBBLE_WIDTH
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 520 : 270)) {
+	if (top * t < 270) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
