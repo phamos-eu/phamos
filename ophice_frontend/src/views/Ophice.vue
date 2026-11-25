@@ -1168,7 +1168,12 @@ const perimeterList = computed(() => {
 		x: chip.x,
 		y: chip.y,
 		mine: chip.mine,
-		contact: chips.some((o) => o.user !== chip.user && Math.hypot(o.x - chip.x, o.y - chip.y) < ENCOUNTER_DISTANCE),
+		// No contact in a space with a call: no encounter starts there.
+		contact:
+			!inCallArea(chip) &&
+			chips.some(
+				(o) => o.user !== chip.user && !inCallArea(o) && Math.hypot(o.x - chip.x, o.y - chip.y) < ENCOUNTER_DISTANCE
+			),
 	}))
 })
 
@@ -1368,10 +1373,12 @@ function onKeyup(event) {
 
 /** The nearest chip within the encounter distance, or null. */
 function nearestInRange() {
+	// A space with a call has its own call and chat: no encounters in it, from either side.
+	if (inCallArea(me.value)) return null
 	let best = null
 	for (const other of others.value) {
 		// Guests (#2082) talk in the guest area's chat and meeting, not in encounters.
-		if (other.offline || other.guest) continue
+		if (other.offline || other.guest || inCallArea(other)) continue
 		const distance = distanceTo(other)
 		if (distance < ENCOUNTER_DISTANCE && (!best || distance < best.distance)) best = { other, distance }
 	}
@@ -1871,7 +1878,7 @@ function onEncounterStarted(message) {
 		return
 	}
 	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
-	if (distanceTo(other) > PART_DISTANCE) return
+	if (distanceTo(other) > PART_DISTANCE || inCallArea(me.value) || inCallArea(other)) return
 	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
 }
@@ -1955,6 +1962,11 @@ function areaAt(chip) {
 				cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
 		) || null
 	)
+}
+
+/** Inside a meeting space with a call (Jitsi link): no encounters there, the space's call and chat collide with them. */
+function inCallArea(chip) {
+	return !!areaAt(chip)?.jitsi_room
 }
 
 // Who stands in which area, from the chips on the map (#2067): the sidebar groups and colours by it.
@@ -3048,7 +3060,7 @@ function pingWalkUp(other) {
 /** Someone stops next to my chip while I work in a cockpit. */
 function noticeWalkUp(other) {
 	if (!props.cockpitOpen || other.guest || other.offline || !me.value) return
-	const near = distanceTo(other) < ENCOUNTER_DISTANCE
+	const near = distanceTo(other) < ENCOUNTER_DISTANCE && !inCallArea(me.value) && !inCallArea(other)
 	if (near && !nearMe.has(other.user)) pingWalkUp(other)
 	if (near) nearMe.add(other.user)
 	else nearMe.delete(other.user)
