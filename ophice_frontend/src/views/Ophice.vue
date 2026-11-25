@@ -1784,7 +1784,8 @@ function onEncounterStarted(message) {
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
-		alertEncounter(other)
+		// Already chatting with them (the bubble stays open behind the cockpit): no alert.
+		if (!bubbles[other.user]) alertEncounter(other)
 		pingWalkUp(other)
 		return
 	}
