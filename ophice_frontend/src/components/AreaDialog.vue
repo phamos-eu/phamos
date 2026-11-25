@@ -50,7 +50,7 @@
 				<FormControl
 					v-model="url"
 					:label="kind === 'Cockpit' ? __('Jitsi meeting URL (optional)') : __('Jitsi meeting URL')"
-					placeholder="https://meet.jit.si/FullTimeDefencesRejectOverly"
+					placeholder="https://meet.systemli.org/FullTimeDefencesRejectOverly"
 				/>
 				<p class="text-xs text-ink-gray-5">
 					{{ __("Whoever stops inside the area joins this meeting, with microphone and camera on.") }}

@@ -209,7 +209,7 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {"ophice_jitsi_domain": None, "ophice_video": None}):
 			first = self._open(self.A, self.B)
 			again = self._open(self.B, self.A)
-			self.assertEqual(first["video"]["domain"], "meet.jit.si")
+			self.assertEqual(first["video"]["domain"], "meet.systemli.org")
 			self.assertRegex(first["video"]["room"], r"^ophice-[0-9a-f]{24}$")
 			self.assertEqual(again["video"], first["video"])
 		with patch.dict(frappe.conf, {"ophice_video": 0}):
@@ -487,11 +487,45 @@ class OphiceAreaTestCase(FrappeTestCase):
 		frappe.db.rollback()
 
 	def test_save_reads_the_room_from_the_url_and_shows_in_the_space(self):
-		name = ophice.save_area("Standup", " https://meet.jit.si/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
+		name = ophice.save_area("Standup", " https://meet.systemli.org/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
 		area = next(a for a in ophice.get_space()["areas"] if a.name == name)
-		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.jit.si", "FullTimeDefencesRejectOverly"))
+		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.systemli.org", "FullTimeDefencesRejectOverly"))
 		self.assertEqual((area.x, area.y, area.width, area.height), (2, 3, 4, 2))
-		self.assertEqual(area.meeting_url, "https://meet.jit.si/FullTimeDefencesRejectOverly")
+		self.assertEqual(area.meeting_url, "https://meet.systemli.org/FullTimeDefencesRejectOverly")
+
+	def test_an_old_meet_jit_si_link_keeps_its_room_on_the_site_server(self):
+		"""#2108: meet.jit.si links still work; only the server changes."""
+		name = ophice.save_area("Old link", "https://meet.jit.si/OurStandup", 2, 3, 4, 2)
+		area = frappe.get_doc("Ophice Area", name)
+		self.assertEqual((area.jitsi_domain, area.jitsi_room), ("meet.systemli.org", "OurStandup"))
+		self.assertEqual(area.meeting_url, "https://meet.systemli.org/OurStandup")
+
+	def test_patch_moves_areas_from_meet_jit_si_and_keeps_the_room(self):
+		"""#2108: existing areas on meet.jit.si move to the site's server, the room stays."""
+		from phamos.patches.v1_0 import ophice_areas_to_site_jitsi_server
+
+		# Room on the map for two areas; the site's own areas come back with the rollback.
+		frappe.db.delete("Ophice Area")
+		old = ophice.save_area("Before", "https://jitsi.example.org/KeptRoom", 2, 3, 4, 2)
+		other = ophice.save_area("Elsewhere", "https://jitsi.example.org/OtherRoom", 10, 3, 4, 2)
+		frappe.db.set_value(
+			"Ophice Area", old, {"jitsi_domain": "meet.jit.si", "meeting_url": "https://meet.jit.si/KeptRoom"}
+		)
+		ophice_areas_to_site_jitsi_server.execute()
+		moved = frappe.get_doc("Ophice Area", old)
+		self.assertEqual((moved.jitsi_domain, moved.jitsi_room), ("meet.systemli.org", "KeptRoom"))
+		self.assertEqual(moved.meeting_url, "https://meet.systemli.org/KeptRoom")
+		# Another allowed server is left alone.
+		self.assertEqual(frappe.db.get_value("Ophice Area", other, "jitsi_domain"), "jitsi.example.org")
+
+	def test_patch_leaves_meet_jit_si_where_the_site_allows_it(self):
+		from phamos.patches.v1_0 import ophice_areas_to_site_jitsi_server
+
+		name = ophice.save_area("Kept", "https://jitsi.example.org/StayRoom", 2, 3, 4, 2)
+		frappe.db.set_value("Ophice Area", name, "jitsi_domain", "meet.jit.si")
+		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "meet.jit.si"}):
+			ophice_areas_to_site_jitsi_server.execute()
+		self.assertEqual(frappe.db.get_value("Ophice Area", name, "jitsi_domain"), "meet.jit.si")
 
 	def test_only_allowed_jitsi_servers_and_proper_rooms(self):
 		self.assertEqual(ophice._parse_meeting_url("https://jitsi.example.org/Team_1"), ("jitsi.example.org", "Team_1"))
