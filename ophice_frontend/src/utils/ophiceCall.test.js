@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
@@ -9,6 +9,9 @@ import {
 	splitCall,
 	encounterCallWindowName,
 	jitsiCallUrl,
+	nextQualityLevel,
+	qualityLevel,
+	qualitySync,
 	resizeCall,
 } from "./ophiceCall.js"
 
@@ -137,5 +140,68 @@ describe("resizeCall", () => {
 	it("stops at the smallest size", () => {
 		const box = resizeCall(from, "e", -5000, 0, view)
 		expect(box.w).toBe(CALL_MIN_W)
+	})
+})
+
+describe("video quality", () => {
+	it("maps Jitsi values to our levels", () => {
+		expect(qualityLevel(2160)).toBe(720)
+		expect(qualityLevel(1080)).toBe(720)
+		expect(qualityLevel(360)).toBe(360)
+		expect(qualityLevel(0)).toBe(180)
+	})
+
+	it("steps up and wraps around", () => {
+		expect(nextQualityLevel(180)).toBe(360)
+		expect(nextQualityLevel(360)).toBe(720)
+		expect(nextQualityLevel(720)).toBe(180)
+		expect(nextQualityLevel(2160)).toBe(180)
+	})
+
+	describe("qualitySync", () => {
+		beforeEach(() => vi.useFakeTimers())
+		afterEach(() => vi.useRealTimers())
+
+		function setup() {
+			const sent = []
+			const shown = []
+			const sync = qualitySync((h) => sent.push(h), (h) => shown.push(h))
+			return { sent, shown, sync }
+		}
+
+		it("resends 180 until Jitsi confirms it, ignoring Jitsi's own start value", () => {
+			const { sent, shown, sync } = setup()
+			sync.reported(2160)
+			sync.start()
+			vi.advanceTimersByTime(1500)
+			expect(sent).toEqual([180, 180])
+			sync.reported(180)
+			vi.advanceTimersByTime(10000)
+			expect(sent).toEqual([180, 180])
+			expect(shown).toEqual([180])
+			// From now on Jitsi's toolbar counts.
+			sync.reported(720)
+			expect(shown).toEqual([180, 720])
+		})
+
+		it("gives up after five tries and shows what Jitsi runs at", () => {
+			const { sent, shown, sync } = setup()
+			sync.start()
+			sync.reported(2160)
+			vi.advanceTimersByTime(10000)
+			expect(sent).toEqual([180, 180, 180, 180, 180])
+			expect(shown).toEqual([2160])
+			sync.reported(360)
+			expect(shown).toEqual([2160, 360])
+		})
+
+		it("a click stops the retries and sends the chosen level", () => {
+			const { sent, shown, sync } = setup()
+			sync.start()
+			sync.choose(360)
+			vi.advanceTimersByTime(10000)
+			expect(sent).toEqual([180, 360])
+			expect(shown).toEqual([360])
+		})
 	})
 })
