@@ -1055,6 +1055,8 @@ class OphiceMeetingPinTestCase(_OphiceRoomBase):
 
 	def tearDown(self):
 		frappe.cache.delete_value(ophice.PIN_CACHE_KEY)
+		for user in (self.A, self.B):
+			frappe.cache.delete_value(ophice._pin_wait_key(user))
 		super().tearDown()
 
 	def _sent_to(self, event):
@@ -1068,8 +1070,12 @@ class OphiceMeetingPinTestCase(_OphiceRoomBase):
 		self.assertEqual(sorted(self._sent_to(ophice.EVENT_PIN)), sorted([self.A, self.B]))
 		frappe.set_user(self.B)
 		self.assertEqual([p["by"] for p in ophice.get_space()["pins"]], [self.A])
-		# A new one replaces the old one; removing it tells everyone.
+		# Right away again: wait a moment (each pin notifies everyone in it; AI review of !1303).
 		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_meeting_pin([self.B], 3, 3)
+		# A new one replaces the old one; removing it tells everyone.
+		frappe.cache.delete_value(ophice._pin_wait_key(self.A))
 		ophice.set_meeting_pin([self.B], 3, 3)
 		self.assertEqual(len(ophice._pins()), 1)
 		ophice.remove_meeting_pin()

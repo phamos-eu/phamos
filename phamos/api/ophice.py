@@ -522,6 +522,8 @@ def leave(x=None, y=None):
 PIN_CACHE_KEY = "phamos_ophice_pins"
 PIN_TTL = 10 * 60
 PIN_MAX_PEOPLE = 50
+# Each pin notifies up to PIN_MAX_PEOPLE people; a short wait keeps a script from flooding them.
+PIN_WAIT_SECONDS = 2
 EVENT_PIN = "ophice_pin"
 EVENT_PIN_REMOVED = "ophice_pin_removed"
 
@@ -539,6 +541,10 @@ def _pins():
 	return pins
 
 
+def _pin_wait_key(user):
+	return f"phamos_ophice_pin_wait:{user}"
+
+
 def _my_pins(user):
 	return [pin for pin in _pins().values() if user in pin.get("users", [])]
 
@@ -552,15 +558,21 @@ def set_meeting_pin(users, x, y):
 		users = frappe.parse_json(users)
 	if not isinstance(users, list):
 		frappe.throw(_("Choose the people to meet."))
+	if frappe.cache.get_value(_pin_wait_key(me)):
+		frappe.throw(_("A meeting point was just set. Please wait a moment."))
 	wanted = list(dict.fromkeys(u for u in users if isinstance(u, str) and u != me))[:PIN_MAX_PEOPLE]
 	# Only System Users can see the map (and get realtime events); guests have their own invite (#2084).
-	people = []
-	for user in wanted:
-		row = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
-		if row and row.enabled and row.user_type == "System User":
-			people.append(user)
+	allowed = set(
+		frappe.get_all(
+			"User",
+			filters={"name": ["in", wanted or [""]], "enabled": 1, "user_type": "System User"},
+			pluck="name",
+		)
+	)
+	people = [user for user in wanted if user in allowed]
 	if not people:
 		frappe.throw(_("Choose the people to meet."))
+	frappe.cache.set_value(_pin_wait_key(me), 1, expires_in_sec=PIN_WAIT_SECONDS)
 	_remove_pin(me)
 	pin = {
 		"by": me,

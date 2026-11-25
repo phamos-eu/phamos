@@ -582,30 +582,30 @@
 					:tile="tile"
 					:ratio="backgroundRatio"
 					@change="(place) => setLayout({ fit: false, ...place })"
-					/>
-				</div>
-					<!--
-					Off the visible map (PM, 2026-11-22, 2026-11-23): a marker at the edge for everyone, in
-					their direction, smaller the farther away; the selected and meeting points glow. A click
-					looks there.
-					-->
-					<div
-						v-for="marker in edgeMarkers"
-						:key="marker.key"
-						class="ophice-edge-at absolute"
-						:style="{ left: `${marker.x}px`, top: `${marker.y}px`, transform: `scale(${marker.scale})` }"
-					>
-					<button
-						type="button"
-						class="ophice-edge"
-						:class="{ 'ophice-edge--pin': marker.kind === 'pin', 'ophice-edge--picked': marker.picked }"
-						:style="{ '--pin-hue': marker.hue, '--ring-hue': marker.kind === 'person' ? ringHue(marker.items[0].person.user) : 0 }"
-						:title="marker.title"
-						:data-scale="marker.scale.toFixed(2)"
-						data-no-pan
-						data-testid="edge-marker"
-						@click.stop="lookAt(marker.items[0])"
-					>
+				/>
+			</div>
+			<!--
+				Off the visible map (PM, 2026-11-22, 2026-11-23): a marker at the edge for everyone, in
+				their direction, smaller the farther away; the selected and meeting points glow. A click
+				looks there.
+			-->
+			<div
+				v-for="marker in edgeMarkers"
+				:key="marker.key"
+				class="ophice-edge-at absolute"
+				:style="{ left: `${marker.x}px`, top: `${marker.y}px`, transform: `scale(${marker.scale})` }"
+			>
+				<button
+					type="button"
+					class="ophice-edge"
+					:class="{ 'ophice-edge--pin': marker.kind === 'pin', 'ophice-edge--picked': marker.picked }"
+					:style="{ '--pin-hue': marker.hue, '--ring-hue': marker.kind === 'person' ? ringHue(marker.items[0].person.user) : 0 }"
+					:title="marker.title"
+					:data-scale="marker.scale.toFixed(2)"
+					data-no-pan
+					data-testid="edge-marker"
+					@click.stop="lookAt(marker.items[0])"
+				>
 					<span class="ophice-edge__arrow" :style="{ transform: `rotate(${marker.angle}deg)` }" aria-hidden="true" />
 					<span class="ophice-edge__face">
 						<FeatherIcon v-if="marker.kind === 'pin'" name="map-pin" class="h-4 w-4" />
@@ -619,8 +619,8 @@
 					</span>
 					<span v-if="marker.items.length > 1" class="ophice-edge__count">{{ marker.items.length }}</span>
 				</button>
-				</div>
-				<!-- A small map switches on a double click (#2091); a faint hint says so. -->
+			</div>
+			<!-- A small map switches on a double click (#2091); a faint hint says so. -->
 			<div
 				v-if="inTiles"
 				class="ophice-switch-hint pointer-events-none absolute inset-x-0 bottom-2 z-30 text-center"
@@ -1402,7 +1402,8 @@ function reopenDismissed() {
 
 // Leaving the window drops every held key, or the chip would keep sailing.
 function releaseAll() {
-	stopTravel()
+	// A flight comes down where it is, like on a key (AI review of !1303).
+	stopTravel(true)
 	held.clear()
 	heldCount.value = 0
 	tapped.clear()
@@ -2584,8 +2585,8 @@ async function placePin(event) {
 	const y = (event.clientY - box.top - cam.pan.y - cam.origin.value.y) / cam.tile.value - 0.5
 	try {
 		upsertPin(await call(`${API}.set_meeting_pin`, { users, x: round(x), y: round(y) }))
-	} catch {
-		toast({ title: __("The meeting point could not be set."), icon: "alert-triangle" })
+	} catch (e) {
+		toast.error(errorText(e) || __("The meeting point could not be set."))
 	}
 }
 
@@ -2928,6 +2929,7 @@ function heartbeat() {
 
 // On tab close the component never unmounts: tell the server with a request that outlives the page.
 function leaveOnPagehide() {
+	stopTravel()
 	// Ophice closes: the call in its own window ends with it.
 	if (poppedOut.value) closeMeetingWindow()
 	try {
@@ -3347,6 +3349,8 @@ onBeforeUnmount(() => {
 	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)
+	// A flight still running would send moves after the leave (AI review of !1303).
+	stopTravel()
 	if (me.value) call(`${API}.leave`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
 	if (frame) cancelAnimationFrame(frame)
 	resizeObserver?.disconnect()
