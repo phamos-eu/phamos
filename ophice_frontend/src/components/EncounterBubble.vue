@@ -5,7 +5,7 @@
 		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="inCall ? 'w-[66rem]' : 'w-72'"
+		:class="inCall ? (movable ? '' : 'w-[66rem]') : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
@@ -87,17 +87,31 @@
 			</div>
 
 			<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
-			<VideoCall
-				v-if="inCall"
-				class="min-w-0 flex-1 rounded-br-xl"
-				:class="{ 'pointer-events-none': dragging }"
-				:domain="video.domain"
-				:room="video.room"
-				:display-name="displayName"
-				@joined="keepChatFocus"
-				@stolen="keepChatFocus"
-				@toggled="input?.focus()"
-			/>
+			<!-- Smooth edges (#2108): the video sits inset, with round corners. -->
+			<div v-if="inCall" class="min-w-0 flex-1 p-2">
+				<VideoCall
+					class="rounded-lg"
+					:class="{ 'pointer-events-none': dragging }"
+					:domain="video.domain"
+					:room="video.room"
+					:display-name="displayName"
+					@joined="keepChatFocus"
+					@stolen="keepChatFocus"
+					@toggled="input?.focus()"
+				/>
+			</div>
+		</div>
+		<!-- Resize by the bottom right corner (#2108); the parent keeps the size. -->
+		<div
+			v-if="movable"
+			class="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-nwse-resize"
+			:title="__('Drag to resize')"
+			data-testid="call-resize"
+			@pointerdown.stop="emit('resize-start', $event)"
+		>
+			<svg viewBox="0 0 16 16" class="h-4 w-4 text-ink-gray-5" aria-hidden="true">
+				<path d="M14 6 6 14M14 10l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" />
+			</svg>
 		</div>
 	</div>
 </template>
@@ -129,7 +143,7 @@ const props = defineProps({
 	/** A drag is on: the call's frame must not take the pointer. */
 	dragging: { type: Boolean, default: false },
 })
-const emit = defineEmits(["send", "close", "call", "move-start"])
+const emit = defineEmits(["send", "close", "call", "move-start", "resize-start"])
 
 function onHeaderDown(event) {
 	if (!props.movable || event.target.closest("button")) return
