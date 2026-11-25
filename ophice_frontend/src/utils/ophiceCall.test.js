@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
+	CALL_HEADER,
 	CALL_MIN_W,
 	JITSI_TOOLBAR_BUTTONS,
 	callBox,
 	callMaxHeight,
+	splitCall,
 	encounterCallWindowName,
 	jitsiCallUrl,
 	nextQualityLevel,
@@ -79,13 +81,47 @@ describe("callBox", () => {
 	it("never lets the video get wider than 16:9; the chat takes the rest", () => {
 		const box = callBox({ w: 2000, h: CALL_DEFAULT.h }, big)
 		expect(box.videoW).toBe(768)
-		expect(box.chatW).toBe(2000 - 1 - 16 - 41 - 768)
+		expect(box.chatW).toBe(2000 - 1 - 16 - 768)
+	})
+
+	it("has room for the top bar above the video (#2135)", () => {
+		const box = callBox(null, big)
+		expect(box.h - box.videoH).toBe(CALL_HEADER + 16)
+	})
+
+	it("a wider chat narrows the video, but not below 1:1 (#2135)", () => {
+		const box = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 400 }, big)
+		expect(box.chatW).toBe(400)
+		expect(box.videoW).toBe(CALL_DEFAULT.w - 17 - 400)
+		const most = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 900 }, big)
+		expect(most.videoW).toBe(432) // square
+		expect(most.chatW).toBe(CALL_DEFAULT.w - 17 - 432)
+	})
+
+	it("a narrower chat than the 16:9 video leaves stays at what is left", () => {
+		const box = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 150 }, big)
+		expect(box.videoW).toBe(768)
+		expect(box.chatW).toBe(288)
 	})
 
 	it("stays inside the stage", () => {
 		const box = callBox({ w: 2000, h: 1200 }, { width: 900, height: 500 })
 		expect(box.w).toBeLessThanOrEqual(900)
 		expect(box.h).toBeLessThanOrEqual(500)
+	})
+})
+
+describe("splitCall", () => {
+	const big = { width: 3000, height: 2000 }
+	const size = { w: CALL_DEFAULT.w, h: CALL_DEFAULT.h }
+
+	it("moves the line between chat and video", () => {
+		expect(splitCall(size, 288, -50, big)).toBe(288) // the video is already 16:9
+		expect(splitCall(size, 288, 100, big)).toBe(388)
+	})
+
+	it("stores the 1:1 limit, not the overshoot", () => {
+		expect(splitCall(size, 288, 2000, big)).toBe(CALL_DEFAULT.w - 17 - 432)
 	})
 })
 
