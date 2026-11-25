@@ -24,6 +24,11 @@ export function jitsiCallUrl(video, displayName = "") {
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
 }
 
+// Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is
+// screen sharing: always there, for everyone (#2136). No "videoquality" (Jitsi's performance
+// settings): our own quality button in the call's bar does that.
+export const JITSI_TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "tileview", "hangup"]
+
 /** Window name of the call: opening it again brings the same window back. */
 export function encounterCallWindowName(video) {
 	return `ophice-call-${String(video?.room || "").replace(/[^A-Za-z0-9_-]/g, "")}`

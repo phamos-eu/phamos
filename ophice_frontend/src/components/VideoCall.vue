@@ -70,7 +70,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { QUALITY_LEVELS, nextQualityLevel, qualityLevel, qualitySync } from "../utils/ophiceCall.js"
+import { JITSI_TOOLBAR_BUTTONS, QUALITY_LEVELS, nextQualityLevel, qualityLevel, qualitySync } from "../utils/ophiceCall.js"
 
 const props = defineProps({
 	/** Jitsi host, for example meet.jit.si */
@@ -172,7 +172,7 @@ onMounted(async () => {
 			prejoinPageEnabled: false,
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
-			toolbarButtons: ["microphone", "camera", "videoquality", "tileview", "hangup"],
+			toolbarButtons: JITSI_TOOLBAR_BUTTONS,
 			toolbarConfig: { alwaysVisible: true },
 		},
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
