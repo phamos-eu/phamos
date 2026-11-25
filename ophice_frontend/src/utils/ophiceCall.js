@@ -1,13 +1,12 @@
-// The encounter call in its own browser window (#2108). meet.jit.si ends embedded calls after
-// 5 minutes; opened as its own page it is a normal Jitsi call without that cap.
+// A Jitsi call in its own browser window: encounter calls and meeting areas (#2108, #2078).
 
 /**
  * Address of the call page: the room on its Jitsi host, with my name filled in.
- * @param {{ domain: string, room: string }} video  the encounter's call, from open_encounter
+ * @param {{ domain: string, room: string }} video  the call: an encounter's (open_encounter) or an area's
  * @param {string} displayName  my name in the call
  * @returns {string} the URL, or "" without a call
  */
-export function encounterCallUrl(video, displayName = "") {
+export function jitsiCallUrl(video, displayName = "") {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""

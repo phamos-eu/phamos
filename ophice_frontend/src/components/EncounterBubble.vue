@@ -5,7 +5,7 @@
 		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="video && !inWindow ? 'w-96' : 'w-72'"
+		:class="inCall ? 'w-[66rem]' : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
@@ -36,48 +36,62 @@
 			</button>
 		</header>
 
-		<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
-		<VideoCall
-			v-if="video && !inWindow"
-			:domain="video.domain"
-			:room="video.room"
-			:display-name="displayName"
-			start-on
-			@joined="keepChatFocus"
-			@stolen="keepChatFocus"
-			@toggled="input?.focus()"
-		/>
+		<!-- With the call (#2108): the chat on the left, the video twice the old size on the right. -->
+		<div class="flex min-h-0" :class="inCall ? 'flex-row' : 'flex-col'">
+			<div class="flex min-h-0 flex-col" :class="inCall ? 'w-72 flex-shrink-0 border-r border-outline-gray-2' : ''">
+				<div
+					ref="list"
+					class="min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm"
+					:class="inCall ? 'flex-1' : 'max-h-48'"
+				>
+					<p v-if="loading" class="text-ink-gray-5">
+						{{ __("Opening the chat…") }}
+					</p>
+					<p v-else-if="error" class="text-ink-red-4">{{ error }}</p>
+					<p v-else-if="!messages.length" class="text-ink-gray-5">
+						{{ __("Say hello to {0}.", [firstName]) }}
+					</p>
+					<div
+						v-for="message in messages"
+						:key="message.name"
+						class="flex"
+						:class="message.owner === me ? 'justify-end' : 'justify-start'"
+					>
+						<span
+							class="max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5"
+							:class="message.owner === me ? 'bg-surface-gray-4' : 'bg-surface-gray-2'"
+							>{{ message.text }}</span
+						>
+					</div>
+				</div>
 
-		<div ref="list" class="max-h-48 min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm">
-			<p v-if="loading" class="text-ink-gray-5">{{ __("Opening the chat…") }}</p>
-			<p v-else-if="error" class="text-ink-red-4">{{ error }}</p>
-			<p v-else-if="!messages.length" class="text-ink-gray-5">{{ __("Say hello to {0}.", [firstName]) }}</p>
-			<div
-				v-for="message in messages"
-				:key="message.name"
-				class="flex"
-				:class="message.owner === me ? 'justify-end' : 'justify-start'"
-			>
-				<span
-					class="max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5"
-					:class="message.owner === me ? 'bg-surface-gray-4' : 'bg-surface-gray-2'"
-				>{{ message.text }}</span>
+				<form v-if="!error && !loading" class="border-t border-outline-gray-2 p-2" @submit.prevent="send">
+					<input
+						ref="input"
+						v-model="draft"
+						type="text"
+						class="w-full rounded-md border-0 bg-surface-gray-2 px-2.5 py-1.5 text-sm text-ink-gray-9 placeholder-ink-gray-5 focus:ring-2 focus:ring-outline-gray-3"
+						:placeholder="__('Write to {0}, Enter to send', [firstName])"
+						:maxlength="2000"
+						:aria-busy="sending || undefined"
+						@keydown="onInputKeydown"
+						@focus="chatActive = true"
+					/>
+				</form>
 			</div>
-		</div>
 
-		<form v-if="!error && !loading" class="border-t border-outline-gray-2 p-2" @submit.prevent="send">
-			<input
-				ref="input"
-				v-model="draft"
-				type="text"
-				class="w-full rounded-md border-0 bg-surface-gray-2 px-2.5 py-1.5 text-sm text-ink-gray-9 placeholder-ink-gray-5 focus:ring-2 focus:ring-outline-gray-3"
-				:placeholder="__('Write to {0}, Enter to send', [firstName])"
-				:maxlength="2000"
-				:aria-busy="sending || undefined"
-				@keydown="onInputKeydown"
-				@focus="chatActive = true"
+			<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
+			<VideoCall
+				v-if="inCall"
+				class="min-w-0 flex-1 rounded-br-xl"
+				:domain="video.domain"
+				:room="video.room"
+				:display-name="displayName"
+				@joined="keepChatFocus"
+				@stolen="keepChatFocus"
+				@toggled="input?.focus()"
 			/>
-		</form>
+		</div>
 	</div>
 </template>
 
@@ -109,6 +123,8 @@ const emit = defineEmits(["send", "close", "call"])
 const draft = ref("")
 const list = ref(null)
 const input = ref(null)
+// The call shows here unless it moved into its own window.
+const inCall = computed(() => !!props.video && !props.inWindow)
 const firstName = computed(() => (props.peer.full_name || "").split(" ")[0] || props.peer.full_name)
 
 // Never disabled while sending: a disabled field drops the focus, and the next message should
@@ -133,7 +149,7 @@ watch(
 		await nextTick()
 		if (list.value) list.value.scrollTop = list.value.scrollHeight
 	},
-	{ immediate: true }
+	{ immediate: true },
 )
 
 // Jitsi's frame may take the focus by itself (on load, on join). Give it back: to the chat if

@@ -666,7 +666,7 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
-import { encounterCallUrl, encounterCallWindowName } from "../utils/ophiceCall.js"
+import { jitsiCallUrl, encounterCallWindowName } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -755,7 +755,8 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 384
+// Chat (288) on the left of the call video (768 x 432), #2108.
+const BUBBLE_WIDTH_VIDEO = 1056
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -1495,7 +1496,7 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = encounterCallUrl(bubble.video, me.value?.full_name || "")
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1849,7 +1850,9 @@ let windowWatch = null
 function popOut() {
 	const area = meetingArea.value
 	if (!area) return
-	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
+	// Straight in, mic and camera on, my name filled in (#2108).
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
+	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
 		meetingWindow.focus()

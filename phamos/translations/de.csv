@@ -2731,7 +2731,7 @@ Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
-"Whoever stops inside the area joins this meeting, with microphone and camera off.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit ausgeschaltetem Mikrofon und ausgeschalteter Kamera."
+"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
 The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
 The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
