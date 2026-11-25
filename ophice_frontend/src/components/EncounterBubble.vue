@@ -10,7 +10,13 @@
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
 	>
-		<header class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
+		<!-- With the call it can be moved by its header (#2108); the parent keeps the place. -->
+		<header
+			class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2"
+			:class="{ 'cursor-move select-none': movable }"
+			:title="movable ? __('Drag to move') : undefined"
+			@pointerdown="onHeaderDown"
+		>
 			<UserAvatar :name="peer.user" :label="peer.full_name" :image="peer.user_image" size="xs" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ peer.full_name }}</span>
 			<!-- The call can move into its own Jitsi window (#2108): bigger, and no cap when the
@@ -84,6 +90,7 @@
 			<VideoCall
 				v-if="inCall"
 				class="min-w-0 flex-1 rounded-br-xl"
+				:class="{ 'pointer-events-none': dragging }"
 				:domain="video.domain"
 				:room="video.room"
 				:display-name="displayName"
@@ -117,8 +124,17 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** The call runs in its own window (#2108): no embedded call here. */
 	inWindow: { type: Boolean, default: false },
+	/** The header drags it (with the call, #2108). */
+	movable: { type: Boolean, default: false },
+	/** A drag is on: the call's frame must not take the pointer. */
+	dragging: { type: Boolean, default: false },
 })
-const emit = defineEmits(["send", "close", "call"])
+const emit = defineEmits(["send", "close", "call", "move-start"])
+
+function onHeaderDown(event) {
+	if (!props.movable || event.target.closest("button")) return
+	emit("move-start", event)
+}
 
 const draft = ref("")
 const list = ref(null)

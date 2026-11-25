@@ -118,7 +118,11 @@
 			@pick="(person, event) => openChatWith(person, event)"
 			@hide="setHideDetails"
 		/>
-		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<div
+			id="ophice-stage"
+			ref="stage"
+			class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
+		>
 			<!--
 				Adjust (#2058, #2089): the image in grid tiles (drag it on the map, or nudge it here), the
 				grid's size, and everyone's starting zoom. Top left; everyone sees the changes.
@@ -428,26 +432,40 @@
 						/>
 					</span>
 				</div>
-				<EncounterBubble
+				<!-- With the call (#2108) the bubble leaves the map: it sits on the stage where the user
+				     last dragged it, and the map can move below it. -->
+				<Teleport
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
-					:ref="(el) => setBubbleRef(bubble.user, el)"
-					:peer="bubble.peer"
-					:me="me.user"
-					:messages="bubble.messages"
-					:loading="bubble.loading"
-					:error="bubble.error"
-					:sending="bubble.sending"
-					:video="bubble.user === videoUser ? bubble.video : null"
-					:display-name="me.full_name"
-					:in-window="!!bubble.inWindow"
-					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
-					data-no-pan
-					@pointerdown.capture="raise(`chat:${bubble.user}`)"
-					@send="(text, done) => sendMessage(bubble, text, done)"
-					@close="closeBubble(bubble.user)"
-					@call="openEncounterCall(bubble)"
-				/>
+					to="#ophice-stage"
+					:disabled="!isCallBubble(bubble)"
+					defer
+				>
+					<EncounterBubble
+						:ref="(el) => setBubbleRef(bubble.user, el)"
+						:peer="bubble.peer"
+						:me="me.user"
+						:messages="bubble.messages"
+						:loading="bubble.loading"
+						:error="bubble.error"
+						:sending="bubble.sending"
+						:video="bubble.user === videoUser ? bubble.video : null"
+						:display-name="me.full_name"
+						:in-window="!!bubble.inWindow"
+						:movable="isCallBubble(bubble)"
+						:dragging="callDrag !== null"
+						:style="{
+							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
+							zIndex: zOf(`chat:${bubble.user}`),
+						}"
+						data-no-pan
+						@pointerdown.capture="raise(`chat:${bubble.user}`)"
+						@send="(text, done) => sendMessage(bubble, text, done)"
+						@close="closeBubble(bubble.user)"
+						@call="openEncounterCall(bubble)"
+						@move-start="startCallDrag"
+					/>
+				</Teleport>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
@@ -1517,6 +1535,72 @@ function openEncounterCall(bubble) {
 	}
 	callWindows[name] = win
 	bubble.inWindow = true
+}
+
+// The bubble with the embedded call (#2108): on the stage, where this user last put it. Kept per
+// browser and user, like the meeting window's place; as share of the free room, so it stays
+// inside the stage at every window size. Default: centred at the top.
+const CALL_POS_KEY = "phamos_ophice_call_pos"
+const CALL_BUBBLE_HEIGHT = 476
+const callPos = ref({ x: 0.5, y: 0 })
+const callDrag = ref(null)
+function isCallBubble(bubble) {
+	return bubble.user === videoUser.value && !!bubble.video && !bubble.inWindow
+}
+function callPosKey() {
+	return `${CALL_POS_KEY}:${me.value?.user || ""}`
+}
+watch(
+	() => me.value?.user,
+	(user) => {
+		if (!user) return
+		try {
+			const pos = JSON.parse(localStorage.getItem(callPosKey()) || "null")
+			if (pos && [pos.x, pos.y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) callPos.value = pos
+		} catch {
+			// private window: the default place
+		}
+	},
+	{ immediate: true }
+)
+function callFree() {
+	return {
+		w: Math.max(0, view.width - BUBBLE_WIDTH_VIDEO),
+		h: Math.max(0, view.height - CALL_BUBBLE_HEIGHT),
+	}
+}
+function callBubbleStyle() {
+	const free = callFree()
+	return { left: `${callPos.value.x * free.w}px`, top: `${callPos.value.y * free.h}px` }
+}
+// Dragged by its header; the call's frame ignores the pointer meanwhile (else Jitsi takes the moves).
+function startCallDrag(event) {
+	if (event.button !== 0) return
+	event.preventDefault()
+	const free = callFree()
+	callDrag.value = { x: event.clientX, y: event.clientY, left: callPos.value.x * free.w, top: callPos.value.y * free.h }
+	window.addEventListener("pointermove", moveCall)
+	window.addEventListener("pointerup", stopCallDrag)
+	window.addEventListener("pointercancel", stopCallDrag)
+}
+function moveCall(event) {
+	const drag = callDrag.value
+	if (!drag) return
+	const free = callFree()
+	const left = Math.max(0, Math.min(free.w, drag.left + event.clientX - drag.x))
+	const top = Math.max(0, Math.min(free.h, drag.top + event.clientY - drag.y))
+	callPos.value = { x: free.w ? left / free.w : 0.5, y: free.h ? top / free.h : 0 }
+}
+function stopCallDrag() {
+	callDrag.value = null
+	window.removeEventListener("pointermove", moveCall)
+	window.removeEventListener("pointerup", stopCallDrag)
+	window.removeEventListener("pointercancel", stopCallDrag)
+	try {
+		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
+	} catch {
+		// private window: the place lasts until the reload
+	}
 }
 
 function setBubbleRef(user, el) {
