@@ -3027,3 +3027,15 @@ Send out of Ophice,Aus dem Ophice schicken
 Call window,Anruffenster
 Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
 Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
+Test settings,Testeinstellungen
+Remove background,Hintergrund entfernen
+Unfold the sidebar: names and descriptions,Seitenleiste aufklappen: Namen und Beschreibungen
+Fold the sidebar to icons,Seitenleiste auf Symbole zuklappen
+"Be right back, or away until a time. Shown above your chip.","Gleich zurück, oder abwesend bis zu einer Uhrzeit. Wird über Ihrem Chip angezeigt."
+Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröße von Ophice und den Cockpits darin. Die Karte hat ihren eigenen Zoom.
+"Drag on the map to draw an area, click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Upload an image as the background of Ophice, for everyone.","Ein Bild als Hintergrund von Ophice hochladen, für alle."
+"Size and position of the background image, the grid's size and everyone's starting zoom.","Größe und Position des Hintergrundbilds, die Größe des Rasters und der Start-Zoom für alle."
+"Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
+"Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
+Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
