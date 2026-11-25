@@ -138,6 +138,24 @@ class TestTestResults(PhriendCase):
 		self.assertIn("403", result["status_error"])
 		self.assertTrue(result["web_url"].endswith("#note_6"))
 
+	@patch("phamos.phriend.api.requests.post")
+	@patch("phamos.phriend.api.requests.get")
+	def test_issues_in_other_projects_are_refused(self, get, post, _enqueue):
+		for ref in ("demo/app#7", "https://git.example.com/other/private/-/issues/7"):
+			with self.assertRaises(frappe.ValidationError):
+				api.add_test_evidence(gitlab_issue=ref, result="Passed")
+		get.assert_not_called()  # GitLab is never asked: no hint whether the issue exists
+		post.assert_not_called()
+
+	def test_the_page_line_cannot_inject_markdown(self, _enqueue):
+		md = api._page_markdown("x`](javascript:alert(1))\n# boom", "javascript:alert(1)")
+		self.assertNotIn("](", md)
+		self.assertNotIn("\n", md)
+		self.assertEqual(md.count("`"), 2)
+		md = api._page_markdown("app/issue", "http://site/app/issue?x=a)b](evil) c")
+		self.assertTrue(md.startswith("[app/issue](http://site/app/issue?x=a%29b%5D%28evil%29%20c)"))
+		self.assertEqual(api._page_markdown("", ""), "-")
+
 	def test_unknown_status_labels_are_refused(self, _enqueue):
 		with self.assertRaises(frappe.ValidationError):
 			api.add_test_evidence(gitlab_issue="#1", result="Passed", status="Done; drop table")
@@ -223,6 +241,20 @@ class TestTestingOnProductionBadge(PhriendCase):
 	def test_a_gitlab_failure_hides_the_badge_and_breaks_nothing(self, get, _enqueue):
 		self.gitlab_answers(get, status=403)
 		self.assertEqual(api.get_testing_on_production(ref_doctype="Sales Invoice")["count"], 0)
+
+	@patch("phamos.phriend.api.requests.get")
+	def test_no_badge_for_website_users(self, get, _enqueue):
+		self.set_settings(allowed_role=None)
+		user = "phriend-badge-website@example.com"
+		if not frappe.db.exists("User", user):
+			frappe.get_doc({
+				"doctype": "User", "email": user, "first_name": "Web", "user_type": "Website User",
+				"send_welcome_email": 0,
+			}).insert(ignore_permissions=True)
+		frappe.set_user(user)
+		with patch("phamos.phriend.api.is_for_user", return_value=True):
+			self.assertEqual(api.get_testing_on_production(ref_doctype="Sales Invoice")["count"], 0)
+		get.assert_not_called()
 
 	@patch("phamos.phriend.api.requests.get")
 	def test_no_badge_for_people_without_phriend(self, get, _enqueue):

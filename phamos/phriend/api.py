@@ -507,7 +507,7 @@ def get_testing_on_production(route=None, ref_doctype=None, ref_docname=None):
 	count 0 hides the badge.
 	"""
 	empty = {"count": 0, "url": None, "about": None, "color": None}
-	if not is_for_user():
+	if not _is_tester():  # staff only: portal users never make the server ask GitLab
 		return empty
 	about = _testing_search_term(route, ref_doctype)
 	if not about:
@@ -964,7 +964,11 @@ def add_test_evidence(
 	if status and status not in STATUS_LABELS:
 		frappe.throw(_("{0} is not a status label.").format(escape_html(status)))
 	base, headers = _gitlab(settings)
-	project, iid = _parse_gitlab_reference(gitlab_issue, base, settings.gitlab_project or DEFAULT_GITLAB_PROJECT)
+	configured = cstr(settings.gitlab_project or DEFAULT_GITLAB_PROJECT).strip("/")
+	project, iid = _parse_gitlab_reference(gitlab_issue, base, configured)
+	# the shared token may reach more projects than the tester may: only the configured one
+	if project.strip("/").lower() != configured.lower():
+		frappe.throw(_("Test results can only be posted to issues in {0}.").format(escape_html(configured)))
 	api = _project_api(base, project)
 
 	response = requests.get(f"{api}/issues/{iid}", headers=headers, timeout=TIMEOUT)
@@ -1044,9 +1048,8 @@ def _test_markdown(result, title, comment, route, page_url, context, screenshot_
 	elif shot_problem:
 		lines += [f"_The screenshot could not be added: {shot_problem}_", ""]
 
-	where = f"[{route or page_url}]({page_url})" if page_url else f"`{route}`" if route else "-"
 	lines += [
-		f"- Page: {where}",
+		f"- Page: {_page_markdown(route, page_url)}",
 		f"- Tested by: {_full_name(frappe.session.user)}",
 		f"- Site: {get_url()}",
 		"",
@@ -1055,6 +1058,18 @@ def _test_markdown(result, title, comment, route, page_url, context, screenshot_
 		lines += ["<details><summary>Captured context</summary>", "", "```json", context, "```", "", "</details>", ""]
 	lines.append("_Captured with Phriend_")
 	return "\n".join(lines)
+
+
+def _page_markdown(route, page_url):
+	"""The page line of a test result. route and page_url come from the browser: only an http(s)
+	link is linked, percent-encoded so it can't close the link, and the route loses every character
+	that could end the link text or the code span."""
+	route = re.sub(r"[`\[\]()<>\s]+", " ", cstr(route)).strip()[:200]
+	url = cstr(page_url).strip()
+	if urlparse(url).scheme in ("http", "https"):
+		url = quote(url, safe=":/?#@!$&'*+,;=%~")
+		return f"[{route or url}]({url})"
+	return f"`{route}`" if route else "-"
 
 
 def _issue_markdown(report, screenshot_md):
