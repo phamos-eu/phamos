@@ -30,6 +30,18 @@
 					<span class="text-sm font-semibold">A+</span>
 				</button>
 			</div>
+			<!-- Encounter alert (#2135): asks for browser notifications, mutes chime and notification. -->
+			<Button
+				v-if="me"
+				variant="subtle"
+				:title="bellTitle"
+				:aria-label="bellTitle"
+				:aria-pressed="bell !== 'muted'"
+				data-testid="encounter-bell"
+				@click="clickBell"
+			>
+				<FeatherIcon :name="bell === 'muted' ? 'bell-off' : 'bell'" class="h-4 w-4" />
+			</Button>
 			<!-- My status (#2053): be right back / away, shown above my chip. -->
 			<Button
 				v-if="me"
@@ -687,6 +699,7 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
 	callBox,
@@ -1720,15 +1733,64 @@ async function focusBubble(user, text = "") {
 }
 
 // The other person started the chat (open_encounter tells this page): open it here too.
+// --- Encounter alert (#2135): someone started a chat with me. Chime, tab title while the tab is
+// hidden, browser notification while I look elsewhere. Only for me, not for the one who started it.
+
+const encounterAlert = createEncounterAlert({
+	win: window,
+	doc: document,
+	storage: (() => {
+		try {
+			return window.localStorage
+		} catch {
+			return null
+		}
+	})(),
+	Notify: typeof Notification === "undefined" ? null : Notification,
+	Audio: window.AudioContext || window.webkitAudioContext || null,
+})
+const alertMuted = ref(encounterAlert.isMuted())
+const alertPermission = ref(encounterAlert.permission())
+const bell = computed(() => bellState(alertMuted.value, alertPermission.value))
+const bellTitle = computed(
+	() =>
+		({
+			ask: __("Get a sound and a browser notification when someone starts a chat with you"),
+			on: __("Sound and notification on when someone starts a chat with you. Click to mute."),
+			blocked: __("Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute."),
+			muted: __("Muted: no sound or notification when someone starts a chat with you. Click to turn on."),
+		})[bell.value]
+)
+
+async function clickBell() {
+	encounterAlert.unlock()
+	if (bell.value === "ask") {
+		alertPermission.value = await encounterAlert.requestPermission()
+	} else {
+		encounterAlert.setMuted(!alertMuted.value)
+		alertMuted.value = encounterAlert.isMuted()
+	}
+}
+
+function alertEncounter(other) {
+	alertPermission.value = encounterAlert.permission()
+	encounterAlert.notify(__("{0} wants to chat", [other.full_name]), { icon: other.user_image || OPHICE_ICON })
+}
+
+// Browsers play sound only after a key press or click on the page.
+const unlockAudio = () => encounterAlert.unlock()
+
 function onEncounterStarted(message) {
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
+		alertEncounter(other)
 		pingWalkUp(other)
 		return
 	}
 	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
 	if (distanceTo(other) > PART_DISTANCE) return
+	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
 }
 
@@ -2833,6 +2895,8 @@ onMounted(async () => {
 	resizeObserver = new ResizeObserver(measure)
 	if (stage.value) resizeObserver.observe(stage.value)
 	window.addEventListener("keydown", onKeydown)
+	window.addEventListener("keydown", unlockAudio, { capture: true, once: true })
+	window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true })
 	window.addEventListener("keyup", onKeyup)
 	window.addEventListener("blur", releaseAll)
 	window.addEventListener("pagehide", leaveOnPagehide)
@@ -2910,6 +2974,9 @@ onBeforeUnmount(() => {
 	clearTimeout(peopleSoon)
 	window.removeEventListener("resize", onViewportResize)
 	window.removeEventListener("keydown", onKeydown)
+	window.removeEventListener("keydown", unlockAudio, { capture: true })
+	window.removeEventListener("pointerdown", unlockAudio, { capture: true })
+	encounterAlert.stop()
 	window.removeEventListener("keyup", onKeyup)
 	window.removeEventListener("blur", releaseAll)
 	window.removeEventListener("pagehide", leaveOnPagehide)
