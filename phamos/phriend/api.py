@@ -7,7 +7,7 @@ import base64
 import binascii
 import json
 import re
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlparse
 
 import frappe
 import requests
@@ -721,15 +721,233 @@ def _upload_screenshot(api, headers, file_url):
 	content = file_doc.get_content()
 	if isinstance(content, str):
 		content = content.encode()
-	mimetype = "image/jpeg" if file_doc.file_name.endswith(".jpg") else "image/png"
+	return _upload_image(api, headers, file_doc.file_name, content)
+
+
+def _upload_image(api, headers, file_name, content):
+	"""Upload an image to the GitLab project; returns the markdown that shows it."""
+	mimetype = "image/jpeg" if file_name.endswith(".jpg") else "image/png"
 	response = requests.post(
 		f"{api}/uploads",
 		headers=headers,
-		files={"file": (file_doc.file_name, content, mimetype)},
+		files={"file": (file_name, content, mimetype)},
 		timeout=TIMEOUT,
 	)
 	_raise_for_gitlab(response, _("screenshot upload"))
 	return response.json().get("markdown", "")
+
+
+# --------------------------------------------------------------------------
+# Test result -> comment on a GitLab issue
+# --------------------------------------------------------------------------
+# While testing (for example a new DAP feature), "Test result" in the flow posts the screenshot
+# and a note straight onto the GitLab issue being tested, as a comment. No ERPNext Issue: it is
+# proof of a test, not a problem report.
+
+TEST_RESULTS = ("Passed", "Failed", "Note")
+TEST_HEADINGS = {"Passed": "✅ Test passed", "Failed": "❌ Test failed", "Note": "📝 Test note"}
+LAST_TEST_ISSUE = "phriend_last_test_issue"  # user default: the issue of the last test result
+_ISSUE_URL_RE = re.compile(r"^(?P<base>https?://[^/\s]+)/(?P<path>[^\s]+?)/-/(?:issues|work_items)/(?P<iid>\d+)/?(?:[?#]\S*)?$")
+_SHORT_REF_RE = re.compile(r"^(?:(?P<path>[\w.-]+(?:/[\w.-]+)+))?#?(?P<iid>\d+)$")
+
+
+# The team's status labels (gitlab-issue-workflow): an issue has exactly one at a time.
+STATUS_LABELS = ("Working", "Ready for Dev", "PM Review", "Testing", "Ready for Production", "Testing on Production")
+# Old status labels the workflow no longer uses: removed whenever Phriend sets a status
+RETIRED_STATUS_LABELS = ("Ready for Staging", "Ready for Release", "Testing on Staging")
+
+
+def _is_tester():
+	"""Everyone who has Phriend in Desk or a cockpit; never a portal (website) user."""
+	return is_for_user() and frappe.get_cached_value("User", frappe.session.user, "user_type") == "System User"
+
+
+def _check_tester():
+	settings = _check_allowed()
+	if not _is_tester():
+		frappe.throw(_("Test results can only be posted from Desk."), frappe.PermissionError)
+	return settings
+
+
+def _parse_gitlab_reference(reference, base, default_project):
+	"""(project path, iid) for "#123", "123", "group/project#123", a GitLab Issue record or an issue
+	link. Links must point at our GitLab: the token is only ever sent there."""
+	ref = cstr(reference).strip()
+	if not ref:
+		frappe.throw(_("Which GitLab issue did you test? Enter its number or link."))
+	if not _SHORT_REF_RE.match(ref) and frappe.db.exists("GitLab Issue", ref):
+		ref = frappe.db.get_value("GitLab Issue", ref, "issue_url") or ref
+	match = _ISSUE_URL_RE.match(ref)
+	if match:
+		if urlparse(match.group("base")).netloc.lower() != urlparse(base).netloc.lower():
+			frappe.throw(_("Only issues on {0} can get test results.").format(escape_html(base)))
+		return match.group("path"), int(match.group("iid"))
+	match = _SHORT_REF_RE.match(ref)
+	if match:
+		return (match.group("path") or cstr(default_project).strip("/")), int(match.group("iid"))
+	frappe.throw(
+		_("{0} is not a GitLab issue. Use #123, group/project#123 or the issue's link.").format(escape_html(ref))
+	)
+
+
+def _timer_issue():
+	"""The GitLab issue of my running (or paused) DAP timer, as {reference, label}, or None."""
+	try:
+		from phamos.api.personal_timer import _session
+		from phamos.gitlab_integration.issue_refs import find_gitlab_issues_in_text
+
+		session = _session()
+	except Exception:
+		return None  # no Employee, no timer: nothing to suggest
+	if not session:
+		return None
+	name = session.get("gitlab_issue")
+	if not name:
+		child, parent = find_gitlab_issues_in_text(session.get("goal") or "")
+		name = child or parent
+	if not name:
+		return None
+	row = frappe.db.get_value("GitLab Issue", name, ["issue_url", "issue_id", "title"], as_dict=True)
+	if not row or not row.issue_url:
+		return None
+	return {"reference": row.issue_url, "label": f"#{row.issue_id} {row.title or ''}".strip()}
+
+
+@frappe.whitelist()
+def get_test_target():
+	"""Whether the user may post test results, and the GitLab issue to suggest: the one on the
+	running DAP timer, else the one of their last test result."""
+	if not _is_tester():
+		return {"allowed": False}
+	settings = _settings()
+	url, token = _gitlab_url_and_token(settings)
+	target = _timer_issue()
+	if target:
+		target["from"] = "timer"
+	else:
+		last = frappe.defaults.get_user_default(LAST_TEST_ISSUE)
+		if last:
+			target = {"reference": last, "label": last, "from": "last"}
+	return {
+		"allowed": bool(url and token),
+		"project": settings.gitlab_project or DEFAULT_GITLAB_PROJECT,
+		"target": target,
+		"statuses": list(STATUS_LABELS),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_test_evidence(
+	gitlab_issue=None,
+	result="Note",
+	title=None,
+	comment=None,
+	route=None,
+	page_url=None,
+	page_title=None,
+	context=None,
+	screenshot=None,
+	status=None,
+):
+	"""Post a test result (screenshot + note) as a comment on a GitLab issue and, when a status
+	is chosen, make it the issue's one status label."""
+	settings = _check_tester()
+	if result not in TEST_RESULTS:
+		result = "Note"
+	status = cstr(status).strip() or None
+	if status and status not in STATUS_LABELS:
+		frappe.throw(_("{0} is not a status label.").format(escape_html(status)))
+	base, headers = _gitlab(settings)
+	project, iid = _parse_gitlab_reference(gitlab_issue, base, settings.gitlab_project or DEFAULT_GITLAB_PROJECT)
+	api = _project_api(base, project)
+
+	response = requests.get(f"{api}/issues/{iid}", headers=headers, timeout=TIMEOUT)
+	if response.status_code == 404:
+		frappe.throw(_("GitLab issue {0}#{1} was not found, or the token can't see it.").format(escape_html(project), iid))
+	_raise_for_gitlab(response, _("issue lookup"))
+	gitlab_issue_data = response.json()
+
+	shot, shot_problem = _decode_screenshot(screenshot) if screenshot else (None, None)
+	screenshot_md = ""
+	if shot:
+		ext, content = shot
+		stamp = frappe.utils.now_datetime().strftime("%Y%m%d-%H%M%S")
+		screenshot_md = _upload_image(api, headers, f"phriend-test-{iid}-{stamp}.{ext}", content)
+
+	body = _test_markdown(
+		result=result,
+		title=cstr(title).strip() or cstr(page_title).strip() or cstr(route).strip() or _("a page"),
+		comment=cstr(comment).strip(),
+		route=route,
+		page_url=page_url,
+		context=_pretty_json(context),
+		screenshot_md=screenshot_md,
+		shot_problem=shot_problem,
+		status=status,
+	)
+	response = requests.post(f"{api}/issues/{iid}/notes", headers=headers, data={"body": body}, timeout=TIMEOUT)
+	_raise_for_gitlab(response, _("comment"))
+	note = response.json()
+
+	status_error = None
+	if status:
+		status_error = _set_status_label(api, headers, iid, status, gitlab_issue_data.get("labels") or [])
+
+	web_url = gitlab_issue_data.get("web_url") or ""
+	if web_url:
+		frappe.defaults.set_user_default(LAST_TEST_ISSUE, web_url)
+	references = gitlab_issue_data.get("references") or {}
+	return {
+		"web_url": f"{web_url}#note_{note.get('id')}" if web_url and note.get("id") else web_url,
+		"reference": references.get("full") or f"{project}#{iid}",
+		"title": gitlab_issue_data.get("title") or "",
+		"status": None if status_error else status,
+		"status_error": status_error,
+	}
+
+
+def _set_status_label(api, headers, iid, status, current_labels):
+	"""Add the new status label and remove every other status label in the same call, so the
+	issue never has two. The comment is already posted: a failure here is reported, not raised."""
+	remove = [
+		label for label in current_labels
+		if label != status and (label in STATUS_LABELS or label in RETIRED_STATUS_LABELS)
+	]
+	data = {"add_labels": status}
+	if remove:
+		data["remove_labels"] = ",".join(remove)
+	try:
+		response = requests.put(f"{api}/issues/{iid}", headers=headers, data=data, timeout=TIMEOUT)
+	except requests.RequestException as e:
+		return cstr(e)
+	if response.status_code >= 400:
+		frappe.log_error(f"Phriend: setting status {status} on issue {iid}: {response.status_code} {response.text[:500]}", "Phriend")
+		return _("GitLab answered {0}").format(response.status_code)
+	return None
+
+
+def _test_markdown(result, title, comment, route, page_url, context, screenshot_md, shot_problem, status=None):
+	lines = [f"### {TEST_HEADINGS[result]}: {' '.join(title.split())}", ""]
+	if status:
+		lines += [f"**Status → {status}**", ""]
+	if comment:
+		lines += [comment, ""]
+	if screenshot_md:
+		lines += [screenshot_md, ""]
+	elif shot_problem:
+		lines += [f"_The screenshot could not be added: {shot_problem}_", ""]
+
+	where = f"[{route or page_url}]({page_url})" if page_url else f"`{route}`" if route else "-"
+	lines += [
+		f"- Page: {where}",
+		f"- Tested by: {_full_name(frappe.session.user)}",
+		f"- Site: {get_url()}",
+		"",
+	]
+	if context:
+		lines += ["<details><summary>Captured context</summary>", "", "```json", context, "```", "", "</details>", ""]
+	lines.append("_Captured with Phriend_")
+	return "\n".join(lines)
 
 
 def _issue_markdown(report, screenshot_md):
