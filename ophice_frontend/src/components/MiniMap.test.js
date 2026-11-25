@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { effectScope, markRaw, reactive } from "vue"
+import { effectScope, markRaw, nextTick, reactive } from "vue"
 
 // Production logged "Cannot access 'T' before initialization" when a cockpit opened in Ophice:
 // MiniMap's `tile` read `wide` before `const wide` ran, through useMapCamera's watch getters.
@@ -221,6 +221,51 @@ describe("MiniMap takes the keyboard for walking (#2155)", () => {
 		active = { tagName: "INPUT" }
 		state.giveKeysBack()
 		expect(emitted.filter(([name]) => name === "keys-back")).toHaveLength(1)
+		scope.stop()
+	})
+})
+
+// When the cockpit opens, my chip sits in the middle of the mini map (#2155), also after the map's
+// box settles to the docked width.
+describe("MiniMap centres on my chip (#2155)", () => {
+	const me = { name: "me", x: 20, y: 12 }
+
+	beforeEach(() => {
+		vi.resetModules()
+		vi.spyOn(console, "warn").mockImplementation(() => {})
+		stubBrowser()
+	})
+	afterEach(() => {
+		vi.unstubAllGlobals()
+		vi.restoreAllMocks()
+	})
+
+	function offCentre(state) {
+		const cam = state.cam
+		const at = cam.toView(me.x + 0.5, me.y + 0.5)
+		const view = { width: state.tile.value * 40, height: state.tile.value * 25 }
+		return Math.max(Math.abs(at.x - view.width / 2), Math.abs(at.y - view.height / 2))
+	}
+
+	it("starts zoomed in, with my chip in the middle", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
+		expect(state.cam.zoom.value).toBeGreaterThan(1)
+		expect(offCentre(state)).toBeLessThan(1)
+		scope.stop()
+	})
+
+	it("keeps my chip in the middle when the box settles to another width", async () => {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
+		state.mapWidth.value = 180
+		await nextTick()
+		expect(offCentre(state)).toBeLessThan(1)
+		scope.stop()
+	})
+
+	it("keeps someone's own zoom", async () => {
+		localStorage.setItem("phamos_ophice_zoom_cockpit_map", "1.5")
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me })
+		expect(state.cam.zoom.value).toBe(1.5)
 		scope.stop()
 	})
 })

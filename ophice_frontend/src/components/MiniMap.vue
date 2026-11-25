@@ -341,6 +341,7 @@ const SIZE_KEY = "phamos_ophice_mini_map_size"
 const MINUTES = [5, 15, 30, 60]
 const ICONS = { walkup: "user", message: "message-circle", meeting: "message-square", reminder: "clock" }
 const POS_KEY = "phamos_ophice_mini_map_pos"
+const START_ZOOM = 2.5
 
 // --- Docked in the cockpit's right sidebar (#2155), kept in this browser; docked unless taken out.
 // Declared before the size and layout below: they read it while this setup runs (see #2109).
@@ -414,6 +415,9 @@ const cam = useMapCamera({
 	grid: () => ({ cols: props.cols, rows: props.rows }),
 	image: () => imageBox.value,
 	storageKey: "phamos_ophice_zoom_cockpit_map",
+	// Zoomed in, so my chip can sit in the middle (#2155); at 1 the whole office fits and the view
+	// can't move. Someone's own zoom (stored in this browser) wins.
+	startZoom: () => START_ZOOM,
 	pad: 0,
 	minTile: 2,
 })
@@ -436,10 +440,14 @@ const imageStyle = computed(() => {
 		? { left: `${(box.left - c.x) * t()}px`, top: `${(box.top - c.y) * t()}px`, width: `${box.width * t()}px`, height: `${box.height * t()}px` }
 		: {}
 })
-// Start on my chip; the view follows it while I walk (the cockpit is in front, so rarely).
+// My chip in the middle when the cockpit opens (the mini map is made new each time), and again
+// whenever the map's box changes size: it settles after mounting (docked width, meeting layout),
+// and a resize by hand should not lose me (PM, 2026-11-25, #2155). Zooming keeps its own point.
+// While I walk, the view follows my chip (the cockpit is in front, so rarely).
 watch(
-	() => cam.tile.value,
-	(value) => value && props.me && !cam.isPlaced() && cam.place(props.me.x, props.me.y)
+	() => [tile.value * props.cols, tile.value * props.rows, cam.tile.value > 0],
+	() => props.me && cam.place(props.me.x + 0.5, props.me.y + 0.5),
+	{ immediate: true }
 )
 watch(
 	() => props.me && [props.me.x, props.me.y],
