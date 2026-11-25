@@ -11,8 +11,9 @@
 		@keydown.escape.prevent="emit('close')"
 		@pointerdown="onBubbleDown"
 	>
-		<!-- With the call no title bar (#2108): the chips sit above the chat, the buttons on the right. -->
-		<header v-if="!inCall" class="flex items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
+		<!-- The top bar, with and without the call (#2135; the call's right bar of #2108 is gone): who,
+		     own window, and "Esc to close" as a button that teaches the key. -->
+		<header class="flex h-9 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3" data-testid="bubble-bar">
 			<UserAvatar :name="peer.user" :label="peer.full_name" :image="peer.user_image" size="xs" />
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{{ peer.full_name }}</span>
 			<!-- The call can move into its own Jitsi window (#2108): bigger, and no cap when the
@@ -25,23 +26,41 @@
 				data-testid="open-call"
 				@click="emit('call')"
 			>
-				<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+				<PopOutIcon class="h-3.5 w-3.5" />
 				{{ inWindow ? __("Call window") : __("Own window") }}
 			</button>
 			<button
 				type="button"
-				class="flex-shrink-0 rounded px-1.5 py-0.5 text-xs text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
-				:title="__('Close the chat and walk on')"
+				class="flex flex-shrink-0 items-center gap-1.5 rounded border border-outline-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+				:title="__('Close the chat and walk on (Esc)')"
+				data-testid="close-bubble"
 				@click="emit('close')"
 			>
-				{{ __("Esc to close") }}
+				<kbd class="rounded bg-surface-gray-2 px-1 font-sans text-[10px] font-semibold text-ink-gray-7">Esc</kbd>
+				{{ __("to close") }}
 			</button>
 		</header>
 
 		<!-- With the call (#2108): the chat on the left (it takes what the video leaves), the video on
 		     the right in the width the parent works out. -->
 		<div class="flex min-h-0" :class="inCall ? 'flex-1 flex-row' : 'flex-col'">
-			<div class="flex min-h-0 flex-col" :class="inCall ? 'min-w-0 flex-1 border-r border-outline-gray-2' : ''">
+			<div class="relative flex min-h-0 flex-col" :class="inCall ? 'min-w-0 flex-1 border-r border-outline-gray-2' : ''">
+				<!-- The line between chat and video (#2135): drag it, or arrow keys when focused. The
+				     video gets no narrower than 1:1; the parent keeps the width. -->
+				<div
+					v-if="inCall && movable"
+					class="absolute -right-1.5 bottom-0 top-0 z-10 w-3 cursor-ew-resize focus:outline-none focus-visible:bg-outline-gray-3"
+					role="separator"
+					aria-orientation="vertical"
+					tabindex="0"
+					:aria-label="__('Width of the chat (arrow keys)')"
+					:title="__('Drag to make the chat wider or narrower, or use the arrow keys')"
+					data-no-drag
+					data-testid="call-split"
+					@pointerdown.stop="emit('resize-start', $event, 'split')"
+					@keydown.left.prevent="emit('split-by', -SPLIT_STEP)"
+					@keydown.right.prevent="emit('split-by', SPLIT_STEP)"
+				/>
 				<!-- Both chips, as in a meeting area's huddle (#2067). -->
 				<MeetingHuddle
 					v-if="inCall && meChip"
@@ -112,33 +131,6 @@
 				/>
 			</div>
 
-			<!-- The bar on the right (#2108): own window, close; room for more later. -->
-			<div
-				v-if="inCall"
-				class="flex w-10 flex-shrink-0 flex-col items-center gap-1 border-l border-outline-gray-2 py-2"
-				data-testid="call-sidebar"
-			>
-				<button
-					type="button"
-					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
-					:title="__('Open the video call with {0} in its own window', [firstName])"
-					:aria-label="__('Open the video call with {0} in its own window', [firstName])"
-					data-testid="open-call"
-					@click="emit('call')"
-				>
-					<PopOutIcon class="h-4 w-4" />
-				</button>
-				<button
-					type="button"
-					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
-					:title="__('Close the chat and walk on (Esc)')"
-					:aria-label="__('Close the chat and walk on (Esc)')"
-					data-testid="close-call"
-					@click="emit('close')"
-				>
-					<FeatherIcon name="x" class="h-4 w-4" />
-				</button>
-			</div>
 		</div>
 		<!-- Resize by every edge and corner (#2108); the parent keeps the size. -->
 		<template v-if="movable">
@@ -169,7 +161,6 @@ import VideoCall from "./VideoCall.vue"
 import MeetingHuddle from "./MeetingHuddle.vue"
 import PopOutIcon from "./PopOutIcon.vue"
 import { ringHue } from "../utils/ophiceColor.js"
-import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
@@ -196,7 +187,9 @@ const props = defineProps({
 	/** The video's width in px (with the call; the parent keeps 16:9 to 1:1). */
 	videoWidth: { type: Number, default: 0 },
 })
-const emit = defineEmits(["send", "close", "call", "move-start", "resize-start"])
+const emit = defineEmits(["send", "close", "call", "move-start", "resize-start", "split-by"])
+// One arrow key press on the line between chat and video, in px.
+const SPLIT_STEP = 24
 
 // Edges 8px, corners 16px, a little outside the rounded border so they are easy to hit.
 const RESIZE_HANDLES = [

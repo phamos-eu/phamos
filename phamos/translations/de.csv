@@ -3025,6 +3025,25 @@ End {0}'s visit?,Besuch von {0} beenden?
 Send out,Hinausschicken
 Send out of Ophice,Aus dem Ophice schicken
 {0} has left Ophice.,{0} hat das Ophice verlassen.
+"Fly there. Hold {0} for: Fly or Beam",Hinfliegen. {0} gedrückt halten für: Fliegen oder Beamen
+Fly,Fliegen
+with wings,mit Flügeln
+Beam,Beamen
+at once,sofort
+Meeting point,Treffpunkt
+Set a meeting point for the two of you,Einen Treffpunkt für Sie beide setzen
+Meeting point of {0}: click to fly there,Treffpunkt von {0}: zum Hinfliegen klicken
+Your meeting point,Ihr Treffpunkt
+Meeting point · {0},Treffpunkt · {0}
+"Remove the meeting point, for everyone","Treffpunkt entfernen, für alle"
+Click on the map where you want to meet · Esc to cancel,"Klicken Sie auf die Karte, wo Sie sich treffen möchten · Esc zum Abbrechen"
+Set a meeting point for you and the people selected,Einen Treffpunkt für Sie und die ausgewählten Personen setzen
+Clear the selection (Esc),Auswahl aufheben (Esc)
+Not on the map right now.,Gerade nicht auf der Karte.
+The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
+{0} set a meeting point,{0} hat einen Treffpunkt gesetzt
+Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
 Call window,Anruffenster
 Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
 Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
@@ -3039,4 +3058,16 @@ Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröß
 "Size and position of the background image, the grid's size and everyone's starting zoom.","Größe und Position des Hintergrundbilds, die Größe des Rasters und der Start-Zoom für alle."
 "Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
 "Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
+{0} wants to chat,{0} möchte mit Ihnen chatten
+Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
+Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
+Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
+to close,zum Schließen
+Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
+"Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Allow chat notifications,Chat-Benachrichtigungen erlauben
+Chat notifications on,Chat-Benachrichtigungen an
+Chat sound on,Chat-Ton an
+Chat notifications muted,Chat-Benachrichtigungen stumm
