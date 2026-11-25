@@ -119,7 +119,7 @@
 					<FeatherIcon name="video" class="h-4 w-4 flex-shrink-0" />
 					<span v-if="!collapsed" class="truncate">{{ editingAreas ? __("Done") : __("Meeting areas") }}</span>
 				</button>
-				<p v-if="!collapsed" class="ophice-side__hint">{{ __("Drag on the map to draw an area, click an area to edit it. Everyone sees the changes.") }}</p>
+				<p v-if="!collapsed" class="ophice-side__hint">{{ __("Drag on the map to draw an area, or click corner by corner for a polygon; click an area to edit it. Everyone sees the changes.") }}</p>
 
 				<!-- Background (#2053, #2058, #2089) -->
 				<button

@@ -35,6 +35,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, strip_html
 
+from phamos.api import ophice_shapes as shapes
 from phamos.cockpits.settings import COCKPITS as _COCKPITS
 
 # One shared world for everyone; the frontend draws exactly this grid.
@@ -386,17 +387,18 @@ def _free_spot(start, user):
 	while y + 1 <= start.y + start.height + 1e-9:
 		x = start.x
 		while x + 1 <= start.x + start.width + 1e-9:
-			if all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken):
+			if shapes.contains(start, x + 0.5, y + 0.5) and all(
+				math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken
+			):
 				spots.append({"x": float(x), "y": float(y)})
 			x += 1
 		y += 1
 	if spots:
 		return random.choice(spots)
-	# Too small or full: the middle of it (chips are drawn one tile wide).
-	return {
-		"x": _clamp(start.x + start.width / 2 - 0.5, _cols()),
-		"y": _clamp(start.y + start.height / 2 - 0.5, _rows()),
-	}
+	# Too small or full: the middle of it (chips are drawn one tile wide), moved into the shape
+	# when the middle lies outside (an L-shaped polygon, #2144).
+	mx, my = shapes.nearest_inside(start, start.x + start.width / 2, start.y + start.height / 2)
+	return {"x": _clamp(mx - 0.5, _cols()), "y": _clamp(my - 0.5, _rows())}
 
 
 def _beam_key(user):
@@ -1468,7 +1470,7 @@ def _areas():
 		AREA_DOCTYPE,
 		fields=[
 			"name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room",
-			"color_hue", "chat_mode", "kind", "cockpit",
+			"color_hue", "chat_mode", "kind", "cockpit", "shape", "points",
 		],
 		order_by="creation asc",
 		limit=MAX_AREAS,
@@ -1478,6 +1480,9 @@ def _areas():
 	tiles = None
 	for area in areas:
 		area.chat_mode = area.chat_mode or "Saved"
+		# Shapes (#2144): the points as a list for the page; a broken polygon falls back to its box.
+		area.points = [list(p) for p in shapes.points_of(area)]
+		area.shape = shapes.shape_of(area) if area.points or shapes.shape_of(area) != "Polygon" else "Rectangle"
 		area.kind = area.kind or "Meeting"
 		if area.cockpit:
 			# The cockpit's app icon, shown on its space (#2076).
@@ -1516,22 +1521,35 @@ def _clean_rect(x, y, width, height):
 	return x, y, width, height
 
 
-def _overlaps(name, x, y, width, height):
+def _overlaps(name, candidate):
+	"""The title of an area the candidate shares ground with (#2144: by shape, not by box)."""
 	for area in _areas():
 		if area.name == name:
 			continue
-		if x < area.x + area.width and area.x < x + width and y < area.y + area.height and area.y < y + height:
+		if shapes.overlaps(candidate, area):
 			return area.title
 	return None
 
 
 @frappe.whitelist(methods=["POST"])
 def save_area(
-	title, meeting_url="", x=0, y=0, width=1, height=1, name=None, chat_mode="Saved", kind="Meeting", cockpit=""
+	title,
+	meeting_url="",
+	x=0,
+	y=0,
+	width=1,
+	height=1,
+	name=None,
+	chat_mode="Saved",
+	kind="Meeting",
+	cockpit="",
+	shape="Rectangle",
+	points=None,
 ):
 	"""Create or change a space, for everyone (map editors only, #2071). A meeting space has a
 	Jitsi meeting and a chat; the start space (#2072, only one) has neither; a cockpit space
-	(#2076) belongs to a cockpit and may have a meeting."""
+	(#2076) belongs to a cockpit and may have a meeting. Shape (#2144): a rectangle, an ellipse
+	filling the box, or a polygon whose corner points set the box."""
 	_require_map_editor()
 	if chat_mode not in CHAT_MODES:
 		frappe.throw(_("Unknown chat mode."))
@@ -1556,8 +1574,16 @@ def save_area(
 		domain = room = ""
 	else:
 		domain, room = _parse_meeting_url(meeting_url)
-	x, y, width, height = _clean_rect(x, y, width, height)
-	clash = _overlaps(name, x, y, width, height)
+	shape = shape or "Rectangle"
+	if shape not in shapes.SHAPES:
+		frappe.throw(_("Unknown shape."))
+	corners = shapes.clean_points(points, _cols(), _rows()) if shape == "Polygon" else []
+	if corners:
+		x, y, width, height = shapes.box_of(corners)
+	else:
+		x, y, width, height = _clean_rect(x, y, width, height)
+	candidate = {"x": x, "y": y, "width": width, "height": height, "shape": shape, "points": corners}
+	clash = _overlaps(name, candidate)
 	if clash:
 		frappe.throw(_("This overlaps the area {0}.").format(clash))
 	values = {
@@ -1570,6 +1596,8 @@ def save_area(
 		"y": y,
 		"width": width,
 		"height": height,
+		"shape": shape,
+		"points": json.dumps(corners, separators=(",", ":")) if corners else None,
 		"chat_mode": chat_mode,
 		"cockpit": cockpit,
 	}
@@ -1614,11 +1642,7 @@ def _inside_area(area, user):
 	position = _position_of(user)
 	if not position:
 		return False
-	cx, cy = position[0] + 0.5, position[1] + 0.5
-	return (
-		area.x - AREA_SLACK <= cx < area.x + area.width + AREA_SLACK
-		and area.y - AREA_SLACK <= cy < area.y + area.height + AREA_SLACK
-	)
+	return shapes.contains(area, position[0] + 0.5, position[1] + 0.5, AREA_SLACK)
 
 
 def _people_in(area, exclude=None):
@@ -2087,7 +2111,7 @@ def get_people():
 		}
 		if chip and (not hidden or row.user == me):
 			cx, cy = chip["x"] + 0.5, chip["y"] + 0.5
-			area = next((a for a in areas if a.x <= cx < a.x + a.width and a.y <= cy < a.y + a.height), None)
+			area = next((a for a in areas if shapes.contains(a, cx, cy)), None)
 			person["area"] = area.title if area else ""
 			person["in_chat"] = row.user in chatting
 		people.append(person)

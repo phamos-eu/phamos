@@ -25,6 +25,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils import strip_html
 
 from phamos.api import ophice
+from phamos.api import ophice_shapes as shapes
 
 GUEST_CACHE_KEY = "phamos_ophice_guests"
 CHECK_CACHE_PREFIX = "phamos_ophice_guest_check:"
@@ -170,7 +171,8 @@ def _corridor(guest_id):
 
 def _inside(area, x, y):
 	cx, cy = x + 0.5, y + 0.5
-	return area.x <= cx <= area.x + area.width and area.y <= cy <= area.y + area.height
+	# Its own edge counts as inside (a guest kept on the edge is in), by shape (#2144).
+	return shapes.contains(area, cx, cy, 1e-6)
 
 
 def clamp_to(areas, x, y, corridor=None):
@@ -182,7 +184,7 @@ def clamp_to(areas, x, y, corridor=None):
 	px, py = x + 0.5, y + 0.5
 	candidates = []
 	for area in areas:
-		candidates.append((min(max(px, area.x), area.x + area.width), min(max(py, area.y), area.y + area.height)))
+		candidates.append(shapes.nearest_inside(area, px, py))
 	if corridor:
 		candidates.append(_onto_band(corridor, px, py))
 	if not candidates:
@@ -207,7 +209,16 @@ def _onto_band(corridor, px, py):
 
 
 def _rect(area):
-	return {"name": area.name, "title": area.title, "x": area.x, "y": area.y, "width": area.width, "height": area.height}
+	return {
+		"name": area.name,
+		"title": area.title,
+		"x": area.x,
+		"y": area.y,
+		"width": area.width,
+		"height": area.height,
+		"shape": shapes.shape_of(area),
+		"points": [list(p) for p in shapes.points_of(area)],
+	}
 
 
 # --- Presence

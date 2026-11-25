@@ -11,6 +11,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import ophice
+from phamos.api import ophice_shapes as shapes
 
 
 
@@ -535,6 +536,41 @@ class OphiceAreaTestCase(FrappeTestCase):
 		self.publish.stop()
 		self.conf.stop()
 		frappe.db.rollback()
+
+	def test_shapes_polygon_and_ellipse_are_saved_and_overlap_by_shape(self):
+		"""#2144: a polygon's box comes from its corners; areas only clash where the shapes meet."""
+		frappe.db.delete("Ophice Area")  # room on the map; the site's areas come back with the rollback
+		url = "https://jitsi.example.org/Shapes"
+		# An L: 0..4 x 0..4 without its top right quarter 2..4 x 0..2.
+		corners = [[0, 0], [2, 0], [2, 2], [4, 2], [4, 4], [0, 4]]
+		name = ophice.save_area("L", url, shape="Polygon", points=json.dumps(corners))
+		area = next(a for a in ophice.get_space()["areas"] if a.name == name)
+		self.assertEqual((area.shape, area.points), ("Polygon", corners))
+		self.assertEqual((area.x, area.y, area.width, area.height), (0, 0, 4, 4))
+		# In the L's empty quarter: no clash, though the boxes overlap.
+		ophice.save_area("Notch", url + "2", 2.5, 0, 1.5, 1.5, shape="Ellipse")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Clash", url + "3", 0.5, 0.5, 1, 1)
+		# Inside by shape: the L's corner square counts, the notch does not.
+		self.assertTrue(shapes.contains(area, 1, 3))
+		self.assertFalse(shapes.contains(area, 3, 1))
+		self.assertTrue(shapes.contains(area, 3, 1.6, ophice.AREA_SLACK))  # just above its edge
+
+	def test_polygon_points_are_checked(self):
+		cols, rows = 40, 25
+		self.assertEqual(shapes.clean_points("[[0.2,0],[3.9,0],[3.9,3.1]]", cols, rows), [[0, 0], [4, 0], [4, 3]])
+		self.assertEqual(shapes.clean_points([[-5, 0], [99, 0], [99, 99]], cols, rows), [[0, 0], [40, 0], [40, 25]])
+		for bad in ("nonsense", [[0, 0], [1, 1]], [[0, 0], [0, 0], [0, 0], [0, 0]], [[0, 0], [4, 4], [4, 0], [0, 4]], [[0, "x"], [1, 1], [2, 0]]):
+			with self.assertRaises(frappe.ValidationError):
+				shapes.clean_points(bad, cols, rows)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Odd", "https://jitsi.example.org/Odd", shape="Hexagon")
+
+	def test_a_guest_is_kept_inside_an_ellipse(self):
+		ellipse = {"x": 0, "y": 0, "width": 4, "height": 2, "shape": "Ellipse"}
+		x, y = shapes.nearest_inside(ellipse, 10, 1)
+		self.assertTrue(shapes.contains(ellipse, x, y))
+		self.assertAlmostEqual(y, 1, places=3)
 
 	def test_save_reads_the_room_from_the_url_and_shows_in_the_space(self):
 		name = ophice.save_area("Standup", " https://meet.systemli.org/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)

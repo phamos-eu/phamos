@@ -201,7 +201,7 @@
 				v-if="editingAreas"
 				class="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
 			>
-				{{ __("Drag on the grid to mark a meeting area, click an area to edit it") }}
+				{{ __("Drag on the grid to mark a meeting area, or click corner by corner for a polygon; click an area to edit it") }}
 			</p>
 			<!--
 				Burn and chat notices (#2057, #2066) sit where they happened, on the map (PM): at their
@@ -606,6 +606,7 @@ import MiniMap from "../components/MiniMap.vue"
 import BackgroundImage from "../components/BackgroundImage.vue"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
+import { contains } from "../utils/ophiceShapes.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
@@ -1732,7 +1733,7 @@ function areaAt(chip) {
 				MEETING_KINDS.includes(a.kind || "Meeting") &&
 				// A cockpit space only has a meeting when it has a link (#2076).
 				(a.kind !== "Cockpit" || a.jitsi_room) &&
-				cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height
+				contains(a, cx, cy)
 		) || null
 	)
 }
@@ -1764,7 +1765,7 @@ function cockpitSpaceAt(chip) {
 	if (!chip) return null
 	const cx = chip.x + 0.5
 	const cy = chip.y + 0.5
-	return areas.value.find((a) => a.kind === "Cockpit" && cx >= a.x && cx < a.x + a.width && cy >= a.y && cy < a.y + a.height) || null
+	return areas.value.find((a) => a.kind === "Cockpit" && contains(a, cx, cy)) || null
 }
 
 function openCockpitSpace() {
@@ -2177,6 +2178,8 @@ async function saveArea(values) {
 			y: values.y,
 			width: values.width,
 			height: values.height,
+			shape: values.shape || "Rectangle",
+			points: values.shape === "Polygon" ? JSON.stringify(values.points || []) : null,
 			chat_mode: values.chat_mode || "Saved",
 			kind: values.kind || "Meeting",
 			cockpit: values.cockpit || "",
