@@ -837,6 +837,101 @@ class TestPhriend(FrappeTestCase):
 		self.assertIn("api", str(raised.exception))
 		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
 
+	# ---- the GitLab issue's author is the reporter, not the token's owner (Sudo)
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_gitlab_issue_is_created_as_the_reporter(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-admin")
+		self.gitlab_project()
+		issue = self.report(screenshot=PNG)
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "Dev.One@example.com")
+		get.return_value = response(json=[{"username": "devone2", "email": "devone2@example.com"},
+			{"username": "devone", "email": "dev.one@example.com"}])
+		post.side_effect = [response(json={"markdown": "![shot](/uploads/x/shot.png)"}), response(json=self.created(7))]
+
+		api.create_gitlab_issue(issue.name)
+
+		self.assertEqual(get.call_args.args[0], "https://git.example.com/api/v4/users")
+		self.assertEqual(get.call_args.kwargs["params"], {"search": "dev.one@example.com"})
+		upload, create = post.call_args_list
+		self.assertEqual(upload.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-admin", "Sudo": "devone"})
+		self.assertEqual(create.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-admin", "Sudo": "devone"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_reporter_without_a_gitlab_user_falls_back_to_the_token_owner(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "nobody@example.com")
+		post.return_value = response(json=self.created(8))
+
+		for answer in (response(json=[]), response(status=403), ConnectionError("down")):
+			get.reset_mock()
+			get.return_value, get.side_effect = (None, answer) if isinstance(answer, Exception) else (answer, None)
+			api.create_gitlab_issue(issue.name)
+			get.assert_called_once()
+			self.assertEqual(post.call_args.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-test"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_administrator_reports_skip_the_user_lookup(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()  # reported by Administrator
+		post.return_value = response(json=self.created(9))
+
+		api.create_gitlab_issue(issue.name)
+
+		get.assert_not_called()
+		self.assertEqual(post.call_args.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-test"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_token_without_sudo_gets_a_clear_message(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-not-admin")
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=403, json={"message": "403 Forbidden - Must be admin to use sudo"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("admin", str(raised.exception))
+		self.assertIn("devone", str(raised.exception))
+		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_missing_scope_with_sudo_names_both_scopes(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-no-sudo")
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=403, json={"error": "insufficient_scope"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("<b>api</b> or <b>sudo</b>", str(raised.exception))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_expired_token_with_sudo_gets_the_plain_message(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-expired")
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=401, json={"message": "401 Unauthorized"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("(401): 401 Unauthorized", str(raised.exception))
+		self.assertNotIn("sudo", str(raised.exception))
+
 
 # ---- the report on the cockpit Issue page (#1901)
 
