@@ -2683,6 +2683,7 @@ This chat has ended.,Dieser Chat ist beendet.
 {0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
 Nobody to chat with here.,Hier ist niemand zum Chatten.
 Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
+"This space has its own meeting: use its call and chat.","Dieser Bereich hat sein eigenes Meeting: Nutzen Sie dessen Anruf und Chat."
 Write something first.,Schreiben Sie zuerst etwas.
 A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
 Esc to close,Esc zum Schließen
