@@ -51,12 +51,23 @@
 			>
 				<FeatherIcon :name="videoMuted ? 'video-off' : 'video'" class="h-4 w-4" />
 			</button>
+			<!-- Video quality: starts at the lowest level with video; a click steps up, after "HD" back down. -->
+			<button
+				type="button"
+				class="flex h-8 min-w-8 items-center justify-center rounded-full bg-black/60 px-2 text-[11px] font-semibold text-white shadow hover:bg-black/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+				:title="qualityTitle"
+				:aria-label="qualityTitle"
+				data-testid="video-quality"
+				@click="nextQuality"
+			>
+				{{ currentQuality.short }}
+			</button>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -101,6 +112,39 @@ function toggle(command) {
 	emit("toggled")
 }
 
+// Jitsi's quality levels (video height). Below 180 Jitsi only has "low bandwidth", which turns
+// video off, so 180 is the lowest level with a picture. Every call starts there: less bandwidth
+// and CPU; who needs more steps it up (PM, 2026-11-25).
+const QUALITIES = [
+	{ height: 180, short: "LD", label: `${__("Low")} (180p)` },
+	{ height: 360, short: "SD", label: `${__("Standard")} (360p)` },
+	{ height: 720, short: "HD", label: `${__("High")} (720p)` },
+]
+const quality = ref(QUALITIES[0].height)
+const currentQuality = computed(
+	() => [...QUALITIES].reverse().find((q) => quality.value >= q.height) || QUALITIES[0]
+)
+const qualityTitle = computed(() => {
+	const next = QUALITIES[(QUALITIES.indexOf(currentQuality.value) + 1) % QUALITIES.length]
+	return __("Video quality: {0}. Click for {1}.", [currentQuality.value.label, next.label])
+})
+// Jitsi has no start setting for this, and right after joining it may drop the command:
+// send it until Jitsi reports it back, a few times at most.
+let qualitySettled = false
+let qualityTimer = null
+function startQuality(tries = 5) {
+	if (qualitySettled || !api || tries <= 0) return
+	api.executeCommand("setVideoQuality", quality.value)
+	qualityTimer = setTimeout(() => startQuality(tries - 1), 1500)
+}
+function nextQuality() {
+	qualitySettled = true
+	const next = QUALITIES[(QUALITIES.indexOf(currentQuality.value) + 1) % QUALITIES.length]
+	quality.value = next.height
+	api?.executeCommand("setVideoQuality", next.height)
+	emit("toggled")
+}
+
 // external_api.js once per page and domain.
 const scripts = (window.__phamosJitsiScripts ||= {})
 function loadJitsi(domain) {
@@ -139,7 +183,7 @@ onMounted(async () => {
 			prejoinPageEnabled: false,
 			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
-			toolbarButtons: ["microphone", "camera", "tileview", "hangup"],
+			toolbarButtons: ["microphone", "camera", "videoquality", "tileview", "hangup"],
 			toolbarConfig: { alwaysVisible: true },
 		},
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
@@ -152,6 +196,14 @@ onMounted(async () => {
 		// The real state, should Jitsi have ignored the start settings.
 		api?.isAudioMuted().then((muted) => (audioMuted.value = muted))
 		api?.isVideoMuted().then((muted) => (videoMuted.value = muted))
+		startQuality()
+	})
+	api.addListener("videoQualityChanged", ({ videoQuality }) => {
+		// Jitsi's own start value (often 2160) is not shown; ours counts until Jitsi confirms it.
+		if (!videoQuality || (!qualitySettled && videoQuality !== quality.value)) return
+		qualitySettled = true
+		// From now on also changes in Jitsi's own toolbar (bigger frames show it).
+		quality.value = videoQuality
 	})
 	api.addListener("audioMuteStatusChanged", ({ muted }) => (audioMuted.value = muted))
 	api.addListener("videoMuteStatusChanged", ({ muted }) => (videoMuted.value = muted))
@@ -174,6 +226,7 @@ function dispose() {
 onBeforeUnmount(() => {
 	window.removeEventListener("blur", onWindowBlur)
 	clearTimeout(quietTimer)
+	clearTimeout(qualityTimer)
 	dispose()
 })
 </script>
