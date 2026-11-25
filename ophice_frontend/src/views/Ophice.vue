@@ -525,7 +525,7 @@
 				<button
 					type="button"
 					class="ophice-zoom__button px-1.5"
-					:title="__('Show the whole grid')"
+					:title="background && !meetingArea ? __('Show the whole image') : __('Show the whole grid')"
 					data-testid="zoom-fit"
 					@click="camera().fit(me.x, me.y)"
 				>
@@ -917,9 +917,11 @@ const mainCam = useMapCamera({
 	view,
 	grid: gridSize,
 	image: () => imageBox.value,
-	storageKey: "phamos_ophice_zoom",
+	// A new key (#2139): zooms remembered before counted from the whole grid, not the image.
+	storageKey: "phamos_ophice_zoom_image",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fitImage: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,

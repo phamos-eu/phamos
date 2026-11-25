@@ -449,7 +449,12 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				ophice.set_background_layout(0, 1, 1, 30)  # no background yet
 			ophice._store_background(self._png(), "map.png")
-			self.assertEqual(ophice.get_space()["background_layout"], {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0})
+			# A new image covers the grid, centred (#2139: the grid lies on it as large as fits).
+			left, top, width = ophice._cover_box(1.0, cols, rows)
+			self.assertEqual(
+				ophice.get_space()["background_layout"],
+				{"fit": True, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": 1.0},
+			)
 			ratio = ophice.get_space()["background_ratio"]
 			self.assertGreater(ratio, 0)
 			layout = ophice.set_background_layout(0, -999, 3.25, 999, 9)
@@ -463,10 +468,56 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 			ophice._store_background(self._png(), "map.png")
 		cols, rows = ophice._grid()
 		value = ophice._background()
+		value.pop("grid")  # stored before #2139
 		value["layout"] = {"fit": False, "scale": 50, "x": 100, "y": 0}
 		layout = ophice._background_layout(value)
 		# Half the grid wide, flush right, at the top.
 		self.assertEqual((layout["width"], layout["left"], layout["top"]), (cols / 2, cols / 2, 0))
+
+
+	def _grid_40_by_25(self):
+		frappe.db.set_default(ophice.GRID_KEY, json.dumps({"cols": 40, "rows": 25}))
+
+	def test_grid_keeps_its_width_on_the_image_when_squares_across_change(self):
+		"""#2139: the image stays put; more squares across make them smaller, rows only add height."""
+		self._grid_40_by_25()
+		with patch.object(ophice.frappe, "publish_realtime") as publish, patch.object(ophice, "_require_map_editor"):
+			ophice._store_background(self._png(), "map.png")
+			ophice.set_background_layout(0, 2, 1, 30, 1.5)
+			stored = ophice._background()["grid"]
+			ophice.set_grid(60, 30)
+			layout = ophice.get_space()["background_layout"]
+			# Seen from the grid the image grows by 60/40: same place on the image, smaller squares.
+			self.assertEqual((layout["left"], layout["top"], layout["width"], layout["zoom"]), (3.0, 1.5, 45.0, 1.5))
+			self.assertEqual(ophice._background()["grid"]["x"], stored["x"])
+			self.assertEqual(ophice._background()["grid"]["tile"], round(stored["tile"] * 40 / 60, 8))
+			self.assertIn(ophice.EVENT_BACKGROUND, [c.args[0] for c in publish.call_args_list])
+			# Rows only: the squares keep their size.
+			ophice.set_grid(60, 40)
+			self.assertEqual(ophice.get_space()["background_layout"]["width"], 45.0)
+
+	def test_patch_converts_the_old_layout_once_and_the_map_looks_the_same(self):
+		from phamos.patches.v1_0 import ophice_grid_on_background
+
+		self._grid_40_by_25()
+		with patch.object(ophice.frappe, "publish_realtime"):
+			ophice._store_background(self._png(), "map.png")
+		value = ophice._background()
+		value.pop("grid"), value.pop("zoom")
+		value["layout"] = {"fit": False, "left": -4, "top": 2.5, "width": 50, "zoom": 1.2}
+		frappe.db.set_default(ophice.BACKGROUND_KEY, json.dumps(value))
+		before = ophice._background_layout(ophice._background())
+		ophice_grid_on_background.execute()
+		converted = ophice._background()
+		self.assertEqual(converted["layout"]["width"], 50)  # the old value is kept
+		after = ophice._background_layout(converted)
+		self.assertEqual((after["left"], after["top"], after["width"]), (-4.0, 2.5, 50.0))
+		self.assertEqual(after, before)
+		# Old zoom 1.2 counted from the 40 x 25 grid (40 px squares in 1600 x 1000); the 50 x 50
+		# image fits with 20 px squares, so the same view is zoom 2.4.
+		self.assertEqual(after["zoom"], 2.4)
+		ophice_grid_on_background.execute()
+		self.assertEqual(ophice._background(), converted)
 
 
 class OphiceAreaTestCase(FrappeTestCase):

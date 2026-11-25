@@ -32,8 +32,9 @@ function prefersReducedMotion() {
  * @param {() => number} [options.startZoom]  the map editor's starting zoom, when nothing is stored
  * @param {number} [options.pad]  room around the map (px)
  * @param {number} [options.minTile]
+ * @param {boolean} [options.fitImage]  zoom 1 shows the whole background image, not the whole grid (#2139)
  */
-export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4 }) {
+export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4, fitImage = false }) {
 	// The view's size: a reactive object, or a function returning one (a derived size).
 	const view = {
 		get width() {
@@ -71,7 +72,8 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 	}
 
 	const baseTile = computed(() => {
-		const { cols, rows } = grid()
+		const box = fitImage ? image() : null
+		const { cols, rows } = box ? { cols: box.width, rows: box.height } : grid()
 		return fitTile(view.width, view.height, cols, rows, pad, minTile)
 	})
 	const tile = computed(() => (baseTile.value ? Math.max(minTile, Math.round(baseTile.value * zoom.value * 100) / 100) : 0))

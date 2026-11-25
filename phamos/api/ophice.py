@@ -252,9 +252,13 @@ def set_grid(cols, rows):
 				_("The space {0} would be cut off. Move or shrink it first.").format(area.title),
 				title=_("Grid too small"),
 			)
+	old_cols, old_rows = _grid()
+	background = _keep_grid_width(old_cols, old_rows, cols)
 	frappe.db.set_default(GRID_KEY, json.dumps({"cols": cols, "rows": rows}, separators=(",", ":")))
 	frappe.local.ophice_grid = None
 	_publish(EVENT_GRID, {"cols": cols, "rows": rows, "by": frappe.session.user})
+	if background:
+		_save_background(background)
 	return {"cols": cols, "rows": rows}
 
 
@@ -659,11 +663,16 @@ def _background():
 	return value if isinstance(value, dict) else {}
 
 
-# How the image lies on the map (#2089): "fit" (covers the grid), or a place and width in grid
-# tiles; the height follows the image's ratio. It may reach beyond the grid: those parts are
-# shown dimmed. "zoom" is everyone's starting zoom (1 = the whole grid fits the window).
+# Where the grid lies on the image (#2139): the image is the world, the grid is placed on it.
+# Stored as "grid": {"x", "y", "tile"}, all in image widths: the grid's top left corner and the
+# size of one square. Changing the number of squares across keeps the grid's width on the image.
+# The API still answers in squares ("layout": where the image lies, seen from the grid), so the
+# maps draw as before. It may reach beyond the grid: those parts are shown dimmed.
+# "zoom" is everyone's starting zoom (1 = the whole image fits the window).
 BACKGROUND_MIN_WIDTH = 5
 ZOOM_RANGE = (1.0, 3.0)
+# The window size the old starting zoom (1 = the whole grid fits) is converted for (#2139).
+ZOOM_REFERENCE_VIEW = (1600, 1000)
 
 
 def _background_ratio(value):
@@ -684,15 +693,29 @@ def _background_ratio(value):
 	return round(width / height, 6) if height else None
 
 
-def _background_layout(value):
-	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
-	cols, rows = _grid()
-	zoom = round(max(ZOOM_RANGE[0], min(ZOOM_RANGE[1], frappe.utils.flt(layout.get("zoom")) or 1)), 2)
+def _clamp_zoom(zoom):
+	return round(max(ZOOM_RANGE[0], min(ZOOM_RANGE[1], frappe.utils.flt(zoom) or 1)), 2)
+
+
+def _cover_box(ratio, cols, rows):
+	"""The image covering the grid, centred: (left, top, width) in squares."""
+	if ratio >= cols / rows:
+		width = rows * ratio
+		return (cols - width) / 2, 0.0, width
+	return 0.0, (rows - cols / ratio) / 2, float(cols)
+
+
+def _clamp_box(left, top, width, ratio, cols, rows):
+	width = max(BACKGROUND_MIN_WIDTH, min(4 * cols, width))
+	height = width / ratio
+	return max(-width, min(cols, left)), max(-height, min(rows, top)), width
+
+
+def _legacy_box(layout, ratio, cols, rows):
+	"""Where the image lay before #2139, in squares: "fit", the first % layout (#2058) or tiles (#2089)."""
 	if layout.get("fit", True):
-		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": zoom}
-	ratio = _background_ratio(value) or cols / rows
+		return _cover_box(ratio, cols, rows)
 	if "width" not in layout:
-		# The first layout (#2058): size in % of the grid width, CSS background-position in %.
 		width = frappe.utils.flt(layout.get("scale") or 100) / 100 * cols
 		height = width / ratio
 		left = (cols - width) * frappe.utils.flt(layout.get("x", 50)) / 100
@@ -701,40 +724,99 @@ def _background_layout(value):
 		width = frappe.utils.flt(layout.get("width")) or cols
 		left = frappe.utils.flt(layout.get("left"))
 		top = frappe.utils.flt(layout.get("top"))
-	width = max(BACKGROUND_MIN_WIDTH, min(4 * cols, width))
-	height = width / ratio
-	left = max(-width, min(cols, left))
-	top = max(-height, min(rows, top))
-	return {"fit": False, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
+	return _clamp_box(left, top, width, ratio, cols, rows)
 
 
-@frappe.whitelist(methods=["POST"])
-def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
-	"""Place and size of the background image on the map, and the starting zoom, for everyone."""
-	_require_map_editor()
-	value = _background()
+def _grid_from_box(left, top, width):
+	"""The image at (left, top), width squares wide, seen the other way round: the grid on the image."""
+	return {"x": round(-left / width, 6), "y": round(-top / width, 6), "tile": round(1 / width, 8)}
+
+
+def _legacy_zoom(zoom, box, ratio, cols, rows):
+	"""The old starting zoom (1 = the grid fits) as the new one (1 = the image fits), for a typical window."""
+	view_w, view_h = ZOOM_REFERENCE_VIEW
+	width = box[2]
+	grid_fit = min(view_w / cols, view_h / rows)
+	image_fit = min(view_w / width, view_h / (width / ratio))
+	return _clamp_zoom((frappe.utils.flt(zoom) or 1) * grid_fit / image_fit)
+
+
+def _grid_on_image(value, cols=None, rows=None):
+	"""(grid, zoom) of a background value: stored since #2139, else converted from the old layout."""
+	if cols is None:
+		cols, rows = _grid()
+	ratio = _background_ratio(value) or cols / rows
+	grid = value.get("grid")
+	if isinstance(grid, dict) and frappe.utils.flt(grid.get("tile")) > 0:
+		grid = {key: frappe.utils.flt(grid.get(key)) for key in ("x", "y", "tile")}
+		return grid, _clamp_zoom(value.get("zoom"))
+	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
+	box = _legacy_box(layout, ratio, cols, rows)
+	return _grid_from_box(*box), _legacy_zoom(layout.get("zoom"), box, ratio, cols, rows)
+
+
+def _background_layout(value):
+	"""Where the image lies, seen from the grid, in squares: what the maps draw."""
+	cols, rows = _grid()
 	if not value.get("url"):
-		frappe.throw(_("Upload a background first."))
-	value["layout"] = {
-		"fit": bool(frappe.utils.cint(fit)),
-		"left": frappe.utils.flt(left),
-		"top": frappe.utils.flt(top),
-		"width": frappe.utils.flt(width) or _cols(),
-		"zoom": frappe.utils.flt(zoom) or 1,
-	}
-	layout = _background_layout(value)
-	value["layout"] = layout
+		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0}
+	ratio = _background_ratio(value) or cols / rows
+	grid, zoom = _grid_on_image(value, cols, rows)
+	width = 1 / grid["tile"]
+	left, top, width = _clamp_box(-grid["x"] * width, -grid["y"] * width, width, ratio, cols, rows)
+	cover = _cover_box(ratio, cols, rows)
+	fit = all(abs(a - b) < 1e-3 for a, b in zip((left, top, width), cover))
+	return {"fit": fit, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
+
+
+def _save_background(value):
+	value.pop("layout", None)
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")))
+	layout = _background_layout(value)
 	_publish(EVENT_BACKGROUND, {"url": value["url"], "layout": layout, "ratio": _background_ratio(value), "by": frappe.session.user})
 	return layout
 
 
+@frappe.whitelist(methods=["POST"])
+def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
+	"""Place and size of the background image on the map, and the starting zoom, for everyone.
+	Given in squares as the image seen from the grid; stored as the grid on the image (#2139)."""
+	_require_map_editor()
+	value = _background()
+	if not value.get("url"):
+		frappe.throw(_("Upload a background first."))
+	cols, rows = _grid()
+	ratio = _background_ratio(value) or cols / rows
+	if frappe.utils.cint(fit):
+		box = _cover_box(ratio, cols, rows)
+	else:
+		box = _clamp_box(frappe.utils.flt(left), frappe.utils.flt(top), frappe.utils.flt(width) or cols, ratio, cols, rows)
+	value["grid"] = _grid_from_box(*box)
+	value["zoom"] = _clamp_zoom(zoom)
+	return _save_background(value)
+
+
+def _keep_grid_width(cols, rows, new_cols):
+	"""Squares across change (#2139): the grid keeps its width on the image, the squares resize."""
+	value = _background()
+	if not value.get("url") or new_cols == cols:
+		return
+	grid, zoom = _grid_on_image(value, cols, rows)
+	grid["tile"] = round(grid["tile"] * cols / new_cols, 8)
+	value["grid"], value["zoom"] = grid, zoom
+	return value
+
+
 def _set_background(value):
 	previous = _background().get("file")
+	if value:
+		# A new image: the grid lies on it as large as fits, centred; zoom 1 shows the whole image.
+		cols, rows = _grid()
+		value["grid"] = _grid_from_box(*_cover_box(_background_ratio(value) or cols / rows, cols, rows))
+		value["zoom"] = 1.0
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")) if value else "")
 	if previous and previous != value.get("file") and frappe.db.exists("File", previous):
 		frappe.delete_doc("File", previous, ignore_permissions=True, delete_permanently=True)
-	# A new image starts fitted to the grid.
 	_publish(
 		EVENT_BACKGROUND,
 		{

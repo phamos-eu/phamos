@@ -2990,6 +2990,7 @@ Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldun
 Zoom out,Verkleinern
 Zoom in,Vergrößern
 Show the whole grid,Ganzes Raster zeigen
+Show the whole image,Ganzes Bild zeigen
 {0} × {1} tiles,{0} × {1} Kacheln
 Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
 "Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
