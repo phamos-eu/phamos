@@ -221,15 +221,13 @@ class OphiceEncounterTestCase(FrappeTestCase):
 
 	def test_no_encounter_in_a_space_with_a_call(self):
 		"""A meeting space with a Jitsi link has its own call and chat: no encounter there."""
-		frappe.db.delete(ophice.AREA_DOCTYPE)
 		ophice.save_area("Call room", "https://meet.systemli.org/CallRoom", 4, 4, 2, 2)
-		frappe.local.message_log = []
-		with self.assertRaises(frappe.ValidationError):
+		# Checked by its message: "Move closer to chat." is a ValidationError too.
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
 			self._open(self.A, self.B)
 		# One of the two outside is not enough: the other one is still in the meeting.
 		self._put(self.B, 6.5, 5)
-		frappe.local.message_log = []
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
 			self._open(self.B, self.A)
 		frappe.set_user("Administrator")
 		self._put(self.A, 7, 5)
