@@ -3098,3 +3098,40 @@ Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
 Chat notifications muted,Chat-Benachrichtigungen stumm
+AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
+Started by hand by {0} (manual override).,Von Hand gestartet von {0} (manueller Override).
+Started by hand by {0}.,Von Hand gestartet von {0}.
+Automatic start,Automatischer Start
+AI model,KI-Modell
+Issue Assistant switched on,Issue-Assistent eingeschaltet
+Issue Assistant Settings: tick Enabled,Issue Assistant Settings: Aktiviert ankreuzen
+AI Agent for Issues enabled,KI-Agent für Anfragen aktiviert
+AI Agent {0}: tick Enabled,KI-Agent {0}: Aktiviert ankreuzen
+Run bench migrate to create the AI Agent,"bench migrate ausführen, um den KI-Agenten anzulegen"
+Project in scope,Projekt im Geltungsbereich
+Project on the Issue: one of {0},Projekt der Anfrage: eines von {0}
+Issue Type in scope,Anfragetyp im Geltungsbereich
+Issue Type on the Issue: one of {0},Anfragetyp der Anfrage: einer von {0}
+Not reported from a sensitive page,Nicht von einer sensiblen Seite gemeldet
+no page,keine Seite
+A report from a page other than {0},Eine Meldung von einer anderen Seite als {0}
+Customer allows AI processing,Kunde erlaubt KI-Verarbeitung
+Customer {0}: tick {1} (signed AVV),Kunde {0}: {1} ankreuzen (unterschriebener AVV)
+Internal Issue or known customer,Interne Anfrage oder bekannter Kunde
+"no Customer, created by {0}","kein Kunde, erstellt von {0}"
+"A Customer on the Issue (directly, via Implementation or Project) with AI processing allowed, or the Issue created by a phamos Desk user while logged in","Ein Kunde an der Anfrage (direkt, über Implementation oder Projekt) mit erlaubter KI-Verarbeitung, oder die Anfrage von einem angemeldeten phamos-Desk-Benutzer erstellt"
+Run Issue Assistant,Issue-Assistent starten
+Start anyway,Trotzdem starten
+The Issue Assistant is already working on this Issue.,Der Issue-Assistent arbeitet bereits an dieser Anfrage.
+The Issue Assistant could not start ({0}).,Der Issue-Assistent konnte nicht starten ({0}).
+Issue Assistant started (manual override),Issue-Assistent gestartet (manueller Override)
+Issue Assistant started,Issue-Assistent gestartet
+Would start automatically for a new Issue,Würde bei einer neuen Anfrage automatisch starten
+May use the AI model,Darf das KI-Modell nutzen
+The automatic start runs only when an Issue is created. Starting here always works; past a red check it is recorded as a manual override.,"Der automatische Start läuft nur, wenn eine Anfrage angelegt wird. Hier starten geht immer; an einer roten Prüfung vorbei wird es als manueller Override festgehalten."
+Needed to pass,Nötig zum Bestehen
+Last run,Letzter Lauf
+Manual Override,Manueller Override
+Override Reasons,Override-Gründe
+Started by hand although the automatic start or the AI gate would not have run it.,"Von Hand gestartet, obwohl der automatische Start oder die KI-Prüfung ihn nicht ausgeführt hätte."
+The checks the manual start went past.,"Die Prüfungen, an denen der manuelle Start vorbeiging."
