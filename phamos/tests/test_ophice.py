@@ -173,6 +173,8 @@ class OphiceEncounterTestCase(FrappeTestCase):
 				ignore_permissions=True
 			)
 		frappe.cache.delete_value(ophice.PRESENCE_CACHE_KEY)
+		# Independent of the site's map: no encounters inside its spaces with a call (rolled back).
+		frappe.db.delete(ophice.AREA_DOCTYPE)
 		self._put(self.A, 5, 5)
 		self._put(self.B, 6, 5)
 		self._put(self.C, 30, 20)
@@ -216,6 +218,21 @@ class OphiceEncounterTestCase(FrappeTestCase):
 			self.assertIsNone(self._open(self.A, self.B)["video"])
 		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "evil.example/x?y", "ophice_video": None}):
 			self.assertIsNone(self._open(self.A, self.B)["video"])
+
+	def test_no_encounter_in_a_space_with_a_call(self):
+		"""A meeting space with a Jitsi link has its own call and chat: no encounter there."""
+		ophice.save_area("Call room", "https://meet.systemli.org/CallRoom", 4, 4, 2, 2)
+		# Checked by its message: "Move closer to chat." is a ValidationError too.
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
+			self._open(self.A, self.B)
+		# One of the two outside is not enough: the other one is still in the meeting.
+		self._put(self.B, 6.5, 5)
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
+			self._open(self.B, self.A)
+		frappe.set_user("Administrator")
+		self._put(self.A, 7, 5)
+		self._put(self.B, 8, 5)
+		self.assertTrue(self._open(self.A, self.B)["encounter"])
 
 	def test_both_pages_opening_at_once_get_the_same_encounter(self):
 		"""The page that loses the race to insert takes the winner's encounter (Pair Key unique)."""
