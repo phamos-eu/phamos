@@ -16,7 +16,7 @@ from frappe.utils import cint, get_system_timezone
 
 from phamos.api.cockpit_preferences import get_preferences
 from phamos.cockpits.settings import COCKPITS, NEUTRAL_THEME_COLOR, cockpit_window
-from phamos.phriend.boot import phriend_boot
+from phamos.phriend.boot import app_versions, phriend_boot
 
 
 def get_spa_boot(default_route):
@@ -52,7 +52,7 @@ def get_spa_boot(default_route):
 			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
 			# and the app versions it adds to a report. Only for users Phriend is for.
 			"phriend": phriend,
-			"versions": _app_versions() if phriend else {},
+			"versions": app_versions() if phriend else {},
 			# The user's own cockpit preferences, e.g. the panel layout of the record pages (#1910).
 			"preferences": get_preferences(),
 			# The cockpit's window colour and edge glow from Cockpit Settings (#1933).
@@ -92,22 +92,6 @@ def theme_color(boot):
 	"""The page's theme-color: the cockpit colour, so an installed cockpit's title bar has it from
 	the first paint (#1933). spa_shared/theme.js keeps it after the page has loaded."""
 	return boot.cockpit_window["color"] or NEUTRAL_THEME_COLOR
-
-
-def _app_versions():
-	"""{app: version}, as Desk has it in frappe.boot.versions.
-
-	From each app's __version__, not frappe.utils.change_log.get_versions(): that runs git for
-	every app, which Desk pays once per session but the cockpits would pay on every page load.
-	"""
-	versions = {}
-	for app in frappe.get_installed_apps():
-		try:
-			versions[app] = getattr(frappe.get_module(app), "__version__", "") or ""
-		except Exception:
-			# a broken app must not take the cockpits down; Phriend just omits its version
-			versions[app] = ""
-	return versions
 
 
 def spa_translations(lang):

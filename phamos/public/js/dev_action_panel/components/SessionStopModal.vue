@@ -4,7 +4,7 @@
 // onStop / onStopProjectTimer handle it unchanged.
 import { ref, onMounted } from "vue";
 import FrappeDatetime from "./FrappeDatetime.vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, percentBillablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   session: Object,
@@ -31,7 +31,8 @@ const labels = {
 const result = ref("");
 const activityType = ref("");
 const valueAdd = ref(VALUE_ADD_DEFAULT);
-const percentBillable = ref(PERCENT_BILLABLE_DEFAULT);
+// The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+const percentBillable = ref(percentBillablePreset(props.session?.project_percent_billable));
 const endTime = ref(frappe.datetime.system_datetime());
 const endTimeModified = ref(false);
 const resultRef = ref(null);

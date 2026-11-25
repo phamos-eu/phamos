@@ -11,6 +11,8 @@ Run with
 import json
 import re
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import set_request
@@ -39,7 +41,9 @@ def _is_404(html):
 	return "is_404 = true" in html
 
 
-class TestWebDocs(FrappeTestCase):
+class DocsFixture(FrappeTestCase):
+	"""Published book with a chapter, an unpublished book; no tests of its own."""
+
 	def setUp(self):
 		frappe.db.savepoint("web_docs_test")
 		frappe.get_doc({
@@ -70,6 +74,8 @@ class TestWebDocs(FrappeTestCase):
 		doc.insert(ignore_permissions=True)
 		return doc.name
 
+
+class TestWebDocs(DocsFixture):
 	def test_overview_lists_published_books_only(self):
 		html = _render("de/dokumentation")
 
@@ -94,6 +100,9 @@ class TestWebDocs(FrappeTestCase):
 		html = _render("de/dokumentation/handbuch-test/konten")
 
 		self.assertIn("<td>1200</td>", html)
+		# wide tables scroll in a box of their own, with the cockpit's scroll hint (#2045)
+		self.assertRegex(html, r'<div class="wp-docs-table" data-wp-docs-table=""><div class="wp-docs-table-scroll"><table>')
+		self.assertIn('data-label-more-right="Mehr rechts"', html)
 		self.assertIn('rel="prev"', html)
 		self.assertIn('href="/de/dokumentation/handbuch-test/erste-schritte" rel="prev"', html)
 		self.assertNotIn('rel="next"', html, "last page has no next")
@@ -169,7 +178,7 @@ class TestWebDocs(FrappeTestCase):
 MODULE = "WP Docs Test Module"
 
 
-class TestModuleDocumentationLinks(TestWebDocs):
+class TestModuleDocumentationLinks(DocsFixture):
 	"""Module pages link their books, the book page links back (phamos/phamos#2006)."""
 
 	def setUp(self):
@@ -234,7 +243,7 @@ class TestModuleDocumentationLinks(TestWebDocs):
 		self.assertIsNone(frappe.cache.hget("web_profile_items", "modules:de"))
 
 
-class TestDocsEnglishAndLinks(TestWebDocs):
+class TestDocsEnglishAndLinks(DocsFixture):
 	"""English pages and links to the website pages (phamos/phamos#2044)."""
 
 	def setUp(self):
@@ -326,3 +335,274 @@ class TestDocsEnglishAndLinks(TestWebDocs):
 		base = "https://doku.example.test"
 		self.assertEqual(html, f'<a href="{base}/books/handbuch-test/page/konten#bkmrk-a">p</a>'
 			f'<a href="{base}/books/handbuch-test/chapter/grundlagen">c</a><a href="{base}/books/handbuch-test">b</a>')
+
+
+class TestDocsLayout(DocsFixture):
+	"""Full-width layouts, collapsible contents, "On this page", jump buttons (phamos/phamos#2045)."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "html",
+			'<h2 id="bkmrk-a">Erster Teil</h2><p>a</p><h3>Unterpunkt</h3><p>b</p><h2>Zweiter Teil</h2>')
+		docs.clear_cache()
+
+	def test_page_lists_its_headings_and_gives_each_an_id(self):
+		html = _render("de/dokumentation/handbuch-test/konten")
+
+		self.assertIn("Auf dieser Seite", html)
+		self.assertIn('href="#bkmrk-a" data-wp-docs-onpage="bkmrk-a">Erster Teil', html)
+		self.assertRegex(html, r'<h3 id="(wp-h-\d+)">Unterpunkt</h3>')
+		heading_id = re.search(r'<h3 id="(wp-h-\d+)">Unterpunkt', html).group(1)
+		self.assertIn(f'href="#{heading_id}" data-wp-docs-onpage="{heading_id}">Unterpunkt', html)
+		self.assertIn('class="wp-docs-onpage-h3"', html)
+
+	def test_page_without_headings_has_no_on_this_page(self):
+		self.assertNotIn("Auf dieser Seite", _render("de/dokumentation/handbuch-test/erste-schritte"))
+
+	def test_contents_open_the_current_chapter_and_can_be_hidden(self):
+		html = _render("de/dokumentation/handbuch-test/konten")
+
+		self.assertRegex(html, r'<details open>\s*<summary>Grundlagen</summary>')
+		self.assertIn("data-wp-docs-nav-toggle hidden", html, "the button appears with the script")
+		self.assertIn('data-label-hide="Inhalt ausblenden"', html)
+		self.assertRegex(html, r'<script[^>]+src="[^"]*web_docs\.bundle')
+		self.assertIn('data-wp-docs-next="h2, h3"', html)
+
+	def test_book_shows_numbered_folding_chapters(self):
+		html = _render("de/dokumentation/handbuch-test")
+
+		self.assertRegex(html, r'<details class="wp-docs-chapter" id="grundlagen" data-wp-docs-chapter>')
+		self.assertIn('<span class="wp-docs-chapter-num" aria-hidden="true">1</span>', html)
+		self.assertIn("1 Seite", html)
+		self.assertNotIn("Lesen beginnen", html)
+		self.assertIn('data-wp-docs-next="[data-wp-docs-chapter]"', html)
+		self.assertIn('class="wp-docs-loose"', html, "a page outside chapters stays in its place")
+
+	def test_other_website_pages_do_not_load_the_docs_script(self):
+		self.assertNotRegex(_render("de/module"), r'<script[^>]+src="[^"]*web_docs\.bundle')
+
+
+class TestDocsSearch(DocsFixture):
+	"""Search in published books and pages only (phamos/phamos#2046). The site may publish real books
+	too, so results are checked within this test's books."""
+
+	def setUp(self):
+		super().setUp()
+		from phamos.bookstack_integration.content import plain_text
+
+		for name in frappe.get_all("Bookstack Page", filters={"instance": INSTANCE, "html": ["is", "set"]}, pluck="name"):
+			html = frappe.db.get_value("Bookstack Page", name, "html")
+			frappe.db.set_value("Bookstack Page", name, "search_text", plain_text(html))
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", {"html": "<p>Die Umsatzsteuer & mehr</p>",
+			"search_text": "Die Umsatzsteuer & mehr wird am Xqzmonatsende gebucht"})
+		docs.clear_cache()
+
+	def _search(self, q, book_slug="handbuch-test"):
+		from phamos.web_profile.docs_search import search
+
+		return search(q, "de", book_slug=book_slug)
+
+	def _render_query(self, path, **query):
+		"""The results page as a visitor gets it: the query in the query string, not the path."""
+		from urllib.parse import urlencode
+
+		frappe.set_user("Guest")
+		set_request(method="GET", path=path, query_string=urlencode(query))
+		frappe.local.form_dict = frappe._dict(query)
+		try:
+			return get_response_content(path)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_a_word_inside_the_text_finds_the_page(self):
+		pages = self._search("Xqzmonatsende", book_slug=None)["pages"]
+		self.assertEqual([p["title"] for p in pages], ["Erste Schritte"])
+		self.assertIn("<mark>Xqzmonatsende</mark>", pages[0]["snippet"])
+
+	def test_unpublished_books_never_appear(self):
+		urls = [p["url"] for p in self._search("Geheim", book_slug=None)["pages"]]
+		self.assertFalse([u for u in urls if "intern-test" in u])
+		self.assertEqual(self._search("Geheim", book_slug="intern-test")["pages"], [])
+
+	def test_all_words_must_match_and_titles_come_first(self):
+		self.assertEqual(self._search("Umsatzsteuer nirgends")["pages"], [])
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", "search_text", "Hier geht es um Konten")
+		titles = [p["title"] for p in self._search("Konten")["pages"]]
+		self.assertEqual(titles, ["Konten", "Erste Schritte"])
+
+	def test_snippet_is_escaped(self):
+		self.assertIn("&amp;", self._search("Umsatzsteuer")["pages"][0]["snippet"])
+		snippet = self._search("am Xqzmonatsende")["pages"][0]["snippet"]
+		self.assertIn("&amp;", snippet, "a match never splits an entity")
+		self.assertIn(" <mark>am</mark> ", snippet)
+
+	def test_wildcards_are_literal(self):
+		self.assertEqual(self._search("%%")["pages"], [])
+		self.assertEqual(self._search("__")["pages"], [])
+
+	def test_scope_by_book(self):
+		self.assertEqual(len(self._search("Xqzmonatsende")["pages"]), 1)
+		self.assertEqual(self._search("Xqzmonatsende", book_slug="intern-test")["pages"], [])
+
+	def test_books_are_found_by_title(self):
+		slugs = [b.slug for b in self._search("Handbuch", book_slug=None)["books"]]
+		self.assertIn("handbuch-test", slugs)
+		self.assertNotIn("intern-test", slugs)
+
+	def test_results_page(self):
+		html = self._render_query("de/dokumentation/suche", q="Xqzmonatsende")
+		self.assertIn('href="/de/dokumentation/handbuch-test/erste-schritte"', html)
+		self.assertIn("1 Treffer für „Xqzmonatsende“", html)
+		self.assertIn('content="noindex, follow"', html)
+		self.assertIn("Bitte mindestens 2 Zeichen", self._render_query("de/dokumentation/suche", q="a"))
+		self.assertIn("Keine Treffer", self._render_query("de/dokumentation/suche", q="Nichtsdergleichenxq"))
+		english = self._render_query("en/documentation/search", q="Xqzmonatsende")
+		self.assertIn('href="/en/documentation/handbuch-test/erste-schritte"', english)
+		scoped = self._render_query("de/dokumentation/suche", q="Xqzmonatsende", book="handbuch-test")
+		self.assertIn("In allen Büchern suchen", scoped)
+
+	def test_search_boxes_on_the_pages(self):
+		self.assertIn('action="/de/dokumentation/suche"', _render("de/dokumentation"))
+		self.assertIn('name="book" value="handbuch-test" checked', _render("de/dokumentation/handbuch-test"))
+		self.assertIn('name="book" value="handbuch-test" checked', _render("de/dokumentation/handbuch-test/konten"))
+
+	def test_suggestions_for_guests(self):
+		from phamos.web_profile.docs_search import suggest
+
+		frappe.local.request = None  # called directly, not over HTTP: no rate limit
+		frappe.set_user("Guest")
+		try:
+			rows = suggest(q="Xqzmonatsende", lang="de")
+			self.assertEqual(suggest(q="a"), [])
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(rows[0]["url"], "/de/dokumentation/handbuch-test/erste-schritte")
+		self.assertNotIn("snippet", rows[0])
+
+	def test_suggestions_are_rate_limited(self):
+		from phamos.web_profile import docs_search
+
+		self.assertTrue(hasattr(docs_search.suggest, "__wrapped__"), "rate_limit wraps the method")
+
+	def test_count_and_title_hits_do_not_depend_on_the_row_limit(self):
+		from phamos.web_profile import docs_search
+
+		# "Konten" gets the word in its title; "Erste Schritte" (alphabetically first) only in its text
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzmonatsende im Text")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "title", "Zum Xqzmonatsende")
+		docs.clear_cache()
+		with patch.object(docs_search, "ROW_LIMIT", 1):
+			result = self._search("Xqzmonatsende")
+		self.assertEqual(result["total"], 2, "counted, not the rows read")
+		self.assertEqual([p["title"] for p in result["pages"]], ["Zum Xqzmonatsende"], "the title hit is the row read")
+
+	def test_a_book_named_like_the_search_page_cannot_be_published(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, "slug", "suche")
+		book = frappe.get_doc("Bookstack Book", self.hidden)
+		book.publish_on_website = 1
+		self.assertRaises(frappe.ValidationError, book.save, ignore_permissions=True)
+
+	def test_plain_text_for_the_search(self):
+		from phamos.bookstack_integration.content import plain_text
+
+		self.assertEqual(plain_text("<h2>Konten</h2><p>1200 <b>Bank</b></p>"), "Konten 1200 Bank")
+
+
+class TestDocsSearchTypos(DocsFixture):
+	"""Typos are searched as the closest words of the published documentation (phamos/phamos#2049).
+	Words unique to this test keep it independent of real books on the site."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", {"html": "<p>x</p>",
+			"search_text": "Der Xqzartikel wird angelegt. Die Bank und die Xqzänderung."})
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzartikelstamm pflegen")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-200", "search_text", "Xqzgeheimwort")  # unpublished book
+		docs.clear_cache()
+
+	def _search(self, q, **kw):
+		from phamos.web_profile.docs_search import search
+
+		kw.setdefault("book_slug", "handbuch-test")
+		return search(q, "de", **kw)
+
+	def test_swapped_letters_find_the_word(self):
+		result = self._search("Xqzartikle")
+		self.assertEqual(result["corrected"], {"Xqzartikle": ["xqzartikel"]})
+		# also inside the longer word ("Xqzartikelstamm"), as the search always matches
+		self.assertEqual([p["title"] for p in result["pages"]], ["Erste Schritte", "Konten"])
+		self.assertIn("<mark>Xqzartikel</mark>", result["pages"][0]["snippet"])
+
+	def test_missing_letter_and_exact_hits_first(self):
+		result = self._search("Xqzartikl")
+		self.assertIn("xqzartikel", result["corrected"]["Xqzartikl"])
+		self.assertTrue(result["pages"])
+
+	def test_short_words_allow_one_mistake_only(self):
+		self.assertEqual(self._search("Bnak")["corrected"], {"Bnak": ["bank"]})
+		self.assertEqual(self._search("Bxnx")["corrected"], {})
+
+	def test_a_word_that_exists_is_not_corrected(self):
+		result = self._search("Xqzartikel")
+		self.assertEqual(result["corrected"], {})
+		self.assertEqual(len(result["pages"]), 2, "also inside the longer word, as before")
+
+	def test_umlaut_spelt_out(self):
+		result = self._search("Xqzaenderung")
+		self.assertEqual(result["corrected"], {"Xqzaenderung": ["xqzänderung"]})
+		self.assertEqual([p["title"] for p in result["pages"]], ["Erste Schritte"])
+
+	def test_exact_search_does_not_correct(self):
+		result = self._search("Xqzartikle", exact=True)
+		self.assertEqual((result["corrected"], result["pages"]), ({}, []))
+
+	def test_words_of_unpublished_books_are_not_used(self):
+		from phamos.web_profile.docs_search import vocabulary
+
+		self.assertNotIn("xqzgeheimwort", vocabulary())
+
+	def test_punctuation_around_a_word_is_no_typo(self):
+		from phamos.web_profile.docs_search import words_of
+
+		self.assertEqual(words_of('„Xqzartikel“, (Bank)!'), ["Xqzartikel", "Bank"])
+		result = self._search("Xqzartikel,")
+		self.assertEqual(result["corrected"], {}, "a correct word with a comma is not corrected")
+		self.assertEqual(len(result["pages"]), 2)
+
+	def test_both_spellings_of_one_key_stay_as_typed(self):
+		# "masse" and "maße" share a key; the more used one must not "correct" the other
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-101", "search_text", "Xqzmaße Xqzmaße Xqzmasse")
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-100", "search_text", "Xqzmaße")
+		docs.clear_cache()
+		self.assertEqual(self._search("Xqzmasse")["corrected"], {})
+		self.assertEqual(self._search("Xqzmaße")["corrected"], {})
+
+	def test_a_search_in_one_book_corrects_with_that_books_words(self):
+		frappe.db.set_value("Bookstack Book", self.hidden, "publish_on_website", 1)
+		frappe.db.set_value("Bookstack Page", f"{INSTANCE}-BSP-200", "search_text", "Xqzgeheimwort")
+		docs.clear_cache()
+		self.assertEqual(self._search("Xqzgeheimwrot", book_slug=None)["corrected"], {"Xqzgeheimwrot": ["xqzgeheimwort"]})
+		self.assertEqual(self._search("Xqzgeheimwrot")["corrected"], {}, "only in another book: no correction here")
+
+	def test_search_works_without_rapidfuzz(self):
+		import sys
+
+		with patch.dict(sys.modules, {"rapidfuzz": None, "rapidfuzz.distance": None}):
+			result = self._search("Xqzartikle")
+		self.assertEqual((result["corrected"], result["pages"]), ({}, []))
+		self.assertEqual(len(self._search("Xqzartikel")["pages"]), 2)
+
+	def test_results_page_says_what_it_searched(self):
+		from urllib.parse import urlencode
+
+		frappe.set_user("Guest")
+		query = {"q": "Xqzartikle", "book": "handbuch-test"}
+		set_request(method="GET", path="de/dokumentation/suche", query_string=urlencode(query))
+		frappe.local.form_dict = frappe._dict(query)
+		try:
+			html = get_response_content("de/dokumentation/suche")
+		finally:
+			frappe.set_user("Administrator")
+		self.assertIn("Ergebnisse für „xqzartikel“", html)
+		self.assertIn("Nur nach „Xqzartikle“ suchen", html)
+		self.assertIn("exact=1", html)

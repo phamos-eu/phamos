@@ -130,7 +130,9 @@
   "implementation_glow_left",
   "implementation_glow_bottom",
   "implementation_glow_right",
-  "implementation_glow_breathing"
+  "implementation_glow_breathing",
+  "ophice_tab",
+  "ophice_start_page"
  ],
  "fields": [
   {
@@ -927,11 +929,23 @@
    "fieldname": "implementation_glow_breathing",
    "fieldtype": "Check",
    "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "ophice_tab",
+   "fieldtype": "Tab Break",
+   "label": "Ophice"
+  },
+  {
+   "default": "0",
+   "description": "Everyone lands in Ophice after login (#2077). Sets the standard System Settings \u2192 Default App to phamos, whose first app is Ophice; people who chose their own default app keep it. Only switch on in production after the privacy owner's OK (#2069).",
+   "fieldname": "ophice_start_page",
+   "fieldtype": "Check",
+   "label": "Ophice is the start page after login"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 07:52:20.295812",
+ "modified": "2026-11-22 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",

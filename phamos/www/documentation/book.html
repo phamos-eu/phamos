@@ -1,12 +1,14 @@
-{#- /de/dokumentation/<book> (and English). Context: book.py. -#}
+{#- /de/dokumentation/<book> (and English). Context: book.py.
+    Full width (#2045): chapter index on the left, numbered folding chapters on the right. -#}
 {% extends "templates/base.html" %}
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, tile with context %}
-{% from "phamos/templates/web_profile/docs_macros.html" import contents as toc with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import book_chapters, jump_buttons, page_count, search_box with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
 
 {% block content %}
+{%- set chapters = contents | selectattr("type", "equalto", "chapter") | list %}
 <main class="wp-page wp-docs wp-docs-book">
 	<header class="wp-page-head">
 		<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
@@ -16,24 +18,50 @@
 				{%- if book.summary %}<p class="wp-intro" lang="de">{{ book.summary | e }}</p>{% endif %}
 				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
 			</div>
+			<span class="wp-chip wp-chip-value">{{ page_count(book.page_count) }}</span>
 		</div>
 	</header>
 
-	<nav class="wp-docs-contents" aria-label="{{ _('Contents') }}">
-		{{ toc(contents, headings=True) }}
-	</nav>
+	<div class="wp-docs-book-layout{% if chapters | length > 1 %} wp-docs-has-index{% endif %}">
+		{%- if chapters | length > 1 %}
+		<aside class="wp-docs-chapter-index" aria-labelledby="wp-docs-index-title">
+			<h2 id="wp-docs-index-title">{{ _("Chapters") }}</h2>
+			<ol>
+				{%- for c in chapters %}<li><a href="#{{ c.slug | e }}" data-wp-docs-index="{{ c.slug | e }}"><span class="wp-docs-chapter-num" aria-hidden="true">{{ loop.index }}</span><span>{{ c.title | e }}</span></a></li>{% endfor %}
+			</ol>
+		</aside>
+		{%- endif %}
 
-	{%- if modules %}
-	<section class="wp-related" aria-labelledby="wp-docs-modules">
-		<div class="wp-related-head"><h2 id="wp-docs-modules">{{ _("Matching module") if modules | length == 1 else _("Matching modules") }}</h2></div>
-		<ul class="wp-grid wp-grid-compact">
-			{%- for module in modules %}{{ tile(module, heading="h3") }}{% endfor %}
-		</ul>
-	</section>
-	{%- endif %}
+		<div class="wp-docs-book-main">
+			<div class="wp-toolbar">
+				{{ search_box(search_action, lang, book=book) }}
+				{%- if chapters %}
+				<div class="wp-docs-toolbar" data-wp-docs-toolbar hidden>
+					<button type="button" class="wp-button wp-button-sm" data-wp-docs-expand>{{ _("Expand all") }}</button>
+					<button type="button" class="wp-button wp-button-sm" data-wp-docs-collapse>{{ _("Collapse all") }}</button>
+				</div>
+				{%- endif %}
+			</div>
+			<nav aria-label="{{ _('Contents') }}">
+				{{ book_chapters(contents) }}
+			</nav>
 
-	{%- if book.source_url %}
-	<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a></p>
-	{%- endif %}
+			{%- if modules %}
+			<section class="wp-related" aria-labelledby="wp-docs-modules">
+				<div class="wp-related-head"><h2 id="wp-docs-modules">{{ _("Matching module") if modules | length == 1 else _("Matching modules") }}</h2></div>
+				<ul class="wp-grid wp-grid-compact">
+					{%- for module in modules %}{{ tile(module, heading="h3") }}{% endfor %}
+				</ul>
+			</section>
+			{%- endif %}
+
+			{%- if book.source_url %}
+			<p class="wp-docs-source"><a href="{{ book.source_url | e }}" rel="noopener">{{ _("Open on {0}").format(book.source_host or "BookStack") | e }} <span aria-hidden="true">↗</span></a></p>
+			{%- endif %}
+		</div>
+	</div>
+	{{ jump_buttons(_("Next chapter"), "[data-wp-docs-chapter]") }}
 </main>
 {% endblock %}
+
+{% block script %}{{ super() }}{{ include_script("web_docs.bundle.js") }}{% endblock %}

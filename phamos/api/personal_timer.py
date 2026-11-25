@@ -28,7 +28,7 @@ from phamos.phamos.doctype.timesheet_record.timesheet_record import (
 	submit_at_available_hours,
 )
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
-from phamos.phamos.timesheet_utils import billing_context, percent_billable_or_preset, percent_billable_preset
+from phamos.phamos.timesheet_utils import billing_context, percent_billable_or_preset
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
@@ -108,7 +108,7 @@ def _session():
 		state = "limit_exceeded"
 		limit = compute_time_limit_status(doc)
 	project = frappe.db.get_value(
-		"Project", doc.project, ["project_name", "percent_billable"], as_dict=True
+		"Project", doc.project, ["project_name"], as_dict=True
 	) or frappe._dict()
 	plan = _break_plan(doc.name)
 	return {
@@ -121,7 +121,7 @@ def _session():
 		"open_row_from": next((row.from_time for row in reversed(rows) if not row.to_time), None),
 		"project": doc.project,
 		"project_name": project.get("project_name") or doc.project,
-		"project_percent_billable": percent_billable_preset(project.get("percent_billable")),
+		"project_percent_billable": billing_context(doc.project)["percent_billable"],
 		"customer": doc.customer,
 		"task": doc.task,
 		"task_subject": frappe.db.get_value("Task", doc.task, "subject") if doc.task else None,
