@@ -18,6 +18,10 @@ describe("JITSI_TOOLBAR_BUTTONS", () => {
 	it("always has screen sharing next to mic, camera and hang-up", () => {
 		expect(JITSI_TOOLBAR_BUTTONS).toEqual(expect.arrayContaining(["microphone", "camera", "desktop", "hangup"]))
 	})
+
+	it("leaves Jitsi's performance settings out: our own quality button does that", () => {
+		expect(JITSI_TOOLBAR_BUTTONS).not.toContain("videoquality")
+	})
 })
 
 describe("jitsiCallUrl", () => {

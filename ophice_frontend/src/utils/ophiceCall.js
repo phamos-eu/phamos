@@ -25,8 +25,9 @@ export function jitsiCallUrl(video, displayName = "") {
 }
 
 // Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is
-// screen sharing: always there, for everyone (#2136).
-export const JITSI_TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "videoquality", "tileview", "hangup"]
+// screen sharing: always there, for everyone (#2136). No "videoquality" (Jitsi's performance
+// settings): our own quality button in the call's bar does that.
+export const JITSI_TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "tileview", "hangup"]
 
 /** Window name of the call: opening it again brings the same window back. */
 export function encounterCallWindowName(video) {
