@@ -374,6 +374,7 @@
 						@call="openEncounterCall(bubble)"
 						@move-start="startCallDrag"
 						@resize-start="startCallDrag"
+						@split-by="splitCallBy"
 					/>
 				</Teleport>
 				<div
@@ -539,6 +540,8 @@
 			:open-route="openRoute"
 			:status="me.status"
 			:status-open="statusOpen"
+			:bell="bell"
+			:bell-title="bellTitle"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -549,6 +552,7 @@
 			:debug-options="debugOptions"
 			@open="openCockpit"
 			@status="toggleStatus()"
+			@bell="clickBell"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -608,12 +612,14 @@ import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
 	callBox,
 	encounterCallWindowName,
 	jitsiCallUrl,
 	resizeCall,
+	splitCall,
 } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
@@ -1394,7 +1400,8 @@ function openEncounterCall(bubble) {
 // The bubble with the embedded call (#2108): on the stage, where and how big this user last left
 // it. Kept per browser and user, like the meeting window's place; the place as share of the free
 // room, so it stays inside the stage at every window size. Default: centred at the top. The size
-// rules (video between 16:9 and 1:1, chat at least 144px) are in callBox / resizeCall.
+// rules (video between 16:9 and 1:1, chat at least 144px, a dragged chat width narrows the video
+// to 1:1 at most, #2135) are in callBox / resizeCall / splitCall.
 const CALL_POS_KEY = "phamos_ophice_call_pos"
 const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
 const callDrag = ref(null)
@@ -1416,6 +1423,7 @@ watch(
 					y: pos.y,
 					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
 					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+					...(Number.isFinite(pos.chat) ? { chat: pos.chat } : {}),
 				}
 			}
 		} catch {
@@ -1440,15 +1448,23 @@ function setCallBox({ left, top, w, h }) {
 	const freeH = Math.max(0, view.height - h)
 	left = Math.max(0, Math.min(freeW, left))
 	top = Math.max(0, Math.min(freeH, top))
-	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+	callPos.value = { ...callPos.value, x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+function setCallChat(chatW, dx) {
+	callPos.value = { ...callPos.value, chat: splitCall(callPos.value, chatW, dx, view) }
+}
+// Arrow keys on the line between chat and video (#2135).
+function splitCallBy(dx) {
+	setCallChat(callLayout.value.chatW, dx)
+	saveCallPos()
 }
 // Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
 // pointer meanwhile (else Jitsi takes the moves).
 function startCallDrag(event, kind = "move") {
 	if (event.button !== 0) return
 	event.preventDefault()
-	const { left, top, w, h } = callLayout.value
-	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h } }
+	const { left, top, w, h, chatW } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h, chatW } }
 	window.addEventListener("pointermove", moveCall)
 	window.addEventListener("pointerup", stopCallDrag)
 	window.addEventListener("pointercancel", stopCallDrag)
@@ -1459,6 +1475,7 @@ function moveCall(event) {
 	const dx = event.clientX - drag.x
 	const dy = event.clientY - drag.y
 	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else if (drag.kind === "split") setCallChat(drag.from.chatW, dx)
 	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
 }
 function stopCallDrag() {
@@ -1466,6 +1483,9 @@ function stopCallDrag() {
 	window.removeEventListener("pointermove", moveCall)
 	window.removeEventListener("pointerup", stopCallDrag)
 	window.removeEventListener("pointercancel", stopCallDrag)
+	saveCallPos()
+}
+function saveCallPos() {
 	try {
 		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
 	} catch {
@@ -1566,16 +1586,67 @@ async function focusBubble(user, text = "") {
 	if (text) bubbleRefs[user]?.insert(text)
 }
 
+// --- Encounter alert (#2135): someone started a chat with me. Chime, tab title while the tab is
+// hidden, browser notification while I look elsewhere. Only for me, not for the one who started it.
+
+const encounterAlert = createEncounterAlert({
+	win: window,
+	doc: document,
+	storage: (() => {
+		try {
+			return window.localStorage
+		} catch {
+			return null
+		}
+	})(),
+	Notify: typeof Notification === "undefined" ? null : Notification,
+	Audio: window.AudioContext || window.webkitAudioContext || null,
+})
+const alertMuted = ref(encounterAlert.isMuted())
+const alertPermission = ref(encounterAlert.permission())
+const bell = computed(() => bellState(alertMuted.value, alertPermission.value))
+const bellTitle = computed(
+	() =>
+		({
+			ask: __("Get a sound and a browser notification when someone starts a chat with you"),
+			on: __("Sound and notification on when someone starts a chat with you. Click to mute."),
+			blocked: __("Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute."),
+			muted: __("Muted: no sound or notification when someone starts a chat with you. Click to turn on."),
+		})[bell.value]
+)
+
+async function clickBell() {
+	encounterAlert.unlock()
+	if (bell.value === "ask") {
+		alertPermission.value = await encounterAlert.requestPermission()
+	} else {
+		encounterAlert.setMuted(!alertMuted.value)
+		alertMuted.value = encounterAlert.isMuted()
+	}
+}
+
+function alertEncounter(other) {
+	alertPermission.value = encounterAlert.permission()
+	encounterAlert.notify(__("{0} wants to chat", [other.full_name]), { icon: other.user_image || OPHICE_ICON })
+}
+
+// Browsers play sound only after a key press or click on the page. On every one, not just the
+// first: some browsers (Safari) suspend the sound again while the tab is in the background.
+const unlockAudio = () => encounterAlert.unlock()
+
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
+		// Already chatting with them (the bubble stays open behind the cockpit), or Esc closed it: no alert.
+		if (!bubbles[other.user] && !dismissed.has(other.user)) alertEncounter(other)
 		pingWalkUp(other)
 		return
 	}
 	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
 	if (distanceTo(other) > PART_DISTANCE) return
+	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
 }
 
@@ -2689,6 +2760,8 @@ onMounted(async () => {
 	resizeObserver = new ResizeObserver(measure)
 	if (stage.value) resizeObserver.observe(stage.value)
 	window.addEventListener("keydown", onKeydown)
+	window.addEventListener("keydown", unlockAudio, { capture: true })
+	window.addEventListener("pointerdown", unlockAudio, { capture: true })
 	window.addEventListener("keyup", onKeyup)
 	window.addEventListener("blur", releaseAll)
 	window.addEventListener("pagehide", leaveOnPagehide)
@@ -2766,6 +2839,9 @@ onBeforeUnmount(() => {
 	clearTimeout(peopleSoon)
 	window.removeEventListener("resize", onViewportResize)
 	window.removeEventListener("keydown", onKeydown)
+	window.removeEventListener("keydown", unlockAudio, { capture: true })
+	window.removeEventListener("pointerdown", unlockAudio, { capture: true })
+	encounterAlert.stop()
 	window.removeEventListener("keyup", onKeyup)
 	window.removeEventListener("blur", releaseAll)
 	window.removeEventListener("pagehide", leaveOnPagehide)
