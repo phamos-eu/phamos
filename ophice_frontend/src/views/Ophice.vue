@@ -2337,6 +2337,8 @@ const selectedOnMap = computed(() => selectedUsers.value.filter(isOnMap))
  * `options.menu` false: only select and show them (the folded strip), no chat menu.
  */
 function onPersonClick(person, event, order = null, options = {}) {
+	// Placing a meeting point: the click only places it (on the map, onViewportClick).
+	if (placingPin.value) return
 	if (!person?.user || person.user === me.value?.user) return
 	if (event?.metaKey || event?.ctrlKey) {
 		const at = selectedUsers.value.indexOf(person.user)
