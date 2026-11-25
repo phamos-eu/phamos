@@ -1572,17 +1572,21 @@ def _with_runway(out, rate):
 
 def so_hours_total(rows):
 	"""One line for the whole MIS: the Sales Orders' hours added up, and how long the remaining
-	hours last at their combined monthly pace (the sum of each SO's rate)."""
+	hours last at their combined monthly pace (the sum of each SO's rate).
+
+	An over-delivered SO counts as 0 remaining, not negative, so it can't eat the other SOs' hours;
+	an SO with no hours left adds nothing to the pace, since its hours can't be spent any more."""
+	open_rows = [r for r in rows if r["remaining_hours"] > 0]
 	out = {
 		"total_hours": flt(sum(r["total_hours"] for r in rows), 2),
 		"delivered_hours": flt(sum(r["delivered_hours"] for r in rows), 2),
-		"remaining_hours": flt(sum(r["remaining_hours"] for r in rows), 2),
+		"remaining_hours": flt(sum(r["remaining_hours"] for r in open_rows), 2),
 		"monthly_rate": 0,
 		"runway_days": None,
 		"used_up": False,
 		"level": "orange",
 	}
-	return _with_runway(out, sum(flt(r["monthly_rate"]) for r in rows))
+	return _with_runway(out, sum(flt(r["monthly_rate"]) for r in open_rows))
 
 
 @frappe.whitelist()

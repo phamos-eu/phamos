@@ -497,6 +497,19 @@ class TestSalesOrderHoursAlert(FrappeTestCase):
 		self.assertLessEqual(total["runway_days"], 28)
 		self.assertEqual(total["level"], "red")
 
+	def test_over_delivered_so_does_not_eat_the_other_sos_hours(self):
+		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
+			so_hours_total,
+		)
+
+		open_so = self.runway(200, 40, "2026-07-01")
+		over = self.runway(50, 70, "2026-09-01")  # 20 h over: remaining -20
+		total = so_hours_total([open_so, over])
+		self.assertEqual((total["total_hours"], total["delivered_hours"]), (250, 110))
+		self.assertEqual(total["remaining_hours"], 160)  # not 140
+		self.assertEqual(total["monthly_rate"], open_so["monthly_rate"])
+		self.assertEqual(total["level"], "orange")
+
 	def test_api_is_empty_on_a_closed_mis(self):
 		from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
 			get_so_hours_alert,
