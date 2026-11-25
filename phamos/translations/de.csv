@@ -3059,3 +3059,6 @@ Get a sound and a browser notification when someone starts a chat with you,Ton u
 Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
 Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
 Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
+to close,zum Schließen
+Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
+"Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"

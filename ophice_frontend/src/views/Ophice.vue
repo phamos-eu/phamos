@@ -479,6 +479,7 @@
 						@call="openEncounterCall(bubble)"
 						@move-start="startCallDrag"
 						@resize-start="startCallDrag"
+						@split-by="splitCallBy"
 					/>
 				</Teleport>
 				<div
@@ -706,6 +707,7 @@ import {
 	encounterCallWindowName,
 	jitsiCallUrl,
 	resizeCall,
+	splitCall,
 } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
@@ -1560,7 +1562,8 @@ function openEncounterCall(bubble) {
 // The bubble with the embedded call (#2108): on the stage, where and how big this user last left
 // it. Kept per browser and user, like the meeting window's place; the place as share of the free
 // room, so it stays inside the stage at every window size. Default: centred at the top. The size
-// rules (video between 16:9 and 1:1, chat at least 144px) are in callBox / resizeCall.
+// rules (video between 16:9 and 1:1, chat at least 144px, a dragged chat width narrows the video
+// to 4:3 at most, #2135) are in callBox / resizeCall / splitCall.
 const CALL_POS_KEY = "phamos_ophice_call_pos"
 const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
 const callDrag = ref(null)
@@ -1582,6 +1585,7 @@ watch(
 					y: pos.y,
 					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
 					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+					...(Number.isFinite(pos.chat) ? { chat: pos.chat } : {}),
 				}
 			}
 		} catch {
@@ -1606,15 +1610,23 @@ function setCallBox({ left, top, w, h }) {
 	const freeH = Math.max(0, view.height - h)
 	left = Math.max(0, Math.min(freeW, left))
 	top = Math.max(0, Math.min(freeH, top))
-	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+	callPos.value = { ...callPos.value, x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+function setCallChat(chatW, dx) {
+	callPos.value = { ...callPos.value, chat: splitCall(callPos.value, chatW, dx, view) }
+}
+// Arrow keys on the line between chat and video (#2135).
+function splitCallBy(dx) {
+	setCallChat(callLayout.value.chatW, dx)
+	saveCallPos()
 }
 // Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
 // pointer meanwhile (else Jitsi takes the moves).
 function startCallDrag(event, kind = "move") {
 	if (event.button !== 0) return
 	event.preventDefault()
-	const { left, top, w, h } = callLayout.value
-	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h } }
+	const { left, top, w, h, chatW } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h, chatW } }
 	window.addEventListener("pointermove", moveCall)
 	window.addEventListener("pointerup", stopCallDrag)
 	window.addEventListener("pointercancel", stopCallDrag)
@@ -1625,6 +1637,7 @@ function moveCall(event) {
 	const dx = event.clientX - drag.x
 	const dy = event.clientY - drag.y
 	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else if (drag.kind === "split") setCallChat(drag.from.chatW, dx)
 	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
 }
 function stopCallDrag() {
@@ -1632,6 +1645,9 @@ function stopCallDrag() {
 	window.removeEventListener("pointermove", moveCall)
 	window.removeEventListener("pointerup", stopCallDrag)
 	window.removeEventListener("pointercancel", stopCallDrag)
+	saveCallPos()
+}
+function saveCallPos() {
 	try {
 		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
 	} catch {
