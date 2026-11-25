@@ -705,6 +705,7 @@
 			:dock="sidebarDock"
 			@slots="(slots) => (dockRects = slots)"
 			@dock-want="setDockWant"
+			@keys-back="giveKeysToCockpit"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -1282,6 +1283,13 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
+/** Over a cockpit: a walk or jump key pressed while the mini map has the keyboard (#2155). */
+function walkKeyInMiniMap(event) {
+	if (!event.target?.closest?.('[data-testid="mini-map"]') || isTyping(event.target)) return false
+	if (event.metaKey || event.ctrlKey || event.altKey) return false
+	return event.code === "Space" || Boolean(DIRECTIONS[event.key?.toLowerCase()])
+}
+
 function isTyping(target) {
 	if (!target) return false
 	const tag = target.tagName
@@ -1290,7 +1298,8 @@ function isTyping(target) {
 
 function onKeydown(event) {
 	shift = event.shiftKey
-	if (props.cockpitOpen) return
+	// Over a cockpit only the mini map walks (#2155): it has the keyboard while the pointer is on it.
+	if (props.cockpitOpen && !walkKeyInMiniMap(event)) return
 	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
 	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
 		event.preventDefault()
@@ -1391,6 +1400,9 @@ function nearestInRange() {
 /** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
 function chatOnStop() {
 	joinAreaIfInside()
+	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
+	// other person can still start one, which the mini map pings.
+	if (props.cockpitOpen) return
 	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
@@ -2260,6 +2272,10 @@ function onDockMessage(event) {
 	if (data.available && (Boolean(data.docked) !== dockWant.docked || Boolean(data.target) !== dockWant.target)) {
 		sendDockWant(event.source)
 	}
+}
+/** The pointer left the mini map: the keyboard goes back to the cockpit page. */
+function giveKeysToCockpit() {
+	document.querySelector("iframe[data-ophice-frame]")?.focus()
 }
 function setDockWant(want) {
 	dockWant = { docked: Boolean(want.docked), target: Boolean(want.target) }

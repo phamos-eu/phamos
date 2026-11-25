@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { effectScope, reactive } from "vue"
+import { effectScope, markRaw, reactive } from "vue"
 
 // Production logged "Cannot access 'T' before initialization" when a cockpit opened in Ophice:
 // MiniMap's `tile` read `wide` before `const wide` ran, through useMapCamera's watch getters.
@@ -157,6 +157,70 @@ describe("MiniMap docked in the cockpit's right sidebar (#2155)", () => {
 		expect(state.isDocked.value).toBe(false)
 		state.setDocked(true)
 		expect(state.isDocked.value).toBe(true)
+		scope.stop()
+	})
+})
+
+// Walking from the mini map over a cockpit (#2155): the keys go to the focused page, so the map
+// takes the keyboard while the pointer is on it, never from a field someone types in.
+describe("MiniMap takes the keyboard for walking (#2155)", () => {
+	const me = { name: "me", x: 3, y: 4 }
+	let active = null
+
+	beforeEach(() => {
+		vi.resetModules()
+		vi.spyOn(console, "warn").mockImplementation(() => {})
+		stubBrowser()
+		active = null
+		vi.stubGlobal("document", {
+			get activeElement() {
+				return active
+			},
+		})
+	})
+	afterEach(() => {
+		vi.unstubAllGlobals()
+		vi.restoreAllMocks()
+	})
+
+	async function withRoot(emitted = []) {
+		const { state, scope } = await runSetup({ cols: 40, rows: 25, me }, emitted)
+		// Like a DOM element, which Vue never wraps in a proxy.
+		const root = markRaw({ focus: vi.fn(() => (active = root)) })
+		state.root.value = root
+		return { state, scope, root }
+	}
+
+	it("takes the keyboard from the cockpit page when the pointer comes onto it", async () => {
+		const { state, scope, root } = await withRoot()
+		active = { tagName: "IFRAME", contentDocument: { activeElement: { tagName: "BODY" } } }
+		state.takeKeys()
+		expect(root.focus).toHaveBeenCalled()
+		scope.stop()
+	})
+
+	it("leaves the keyboard with a field someone types in, in the cockpit or here", async () => {
+		const { state, scope, root } = await withRoot()
+		active = { tagName: "IFRAME", contentDocument: { activeElement: { tagName: "TEXTAREA" } } }
+		state.takeKeys()
+		active = { tagName: "INPUT" }
+		state.takeKeys()
+		active = { tagName: "IFRAME", contentDocument: { activeElement: { tagName: "DIV", isContentEditable: true } } }
+		state.takeKeys()
+		expect(root.focus).not.toHaveBeenCalled()
+		scope.stop()
+	})
+
+	it("hands the keyboard back when the pointer leaves, only if it still has it", async () => {
+		const emitted = []
+		const { state, scope } = await withRoot(emitted)
+		state.takeKeys()
+		state.giveKeysBack()
+		expect(emitted.filter(([name]) => name === "keys-back")).toHaveLength(1)
+		// A reply typed in a ping has the focus now: leave it there.
+		active = { tagName: "INPUT" }
+		state.giveKeysBack()
+		expect(emitted.filter(([name]) => name === "keys-back")).toHaveLength(1)
 		scope.stop()
 	})
 })

@@ -11,12 +11,15 @@
 	<Teleport :to="floatTarget || 'body'" :disabled="!floatTarget">
 		<div
 			ref="root"
-			class="mini-map flex flex-col overflow-hidden rounded-xl border border-outline-gray-3 bg-surface-white text-ink-gray-9"
+			class="mini-map flex flex-col overflow-hidden rounded-xl border border-outline-gray-3 bg-surface-white text-ink-gray-9 outline-none focus:ring-2 focus:ring-outline-gray-4"
 			:class="floatTarget ? 'mini-map--floating' : isDocked ? 'fixed z-[60] shadow-sm' : 'fixed z-[60] shadow-2xl'"
 			:style="floatTarget ? {} : panelStyle"
 			:data-layout="wide ? 'wide' : 'tall'"
 			:data-docked="isDocked ? '1' : null"
+			tabindex="-1"
 			data-testid="mini-map"
+			@pointerenter="takeKeys"
+			@pointerleave="giveKeysBack"
 		>
 			<header
 				class="flex flex-shrink-0 select-none items-center gap-1.5 border-b border-outline-gray-2 px-2 py-1.5"
@@ -313,7 +316,7 @@ const props = defineProps({
 	 */
 	dock: { type: Object, default: null },
 })
-const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "dock-want"])
+const emit = defineEmits(["fullscreen", "reply", "open-chat", "dismiss", "send", "slots", "float", "dock-want", "keys-back"])
 
 // Replies typed in a ping: sent by the page (Ophice), which knows the chat behind it.
 const drafts = reactive({})
@@ -541,6 +544,36 @@ onBeforeUnmount(() => {
 	window.removeEventListener("resize", keepInView)
 	window.removeEventListener("pointermove", onDrag)
 })
+
+// --- Walking from the mini map: with the pointer on it, the arrow keys, WASD and Space walk and
+// jump my chip, as on the big map. The keys go to the page that has the focus, so the mini map
+// takes it while the pointer is on it, and hands it back to the cockpit when the pointer leaves.
+// It never takes it from a field someone types in (in the cockpit or a reply here).
+
+function isEditable(el) {
+	if (!el) return false
+	const tag = el.tagName
+	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(el.isContentEditable)
+}
+/** The focused element, looking into the cockpit's frame (same site) when that has the focus. */
+function focusedField() {
+	const active = document.activeElement
+	if (active?.tagName !== "IFRAME") return active
+	try {
+		return active.contentDocument?.activeElement || active
+	} catch {
+		return active
+	}
+}
+function takeKeys() {
+	// In the floating window the keys go to that window; moving or resizing: leave it alone.
+	if (props.floatTarget || grabbing.value || !root.value || isEditable(focusedField())) return
+	root.value.focus({ preventScroll: true })
+}
+function giveKeysBack() {
+	if (props.floatTarget || document.activeElement !== root.value) return
+	emit("keys-back")
+}
 
 // --- Float: Document Picture-in-Picture, a small window on top of everything (Chrome, Edge,
 // newer Firefox; not Safari). The same element moves into it; closing it brings it back.
