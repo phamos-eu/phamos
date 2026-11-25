@@ -220,3 +220,59 @@ class TestBriefInChat(IssueAssistantTestCase):
 		)
 		self.assertTrue(any(doc.name in (t or "") for t in texts), texts)
 		self.assertTrue(frappe.db.exists("Raven Channel Member", {"channel_id": channel, "user_id": bot_user}))
+
+
+class TestManualRun(IssueAssistantTestCase):
+	def checks(self, doc):
+		return {c["key"]: c for c in assistant.get_manual_run_info(doc.name)["checks"]}
+
+	def test_dialog_names_what_is_missing(self):
+		self.settings.enabled = 0
+		self.settings.save(ignore_permissions=True)
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		info = assistant.get_manual_run_info(doc.name)
+		checks = {c["key"]: c for c in info["checks"]}
+		self.assertFalse(info["would_start"])
+		self.assertFalse(info["model_allowed"])
+		self.assertFalse(checks["settings_enabled"]["ok"])
+		self.assertFalse(checks["customer_ai_allowed"]["ok"])
+		self.assertIn(CUSTOMER, checks["customer_ai_allowed"]["needed"])
+
+	def test_all_green_is_not_an_override(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		self.assertTrue(all(c["ok"] for c in self.checks(doc).values()))
+		with patch("phamos.ai_agents.runner.frappe.enqueue"):
+			result = assistant.start_manual_run(doc.name)
+		self.assertTrue(result["queued"])
+		run = frappe.get_doc("AI Agent Run", result["run"])
+		self.assertEqual((run.trigger, run.manual_override), ("Manual", 0))
+		frappe.cache.delete(frappe.cache.make_key(f"ai_agent_run_lock:Issue:{doc.name}"))
+
+	def test_override_runs_past_the_gate_and_is_recorded(self):
+		self.settings.enabled = 0
+		self.settings.save(ignore_permissions=True)
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		reasons = [f"{c['label']}: {c['current']}" for c in self.checks(doc).values() if not c["ok"]]
+		run = runner.run_now("Issue", doc.name, trigger="Manual", override_reasons=reasons)
+		self.assertEqual(run.status, "Completed", run.error)
+		self.assertEqual(run.manual_override, 1)
+		self.assertIn(CUSTOMER, run.override_reasons)
+		gate = frappe.parse_json(run.analysis)["gate"]
+		self.assertEqual((gate["allowed"], gate["reason"], gate["checked_reason"]),
+			(True, assistant.MANUAL_OVERRIDE, assistant.CUSTOMER_NOT_ALLOWED))
+		self.assertIn("manual override", run.summary)
+
+	def test_override_starts_a_disabled_agent(self):
+		frappe.db.set_value("AI Agent", setup.ASSISTANT_NAME, "enabled", 0)
+		doc = self.issue(raised_by=WEBSITE_USER)
+		self.assertIsNone(runner.get_agent("Issue"))
+		run = runner.run_now("Issue", doc.name, trigger="Manual", override_reasons=["AI Agent disabled"])
+		self.assertEqual(run.status, "Completed", run.error)
+
+	def test_needs_write_permission(self):
+		doc = self.issue(raised_by=WEBSITE_USER)
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(WEBSITE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			assistant.start_manual_run(doc.name)
