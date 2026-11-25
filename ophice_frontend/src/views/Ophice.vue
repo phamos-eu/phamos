@@ -753,6 +753,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { openFloatingWindow } from "../utils/pip.js"
 import { DOCK_RECT, DOCK_SIZE, dockMessage } from "@spa/utils/ophiceDock.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { areaUnder, walkedOut } from "../utils/ophiceWalkOut.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
@@ -2245,6 +2246,27 @@ watch(
 		// Back in the office (PM, 2026-11-22): the floating window closes and call and chat come
 		// back onto the map. A meeting in its own browser window (the long one, #2078) stays there.
 		if (pipBody.value) closeMeetingPip()
+	}
+)
+
+// Over a cockpit, walking from the mini map out of the area I stood in when the cockpit opened
+// takes me back to the map (PM, 2026-11-25, #2155). The keys stay held, so the chip walks on there.
+// Opened outside any area: walking keeps the cockpit. Opened by a reload of /open/..., my chip
+// and the areas arrive after the cockpit: the start area is taken once both are there.
+let cockpitArea = null
+watch(
+	() => (props.cockpitOpen && me.value && areas.value.length ? areas.value : null),
+	(loaded) => {
+		cockpitArea = loaded ? areaUnder(loaded, me.value)?.name || null : null
+	},
+	{ immediate: true }
+)
+watch(
+	() => me.value && [me.value.x, me.value.y],
+	() => {
+		if (!props.cockpitOpen || !walkedOut(cockpitArea, areas.value, me.value)) return
+		cockpitArea = null
+		emit("back-to-map")
 	}
 )
 
