@@ -1711,7 +1711,8 @@ function alertEncounter(other) {
 	encounterAlert.notify(__("{0} wants to chat", [other.full_name]), { icon: other.user_image || OPHICE_ICON })
 }
 
-// Browsers play sound only after a key press or click on the page.
+// Browsers play sound only after a key press or click on the page. On every one, not just the
+// first: some browsers (Safari) suspend the sound again while the tab is in the background.
 const unlockAudio = () => encounterAlert.unlock()
 
 // The other person started the chat (open_encounter tells this page): open it here too.
@@ -2842,8 +2843,8 @@ onMounted(async () => {
 	resizeObserver = new ResizeObserver(measure)
 	if (stage.value) resizeObserver.observe(stage.value)
 	window.addEventListener("keydown", onKeydown)
-	window.addEventListener("keydown", unlockAudio, { capture: true, once: true })
-	window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true })
+	window.addEventListener("keydown", unlockAudio, { capture: true })
+	window.addEventListener("pointerdown", unlockAudio, { capture: true })
 	window.addEventListener("keyup", onKeyup)
 	window.addEventListener("blur", releaseAll)
 	window.addEventListener("pagehide", leaveOnPagehide)
