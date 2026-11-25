@@ -1,18 +1,13 @@
 <template>
 	<!--
-		Ophice's background image, placed in grid tiles (#2089). It may reach beyond the grid (those
-		parts are dimmed by MapFog). With `frame` (edit mode "Adjust") it is only the outline with
+		Ophice's background image, placed in grid tiles (#2089). It is the world (#2139): its edges
+		fade out softly, so the map ends like a horizon, not a cut. With `frame` (edit mode "Adjust") it is only the outline with
 		handles: drag inside to move it, drag a corner to resize it (half-tile steps, Alt = free).
 	-->
-	<img
-		v-if="!frame"
-		:src="src"
-		alt=""
-		draggable="false"
-		class="pointer-events-none absolute max-w-none select-none"
-		:style="box"
-		data-testid="background-image"
-	/>
+	<div v-if="!frame" class="bg-image pointer-events-none absolute select-none" :style="box" aria-hidden="true">
+		<img :src="src" alt="" draggable="false" class="h-full w-full max-w-none" data-testid="background-image" />
+		<div class="bg-image__shade absolute inset-0" />
+	</div>
 	<div
 		v-else
 		class="bg-frame absolute"
@@ -114,6 +109,26 @@ function round(value) {
 </script>
 
 <style scoped>
+/* Soft edges of the map (#2139), like the cockpit glow: the image darkens towards its edges in
+   a gentle fade and then fades out, so the map ends like a horizon, not a cut. */
+.bg-image {
+	--fade-out: 3%;
+	--shade: rgb(15 23 42 / 0.55);
+	--shade-in: 9%;
+	-webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-out), #000 calc(100% - var(--fade-out)), transparent),
+		linear-gradient(to bottom, transparent, #000 var(--fade-out), #000 calc(100% - var(--fade-out)), transparent);
+	-webkit-mask-composite: source-in;
+	mask-image: linear-gradient(to right, transparent, #000 var(--fade-out), #000 calc(100% - var(--fade-out)), transparent),
+		linear-gradient(to bottom, transparent, #000 var(--fade-out), #000 calc(100% - var(--fade-out)), transparent);
+	mask-composite: intersect;
+}
+.bg-image__shade {
+	background:
+		linear-gradient(to right, var(--shade), transparent var(--shade-in)),
+		linear-gradient(to left, var(--shade), transparent var(--shade-in)),
+		linear-gradient(to bottom, var(--shade), transparent var(--shade-in)),
+		linear-gradient(to top, var(--shade), transparent var(--shade-in));
+}
 .bg-frame {
 	z-index: 40;
 	cursor: grab;

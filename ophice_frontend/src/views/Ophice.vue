@@ -265,12 +265,7 @@
 					:canvas="camera().canvas.value"
 					:tile="tile"
 				/>
-				<MapFog
-					v-if="background && imageBox"
-					:canvas="camera().canvas.value"
-					:revealed="{ x: 0, y: 0, w: me.cols, h: me.rows }"
-					:tile="tile"
-				/>
+				<!-- No fog around the grid any more (#2139): the image is the world, its own edges fade out. -->
 			<div
 				class="ophice-grid absolute"
 				:class="{
@@ -608,7 +603,6 @@ import OphiceSidebar from "../components/OphiceSidebar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
-import MapFog from "../components/MapFog.vue"
 import BackgroundImage from "../components/BackgroundImage.vue"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
