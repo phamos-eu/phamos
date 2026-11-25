@@ -2731,13 +2731,13 @@ Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
-"Whoever stops inside the area joins this meeting, with microphone and camera off.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit ausgeschaltetem Mikrofon und ausgeschalteter Kamera."
+"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
 The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
 The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
 Leave the meeting,Besprechung verlassen
 Leave (Esc),Verlassen (Esc)
-"The meeting URL must start with https://, for example https://meet.jit.si/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.jit.si/OurStandup."
+"The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.systemli.org/OurStandup."
 Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} verwendet werden.
 "The meeting URL needs a room name after the server, for example /OurStandup.","Die Besprechungs-URL braucht nach dem Server einen Raumnamen, zum Beispiel /OurStandup."
 Give the area a name.,Geben Sie dem Bereich einen Namen.
@@ -3036,6 +3036,8 @@ End {0}'s visit?,Besuch von {0} beenden?
 Send out,Hinausschicken
 Send out of Ophice,Aus dem Ophice schicken
 {0} has left Ophice.,{0} hat das Ophice verlassen.
+Call window,Anruffenster
+Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
 AI processing allowed,KI-Verarbeitung erlaubt
 Issue Assistant Settings,Einstellungen Anfrage-Assistent
 Assistant User,Assistent-Benutzer
@@ -3051,3 +3053,4 @@ AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt 
 AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
 The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
 AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
+Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)

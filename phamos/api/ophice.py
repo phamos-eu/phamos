@@ -87,8 +87,16 @@ EVENT_SAVED = "ophice_saved"
 EVENT_BURNED = "ophice_burned"
 
 # Video call on encounter (#2059): a Jitsi room per encounter, joined muted with the camera off.
-# Site config: "ophice_jitsi_domain" (default meet.jit.si), "ophice_video": 0 turns it off.
-JITSI_DEFAULT_DOMAIN = "meet.jit.si"
+# Site config: "ophice_jitsi_domain" (default meet.systemli.org), "ophice_video": 0 turns it off.
+# meet.jit.si was the default until #2108: a new room there waits for a logged-in moderator, and
+# embedded calls end after 5 minutes. Its links still work: they move to the site's server.
+JITSI_DEFAULT_DOMAIN = "meet.systemli.org"
+LEGACY_JITSI_DOMAINS = ("meet.jit.si",)
+
+
+def _jitsi_domain():
+	"""The site's Jitsi server: site config or the default."""
+	return str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/").lower()
 
 # Meeting areas (#2060): rectangles of the grid with a fixed Jitsi meeting.
 AREA_DOCTYPE = "Ophice Area"
@@ -920,7 +928,7 @@ def _video(doc):
 	switch = frappe.conf.get("ophice_video")
 	if switch is not None and not frappe.utils.cint(switch):
 		return None
-	domain = str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/")
+	domain = _jitsi_domain()
 	# A bare host name: the page loads https://<domain>/external_api.js from it.
 	if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", domain):
 		return None
@@ -1357,7 +1365,7 @@ def _part_all_mine(user):
 def _allowed_jitsi_domains():
 	"""The Jitsi servers areas may point to. The page loads external_api.js from that server, so
 	only servers the site trusts: the configured one plus an optional list."""
-	domains = {str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().lower()}
+	domains = {_jitsi_domain()}
 	extra = frappe.conf.get("ophice_jitsi_domains") or []
 	if isinstance(extra, list):
 		domains |= {str(d).strip().lower() for d in extra if d}
@@ -1374,7 +1382,10 @@ def _parse_meeting_url(url):
 		domain = f"{domain}:{parsed.port}"
 	room = unquote(parsed.path.strip("/"))
 	if parsed.scheme != "https" or not domain:
-		frappe.throw(_("The meeting URL must start with https://, for example https://meet.jit.si/OurStandup."))
+		frappe.throw(_("The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup."))
+	# An old meet.jit.si link (#2108): same room on the site's server; Jitsi rooms are just names.
+	if domain in LEGACY_JITSI_DOMAINS and domain not in _allowed_jitsi_domains():
+		domain = _jitsi_domain()
 	if domain not in _allowed_jitsi_domains():
 		frappe.throw(
 			_("Only meetings on {0} can be used here.").format(", ".join(sorted(_allowed_jitsi_domains())))

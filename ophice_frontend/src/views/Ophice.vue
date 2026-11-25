@@ -118,7 +118,11 @@
 			@pick="(person, event) => openChatWith(person, event)"
 			@hide="setHideDetails"
 		/>
-		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<div
+			id="ophice-stage"
+			ref="stage"
+			class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
+		>
 			<!--
 				Adjust (#2058, #2089): the image in grid tiles (drag it on the map, or nudge it here), the
 				grid's size, and everyone's starting zoom. Top left; everyone sees the changes.
@@ -428,24 +432,43 @@
 						/>
 					</span>
 				</div>
-				<EncounterBubble
+				<!-- With the call (#2108) the bubble leaves the map: it sits on the stage where the user
+				     last dragged it, and the map can move below it. -->
+				<Teleport
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
-					:ref="(el) => setBubbleRef(bubble.user, el)"
-					:peer="bubble.peer"
-					:me="me.user"
-					:messages="bubble.messages"
-					:loading="bubble.loading"
-					:error="bubble.error"
-					:sending="bubble.sending"
-					:video="bubble.user === videoUser ? bubble.video : null"
-					:display-name="me.full_name"
-					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
-					data-no-pan
-					@pointerdown.capture="raise(`chat:${bubble.user}`)"
-					@send="(text, done) => sendMessage(bubble, text, done)"
-					@close="closeBubble(bubble.user)"
-				/>
+					to="#ophice-stage"
+					:disabled="!isCallBubble(bubble)"
+					defer
+				>
+					<EncounterBubble
+						:ref="(el) => setBubbleRef(bubble.user, el)"
+						:peer="bubble.peer"
+						:me="me.user"
+						:messages="bubble.messages"
+						:loading="bubble.loading"
+						:error="bubble.error"
+						:sending="bubble.sending"
+						:video="bubble.user === videoUser ? bubble.video : null"
+						:display-name="me.full_name"
+						:in-window="!!bubble.inWindow"
+						:movable="isCallBubble(bubble)"
+						:dragging="callDrag !== null"
+						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:me-chip="me"
+						:style="{
+							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
+							zIndex: zOf(`chat:${bubble.user}`),
+						}"
+						data-no-pan
+						@pointerdown.capture="raise(`chat:${bubble.user}`)"
+						@send="(text, done) => sendMessage(bubble, text, done)"
+						@close="closeBubble(bubble.user)"
+						@call="openEncounterCall(bubble)"
+						@move-start="startCallDrag"
+						@resize-start="startCallDrag"
+					/>
+				</Teleport>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
@@ -664,6 +687,13 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import {
+	CALL_DEFAULT,
+	callBox,
+	encounterCallWindowName,
+	jitsiCallUrl,
+	resizeCall,
+} from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -752,7 +782,6 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 384
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -1487,6 +1516,120 @@ const videoUser = computed(() => {
 	return best?.user || null
 })
 
+// The encounter call in its own Jitsi window (#2108): bigger, and without the 5-minute cap of
+// embedded meet.jit.si calls. The bubble then leaves its embedded call (no double join). The
+// window stays open when the two walk apart: the call is the person's own from then on.
+const callWindows = {}
+function openEncounterCall(bubble) {
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
+	if (!url) return
+	const name = encounterCallWindowName(bubble.video)
+	const open = callWindows[name]
+	if (open && !open.closed) {
+		open.focus()
+		return
+	}
+	const win = window.open(url, name, "popup,width=1200,height=800")
+	if (!win) {
+		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
+		return
+	}
+	// The call page must not steer Ophice's tab (reverse tabnabbing).
+	try {
+		win.opener = null
+	} catch {
+		// some browsers do not allow it
+	}
+	callWindows[name] = win
+	bubble.inWindow = true
+}
+
+// The bubble with the embedded call (#2108): on the stage, where and how big this user last left
+// it. Kept per browser and user, like the meeting window's place; the place as share of the free
+// room, so it stays inside the stage at every window size. Default: centred at the top. The size
+// rules (video between 16:9 and 1:1, chat at least 144px) are in callBox / resizeCall.
+const CALL_POS_KEY = "phamos_ophice_call_pos"
+const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
+const callDrag = ref(null)
+function isCallBubble(bubble) {
+	return bubble.user === videoUser.value && !!bubble.video && !bubble.inWindow
+}
+function callPosKey() {
+	return `${CALL_POS_KEY}:${me.value?.user || ""}`
+}
+watch(
+	() => me.value?.user,
+	(user) => {
+		if (!user) return
+		try {
+			const pos = JSON.parse(localStorage.getItem(callPosKey()) || "null")
+			if (pos && [pos.x, pos.y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+				callPos.value = {
+					x: pos.x,
+					y: pos.y,
+					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
+					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+				}
+			}
+		} catch {
+			// private window: the default place
+		}
+	},
+	{ immediate: true }
+)
+// Place and size as shown: px on the stage.
+const callLayout = computed(() => {
+	const box = callBox(callPos.value, view)
+	const freeW = Math.max(0, view.width - box.w)
+	const freeH = Math.max(0, view.height - box.h)
+	return { ...box, left: callPos.value.x * freeW, top: callPos.value.y * freeH }
+})
+function callBubbleStyle() {
+	const box = callLayout.value
+	return { left: `${box.left}px`, top: `${box.top}px`, width: `${box.w}px`, height: `${box.h}px` }
+}
+function setCallBox({ left, top, w, h }) {
+	const freeW = Math.max(0, view.width - w)
+	const freeH = Math.max(0, view.height - h)
+	left = Math.max(0, Math.min(freeW, left))
+	top = Math.max(0, Math.min(freeH, top))
+	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+// Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
+// pointer meanwhile (else Jitsi takes the moves).
+function startCallDrag(event, kind = "move") {
+	if (event.button !== 0) return
+	event.preventDefault()
+	const { left, top, w, h } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h } }
+	window.addEventListener("pointermove", moveCall)
+	window.addEventListener("pointerup", stopCallDrag)
+	window.addEventListener("pointercancel", stopCallDrag)
+}
+function moveCall(event) {
+	const drag = callDrag.value
+	if (!drag) return
+	const dx = event.clientX - drag.x
+	const dy = event.clientY - drag.y
+	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
+}
+function stopCallDrag() {
+	callDrag.value = null
+	window.removeEventListener("pointermove", moveCall)
+	window.removeEventListener("pointerup", stopCallDrag)
+	window.removeEventListener("pointercancel", stopCallDrag)
+	try {
+		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
+	} catch {
+		// private window: the place lasts until the reload
+	}
+}
+// Ophice closed in the middle of a drag: no listeners left behind.
+onBeforeUnmount(() => {
+	if (callDrag.value) stopCallDrag()
+})
+
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el
 	else delete bubbleRefs[user]
@@ -1498,13 +1641,12 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	// With the video call the bubble is wider and about 200px taller (#2059).
-	const withVideo = bubble.user === videoUser.value
-	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	// Only the chat sits here; with the call the bubble is on the stage (callBubbleStyle, #2108).
+	const width = BUBBLE_WIDTH
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 520 : 270)) {
+	if (top * t < 270) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
@@ -1818,7 +1960,9 @@ let windowWatch = null
 function popOut() {
 	const area = meetingArea.value
 	if (!area) return
-	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
+	// Straight in, mic and camera on, my name filled in (#2108).
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
+	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
 		meetingWindow.focus()

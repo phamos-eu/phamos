@@ -83,3 +83,4 @@ phamos.patches.v1_0.mis_links_from_documents
 phamos.patches.v1_0.docs_links_back_to_bookstack #2044
 phamos.patches.v1_0.fill_docs_search_text #2046
 phamos.patches.v1_0.backfill_reviewed_revision_on_meeting_reviews
+phamos.patches.v1_0.ophice_areas_to_site_jitsi_server #2108
