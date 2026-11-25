@@ -649,21 +649,30 @@ def _raise_for_gitlab(response, what, sudo=None):
 		detail = detail.get("message") or detail.get("error") or detail
 	except Exception:
 		detail = response.text[:500]
-	if sudo and response.status_code in (401, 403):
-		frappe.throw(
-			_(
-				"GitLab {0} as <b>{1}</b> failed: the GitLab token must belong to an admin "
-				"and have the <b>sudo</b> scope, and {1} needs access to the project. ({2})"
-			).format(what, escape_html(sudo), escape_html(cstr(detail))),
-			title=_("GitLab token needs the sudo scope"),
-		)
+	# 401 (invalid or expired token) falls through to the generic message, Sudo or not
 	if cstr(detail) == "insufficient_scope":
+		if sudo:
+			frappe.throw(
+				_(
+					"GitLab {0} failed: the GitLab token is missing the <b>api</b> or <b>sudo</b> scope. "
+					"Create a token with both scopes (on an admin account) and add it in Phriend Settings."
+				).format(what),
+				title=_("GitLab token needs the api and sudo scopes"),
+			)
 		frappe.throw(
 			_(
 				"GitLab {0} failed: the GitLab token is missing the <b>api</b> scope. "
 				"Create a token with the <b>api</b> scope (Reporter role or higher) and add it in Phriend Settings."
 			).format(what),
 			title=_("GitLab token needs the api scope"),
+		)
+	if sudo and response.status_code == 403:
+		frappe.throw(
+			_(
+				"GitLab {0} as <b>{1}</b> failed: the GitLab token must belong to an admin, "
+				"and {1} needs access to the project. ({2})"
+			).format(what, escape_html(sudo), escape_html(cstr(detail))),
+			title=_("GitLab could not act as the reporter"),
 		)
 	frappe.throw(_("GitLab {0} failed ({1}): {2}").format(what, response.status_code, escape_html(cstr(detail))))
 

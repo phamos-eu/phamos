@@ -899,9 +899,38 @@ class TestPhriend(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError) as raised:
 			api.create_gitlab_issue(issue.name)
 
-		self.assertIn("sudo", str(raised.exception))
+		self.assertIn("admin", str(raised.exception))
 		self.assertIn("devone", str(raised.exception))
 		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_missing_scope_with_sudo_names_both_scopes(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-no-sudo")
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=403, json={"error": "insufficient_scope"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("<b>api</b> or <b>sudo</b>", str(raised.exception))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_expired_token_with_sudo_gets_the_plain_message(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-expired")
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=401, json={"message": "401 Unauthorized"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("(401): 401 Unauthorized", str(raised.exception))
+		self.assertNotIn("sudo", str(raised.exception))
 
 
 # ---- the report on the cockpit Issue page (#1901)
