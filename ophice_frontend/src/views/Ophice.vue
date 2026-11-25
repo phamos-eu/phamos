@@ -2237,9 +2237,9 @@ watch(
 )
 
 // --- The mini map's spot in the cockpit's sidebar (#2155). The cockpit frame says where the spot
-// is; the mini map says how tall it must be, and Ophice passes that back to the frame.
+// is; the mini map says how tall it must be, and Ophice passes that back to the frame. Always the
+// frame that is there now: a cockpit reopened from the shortcut bar gets a new iframe.
 const sidebarDock = ref(null)
-let dockFrame = null
 let dockSize = { height: 0, target: false }
 function cockpitFrameWindow() {
 	return document.querySelector("iframe[data-ophice-frame]")?.contentWindow || null
@@ -2254,14 +2254,13 @@ function sendDockSize(win) {
 function onDockMessage(event) {
 	const data = dockMessage(event, DOCK_RECT)
 	if (!data || !event.source || event.source !== cockpitFrameWindow()) return
-	dockFrame = event.source
 	sidebarDock.value = data.rect ? { ...data.rect, max: Number(data.max) || 0 } : null
 	// A new page in the frame starts with an empty spot: tell it the size.
-	if (data.rect && (data.height !== dockSize.height || data.target !== dockSize.target)) sendDockSize(dockFrame)
+	if (data.rect && (data.height !== dockSize.height || data.target !== dockSize.target)) sendDockSize(event.source)
 }
 function setDockSize(size) {
 	dockSize = { height: Math.round(size.height), target: Boolean(size.target) }
-	sendDockSize(dockFrame || cockpitFrameWindow())
+	sendDockSize(cockpitFrameWindow())
 }
 window.addEventListener("message", onDockMessage)
 

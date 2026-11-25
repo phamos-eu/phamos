@@ -378,11 +378,11 @@ function storedSize() {
 }
 const size = reactive(storedSize())
 const floatSize = reactive({ w: 0, h: 0 })
+// Docked: as tall as the sidebar allows, never less than a useful map.
+const dockMax = computed(() => Math.max(160, props.dock?.max || 0))
 const panelHeight = computed(() =>
 	props.floatTarget ? floatSize.h : isDocked.value ? dockMax.value : props.meeting ? size.h : 2000
 )
-// Docked: as tall as the sidebar allows, never less than a useful map.
-const dockMax = computed(() => Math.max(160, props.dock?.max || 0))
 const wide = computed(() => {
 	// Docked, it is as narrow as the sidebar: always tall.
 	if (!props.meeting || isDocked.value) return false
