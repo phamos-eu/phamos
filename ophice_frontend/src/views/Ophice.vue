@@ -1,104 +1,14 @@
 <template>
 	<!-- Ophice (#2053, #2070): its own app at /ophice, full screen. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
-		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
-			<div class="flex items-center gap-2 text-base font-semibold tracking-tight">
-				<img :src="OPHICE_ICON" alt="" class="h-6 w-6 rounded-md" />
-				{{ __("Ophice") }}
-			</div>
-			<!-- One line; shortened when the text is large or the window small (#2091). -->
-			<div
-				class="ml-auto min-w-0 truncate text-sm text-ink-gray-5"
-				:title="__('Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)')"
-			>
-				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
-			</div>
-			<!-- Text size (#2091): for weaker eyes and small screens; the map has its own zoom. -->
-			<div
-				v-if="me"
-				class="flex items-center rounded-lg border border-outline-gray-2 bg-surface-white p-0.5 text-xs"
-				:title="__('Text size of Ophice and the cockpits in it')"
-				data-testid="text-size"
-			>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale <= UI_SCALES[0]" :title="__('Smaller text')" data-testid="text-smaller" @click="stepUiScale(-1)">
-					<span class="text-[11px] font-semibold">A−</span>
-				</button>
-				<button type="button" class="ophice-zoom__button w-11 tabular-nums text-ink-gray-7" :title="__('Normal text size')" data-testid="text-reset" @click="setUiScale(1)">
-					{{ Math.round(uiScale * 100) }} %
-				</button>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale >= UI_SCALES[UI_SCALES.length - 1]" :title="__('Larger text')" data-testid="text-larger" @click="stepUiScale(1)">
-					<span class="text-sm font-semibold">A+</span>
-				</button>
-			</div>
-			<!-- My status (#2053): be right back / away, shown above my chip. -->
-			<Button
-				v-if="me"
-				:variant="statusOpen ? 'solid' : 'subtle'"
-				:title="__('Set a status: be right back, or away until a time')"
-				data-testid="status-button"
-				@click="toggleStatus()"
-			>
-				<template #prefix>
-					<FeatherIcon :name="me.status?.kind === 'away' ? 'moon' : me.status ? 'coffee' : 'check-circle'" class="h-4 w-4" />
-				</template>
-				{{ me.status?.kind === "away" ? __("Away") : me.status ? __("Be right back") : __("Available") }}
-			</Button>
-			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. Map editors only (#2071). -->
-			<Button
-				v-if="canEditMap"
-				:variant="editingAreas ? 'solid' : 'subtle'"
-				:title="__('Draw and edit meeting areas, for everyone')"
-				:aria-pressed="editingAreas"
-				@click="editingAreas = !editingAreas"
-			>
-				<template #prefix><FeatherIcon name="video" class="h-4 w-4" /></template>
-				{{ editingAreas ? __("Done") : __("Meeting areas") }}
-			</Button>
-			<!-- Ophice's background, one for everyone (#2053). -->
-			<input
-				ref="backgroundInput"
-				type="file"
-				accept="image/png,image/jpeg,image/webp,image/gif"
-				class="hidden"
-				@change="uploadBackground"
-			/>
-			<Button
-				v-if="canEditMap"
-				variant="subtle"
-				:loading="backgroundBusy"
-				:title="__('Upload an image as the background of Ophice, for everyone')"
-				@click="backgroundInput?.click()"
-			>
-				<template #prefix><FeatherIcon name="image" class="h-4 w-4" /></template>
-				{{ __("Background") }}
-			</Button>
-			<Button
-				v-if="canEditMap"
-				:variant="adjustingBackground ? 'solid' : 'subtle'"
-				:title="__('Size and position of the background image on the grid, for everyone')"
-				:aria-pressed="adjustingBackground"
-				@click="adjustingBackground = !adjustingBackground"
-			>
-				<template #prefix><FeatherIcon name="maximize-2" class="h-4 w-4" /></template>
-				{{ __("Adjust") }}
-			</Button>
-			<Button
-				v-if="canEditMap && background"
-				variant="ghost"
-				:disabled="backgroundBusy"
-				:title="__('Remove the background, for everyone')"
-				@click="removeBackground"
-			>
-				{{ __("Remove") }}
-			</Button>
-			<!-- Debug (#2072): replays things on my own screen only, for testing. Map editors only. -->
-			<Dropdown v-if="canEditMap" :options="debugOptions" placement="right">
-				<Button variant="ghost" :title="__('Debug: simulate things on your own screen only')" data-testid="debug-menu">
-					<template #prefix><FeatherIcon name="tool" class="h-4 w-4" /></template>
-					{{ __("Debug") }}
-				</Button>
-			</Dropdown>
-		</header>
+		<!-- Ophice's background, one for everyone (#2053); the button is in the right sidebar. -->
+		<input
+			ref="backgroundInput"
+			type="file"
+			accept="image/png,image/jpeg,image/webp,image/gif"
+			class="hidden"
+			@change="uploadBackground"
+		/>
 
 		<div class="flex min-h-0 flex-1">
 		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
@@ -619,14 +529,32 @@
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
-		<!-- Shortcut bar (#2073): the cockpits in a column at the right edge, part of the page like
-		     the people list (PM: not floating over the map); they open inside Ophice. -->
-		<CockpitBar
+		<!-- Right sidebar (#2073, PM 2026-11-25): cockpits, my status and the testing settings; it
+		     replaced the top bar. Part of the page like the people list, not floating over the map. -->
+		<OphiceSidebar
 			v-if="me"
-			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
+			v-model:collapsed="sideCollapsed"
+			:icon="OPHICE_ICON"
 			:cockpits="barCockpits"
 			:open-route="openRoute"
+			:status="me.status"
+			:status-open="statusOpen"
+			:ui-scale="uiScale"
+			:scales="UI_SCALES"
+			:can-edit-map="canEditMap"
+			:editing-areas="editingAreas"
+			:adjusting-background="adjustingBackground"
+			:has-background="Boolean(background)"
+			:background-busy="backgroundBusy"
+			:debug-options="debugOptions"
 			@open="openCockpit"
+			@status="toggleStatus()"
+			@text-step="stepUiScale"
+			@text-reset="setUiScale(1)"
+			@areas="editingAreas = !editingAreas"
+			@background="backgroundInput?.click()"
+			@adjust="adjustingBackground = !adjustingBackground"
+			@remove-background="removeBackground"
 		/>
 		</div>
 		<!-- Over an open cockpit (#2074): the office small, with pings and quick replies. -->
@@ -665,12 +593,12 @@
 
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
-import { Button, call, Dropdown, FeatherIcon, toast } from "frappe-ui"
+import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
-import CockpitBar from "../components/CockpitBar.vue"
+import OphiceSidebar from "../components/OphiceSidebar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
@@ -2025,6 +1953,7 @@ const areaChatStyle = computed(() => (tileRects.value?.chat ? rectStyle(tileRect
 // --- People list (#2063) and "chat with" (list or map).
 
 const PEOPLE_KEY = "phamos_ophice_people_open"
+const SIDEBAR_KEY = "phamos_ophice_sidebar_open"
 const PEOPLE_REFRESH_MS = 15000
 const people = ref([])
 const hideDetails = ref(false)
@@ -2081,6 +2010,16 @@ function readFlag(key, fallback) {
 		return fallback
 	}
 }
+
+// The right sidebar (PM, 2026-11-25): folded to icons by default, remembered in this browser.
+const sideCollapsed = ref(!readFlag(SIDEBAR_KEY, false))
+watch(sideCollapsed, (value) => {
+	try {
+		localStorage.setItem(SIDEBAR_KEY, value ? "0" : "1")
+	} catch {
+		// private window: folded again after a reload
+	}
+})
 
 /** Keep the people list open, or fold it back to its chips (#2091). */
 function setPeoplePinned(value) {
