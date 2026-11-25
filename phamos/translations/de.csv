@@ -2624,6 +2624,24 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
 This documentation is in German.,Diese Dokumentation ist auf Deutsch.
+Hide contents,Inhalt ausblenden
+Show contents,Inhalt einblenden
+On this page,Auf dieser Seite
+Back to top,Nach oben
+Next heading,Nächste Überschrift
+Next chapter,Nächstes Kapitel
+Expand all,Alle aufklappen
+Collapse all,Alle zuklappen
+Search the documentation,Dokumentation durchsuchen
+Search in {0},In {0} suchen
+Only this book,Nur in diesem Buch
+Please enter at least 2 characters.,Bitte mindestens 2 Zeichen eingeben.
+{0} results for “{1}”,{0} Treffer für „{1}“
+No results for “{0}”,Keine Treffer für „{0}“
+in {0},in {0}
+Search all books,In allen Büchern suchen
+Showing the first {0} pages. Add words to narrow the search.,Die ersten {0} Seiten werden angezeigt. Weitere Wörter grenzen die Suche ein.
+More to the right,Mehr rechts
 {0} has been live for a while. How do you like it now?,{0} ist schon eine Weile live. Wie gefällt es Ihnen jetzt?
 {0} is live. How do you like it?,{0} ist live. Wie gefällt es Ihnen?
 {0} has been live for a while. Still fixed?,{0} ist schon eine Weile live. Immer noch behoben?
@@ -2687,3 +2705,394 @@ Slack is how many days a chapter can slip before it delays the end date. Late me
 "The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
 "Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
 Target level reached,Ziellevel erreicht
+Results for “{0}”,Ergebnisse für „{0}“
+Search only for “{0}”,Nur nach „{0}“ suchen
+The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
+Ophice,Ophice
+"Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen (zweimal: Doppelsprung, halten: fliegen)"
+Ophice could not be loaded.,Ophice konnte nicht geladen werden.
+Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
+Ophice is only available to System Users.,Ophice steht nur Systembenutzern zur Verfügung.
+Chat with {0},Chat mit {0}
+Opening the chat…,Chat wird geöffnet…
+Say hello to {0}.,Sagen Sie {0} Hallo.
+"Write to {0}, Enter to send","An {0} schreiben, Enter zum Senden"
+The chat could not be opened.,Der Chat konnte nicht geöffnet werden.
+The message could not be sent.,Die Nachricht konnte nicht gesendet werden.
+This chat is not yours.,Dieser Chat gehört nicht Ihnen.
+This chat has ended.,Dieser Chat ist beendet.
+"Ophice encounter, {0}","Ophice-Begegnung, {0}"
+{0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
+Nobody to chat with here.,Hier ist niemand zum Chatten.
+Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
+Write something first.,Schreiben Sie zuerst etwas.
+A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
+Esc to close,Esc zum Schließen
+Close the chat and walk on,Chat schließen und weitergehen
+"Upload an image as the background of Ophice, for everyone","Ein Bild als Hintergrund von Ophice hochladen, für alle"
+"Remove the background, for everyone","Den Hintergrund entfernen, für alle"
+The image could not be uploaded.,Das Bild konnte nicht hochgeladen werden.
+The background could not be removed.,Der Hintergrund konnte nicht entfernt werden.
+Choose an image first.,Wählen Sie zuerst ein Bild.
+The image can be at most {0} MB.,Das Bild darf höchstens {0} MB groß sein.
+"This file is not an image Ophice can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das Ophice zeigen kann (PNG, JPEG, WebP oder GIF)."
+Background,Hintergrund
+Kept,Behalten
+Moved to your Raven chat with {0}.,In Ihren Raven-Chat mit {0} verschoben.
+Burned,Verbrannt
+The chat with {0} is gone.,Der Chat mit {0} ist gelöscht.
+Chat with {0} burns in {1},Chat mit {0} verbrennt in {1}
+Saved,Gespeichert
+"You want to keep it. Waiting for {0}.","Sie möchten ihn behalten. Warten auf {0}."
+"{0} wants to keep it. Save to keep it.","{0} möchte ihn behalten. Speichern Sie, um ihn zu behalten."
+Kept only if you both save it.,"Er bleibt nur, wenn Sie beide speichern."
+The chat could not be saved.,Der Chat konnte nicht gespeichert werden.
+The video call could not be started.,Der Videoanruf konnte nicht gestartet werden.
+Joining the call…,Anruf wird verbunden…
+The chat is just being opened. Please try again.,Der Chat wird gerade geöffnet. Bitte versuchen Sie es noch einmal.
+Turn on the microphone,Mikrofon einschalten
+Turn off the microphone,Mikrofon ausschalten
+Turn on the camera,Kamera einschalten
+Turn off the camera,Kamera ausschalten
+No sound? Click once into the video.,Kein Ton? Einmal in das Video klicken.
+"Draw and edit meeting areas, for everyone","Besprechungsbereiche zeichnen und bearbeiten, für alle"
+Done,Fertig
+Meeting areas,Besprechungsbereiche
+"Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
+Standup,Standup
+Jitsi meeting URL,Jitsi-Besprechungs-URL
+"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
+The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
+The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
+Meeting {0},Besprechung {0}
+Leave the meeting,Besprechung verlassen
+Leave (Esc),Verlassen (Esc)
+"The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.systemli.org/OurStandup."
+Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} verwendet werden.
+"The meeting URL needs a room name after the server, for example /OurStandup.","Die Besprechungs-URL braucht nach dem Server einen Raumnamen, zum Beispiel /OurStandup."
+Give the area a name.,Geben Sie dem Bereich einen Namen.
+This overlaps the area {0}.,Das überschneidet sich mit dem Bereich {0}.
+This area no longer exists.,Diesen Bereich gibt es nicht mehr.
+Ophice has room for at most {0} meeting areas.,Ophice hat Platz für höchstens {0} Besprechungsbereiche.
+"Size and position of the background image on the grid, for everyone","Größe und Lage des Hintergrundbilds auf dem Raster, für alle"
+Adjust,Anpassen
+Background image,Hintergrundbild
+Fit,Einpassen
+Size,Größe
+The background could not be adjusted.,Der Hintergrund konnte nicht angepasst werden.
+Upload a background first.,Laden Sie zuerst einen Hintergrund hoch.
+Away,Abwesend
+Be right back,Gleich zurück
+Available,Verfügbar
+"Set a status: be right back, or away until a time","Status setzen: gleich zurück oder abwesend bis zu einer Uhrzeit"
+"{0} (away, page closed)","{0} (abwesend, Seite geschlossen)"
+Was due back at {0},Wollte um {0} zurück sein
+Back at {0},Zurück um {0}
+{0} local time in {1},{0} Ortszeit in {1}
+My status,Mein Status
+Doctor's appointment,Arzttermin
+Getting a coffee,Hole mir einen Kaffee
+Back at,Zurück um
+30 min,30 Min.
+1 hour,1 Stunde
+2 hours,2 Stunden
+Tomorrow 9:00,Morgen 9:00
+Your time zone: {0}. Everyone sees the time on their own clock.,Ihre Zeitzone: {0}. Alle sehen die Uhrzeit in ihrer eigenen Zeitzone.
+Shown above your chip until you move again.,"Wird über Ihrem Chip angezeigt, bis Sie sich wieder bewegen."
+Set status,Status setzen
+Please say when you will be back.,"Bitte geben Sie an, wann Sie zurück sind."
+The status could not be set.,Der Status konnte nicht gesetzt werden.
+Unknown status.,Unbekannter Status.
+The note can be at most {0} characters.,Die Notiz darf höchstens {0} Zeichen lang sein.
+The return time must be in the future.,Die Rückkehrzeit muss in der Zukunft liegen.
+The return time can be at most {0} days ahead.,Die Rückkehrzeit darf höchstens {0} Tage in der Zukunft liegen.
+Fullscreen,Vollbild
+Leave fullscreen,Vollbild beenden
+Drag to resize,Ziehen zum Ändern der Größe
+Chat of {0},Chat von {0}
+Burn,Verbrennen
+No messages yet. Say hello to the room.,Noch keine Nachrichten. Sagen Sie dem Raum Hallo.
+Message the room,Nachricht an den Raum
+"Enter sends, Esc goes back to the map","Enter sendet, Esc geht zurück zur Karte"
+Confidential,Vertraulich
+"Never stored. Only people in the room see it, only now.","Nie gespeichert. Nur wer gerade im Raum ist, sieht es, und nur jetzt."
+The chat could not be loaded.,Der Chat konnte nicht geladen werden.
+"Saved: history is kept, can be burned","Gespeichert: Verlauf bleibt, kann verbrannt werden"
+"Not saved: deleted 10 minutes after the room empties, unless someone saves it","Nicht gespeichert: 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn"
+"Confidential: never stored, only live","Vertraulich: nie gespeichert, nur live"
+Unknown chat mode.,Unbekannter Chat-Modus.
+Step into the area to use its chat.,"Betreten Sie den Bereich, um seinen Chat zu nutzen."
+Ophice area chat: {0},Ophice-Bereichschat: {0}
+You can't chat: no Raven access.,Sie können nicht chatten: kein Zugang zu Raven.
+Find a person,Person suchen
+you,Sie
+Hide my details,Meine Details ausblenden
+"Others then only see that you are online, not where or on what.","Andere sehen dann nur, dass Sie online sind, nicht wo oder woran."
+back {0},zurück {0}
+Not in Ophice,Nicht in Ophice
+In a chat,Im Gespräch
+In {0},In {0}
+Around in Ophice,Unterwegs in Ophice
+Direct message,Direktnachricht
+New direct message,Neue Direktnachricht
+Recent chats together,Letzte gemeinsame Chats
+The chats could not be loaded.,Die Chats konnten nicht geladen werden.
+The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
+Open the Implementation,Implementation öffnen
+Working on,Arbeitet an
+"{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
+Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
+Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
+{0} msg.,{0} Nachr.
+Vote to burn {0},{0} zur Abstimmung stellen
+Vote to burn,Zur Abstimmung stellen
+Each meeting's chat is kept. The people who were there can vote to burn it.,"Der Chat jeder Besprechung bleibt erhalten. Wer dabei war, kann über das Verbrennen abstimmen."
+"Each meeting's chat is deleted 10 minutes after the room empties, unless someone saves it.","Der Chat jeder Besprechung wird 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn."
+"Vote: {0} keep, {1} burn. You voted {2}. Decided {3} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Sie haben für {2} gestimmt. Entschieden spätestens {3}; bei Gleichstand bleibt er erhalten."
+keep,Behalten
+burn,Verbrennen
+"Vote: {0} keep, {1} burn. Keep or burn this chat? Decided {2} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Diesen Chat behalten oder verbrennen? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. This chat will be kept {0}.,Der Raum ist leer. Dieser Chat wird {0} behalten.
+The room is empty. This chat is deleted {0} unless someone saves it.,"Der Raum ist leer. Dieser Chat wird {0} gelöscht, außer jemand speichert ihn."
+This meeting's chat is saved.,Der Chat dieser Besprechung ist gespeichert.
+This meeting's chat is temporary until someone saves it.,"Der Chat dieser Besprechung ist vorläufig, bis jemand ihn speichert."
+Keep,Behalten
+Your vote could not be saved.,Ihre Stimme konnte nicht gespeichert werden.
+"{0} keep, {1} burn. Your vote? Decided {2} at the latest; a tie keeps it.","{0} behalten, {1} verbrennen. Ihre Stimme? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. The chat will be kept.,Der Raum ist leer. Der Chat bleibt erhalten.
+The room is empty. Deleted {0} unless someone saves it.,"Der Raum ist leer. Wird {0} gelöscht, außer jemand speichert ihn."
+Vote Keep or Burn.,Stimmen Sie für Behalten oder Verbrennen.
+This chat no longer exists.,Diesen Chat gibt es nicht mehr.
+Only the people who were in this meeting can decide about its chat.,"Nur wer bei dieser Besprechung dabei war, kann über ihren Chat entscheiden."
+{0} (you),{0} (Sie)
+{0} joined the room,{0} ist dazugekommen
+{0} left the room,{0} ist gegangen
+You joined the room,Sie sind dazugekommen
+You left the room,Sie sind gegangen
+in the last {0} minutes,in den letzten {0} Minuten
+Only Ophice map editors can change the map.,Nur Ophice-Kartenbearbeiter können die Karte ändern.
+Ophice Map Editor,Ophice-Kartenbearbeiter
+Edit space,Bereich bearbeiten
+New space,Neuer Bereich
+Kind of space,Art des Bereichs
+Meeting,Besprechung
+Start,Start
+Entrance,Eingang
+"People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space.","Wer ins Ophice kommt, wird hier hineingebeamt: beim ersten Besuch des Tages oder nach mehr als 5 Minuten Abwesenheit. Es gibt nur einen Startbereich."
+Debug,Debug
+Debug: simulate things on your own screen only,Debug: Abläufe nur auf dem eigenen Bildschirm simulieren
+Simulate beam-in,Hineinbeamen simulieren
+There is already a start space: {0}.,Es gibt schon einen Startbereich: {0}.
+Unknown kind of space.,Unbekannte Art von Bereich.
+This space has no chat.,Dieser Bereich hat keinen Chat.
+Cockpit,Cockpit
+Back to the Ophice map (the cockpit stays open),Zurück zur Ophice-Karte (das Cockpit bleibt offen)
+Back to map,Zurück zur Karte
+Open {0},{0} öffnen
+Open the meeting in its own browser window,Besprechung in einem eigenen Browserfenster öffnen
+Own window,Eigenes Fenster
+"Here in Ophice, meet.jit.si ends the call after 5 minutes. In its own window the meeting runs up to 1 h 35 min.",Hier im Ophice beendet meet.jit.si den Anruf nach 5 Minuten. Im eigenen Fenster läuft die Besprechung bis zu 1 Std. 35 Min.
+Open in own window,Im eigenen Fenster öffnen
+Show that window,Dieses Fenster zeigen
+Back into Ophice,Zurück ins Ophice
+The browser blocked the new window. Please allow pop-ups for this site.,Der Browser hat das neue Fenster blockiert. Bitte Pop-ups für diese Seite erlauben.
+Keep the video on top,Video im Vordergrund halten
+"Right-click a person's video and choose ""Picture in picture"". If a small menu of the call opens first, right-click again.","Rechtsklick auf das Video einer Person und ""Bild im Bild"" wählen. Öffnet sich zuerst ein kleines Menü der Besprechung, noch einmal rechtsklicken."
+"The video then floats above all windows, also when you go back to another tab or app.","Das Video schwebt dann über allen Fenstern, auch wenn Sie zu einem anderen Tab oder Programm wechseln."
+Shortcut,Tastenkürzel
+with,mit
+Got it,Verstanden
+Keep the video on top of all windows,Video über allen Fenstern halten
+On top,Im Vordergrund
+The meeting window was closed,Das Besprechungsfenster wurde geschlossen
+Your call runs in its own window,Ihr Anruf läuft in einem eigenen Fenster
+"Open it again, or continue the call here in Ophice.",Öffnen Sie es wieder oder führen Sie den Anruf hier im Ophice weiter.
+You are still in the meeting of {0}. Video and sound are in the separate browser window.,Sie sind weiter in der Besprechung von {0}. Bild und Ton sind im separaten Browserfenster.
+Open it again,Wieder öffnen
+Can't find the call?,Anruf nicht zu finden?
+"Click ""Show that window"": it comes to the front.","Klicken Sie auf ""Dieses Fenster zeigen"": Es kommt nach vorn."
+Or press {0} to switch between the browser's windows.,"Oder drücken Sie {0}, um zwischen den Fenstern des Browsers zu wechseln."
+Or press {0} to switch windows.,"Oder drücken Sie {0}, um das Fenster zu wechseln."
+Keep the video visible while you work here,"Video sichtbar halten, während Sie hier arbeiten"
+"In the call's window, right-click a person's video and choose ""Picture in picture"". If a small menu of the call opens first, right-click again. The video then floats above all windows, also over Ophice.","Im Fenster des Anrufs per Rechtsklick auf das Video einer Person ""Bild im Bild"" wählen. Öffnet sich zuerst ein kleines Menü des Anrufs, noch einmal rechtsklicken. Das Video schwebt dann über allen Fenstern, auch über dem Ophice."
+Closes the separate window and continues the call here.,Schließt das separate Fenster und führt den Anruf hier weiter.
+Here meet.jit.si ends the call after 5 minutes.,Hier beendet meet.jit.si den Anruf nach 5 Minuten.
+Leaving,Verlassen
+"Walk out of the space or press ""Leave"": the separate window closes and the call ends.","Verlassen Sie den Bereich oder drücken Sie ""Verlassen"": Das separate Fenster schließt sich und der Anruf endet."
+Guest area,Gastbereich
+Customer meeting,Kundenbesprechung
+External guests arrive here through the guest link and can only move inside it. Employees walk in and out freely and meet them in its meeting. There is only one guest area.,Externe Gäste kommen über den Gast-Link hier an und können sich nur darin bewegen. Mitarbeitende gehen frei hinein und hinaus und treffen sie in der Besprechung des Bereichs. Es gibt nur einen Gastbereich.
+A meeting room for guests: employees invite a guest from the guest area to come here.,Ein Besprechungsraum für Gäste: Mitarbeitende laden einen Gast aus dem Gastbereich hierher ein.
+"Chat: the guest chat, kept only for a short while (comes with the guest chat).","Chat: der Gast-Chat, nur kurz gespeichert (kommt mit dem Gast-Chat)."
+Guests,Gäste
+There is already a guest area: {0}.,Es gibt schon einen Gastbereich: {0}.
+phamos Ophice,phamos Ophice
+Move with WASD or the arrow keys,Mit WASD oder den Pfeiltasten bewegen
+Welcome to the phamos Ophice,Willkommen im phamos Ophice
+Come in and meet us in {0}.,Kommen Sie herein und treffen Sie uns in {0}.
+Nobody can welcome guests at the moment. Please come back later.,Gerade kann niemand Gäste empfangen. Bitte kommen Sie später wieder.
+First and last name,Vor- und Nachname
+Drag your chip to the entrance to come in,"Ziehen Sie Ihren Chip zum Eingang, um hereinzukommen"
+Your chip: drag it to the entrance,Ihr Chip: zum Eingang ziehen
+Tell us your name first.,Bitte zuerst Ihren Namen angeben.
+Coming in…,Sie kommen herein …
+"Privacy: we use your name and where your chip stands only for this visit. Chats are not stored for long. Video runs through Jitsi. Your visit ends when you close this page, after 12 hours at the latest.","Datenschutz: Ihren Namen und den Ort Ihres Chips verwenden wir nur für diesen Besuch. Chats werden nicht lange gespeichert. Video läuft über Jitsi. Ihr Besuch endet, wenn Sie diese Seite schließen, spätestens nach 12 Stunden."
+Something went wrong. Please try again.,Etwas ist schiefgegangen. Bitte versuchen Sie es noch einmal.
+Almost: drop your chip right on the entrance.,Fast: Lassen Sie Ihren Chip genau auf dem Eingang los.
+Guest · {0},Gast · {0}
+Guest,Gast
+Your visit has ended. Please come in again.,Ihr Besuch ist beendet. Bitte kommen Sie erneut herein.
+Please tell us your name.,Bitte nennen Sie uns Ihren Namen.
+That did not work. Please drag your chip to the entrance again.,Das hat nicht geklappt. Bitte ziehen Sie Ihren Chip noch einmal zum Eingang.
+Ophice has no guest area at the moment.,Das Ophice hat gerade keinen Gastbereich.
+Ophice is full right now. Please try again in a few minutes.,Das Ophice ist gerade voll. Bitte versuchen Sie es in ein paar Minuten noch einmal.
+You are logged in: please use Ophice as an employee.,Sie sind angemeldet: Bitte nutzen Sie das Ophice mit Ihrem Konto.
+Opens a draft in your mail program with this chat,Öffnet einen Entwurf mit diesem Chat in Ihrem Mailprogramm
+Save by e-mail,Per E-Mail speichern
+Copy the whole chat,Den ganzen Chat kopieren
+Not stored: this chat is deleted 10 minutes after everyone has left. Save it by e-mail if you need it.,"Nicht gespeichert: Dieser Chat wird 10 Minuten nachdem alle gegangen sind gelöscht. Speichern Sie ihn per E-Mail, wenn Sie ihn brauchen."
+No messages yet. Say hello.,Noch keine Nachrichten. Sagen Sie Hallo.
+Write a message,Nachricht schreiben
+"(Earlier messages left out: use ""Copy chat"" for all of them.)","(Ältere Nachrichten ausgelassen: Mit ""Chat kopieren"" erhalten Sie alle.)"
+Chat copied,Chat kopiert
+The chat could not be copied.,Der Chat konnte nicht kopiert werden.
+"Not so fast, please.",Bitte nicht so schnell.
+Step into the area to chat.,"Gehen Sie in den Bereich, um zu chatten."
+This space has no guest chat.,Dieser Bereich hat keinen Gast-Chat.
+Invite {0},{0} einladen
+Invited to {0} by {1}. Waiting for the answer.,Von {1} nach {0} eingeladen. Wartet auf Antwort.
+On the way to {0} (invited by {1}).,Unterwegs nach {0} (eingeladen von {1}).
+In {0} (invited by {1}).,In {0} (eingeladen von {1}).
+Take the invite back,Einladung zurücknehmen
+Invite to a customer meeting:,Zu einer Kundenbesprechung einladen:
+No customer meeting areas yet. Map editors can draw one.,Noch keine Kundenbesprechungsbereiche. Kartenbearbeiter können einen anlegen.
+{0} is invited to {1}.,{0} ist nach {1} eingeladen.
+{0} accepted and is on the way to {1}.,{0} hat angenommen und ist unterwegs nach {1}.
+{0} declined the invite to {1}.,{0} hat die Einladung nach {1} abgelehnt.
+{0} invites you to {1},{0} lädt Sie nach {1} ein
+A dotted line will show you the way; your chip walks there by itself. Use the arrow keys to walk yourself.,Eine gepunktete Linie zeigt Ihnen den Weg; Ihr Chip geht von selbst dorthin. Mit den Pfeiltasten gehen Sie selbst.
+Decline,Ablehnen
+Accept,Annehmen
+On the way to {0} · arrow keys to walk yourself,"Unterwegs nach {0} · Pfeiltasten, um selbst zu gehen"
+Follow the dotted line to {0},Folgen Sie der gepunkteten Linie nach {0}
+This guest has left.,Dieser Gast ist gegangen.
+Guests can only be invited to a customer meeting area.,Gäste können nur in einen Kundenbesprechungsbereich eingeladen werden.
+This invite is no longer open.,Diese Einladung ist nicht mehr offen.
+{0} notices on the map,{0} Hinweise auf der Karte
+Float: keep the map on top of all windows,Schweben: Karte über allen Fenstern halten
+I'll get back to you in,Ich melde mich in
+Coming soon,Kommt bald
+Book an appointment with me,Termin mit mir buchen
+coming soon,kommt bald
+Show on the map,Auf der Karte zeigen
+{0}: {1},{0}: {1}
+{0} came over to you.,{0} ist zu Ihnen gekommen.
+{0} in {1}: {2},{0} in {1}: {2}
+I'll get back to you in {0} min,Ich melde mich in {0} Min.
+Time to get back to {0}.,"Zeit, sich bei {0} zu melden."
+Simulate a ping,Ping simulieren
+A colleague,Eine Kollegin / ein Kollege
+Open a cockpit to see the ping on the mini map.,"Öffnen Sie ein Cockpit, um den Ping auf der Mini-Karte zu sehen."
+You: {0},Sie: {0}
+Reply in the meeting chat,Im Besprechungs-Chat antworten
+Reply,Antworten
+I'll get back to you,Ich melde mich gleich
+You are no longer in the meeting.,Sie sind nicht mehr in der Besprechung.
+{0} has left.,{0} ist gegangen.
+"For more than {0} hours, please set Away.","Für mehr als {0} Stunden bitte ""Abwesend"" setzen."
+Float: call and chat in a small window on top of everything,Schweben: Anruf und Chat in einem kleinen Fenster über allem
+Float,Schweben
+Map,Karte
+Call,Anruf
+"Call (folded, still running)","Anruf (eingeklappt, läuft weiter)"
+Back to the map,Zurück zur Karte
+Cockpit space,Cockpit-Bereich
+"Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional.","Wer hier stehen bleibt, öffnet dieses Cockpit, sofern er es öffnen darf (jede Person kann das abschalten). Eine Besprechung ist optional."
+Pick a cockpit,Cockpit wählen
+Jitsi meeting URL (optional),Jitsi-Besprechungs-URL (optional)
+You can't open {0}; you can still use this space and its meeting.,Sie können {0} nicht öffnen; den Bereich und seine Besprechung können Sie trotzdem nutzen.
+Open cockpits in their spaces,Cockpits in ihren Bereichen öffnen
+Stopping in a cockpit space opens that cockpit.,"Wer in einem Cockpit-Bereich stehen bleibt, öffnet dieses Cockpit."
+Pick the cockpit this space belongs to.,"Wählen Sie das Cockpit, zu dem dieser Bereich gehört."
+Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldung
+"Float: call and chat in a small window on top of everything, also outside the browser","Schweben: Anruf und Chat in einem kleinen Fenster über allem, auch außerhalb des Browsers"
+Zoom out,Verkleinern
+Zoom in,Vergrößern
+Show the whole grid,Ganzes Raster zeigen
+{0} × {1} tiles,{0} × {1} Kacheln
+Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
+"Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
+Width,Breite
+Left,Links
+Top,Oben
+Half a tile less,Eine halbe Kachel weniger
+Half a tile more,Eine halbe Kachel mehr
+Grid,Raster
+Across,Breit
+Down,Hoch
+One tile less,Eine Kachel weniger
+One tile more,Eine Kachel mehr
+Grows the grid to the right and down until it covers the image,"Vergrößert das Raster nach rechts und unten, bis es das Bild abdeckt"
+Grid to cover the image,Raster über das ganze Bild
+Starting zoom for everyone: {0} %,Start-Zoom für alle: {0} %
+Use mine,Meinen nehmen
+Everyone sees the change.,Alle sehen die Änderung.
+The grid could not be changed.,Das Raster konnte nicht geändert werden.
+The space {0} would be cut off. Move or shrink it first.,Der Bereich {0} würde abgeschnitten. Verschieben oder verkleinern Sie ihn zuerst.
+Grid too small,Raster zu klein
+Keep the people list open,Personenliste offen halten
+Fold the list back to the chips,Liste zu den Chips zusammenklappen
+Text size of Ophice and the cockpits in it,Textgröße von Ophice und den Cockpits darin
+Smaller text,Kleinere Schrift
+Normal text size,Normale Schriftgröße
+Larger text,Größere Schrift
+Open the people list,Personenliste öffnen
+Find a person ({0}),Person suchen ({0})
+Vote on the chat of {0},Über den Chat von {0} abstimmen
+The chat of {0} will be deleted unless someone saves it,"Der Chat von {0} wird gelöscht, außer jemand speichert ihn"
+Make it the big tile,Zur großen Kachel machen
+"Standard arrangement of video, chat and map","Standard-Anordnung von Video, Chat und Karte"
+Double-click to switch,Doppelklick zum Wechseln
+Double-tap to switch,Doppeltippen zum Wechseln
+Video,Video
+Standard arrangement,Standard-Anordnung
+Layout,Anordnung
+Double-click for the meeting view,Doppelklick für die Besprechungsansicht
+Double-tap for the meeting view,Doppeltippen für die Besprechungsansicht
+"Phriend stands in the middle of this space, a little bigger than the people. A click on it does what Phriend does everywhere: report a problem, the reports here, its menu. Only one place.","Phriend steht in der Mitte dieses Bereichs, etwas größer als die Personen. Ein Klick darauf tut, was Phriend überall tut: ein Problem melden, die Meldungen hier, sein Menü. Nur ein Platz."
+Phriend already has a place on the map: {0}.,Phriend hat schon einen Platz auf der Karte: {0}.
+End {0}'s visit?,Besuch von {0} beenden?
+Send out,Hinausschicken
+Send out of Ophice,Aus dem Ophice schicken
+{0} has left Ophice.,{0} hat das Ophice verlassen.
+Call window,Anruffenster
+Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
+AI processing allowed,KI-Verarbeitung erlaubt
+Issue Assistant Settings,Einstellungen Anfrage-Assistent
+Assistant User,Assistent-Benutzer
+Excluded Pages,Ausgeschlossene Seiten
+First look at {0},Erster Blick auf {0}
+Sender: {0},Absender: {0}
+Phriend report forwarded from {0},"Phriend-Meldung, weitergeleitet von {0}"
+Created in ERPNext,In ERPNext angelegt
+AI model not used: reported from a sensitive page ({0}).,KI-Modell nicht genutzt: gemeldet von einer sensiblen Seite ({0}).
+AI model not used: AI processing is not allowed for customer {0}.,KI-Modell nicht genutzt: KI-Verarbeitung ist für Kunde {0} nicht erlaubt.
+AI model not used: the sender is not known as a customer or a phamos user.,KI-Modell nicht genutzt: Der Absender ist weder als Kunde noch als phamos-Benutzer bekannt.
+AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt werden: Kunde {0} erlaubt KI-Verarbeitung.
+AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
+The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
+AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
+Test settings,Testeinstellungen
+Remove background,Hintergrund entfernen
+Unfold the sidebar: names and descriptions,Seitenleiste aufklappen: Namen und Beschreibungen
+Fold the sidebar to icons,Seitenleiste auf Symbole zuklappen
+"Be right back, or away until a time. Shown above your chip.","Gleich zurück, oder abwesend bis zu einer Uhrzeit. Wird über Ihrem Chip angezeigt."
+Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröße von Ophice und den Cockpits darin. Die Karte hat ihren eigenen Zoom.
+"Drag on the map to draw an area, click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Upload an image as the background of Ophice, for everyone.","Ein Bild als Hintergrund von Ophice hochladen, für alle."
+"Size and position of the background image, the grid's size and everyone's starting zoom.","Größe und Position des Hintergrundbilds, die Größe des Rasters und der Start-Zoom für alle."
+"Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
+"Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
+Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
+Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.

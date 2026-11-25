@@ -11,7 +11,7 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
-from phamos.bookstack_integration.content import clean_page_html
+from phamos.bookstack_integration.content import clean_page_html, plain_text
 
 
 LOG_TITLE = "Bookstack Sync"
@@ -281,6 +281,7 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 	clear = (
 		frappe.qb.update(page)
 		.set(page.html, None)
+		.set(page.search_text, None)
 		.set(page.content_updated_at, None)
 		.where(page.instance == instance)
 		.where(page.html.isnotnull() | page.content_updated_at.isnotnull())
@@ -295,13 +296,11 @@ def sync_page_content(client: BookstackClient, instance: str) -> int:
 			continue
 		try:
 			data = client.get(f"pages/{p.bookstack_id}")
+			html = clean_page_html((data or {}).get("html") or "", client.base_url)
 			frappe.db.set_value(
 				"Bookstack Page",
 				p.name,
-				{
-					"html": clean_page_html((data or {}).get("html") or "", client.base_url),
-					"content_updated_at": p.updated_at,
-				},
+				{"html": html, "search_text": plain_text(html), "content_updated_at": p.updated_at},
 				update_modified=False,
 			)
 		except _JOB_TIMEOUT:

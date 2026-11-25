@@ -64,6 +64,48 @@ def _may_open_implementation_cockpit():
 	return is_internal_user() and has_internal_access()
 
 
+def app_versions():
+	"""{app: version}, as Desk has it in frappe.boot.versions; for the cockpits and the website.
+
+	From each app's __version__, not frappe.utils.change_log.get_versions(): that runs git for
+	every app, which Desk pays once per session but the cockpits would pay on every page load.
+	"""
+	versions = {}
+	for app in frappe.get_installed_apps():
+		try:
+			versions[app] = getattr(frappe.get_module(app), "__version__", "") or ""
+		except Exception:
+			# a broken app must not take the page down; Phriend just omits its version
+			versions[app] = ""
+	return versions
+
+
+def web_boot():
+	"""Phriend on the website pages (#2104): what phriend_boot() gives Desk, plus the app versions.
+
+	Only for Desk users (user type System User), not for portal logins (Website User), even
+	with an empty Allowed role (PM, 2026-11-23). None when Phriend is not for the user.
+	"""
+	if frappe.session.user == "Guest":
+		return None
+	if frappe.get_cached_value("User", frappe.session.user, "user_type") != "System User":
+		return None
+	boot = phriend_boot()
+	if not boot:
+		return None
+	versions = app_versions()
+	lang = frappe.local.lang or "en"
+	return {
+		**boot,
+		"user": frappe.session.user,
+		"versions": versions,
+		# website pages carry no translations: the ball fetches Phriend's words once per language
+		# and phamos version (get_web_translations) and keeps them in the browser
+		"lang": lang,
+		"messages_key": "" if lang == "en" else f"{lang}:{versions.get('phamos', '')}",
+	}
+
+
 def boot_session(bootinfo):
 	"""Tell the desk whether Phriend shows up for this user (`frappe.boot.phriend`)."""
 	boot = phriend_boot()

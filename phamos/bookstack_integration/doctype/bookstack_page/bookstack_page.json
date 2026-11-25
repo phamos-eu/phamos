@@ -24,6 +24,7 @@
   "url",
   "content_updated_at",
   "html",
+  "search_text",
   "section_meta",
   "owned_by",
   "created_at",
@@ -144,6 +145,15 @@
    "fieldname": "html",
    "fieldtype": "Long Text",
    "label": "Content (HTML)",
+   "read_only": 1
+  },
+  {
+   "description": "Plain text of the website copy, for the documentation search (#2046).",
+   "fieldname": "search_text",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Search Text",
+   "no_copy": 1,
    "read_only": 1
   },
   {

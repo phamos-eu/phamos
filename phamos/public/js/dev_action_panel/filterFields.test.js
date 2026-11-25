@@ -29,6 +29,18 @@ describe("filterFields", () => {
 		expect(fields[0]).toMatchObject({ fieldname: "name", label: "ID", parent: "Project" })
 	})
 
+	it("offers GitLab Parent / Child Issue on GitLab Issue, like the Timesheet list", () => {
+		const fields = filterFields("GitLab Issue", (doctype, fieldname) => ({ fieldname, parent: doctype }))
+		const byName = Object.fromEntries(fields.map((f) => [f.fieldname, f]))
+		expect(byName.gitlab_parent_issue).toMatchObject({
+			label: "GitLab Parent Issue", fieldtype: "Link", options: "GitLab Issue", parent: "GitLab Issue",
+		})
+		expect(byName.gitlab_child_issue).toMatchObject({
+			label: "GitLab Child Issue", fieldtype: "Link", options: "GitLab Issue", parent: "GitLab Issue",
+		})
+		expect(filterFields("Project", () => null).map((f) => f.fieldname)).toEqual(["name"])
+	})
+
 	it("skips fields the doctype does not have", () => {
 		const fields = filterFields("Project", (doctype, fieldname) => (fieldname === "status" ? { fieldname } : null))
 		expect(fields.map((f) => f.fieldname)).toEqual(["name", "status"])

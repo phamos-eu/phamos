@@ -19,6 +19,11 @@ class BookstackBook(Document):
 		# into a clash must not make every sync fail (the website shows one of the two anyway).
 		if not (self.publish_on_website and self.slug and self.has_value_changed("publish_on_website")):
 			return
+		from phamos.web_profile.docs import SEARCH_SLUGS
+
+		if self.slug in SEARCH_SLUGS.values():
+			# /de/dokumentation/suche and /en/documentation/search are the search pages (#2046)
+			frappe.throw(frappe._("The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.").format(self.slug))
 		if frappe.db.exists("Bookstack Book", {"publish_on_website": 1, "slug": self.slug, "name": ["!=", self.name]}):
 			frappe.throw(frappe._("Another published book already uses the web address /de/dokumentation/{0}.").format(self.slug))
 
@@ -51,6 +56,7 @@ class BookstackBook(Document):
 		(
 			frappe.qb.update(page)
 			.set(page.html, None)
+			.set(page.search_text, None)
 			.set(page.content_updated_at, None)
 			.where(page.book == self.name)
 		).run()
