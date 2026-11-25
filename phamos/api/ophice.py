@@ -403,6 +403,12 @@ def _beam_key(user):
 	return f"phamos_ophice_beam:{user}"
 
 
+def _present(user):
+	"""My chip is on the map right now (a recent heartbeat, e.g. from another tab)."""
+	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
+	return isinstance(entry, dict) and time.time() - entry.get("ts", 0) <= PRESENCE_TTL
+
+
 @frappe.whitelist()
 def get_space():
 	"""The grid size, my chip (where it stands, or the spawn) and the other chips."""
@@ -414,20 +420,26 @@ def get_space():
 	present = dummy_users | {c["user"] for c in online} | {user}
 	arriving = _arriving(user)
 	if arriving:
-		# Beamed in at the start space; the others see it with my first heartbeat.
+		# Came in: the chip lands in the start space.
 		position = _start_spot(user)
 		frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
-		frappe.cache.set_value(_beam_key(user), 1, expires_in_sec=60)
 	else:
 		position = _stored_position() or _spawn()
+	# Every re-join beams in (PM, 2026-11-22): a reload too, at the spot it had. Not a second tab
+	# while the chip is already on the map. The others see it with my first heartbeat.
+	beam_in = arriving or not _present(user)
+	if beam_in:
+		frappe.cache.set_value(_beam_key(user), 1, expires_in_sec=60)
 	_touch(user)
 	return {
 		"cols": _cols(),
 		"rows": _rows(),
 		"me": {**_chip(user, position), "cols": _cols(), "rows": _rows()},
-		"beam_in": arriving,
+		"beam_in": beam_in,
 		"others": dummies + online + [c for c in _away_offline() if c["user"] not in present],
 		"presence_ttl": PRESENCE_TTL,
+		# Meeting points set for me (or by me), e.g. after a reload.
+		"pins": _my_pins(user),
 		# Burn notices still running for me (#2057), e.g. after a reload.
 		"notices": _my_notices(user),
 		"background": _background().get("url") or "",
@@ -447,21 +459,23 @@ def heartbeat(x, y):
 	_require_user()
 	user = frappe.session.user
 	chip = _chip(user, {"x": _clamp(x, _cols()), "y": _clamp(y, _rows())})
+	# Just came in (#2072), or back after the chip had dropped off the map (sleep, lost
+	# connection): the others play the beam-in once, and so does my own page.
+	beam = bool(frappe.cache.get_value(_beam_key(user))) or not _present(user)
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, {**chip, "ts": time.time()})
 	_touch(user)
-	# Just came in (#2072): the others play the beam-in once.
-	beam = bool(frappe.cache.get_value(_beam_key(user)))
 	if beam:
 		frappe.cache.delete_value(_beam_key(user))
 	_publish(EVENT_PRESENCE, {**chip, "beam": True} if beam else chip)
-	return chip
+	return {**chip, "beam": True} if beam else chip
 
 
 @frappe.whitelist(methods=["POST"])
-def move(x, y, lift=0):
+def move(x, y, lift=0, beam=0):
 	"""Tell the others where my chip is now. Only for a chip that is present (heartbeat first).
 
 	`lift`: the chip was lifted out of a meeting space (Leave or Esc), the others see it carried.
+	`beam`: the chip beamed there ("Go to" → Beam), the others see it beam in.
 	"""
 	_require_user()
 	user = frappe.session.user
@@ -473,15 +487,23 @@ def move(x, y, lift=0):
 	message = {"user": user, "x": entry["x"], "y": entry["y"]}
 	if frappe.utils.cint(lift):
 		message["lift"] = 1
+	if frappe.utils.cint(beam):
+		message["beam"] = 1
 	_publish(EVENT_MOVE, message)
 	return message
 
 
 @frappe.whitelist(methods=["POST"])
-def leave():
-	"""I closed the page: my chip disappears for everyone right away."""
+def leave(x=None, y=None):
+	"""I closed the page: my chip disappears for everyone right away.
+
+	`x`, `y`: where it stood. Saved here, since the page saves only a moment after the last
+	step and a quick reload would otherwise beam the chip in at an older spot (PM, 2026-11-23).
+	"""
 	_require_user()
 	user = frappe.session.user
+	if x is not None and y is not None:
+		save_my_position(x, y)
 	frappe.cache.hdel(PRESENCE_CACHE_KEY, user)
 	status = _status_of(user)
 	if status and status["kind"] == "away":
@@ -491,6 +513,94 @@ def leave():
 		_publish(EVENT_LEAVE, {"user": user})
 	# Leaving the page is parting from everyone I was chatting with (#2057).
 	_part_all_mine(user)
+
+
+# --- Meeting points (PM, 2026-11-22): a bouncing pin for me and the people I selected. Nobody is
+# moved; each one decides to go there. One per person who sets it; gone after PIN_TTL, when its
+# setter removes it, or (in the pages) once everyone stands at it. Kept in Redis, so a reload keeps it.
+
+PIN_CACHE_KEY = "phamos_ophice_pins"
+PIN_TTL = 10 * 60
+PIN_MAX_PEOPLE = 50
+# Each pin notifies up to PIN_MAX_PEOPLE people; a short wait keeps a script from flooding them.
+PIN_WAIT_SECONDS = 2
+EVENT_PIN = "ophice_pin"
+EVENT_PIN_REMOVED = "ophice_pin_removed"
+
+
+def _pins():
+	"""All running meeting points, by setter; expired ones are dropped on the way."""
+	now = time.time()
+	pins = {}
+	for setter, pin in (frappe.cache.hgetall(PIN_CACHE_KEY) or {}).items():
+		setter = frappe.safe_decode(setter)
+		if not isinstance(pin, dict) or pin.get("until", 0) <= now:
+			frappe.cache.hdel(PIN_CACHE_KEY, setter)
+			continue
+		pins[setter] = pin
+	return pins
+
+
+def _pin_wait_key(user):
+	return f"phamos_ophice_pin_wait:{user}"
+
+
+def _my_pins(user):
+	return [pin for pin in _pins().values() if user in pin.get("users", [])]
+
+
+@frappe.whitelist(methods=["POST"])
+def set_meeting_pin(users, x, y):
+	"""A meeting point at x, y for me and `users` (a list); replaces my earlier one."""
+	_require_user()
+	me = frappe.session.user
+	if isinstance(users, str):
+		users = frappe.parse_json(users)
+	if not isinstance(users, list):
+		frappe.throw(_("Choose the people to meet."))
+	if frappe.cache.get_value(_pin_wait_key(me)):
+		frappe.throw(_("A meeting point was just set. Please wait a moment."))
+	wanted = list(dict.fromkeys(u for u in users if isinstance(u, str) and u != me))[:PIN_MAX_PEOPLE]
+	# Only System Users can see the map (and get realtime events); guests have their own invite (#2084).
+	allowed = set(
+		frappe.get_all(
+			"User",
+			filters={"name": ["in", wanted or [""]], "enabled": 1, "user_type": "System User"},
+			pluck="name",
+		)
+	)
+	people = [user for user in wanted if user in allowed]
+	if not people:
+		frappe.throw(_("Choose the people to meet."))
+	frappe.cache.set_value(_pin_wait_key(me), 1, expires_in_sec=PIN_WAIT_SECONDS)
+	_remove_pin(me)
+	pin = {
+		"by": me,
+		"by_name": frappe.db.get_value("User", me, "full_name") or me,
+		"x": _clamp(x, _cols()),
+		"y": _clamp(y, _rows()),
+		"users": [me, *people],
+		"until": time.time() + PIN_TTL,
+	}
+	frappe.cache.hset(PIN_CACHE_KEY, me, pin)
+	for user in pin["users"]:
+		frappe.publish_realtime(EVENT_PIN, pin, user=user, after_commit=False)
+	return pin
+
+
+def _remove_pin(setter):
+	pin = frappe.cache.hget(PIN_CACHE_KEY, setter)
+	frappe.cache.hdel(PIN_CACHE_KEY, setter)
+	if isinstance(pin, dict):
+		for user in pin.get("users", []):
+			frappe.publish_realtime(EVENT_PIN_REMOVED, {"by": setter}, user=user, after_commit=False)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_meeting_pin():
+	"""Take my meeting point away, for everyone it was for."""
+	_require_user()
+	_remove_pin(frappe.session.user)
 
 
 @frappe.whitelist(methods=["POST"])

@@ -3036,6 +3036,25 @@ End {0}'s visit?,Besuch von {0} beenden?
 Send out,Hinausschicken
 Send out of Ophice,Aus dem Ophice schicken
 {0} has left Ophice.,{0} hat das Ophice verlassen.
+"Fly there. Hold {0} for: Fly or Beam",Hinfliegen. {0} gedrückt halten für: Fliegen oder Beamen
+Fly,Fliegen
+with wings,mit Flügeln
+Beam,Beamen
+at once,sofort
+Meeting point,Treffpunkt
+Set a meeting point for the two of you,Einen Treffpunkt für Sie beide setzen
+Meeting point of {0}: click to fly there,Treffpunkt von {0}: zum Hinfliegen klicken
+Your meeting point,Ihr Treffpunkt
+Meeting point · {0},Treffpunkt · {0}
+"Remove the meeting point, for everyone","Treffpunkt entfernen, für alle"
+Click on the map where you want to meet · Esc to cancel,"Klicken Sie auf die Karte, wo Sie sich treffen möchten · Esc zum Abbrechen"
+Set a meeting point for you and the people selected,Einen Treffpunkt für Sie und die ausgewählten Personen setzen
+Clear the selection (Esc),Auswahl aufheben (Esc)
+Not on the map right now.,Gerade nicht auf der Karte.
+The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
+{0} set a meeting point,{0} hat einen Treffpunkt gesetzt
+Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
 Call window,Anruffenster
 Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
 AI processing allowed,KI-Verarbeitung erlaubt
