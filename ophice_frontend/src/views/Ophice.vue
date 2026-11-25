@@ -753,7 +753,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { openFloatingWindow } from "../utils/pip.js"
 import { DOCK_RECT, DOCK_SIZE, dockMessage } from "@spa/utils/ophiceDock.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
-import { areaUnder, walkedOut } from "../utils/ophiceWalkOut.js"
+import { areaUnder, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
@@ -1284,13 +1284,6 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
-/** Over a cockpit: a walk or jump key pressed while the mini map has the keyboard (#2155). */
-function walkKeyInMiniMap(event) {
-	if (!event.target?.closest?.('[data-testid="mini-map"]') || isTyping(event.target)) return false
-	if (event.metaKey || event.ctrlKey || event.altKey) return false
-	return event.code === "Space" || Boolean(DIRECTIONS[event.key?.toLowerCase()])
-}
-
 function isTyping(target) {
 	if (!target) return false
 	const tag = target.tagName
@@ -1299,8 +1292,10 @@ function isTyping(target) {
 
 function onKeydown(event) {
 	shift = event.shiftKey
-	// Over a cockpit only the mini map walks (#2155): it has the keyboard while the pointer is on it.
-	if (props.cockpitOpen && !walkKeyInMiniMap(event)) return
+	// Over a cockpit only walking and jumping (#2155). The keys reach this page as long as nobody
+	// clicked into the cockpit: right after a cockpit space opened it, or with the pointer on the
+	// mini map. So a cockpit space never locks me in; walking out of it brings the map back.
+	if (props.cockpitOpen && !isWalkKey(event, DIRECTIONS)) return
 	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
 	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
 		event.preventDefault()

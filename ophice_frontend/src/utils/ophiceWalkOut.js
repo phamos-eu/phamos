@@ -14,3 +14,17 @@ export function walkedOut(start, areas, chip) {
 	if (!start || !chip) return false
 	return areaUnder(areas, chip)?.name !== start
 }
+
+function isTyping(el) {
+	const tag = el?.tagName
+	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(el?.isContentEditable)
+}
+
+/**
+ * Over a cockpit: a key that walks or jumps my chip (arrows, WASD, Space), not typed into a field
+ * and without a modifier. Everything else belongs to the cockpit.
+ */
+export function isWalkKey(event, directions) {
+	if (!event || isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return false
+	return event.code === "Space" || Boolean(directions[event.key?.toLowerCase()])
+}
