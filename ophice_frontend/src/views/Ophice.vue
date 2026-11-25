@@ -454,6 +454,7 @@
 						:in-window="!!bubble.inWindow"
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
+						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
 							zIndex: zOf(`chat:${bubble.user}`),
@@ -464,7 +465,7 @@
 						@close="closeBubble(bubble.user)"
 						@call="openEncounterCall(bubble)"
 						@move-start="startCallDrag"
-						@resize-start="(event) => startCallDrag(event, 'resize')"
+						@resize-start="startCallDrag"
 					/>
 				</Teleport>
 				<div
@@ -685,7 +686,13 @@ import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
-import { jitsiCallUrl, encounterCallWindowName } from "../utils/ophiceCall.js"
+import {
+	CALL_DEFAULT,
+	callBox,
+	encounterCallWindowName,
+	jitsiCallUrl,
+	resizeCall,
+} from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1540,14 +1547,10 @@ function openEncounterCall(bubble) {
 
 // The bubble with the embedded call (#2108): on the stage, where and how big this user last left
 // it. Kept per browser and user, like the meeting window's place; the place as share of the free
-// room, so it stays inside the stage at every window size. Default: centred at the top.
+// room, so it stays inside the stage at every window size. Default: centred at the top. The size
+// rules (video between 16:9 and 1:1, chat at least 144px) are in callBox / resizeCall.
 const CALL_POS_KEY = "phamos_ophice_call_pos"
-// Chat column 288 + its border; header 41; the video's padding 8 on each side; video 16:9.
-const CALL_CHAT_WIDTH = 289
-const CALL_HEADER_HEIGHT = 41
-const CALL_VIDEO_PAD = 16
-const CALL_MIN_WIDTH = 640
-const callPos = ref({ x: 0.5, y: 0, w: BUBBLE_WIDTH_VIDEO })
+const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
 const callDrag = ref(null)
 function isCallBubble(bubble) {
 	return bubble.user === videoUser.value && !!bubble.video && !bubble.inWindow
@@ -1562,8 +1565,12 @@ watch(
 		try {
 			const pos = JSON.parse(localStorage.getItem(callPosKey()) || "null")
 			if (pos && [pos.x, pos.y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
-				const w = Number.isFinite(pos.w) ? Math.max(CALL_MIN_WIDTH, pos.w) : BUBBLE_WIDTH_VIDEO
-				callPos.value = { x: pos.x, y: pos.y, w }
+				callPos.value = {
+					x: pos.x,
+					y: pos.y,
+					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
+					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+				}
 			}
 		} catch {
 			// private window: the default place
@@ -1571,44 +1578,31 @@ watch(
 	},
 	{ immediate: true }
 )
-function callHeightFor(width) {
-	return CALL_HEADER_HEIGHT + CALL_VIDEO_PAD + Math.round(((width - CALL_CHAT_WIDTH - CALL_VIDEO_PAD) * 9) / 16)
-}
-// The size as shown: never wider or taller than the stage.
-function callSize() {
-	let w = Math.min(callPos.value.w, view.width || callPos.value.w)
-	const maxH = view.height || Infinity
-	if (callHeightFor(w) > maxH) w = CALL_CHAT_WIDTH + CALL_VIDEO_PAD + Math.floor(((maxH - CALL_HEADER_HEIGHT - CALL_VIDEO_PAD) * 16) / 9)
-	w = Math.max(Math.min(CALL_MIN_WIDTH, view.width || CALL_MIN_WIDTH), w)
-	return { w, h: callHeightFor(w) }
-}
-function callFree(size = callSize()) {
-	return { w: Math.max(0, view.width - size.w), h: Math.max(0, view.height - size.h) }
-}
+// Place and size as shown: px on the stage.
+const callLayout = computed(() => {
+	const box = callBox(callPos.value, view)
+	const freeW = Math.max(0, view.width - box.w)
+	const freeH = Math.max(0, view.height - box.h)
+	return { ...box, left: callPos.value.x * freeW, top: callPos.value.y * freeH }
+})
 function callBubbleStyle() {
-	const size = callSize()
-	const free = callFree(size)
-	return {
-		left: `${callPos.value.x * free.w}px`,
-		top: `${callPos.value.y * free.h}px`,
-		width: `${size.w}px`,
-	}
+	const box = callLayout.value
+	return { left: `${box.left}px`, top: `${box.top}px`, width: `${box.w}px`, height: `${box.h}px` }
 }
-// Moved by its header, resized by its corner; the call's frame ignores the pointer meanwhile
-// (else Jitsi takes the moves).
+function setCallBox({ left, top, w, h }) {
+	const freeW = Math.max(0, view.width - w)
+	const freeH = Math.max(0, view.height - h)
+	left = Math.max(0, Math.min(freeW, left))
+	top = Math.max(0, Math.min(freeH, top))
+	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+// Moved by its header, resized by its edges and corners; the call's frame ignores the pointer
+// meanwhile (else Jitsi takes the moves).
 function startCallDrag(event, kind = "move") {
 	if (event.button !== 0) return
 	event.preventDefault()
-	const size = callSize()
-	const free = callFree(size)
-	callDrag.value = {
-		kind,
-		x: event.clientX,
-		y: event.clientY,
-		left: callPos.value.x * free.w,
-		top: callPos.value.y * free.h,
-		w: size.w,
-	}
+	const { left, top, w, h } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h } }
 	window.addEventListener("pointermove", moveCall)
 	window.addEventListener("pointerup", stopCallDrag)
 	window.addEventListener("pointercancel", stopCallDrag)
@@ -1616,22 +1610,10 @@ function startCallDrag(event, kind = "move") {
 function moveCall(event) {
 	const drag = callDrag.value
 	if (!drag) return
-	let { left, top } = drag
-	let w = callPos.value.w
-	if (drag.kind === "resize") {
-		// The left top corner stays; the bottom right corner follows the pointer.
-		const maxW = Math.max(CALL_MIN_WIDTH, view.width - left)
-		w = Math.max(CALL_MIN_WIDTH, Math.min(maxW, drag.w + event.clientX - drag.x))
-		while (w > CALL_MIN_WIDTH && top + callHeightFor(w) > view.height) w -= 8
-	} else {
-		left = drag.left + event.clientX - drag.x
-		top = drag.top + event.clientY - drag.y
-	}
-	const size = { w, h: callHeightFor(w) }
-	const free = callFree(size)
-	left = Math.max(0, Math.min(free.w, left))
-	top = Math.max(0, Math.min(free.h, top))
-	callPos.value = { x: free.w ? left / free.w : 0.5, y: free.h ? top / free.h : 0, w }
+	const dx = event.clientX - drag.x
+	const dy = event.clientY - drag.y
+	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
 }
 function stopCallDrag() {
 	callDrag.value = null

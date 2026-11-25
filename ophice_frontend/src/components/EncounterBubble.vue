@@ -5,7 +5,7 @@
 		class="encounter-bubble absolute z-20 flex flex-col rounded-xl border border-outline-gray-2 bg-surface-white text-ink-gray-9 shadow-xl"
 		role="dialog"
 		:aria-label="__('Chat with {0}', [peer.full_name])"
-		:class="inCall ? (movable ? '' : 'w-[66rem]') : 'w-72'"
+		:class="inCall ? (movable ? '' : 'w-[67rem]') : 'w-72'"
 		data-testid="encounter-bubble"
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
@@ -42,9 +42,10 @@
 			</button>
 		</header>
 
-		<!-- With the call (#2108): the chat on the left, the video twice the old size on the right. -->
-		<div class="flex min-h-0" :class="inCall ? 'flex-row' : 'flex-col'">
-			<div class="flex min-h-0 flex-col" :class="inCall ? 'w-72 flex-shrink-0 border-r border-outline-gray-2' : ''">
+		<!-- With the call (#2108): the chat on the left (it takes what the video leaves), the video on
+		     the right in the width the parent works out. -->
+		<div class="flex min-h-0" :class="inCall ? 'flex-1 flex-row' : 'flex-col'">
+			<div class="flex min-h-0 flex-col" :class="inCall ? 'min-w-0 flex-1 border-r border-outline-gray-2' : ''">
 				<div
 					ref="list"
 					class="min-h-[3rem] space-y-1.5 overflow-y-auto px-3 py-2 text-sm"
@@ -88,9 +89,14 @@
 
 			<!-- The call goes with the nearest person only (#2059); the chat keeps the keyboard. -->
 			<!-- Smooth edges (#2108): the video sits inset, with round corners. -->
-			<div v-if="inCall" class="min-w-0 flex-1 p-2">
+			<div
+				v-if="inCall"
+				class="flex-shrink-0 p-2"
+				:style="videoWidth ? { width: `${videoWidth + 16}px` } : { width: '48rem' }"
+			>
 				<VideoCall
-					class="rounded-lg"
+					class="h-full rounded-lg"
+					fill
 					:class="{ 'pointer-events-none': dragging }"
 					:domain="video.domain"
 					:room="video.room"
@@ -101,18 +107,25 @@
 				/>
 			</div>
 		</div>
-		<!-- Resize by the bottom right corner (#2108); the parent keeps the size. -->
-		<div
-			v-if="movable"
-			class="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-nwse-resize"
-			:title="__('Drag to resize')"
-			data-testid="call-resize"
-			@pointerdown.stop="emit('resize-start', $event)"
-		>
-			<svg viewBox="0 0 16 16" class="h-4 w-4 text-ink-gray-5" aria-hidden="true">
+		<!-- Resize by every edge and corner (#2108); the parent keeps the size. -->
+		<template v-if="movable">
+			<div
+				v-for="handle in RESIZE_HANDLES"
+				:key="handle.kind"
+				class="absolute z-10"
+				:class="handle.class"
+				:title="__('Drag to resize')"
+				:data-testid="`call-resize-${handle.kind}`"
+				@pointerdown.stop="emit('resize-start', $event, handle.kind)"
+			/>
+			<svg
+				viewBox="0 0 16 16"
+				class="pointer-events-none absolute bottom-0.5 right-0.5 z-10 h-3.5 w-3.5 text-ink-gray-5"
+				aria-hidden="true"
+			>
 				<path d="M14 6 6 14M14 10l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" />
 			</svg>
-		</div>
+		</template>
 	</div>
 </template>
 
@@ -142,8 +155,22 @@ const props = defineProps({
 	movable: { type: Boolean, default: false },
 	/** A drag is on: the call's frame must not take the pointer. */
 	dragging: { type: Boolean, default: false },
+	/** The video's width in px (with the call; the parent keeps 16:9 to 1:1). */
+	videoWidth: { type: Number, default: 0 },
 })
 const emit = defineEmits(["send", "close", "call", "move-start", "resize-start"])
+
+// Edges 8px, corners 16px, a little outside the rounded border so they are easy to hit.
+const RESIZE_HANDLES = [
+	{ kind: "n", class: "-top-1 left-3 right-3 h-2 cursor-ns-resize" },
+	{ kind: "s", class: "-bottom-1 left-3 right-3 h-2 cursor-ns-resize" },
+	{ kind: "w", class: "-left-1 top-3 bottom-3 w-2 cursor-ew-resize" },
+	{ kind: "e", class: "-right-1 top-3 bottom-3 w-2 cursor-ew-resize" },
+	{ kind: "nw", class: "-left-1 -top-1 h-4 w-4 cursor-nwse-resize" },
+	{ kind: "ne", class: "-right-1 -top-1 h-4 w-4 cursor-nesw-resize" },
+	{ kind: "sw", class: "-bottom-1 -left-1 h-4 w-4 cursor-nesw-resize" },
+	{ kind: "se", class: "-bottom-1 -right-1 h-4 w-4 cursor-nwse-resize" },
+]
 
 function onHeaderDown(event) {
 	if (!props.movable || event.target.closest("button")) return
