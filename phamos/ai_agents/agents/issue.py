@@ -24,6 +24,7 @@ CUSTOMER_ALLOWED = "customer_allowed"
 CUSTOMER_NOT_ALLOWED = "customer_not_allowed"
 INTERNAL = "internal"
 UNKNOWN_SENDER = "unknown_sender"
+MANUAL_OVERRIDE = "manual_override"
 
 
 def on_issue_insert(doc, method=None):
@@ -152,6 +153,10 @@ def run_check_gate(ctx, skill):
 	"""Skill "Check AI gate" (phase Extract): assignment and the gate."""
 	assigned = assign(ctx.doc, ctx.agent.user)
 	gate = model_allowed(ctx.doc)
+	if ctx.run.get("manual_override") and not gate["allowed"]:
+		# started by hand: the user's decision counts, the check's own answer stays on the run
+		gate = {**gate, "allowed": True, "reason": MANUAL_OVERRIDE, "checked_reason": gate["reason"],
+			"by": ctx.run.triggered_by}
 	ctx.analysis["gate"] = gate
 	ctx.analysis["assigned"] = assigned
 	ctx.analysis["reporter"] = reporter_user(ctx.doc)
@@ -168,6 +173,9 @@ def get_party(doc):
 
 
 def gate_text(gate):
+	if gate["reason"] == MANUAL_OVERRIDE:
+		checked = gate_text({**gate, "reason": gate["checked_reason"]})
+		return _("AI model may be used: manual override. Without it: {0}").format(checked)
 	if gate["reason"] == SENSITIVE_PAGE:
 		return _("AI model not used: reported from a sensitive page ({0}).").format(_(gate["page"]))
 	if gate["reason"] == CUSTOMER_NOT_ALLOWED:
@@ -200,12 +208,17 @@ def brief_lines(ctx):
 	# No gate result means the check failed: say so instead of deciding again here (fail closed).
 	gate = ctx.analysis.get("gate")
 	reporter = ctx.analysis.get("reporter")
-	return [
+	lines = [
 		_("First look at {0}").format(ctx.doc.name),
 		_("Sender: {0}").format(sender_text(ctx.doc, reporter)),
 		_("Source: {0}").format(source_text(ctx.doc)),
 		gate_text(gate) if gate else _("AI model not used: the check could not run."),
 	]
+	if ctx.run.trigger == "Manual":
+		by = frappe.utils.get_fullname(ctx.run.triggered_by)
+		lines.append(_("Started by hand by {0} (manual override).").format(by) if ctx.run.get("manual_override")
+			else _("Started by hand by {0}.").format(by))
+	return lines
 
 
 def finalize(ctx):
@@ -228,3 +241,92 @@ def finalize(ctx):
 		frappe.log_error(title=f"Issue Assistant: could not post the brief on {ctx.doc.name}")
 		ctx.flags.append({"code": "brief_not_posted", "severity": "warn",
 			"message": _("The brief could not be posted in the Issue chat.")})
+
+
+# Manual start (testing the assistant): a Desk button on Issue opens a dialog that shows each
+# check of the automatic start and of the AI gate, with what would have to be set for it to pass.
+# The user may always start a run; a run started past a failing check is a manual override and is
+# marked so on the AI Agent Run (manual_override, override_reasons) and in the brief.
+
+
+def _check(key, group, label, ok, current, needed):
+	return {"key": key, "group": group, "label": label, "ok": bool(ok), "current": current or "", "needed": needed}
+
+
+def manual_checks(doc):
+	"""Every condition the automatic start and the AI gate look at, passed or not."""
+	settings = frappe.get_cached_doc(SETTINGS)
+	from phamos.ai_agents import runner
+
+	agent = runner.get_agent("Issue", include_disabled=True)
+	auto, model = _("Automatic start"), _("AI model")
+	checks = [
+		_check("settings_enabled", auto, _("Issue Assistant switched on"), settings.enabled,
+			_("On") if settings.enabled else _("Off"), _("Issue Assistant Settings: tick Enabled")),
+		_check("agent_enabled", auto, _("AI Agent for Issues enabled"), agent and agent.enabled,
+			(agent.name if agent else _("none")) + (" " + (_("enabled") if agent.enabled else _("disabled")) if agent else ""),
+			_("AI Agent {0}: tick Enabled").format(agent.name) if agent else _("Run bench migrate to create the AI Agent")),
+	]
+	projects = [row.project for row in settings.scope_projects]
+	if projects:
+		checks.append(_check("project_scope", auto, _("Project in scope"), doc.project in projects,
+			doc.project or _("empty"), _("Project on the Issue: one of {0}").format(", ".join(projects))))
+	types = [row.issue_type for row in settings.scope_issue_types]
+	if types:
+		checks.append(_check("issue_type_scope", auto, _("Issue Type in scope"), doc.issue_type in types,
+			doc.issue_type or _("empty"), _("Issue Type on the Issue: one of {0}").format(", ".join(types))))
+
+	page = doc.get("phriend_ref_doctype")
+	excluded = [row.excluded_doctype for row in settings.excluded_doctypes]
+	checks.append(_check("sensitive_page", model, _("Not reported from a sensitive page"),
+		not (page and page in excluded), _(page) if page else _("no page"),
+		_("A report from a page other than {0}").format(", ".join(_(d) for d in excluded)) if excluded else ""))
+	customer = customer_of(doc)
+	if customer:
+		allowed = bool(frappe.db.get_value("Customer", customer, AI_ALLOWED_FIELD))
+		label = _(frappe.get_meta("Customer").get_label(AI_ALLOWED_FIELD))
+		checks.append(_check("customer_ai_allowed", model, _("Customer allows AI processing"), allowed,
+			_("{0}: {1}").format(customer, _("Yes") if allowed else _("No")),
+			_("Customer {0}: tick {1} (signed AVV)").format(customer, label)))
+	else:
+		reporter = logged_in_reporter(doc)
+		checks.append(_check("internal", model, _("Internal Issue or known customer"), reporter,
+			reporter or _("no Customer, created by {0}").format(doc.owner),
+			_("A Customer on the Issue (directly, via Implementation or Project) with AI processing "
+				"allowed, or the Issue created by a phamos Desk user while logged in")))
+	return checks
+
+
+@frappe.whitelist()
+def get_manual_run_info(issue):
+	"""What the dialog shows before a manual start."""
+	doc = frappe.get_doc("Issue", issue)
+	doc.check_permission("read")
+	checks = manual_checks(doc)
+	from phamos.ai_agents import runner
+
+	run = runner.latest_run("Issue", doc.name)
+	return {
+		"checks": checks,
+		"would_start": all(c["ok"] for c in checks if c["key"] in AUTO_KEYS),
+		"model_allowed": model_allowed(doc)["allowed"],
+		"latest_run": frappe.db.get_value(runner.RUN_DOCTYPE, run,
+			["name", "status", "trigger", "manual_override", "creation"], as_dict=True) if run else None,
+	}
+
+
+AUTO_KEYS = ("settings_enabled", "agent_enabled", "project_scope", "issue_type_scope")
+
+
+@frappe.whitelist(methods=["POST"])
+def start_manual_run(issue):
+	"""Start the assistant on an Issue by hand, whatever the checks say; failing checks are
+	recorded as the override's reasons."""
+	doc = frappe.get_doc("Issue", issue)
+	doc.check_permission("write")
+	reasons = [f"{c['label']}: {c['current']}" for c in manual_checks(doc) if not c["ok"]]
+	from phamos.ai_agents import runner
+
+	result = runner.enqueue_run("Issue", doc.name, trigger="Manual", override_reasons=reasons)
+	result["manual_override"] = bool(reasons)
+	return result
