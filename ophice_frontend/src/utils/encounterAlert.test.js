@@ -45,9 +45,12 @@ function fakeAudio() {
 	const tones = []
 	class Audio {
 		constructor() {
-			this.state = "running"
+			this.state = Audio.startState
 			this.currentTime = 0
 			this.destination = {}
+		}
+		resume() {
+			return Promise.reject(new Error("needs a gesture"))
 		}
 		createOscillator() {
 			const osc = { frequency: {}, connect: (g) => g, start: vi.fn(), stop: vi.fn() }
@@ -63,6 +66,7 @@ function fakeAudio() {
 		close() {}
 	}
 	Audio.tones = tones
+	Audio.startState = "running"
 	return Audio
 }
 
@@ -90,6 +94,15 @@ describe("bellState", () => {
 })
 
 describe("createEncounterAlert", () => {
+	it("skips the chime while the sound is still locked, and still notifies", async () => {
+		const { alert, Notify, Audio } = setup({ hidden: true })
+		Audio.startState = "suspended"
+		expect(alert.notify("Anna wants to chat")).toBe(true)
+		await Promise.resolve() // the refused resume() must not end up unhandled
+		expect(Audio.tones).toHaveLength(0)
+		expect(Notify.shown).toHaveLength(1)
+	})
+
 	it("chimes while I look at the page, without title or notification", () => {
 		const { alert, doc, Notify, Audio } = setup()
 		expect(alert.notify("Anna wants to chat")).toBe(true)

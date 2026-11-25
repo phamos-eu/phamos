@@ -38,7 +38,7 @@ export function encounterCallWindowName(video) {
 //   to 1:1, not further
 export const CALL_PAD = 16 // the video's inset, 8px on each side
 export const CALL_BORDER = 1 // between chat and video
-export const CALL_HEADER = 37 // the top bar, with its border
+export const CALL_HEADER = 36 // the top bar (h-9), its border inside
 export const CALL_CHAT_MIN = 144
 // The chat column needs room for the two chips, a message and the text field.
 export const CALL_MIN_H = 240

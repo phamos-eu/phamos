@@ -60,7 +60,8 @@ export function createEncounterAlert({ win, doc, storage, Notify, Audio } = {}) 
 		if (!Audio) return
 		try {
 			audio = audio || new Audio()
-			if (audio.state === "suspended") audio.resume()
+			// resume() is a promise and may be refused without a key press or click.
+			if (audio.state === "suspended") audio.resume().catch(() => {})
 		} catch {
 			audio = null
 		}
@@ -68,7 +69,9 @@ export function createEncounterAlert({ win, doc, storage, Notify, Audio } = {}) 
 
 	function chime() {
 		unlock()
-		if (!audio) return
+		// A context that has not been unlocked yet keeps its clock still: the tones would all
+		// play at the next click, long after the encounter. Then the title and notification do.
+		if (!audio || audio.state !== "running") return
 		try {
 			const start = audio.currentTime
 			// Two soft rising tones.
