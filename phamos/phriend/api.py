@@ -21,7 +21,7 @@ from phamos.phriend import feedback as phriend_feedback
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend import voice as phriend_voice
-from phamos.phriend.boot import is_for_user
+from phamos.phriend.boot import is_for_user, web_boot
 from phamos.phriend.gitlab_issues import link_created
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
@@ -413,6 +413,29 @@ def _may_read(doctype, name=None):
 		return False
 
 
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_web_boot():
+	"""Whether the Phriend ball shows on the website pages, and what it needs (#2104).
+
+	The website has no Desk boot: phriend_web.bundle.js asks here, and only for users whose
+	`system_user` cookie says Desk user. None for everyone Phriend is not for, Guests included
+	(a stale cookie after logout must not raise an error).
+	"""
+	return web_boot()
+
+
+@frappe.whitelist(methods=["GET"])
+def get_web_translations():
+	"""Phriend's words in the user's language, for the website pages (#2104): the table the
+	cockpits boot with. Fetched once per language and phamos version; empty when Phriend is not
+	for the user."""
+	from phamos.www.spa_boot import spa_translations
+
+	if not web_boot():
+		return {}
+	return spa_translations(frappe.local.lang)
+
+
 @frappe.whitelist()
 def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	"""How many open Phriend reports there are about this record or page: the badge on the ball
@@ -596,7 +619,29 @@ def _project_api(base, project):
 	return f"{base}/api/v4/projects/{quote(project, safe='')}"
 
 
-def _raise_for_gitlab(response, what):
+def _gitlab_username_for(base, headers, user):
+	"""The reporter's GitLab username, matched by email; None when not found.
+
+	Only an admin token sees users' emails, so with any other token this finds no one.
+	"""
+	if not user or user in ("Administrator", "Guest"):
+		return None
+	email = cstr(frappe.db.get_value("User", user, "email") or user).strip().lower()
+	if "@" not in email:
+		return None
+	try:
+		response = requests.get(f"{base}/api/v4/users", headers=headers, params={"search": email}, timeout=TIMEOUT)
+		if not response.ok:
+			return None
+		for gitlab_user in response.json():
+			if cstr(gitlab_user.get("email")).strip().lower() == email:
+				return gitlab_user.get("username")
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Phriend: GitLab user lookup failed")
+	return None
+
+
+def _raise_for_gitlab(response, what, sudo=None):
 	if response.ok:
 		return
 	try:
@@ -604,13 +649,30 @@ def _raise_for_gitlab(response, what):
 		detail = detail.get("message") or detail.get("error") or detail
 	except Exception:
 		detail = response.text[:500]
+	# 401 (invalid or expired token) falls through to the generic message, Sudo or not
 	if cstr(detail) == "insufficient_scope":
+		if sudo:
+			frappe.throw(
+				_(
+					"GitLab {0} failed: the GitLab token is missing the <b>api</b> or <b>sudo</b> scope. "
+					"Create a token with both scopes (on an admin account) and add it in Phriend Settings."
+				).format(what),
+				title=_("GitLab token needs the api and sudo scopes"),
+			)
 		frappe.throw(
 			_(
 				"GitLab {0} failed: the GitLab token is missing the <b>api</b> scope. "
 				"Create a token with the <b>api</b> scope (Reporter role or higher) and add it in Phriend Settings."
 			).format(what),
 			title=_("GitLab token needs the api scope"),
+		)
+	if sudo and response.status_code == 403:
+		frappe.throw(
+			_(
+				"GitLab {0} as <b>{1}</b> failed: the GitLab token must belong to an admin, "
+				"and {1} needs access to the project. ({2})"
+			).format(what, escape_html(sudo), escape_html(cstr(detail))),
+			title=_("GitLab could not act as the reporter"),
 		)
 	frappe.throw(_("GitLab {0} failed ({1}): {2}").format(what, response.status_code, escape_html(cstr(detail))))
 
@@ -656,7 +718,14 @@ def create_gitlab_issue(issue, labels=None, title=None):
 	# internal assistant: always the configured project (phamos/phamos by default), never a user's choice
 	api = _project_api(base, settings.gitlab_project or DEFAULT_GITLAB_PROJECT)
 
-	screenshot_md = _upload_screenshot(api, headers, doc.phriend_screenshot) if doc.get("phriend_screenshot") else ""
+	# GitLab shows the token's owner as author unless we act as the reporter (Sudo, admin token only)
+	sudo = _gitlab_username_for(base, headers, doc.get("phriend_reported_by") or doc.owner)
+	if sudo:
+		headers = {**headers, "Sudo": sudo}
+
+	screenshot_md = (
+		_upload_screenshot(api, headers, doc.phriend_screenshot, sudo) if doc.get("phriend_screenshot") else ""
+	)
 
 	payload = {
 		"title": cstr(title or doc.subject)[:255],
@@ -664,7 +733,7 @@ def create_gitlab_issue(issue, labels=None, title=None):
 		"labels": labels if labels is not None else (settings.gitlab_labels or ""),
 	}
 	response = requests.post(f"{api}/issues", headers=headers, data=payload, timeout=TIMEOUT)
-	_raise_for_gitlab(response, _("issue creation"))
+	_raise_for_gitlab(response, _("issue creation"), sudo)
 	created = response.json()
 	web_url = created.get("web_url")
 
@@ -693,7 +762,7 @@ def create_gitlab_issue(issue, labels=None, title=None):
 	return {"web_url": web_url, "iid": created.get("iid"), "reference": reference, "gitlab_issue": record}
 
 
-def _upload_screenshot(api, headers, file_url):
+def _upload_screenshot(api, headers, file_url, sudo=None):
 	file_doc = frappe.get_doc("File", {"file_url": file_url})
 	content = file_doc.get_content()
 	if isinstance(content, str):
@@ -705,7 +774,7 @@ def _upload_screenshot(api, headers, file_url):
 		files={"file": (file_doc.file_name, content, mimetype)},
 		timeout=TIMEOUT,
 	)
-	_raise_for_gitlab(response, _("screenshot upload"))
+	_raise_for_gitlab(response, _("screenshot upload"), sudo)
 	return response.json().get("markdown", "")
 
 

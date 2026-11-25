@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
@@ -6,7 +8,7 @@ from phamos.phamos.timesheet_utils import (
     billable_seconds_term,
     billing_context,
     percent_billable_or_preset,
-    percent_billable_preset,
+    project_percent_billable_preset,
 )
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from phamos.gitlab_integration.issue_refs import issue_created_during, link_gitlab_issues
@@ -607,6 +609,7 @@ def get_dev_my_projects():
             Project.status,
             Project.percent_billable,
             Project.customer,
+            Project.custom_is_internal_project,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
         )
         .distinct()
@@ -642,6 +645,7 @@ def get_dev_all_projects():
             Project.status,
             Project.percent_billable,
             Project.customer,
+            Project.custom_is_internal_project,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
         )
@@ -695,11 +699,21 @@ FILTERABLE_FIELDS = {
             "name", "issue_id", "title", "state", "due_date", "start_date",
             "assignee", "assignee_email", "gitlab_username",
             "issue_url", "parent_issue", "gitlab_project", "labels",
+            "gitlab_parent_issue", "gitlab_child_issue",
         }
     ),
     "Project": frozenset({"name", "project_name", "status", "percent_billable", "customer"}),
 }
 FILTERABLE_DOCTYPES = tuple(FILTERABLE_FIELDS)
+
+# Filter-only fields of GitLab Issue, named like the Timesheet list's GitLab Parent / Child Issue
+# (#1896). They are not columns, so get_matching_names works them out from parent_issue:
+# - gitlab_parent_issue: the top of the issue's family, i.e. its parent, or the issue itself when
+#   it has none. "GitLab Parent Issue = #X" lists #X together with its child issues.
+# - gitlab_child_issue: the issue itself when it has a parent, empty otherwise. "is set" lists
+#   child issues only, "is not set" parents and standalone issues only.
+ISSUE_FAMILY_FIELDS = frozenset({"gitlab_parent_issue", "gitlab_child_issue"})
+_FAMILY_OPERATORS = frozenset({"=", "!=", "like", "not like", "in", "not in", "is"})
 
 
 @frappe.whitelist()
@@ -719,9 +733,63 @@ def get_matching_names(doctype, filters):
         frappe.throw(_("No Employee record linked to your user account."), frappe.PermissionError)
     filters = _filter_rows(doctype, filters)
     if doctype == "GitLab Issue":
-        return frappe.get_all(doctype, filters=[*filters, [doctype, "state", "=", "opened"]], pluck="name")
+        family = [f for f in filters if f[1] in ISSUE_FAMILY_FIELDS]
+        columns = [f for f in filters if f[1] not in ISSUE_FAMILY_FIELDS]
+        for f in family:
+            if cstr(f[2]).lower() not in _FAMILY_OPERATORS:
+                frappe.throw(_("The condition {0} is not supported for {1}.").format(f[2], _(_family_label(f[1]))))
+        issues = frappe.get_all(
+            doctype, filters=[*columns, [doctype, "state", "=", "opened"]], fields=["name", "parent_issue"]
+        )
+        return [i.name for i in issues if all(_family_matches(i, f) for f in family)]
     allowed = _dev_project_names(user)
     return [name for name in frappe.get_all(doctype, filters=filters, pluck="name") if name in allowed]
+
+
+def _sql_like(value, pattern):
+    """MariaDB LIKE, as the column filters get it: % and _ anywhere, \\% and \\_ literal,
+    case-insensitive. (frappe.utils.data.sql_like only knows a leading / trailing % and is
+    case-sensitive.) A run of % becomes one .*, so a pattern like %%%%x cannot make the regex
+    backtrack for long."""
+    chars, parts, i = cstr(pattern), [], 0
+    while i < len(chars):
+        c = chars[i]
+        if c == "\\" and i + 1 < len(chars):
+            parts.append(re.escape(chars[i + 1]))
+            i += 2
+            continue
+        if c == "%":
+            if not parts or parts[-1] != ".*":
+                parts.append(".*")
+        else:
+            parts.append("." if c == "_" else re.escape(c))
+        i += 1
+    return re.fullmatch("".join(parts), value, re.IGNORECASE | re.DOTALL) is not None
+
+
+def _family_label(fieldname):
+    return "GitLab Parent Issue" if fieldname == "gitlab_parent_issue" else "GitLab Child Issue"
+
+
+def _family_matches(issue, row):
+    """Whether one issue matches one gitlab_parent_issue / gitlab_child_issue filter row."""
+    from frappe.utils.data import compare
+
+    if row[1] == "gitlab_parent_issue":
+        value = issue.parent_issue or issue.name
+    else:
+        value = issue.name if issue.parent_issue else None
+    operator, wanted = cstr(row[2]).lower(), row[3]
+    if operator in ("like", "not like"):
+        matched = _sql_like(cstr(value), wanted)
+        return matched if operator == "like" else not matched
+    if operator == "is":
+        return compare(value, "is", cstr(wanted))
+    if operator in ("in", "not in"):
+        if isinstance(wanted, str):
+            wanted = frappe.parse_json(wanted) if wanted.strip().startswith("[") else wanted.split(",")
+        wanted = [cstr(w).strip() for w in wanted or [] if cstr(w).strip()]
+    return compare(cstr(value), operator, wanted, "Data")
 
 
 def _filter_rows(doctype, filters):
@@ -825,7 +893,7 @@ def _enrich_projects(projects, user):
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
         p["last_used"] = ts.get("last_used")
-        p["percent_billable"] = percent_billable_preset(p.get("percent_billable"))
+        p["percent_billable"] = project_percent_billable_preset(p)
 
     return projects
 

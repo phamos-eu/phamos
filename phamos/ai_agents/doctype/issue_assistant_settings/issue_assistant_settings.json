@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 10:00:00.000000",
+ "description": "The phamos Issue Assistant: first point of contact for new Issues (#1953).",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "assistant_user",
+  "column_break_gen",
+  "scope_projects",
+  "scope_issue_types",
+  "privacy_section",
+  "excluded_doctypes"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "0",
+   "description": "While off, new Issues are not touched."
+  },
+  {
+   "fieldname": "assistant_user",
+   "fieldtype": "Link",
+   "label": "Assistant User",
+   "options": "User",
+   "read_only": 1,
+   "description": "Set by the setup. The assistant works and writes as this user."
+  },
+  {
+   "fieldname": "column_break_gen",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "scope_projects",
+   "fieldtype": "Table MultiSelect",
+   "label": "Projects",
+   "options": "Issue Assistant Project",
+   "description": "Only Issues of these projects. Empty: all projects."
+  },
+  {
+   "fieldname": "scope_issue_types",
+   "fieldtype": "Table MultiSelect",
+   "label": "Issue Types",
+   "options": "Issue Assistant Issue Type",
+   "description": "Only Issues of these types. Empty: all types."
+  },
+  {
+   "fieldname": "privacy_section",
+   "fieldtype": "Section Break",
+   "label": "Privacy"
+  },
+  {
+   "fieldname": "excluded_doctypes",
+   "fieldtype": "Table MultiSelect",
+   "label": "Excluded Pages",
+   "options": "Issue Assistant Excluded DocType",
+   "description": "Reports from these pages never go to the AI model (HR, salary, leave; #1904)."
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-24 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AI Agents",
+ "name": "Issue Assistant Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

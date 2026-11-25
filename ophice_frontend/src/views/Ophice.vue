@@ -1,104 +1,14 @@
 <template>
 	<!-- Ophice (#2053, #2070): its own app at /ophice, full screen. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
-		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
-			<div class="flex items-center gap-2 text-base font-semibold tracking-tight">
-				<img :src="OPHICE_ICON" alt="" class="h-6 w-6 rounded-md" />
-				{{ __("Ophice") }}
-			</div>
-			<!-- One line; shortened when the text is large or the window small (#2091). -->
-			<div
-				class="ml-auto min-w-0 truncate text-sm text-ink-gray-5"
-				:title="__('Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)')"
-			>
-				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
-			</div>
-			<!-- Text size (#2091): for weaker eyes and small screens; the map has its own zoom. -->
-			<div
-				v-if="me"
-				class="flex items-center rounded-lg border border-outline-gray-2 bg-surface-white p-0.5 text-xs"
-				:title="__('Text size of Ophice and the cockpits in it')"
-				data-testid="text-size"
-			>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale <= UI_SCALES[0]" :title="__('Smaller text')" data-testid="text-smaller" @click="stepUiScale(-1)">
-					<span class="text-[11px] font-semibold">A−</span>
-				</button>
-				<button type="button" class="ophice-zoom__button w-11 tabular-nums text-ink-gray-7" :title="__('Normal text size')" data-testid="text-reset" @click="setUiScale(1)">
-					{{ Math.round(uiScale * 100) }} %
-				</button>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale >= UI_SCALES[UI_SCALES.length - 1]" :title="__('Larger text')" data-testid="text-larger" @click="stepUiScale(1)">
-					<span class="text-sm font-semibold">A+</span>
-				</button>
-			</div>
-			<!-- My status (#2053): be right back / away, shown above my chip. -->
-			<Button
-				v-if="me"
-				:variant="statusOpen ? 'solid' : 'subtle'"
-				:title="__('Set a status: be right back, or away until a time')"
-				data-testid="status-button"
-				@click="toggleStatus()"
-			>
-				<template #prefix>
-					<FeatherIcon :name="me.status?.kind === 'away' ? 'moon' : me.status ? 'coffee' : 'check-circle'" class="h-4 w-4" />
-				</template>
-				{{ me.status?.kind === "away" ? __("Away") : me.status ? __("Be right back") : __("Available") }}
-			</Button>
-			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. Map editors only (#2071). -->
-			<Button
-				v-if="canEditMap"
-				:variant="editingAreas ? 'solid' : 'subtle'"
-				:title="__('Draw and edit meeting areas, for everyone')"
-				:aria-pressed="editingAreas"
-				@click="editingAreas = !editingAreas"
-			>
-				<template #prefix><FeatherIcon name="video" class="h-4 w-4" /></template>
-				{{ editingAreas ? __("Done") : __("Meeting areas") }}
-			</Button>
-			<!-- Ophice's background, one for everyone (#2053). -->
-			<input
-				ref="backgroundInput"
-				type="file"
-				accept="image/png,image/jpeg,image/webp,image/gif"
-				class="hidden"
-				@change="uploadBackground"
-			/>
-			<Button
-				v-if="canEditMap"
-				variant="subtle"
-				:loading="backgroundBusy"
-				:title="__('Upload an image as the background of Ophice, for everyone')"
-				@click="backgroundInput?.click()"
-			>
-				<template #prefix><FeatherIcon name="image" class="h-4 w-4" /></template>
-				{{ __("Background") }}
-			</Button>
-			<Button
-				v-if="canEditMap"
-				:variant="adjustingBackground ? 'solid' : 'subtle'"
-				:title="__('Size and position of the background image on the grid, for everyone')"
-				:aria-pressed="adjustingBackground"
-				@click="adjustingBackground = !adjustingBackground"
-			>
-				<template #prefix><FeatherIcon name="maximize-2" class="h-4 w-4" /></template>
-				{{ __("Adjust") }}
-			</Button>
-			<Button
-				v-if="canEditMap && background"
-				variant="ghost"
-				:disabled="backgroundBusy"
-				:title="__('Remove the background, for everyone')"
-				@click="removeBackground"
-			>
-				{{ __("Remove") }}
-			</Button>
-			<!-- Debug (#2072): replays things on my own screen only, for testing. Map editors only. -->
-			<Dropdown v-if="canEditMap" :options="debugOptions" placement="right">
-				<Button variant="ghost" :title="__('Debug: simulate things on your own screen only')" data-testid="debug-menu">
-					<template #prefix><FeatherIcon name="tool" class="h-4 w-4" /></template>
-					{{ __("Debug") }}
-				</Button>
-			</Dropdown>
-		</header>
+		<!-- Ophice's background, one for everyone (#2053); the button is in the right sidebar. -->
+		<input
+			ref="backgroundInput"
+			type="file"
+			accept="image/png,image/jpeg,image/webp,image/gif"
+			class="hidden"
+			@change="uploadBackground"
+		/>
 
 		<div class="flex min-h-0 flex-1">
 		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
@@ -119,7 +29,11 @@
 			@pick="onPersonClick"
 			@hide="setHideDetails"
 		/>
-		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<div
+			id="ophice-stage"
+			ref="stage"
+			class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
+		>
 			<!--
 				Adjust (#2058, #2089): the image in grid tiles (drag it on the map, or nudge it here), the
 				grid's size, and everyone's starting zoom. Top left; everyone sees the changes.
@@ -483,24 +397,43 @@
 						/>
 					</span>
 				</div>
-				<EncounterBubble
+				<!-- With the call (#2108) the bubble leaves the map: it sits on the stage where the user
+				     last dragged it, and the map can move below it. -->
+				<Teleport
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
-					:ref="(el) => setBubbleRef(bubble.user, el)"
-					:peer="bubble.peer"
-					:me="me.user"
-					:messages="bubble.messages"
-					:loading="bubble.loading"
-					:error="bubble.error"
-					:sending="bubble.sending"
-					:video="bubble.user === videoUser ? bubble.video : null"
-					:display-name="me.full_name"
-					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
-					data-no-pan
-					@pointerdown.capture="raise(`chat:${bubble.user}`)"
-					@send="(text, done) => sendMessage(bubble, text, done)"
-					@close="closeBubble(bubble.user)"
-				/>
+					to="#ophice-stage"
+					:disabled="!isCallBubble(bubble)"
+					defer
+				>
+					<EncounterBubble
+						:ref="(el) => setBubbleRef(bubble.user, el)"
+						:peer="bubble.peer"
+						:me="me.user"
+						:messages="bubble.messages"
+						:loading="bubble.loading"
+						:error="bubble.error"
+						:sending="bubble.sending"
+						:video="bubble.user === videoUser ? bubble.video : null"
+						:display-name="me.full_name"
+						:in-window="!!bubble.inWindow"
+						:movable="isCallBubble(bubble)"
+						:dragging="callDrag !== null"
+						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:me-chip="me"
+						:style="{
+							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
+							zIndex: zOf(`chat:${bubble.user}`),
+						}"
+						data-no-pan
+						@pointerdown.capture="raise(`chat:${bubble.user}`)"
+						@send="(text, done) => sendMessage(bubble, text, done)"
+						@close="closeBubble(bubble.user)"
+						@call="openEncounterCall(bubble)"
+						@move-start="startCallDrag"
+						@resize-start="startCallDrag"
+					/>
+				</Teleport>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
@@ -722,14 +655,32 @@
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
-		<!-- Shortcut bar (#2073): the cockpits in a column at the right edge, part of the page like
-		     the people list (PM: not floating over the map); they open inside Ophice. -->
-		<CockpitBar
+		<!-- Right sidebar (#2073, PM 2026-11-25): cockpits, my status and the testing settings; it
+		     replaced the top bar. Part of the page like the people list, not floating over the map. -->
+		<OphiceSidebar
 			v-if="me"
-			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
+			v-model:collapsed="sideCollapsed"
+			:icon="OPHICE_ICON"
 			:cockpits="barCockpits"
 			:open-route="openRoute"
+			:status="me.status"
+			:status-open="statusOpen"
+			:ui-scale="uiScale"
+			:scales="UI_SCALES"
+			:can-edit-map="canEditMap"
+			:editing-areas="editingAreas"
+			:adjusting-background="adjustingBackground"
+			:has-background="Boolean(background)"
+			:background-busy="backgroundBusy"
+			:debug-options="debugOptions"
 			@open="openCockpit"
+			@status="toggleStatus()"
+			@text-step="stepUiScale"
+			@text-reset="setUiScale(1)"
+			@areas="editingAreas = !editingAreas"
+			@background="backgroundInput?.click()"
+			@adjust="adjustingBackground = !adjustingBackground"
+			@remove-background="removeBackground"
 		/>
 		</div>
 		<!-- Over an open cockpit (#2074): the office small, with pings and quick replies. -->
@@ -777,12 +728,12 @@
 
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
-import { Button, call, Dropdown, FeatherIcon, toast } from "frappe-ui"
+import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
-import CockpitBar from "../components/CockpitBar.vue"
+import OphiceSidebar from "../components/OphiceSidebar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
@@ -794,6 +745,13 @@ import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
 import { canFloat, openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import {
+	CALL_DEFAULT,
+	callBox,
+	encounterCallWindowName,
+	jitsiCallUrl,
+	resizeCall,
+} from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -884,7 +842,6 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 384
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -1631,6 +1588,120 @@ const videoUser = computed(() => {
 	return best?.user || null
 })
 
+// The encounter call in its own Jitsi window (#2108): bigger, and without the 5-minute cap of
+// embedded meet.jit.si calls. The bubble then leaves its embedded call (no double join). The
+// window stays open when the two walk apart: the call is the person's own from then on.
+const callWindows = {}
+function openEncounterCall(bubble) {
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
+	if (!url) return
+	const name = encounterCallWindowName(bubble.video)
+	const open = callWindows[name]
+	if (open && !open.closed) {
+		open.focus()
+		return
+	}
+	const win = window.open(url, name, "popup,width=1200,height=800")
+	if (!win) {
+		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
+		return
+	}
+	// The call page must not steer Ophice's tab (reverse tabnabbing).
+	try {
+		win.opener = null
+	} catch {
+		// some browsers do not allow it
+	}
+	callWindows[name] = win
+	bubble.inWindow = true
+}
+
+// The bubble with the embedded call (#2108): on the stage, where and how big this user last left
+// it. Kept per browser and user, like the meeting window's place; the place as share of the free
+// room, so it stays inside the stage at every window size. Default: centred at the top. The size
+// rules (video between 16:9 and 1:1, chat at least 144px) are in callBox / resizeCall.
+const CALL_POS_KEY = "phamos_ophice_call_pos"
+const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
+const callDrag = ref(null)
+function isCallBubble(bubble) {
+	return bubble.user === videoUser.value && !!bubble.video && !bubble.inWindow
+}
+function callPosKey() {
+	return `${CALL_POS_KEY}:${me.value?.user || ""}`
+}
+watch(
+	() => me.value?.user,
+	(user) => {
+		if (!user) return
+		try {
+			const pos = JSON.parse(localStorage.getItem(callPosKey()) || "null")
+			if (pos && [pos.x, pos.y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+				callPos.value = {
+					x: pos.x,
+					y: pos.y,
+					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
+					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+				}
+			}
+		} catch {
+			// private window: the default place
+		}
+	},
+	{ immediate: true }
+)
+// Place and size as shown: px on the stage.
+const callLayout = computed(() => {
+	const box = callBox(callPos.value, view)
+	const freeW = Math.max(0, view.width - box.w)
+	const freeH = Math.max(0, view.height - box.h)
+	return { ...box, left: callPos.value.x * freeW, top: callPos.value.y * freeH }
+})
+function callBubbleStyle() {
+	const box = callLayout.value
+	return { left: `${box.left}px`, top: `${box.top}px`, width: `${box.w}px`, height: `${box.h}px` }
+}
+function setCallBox({ left, top, w, h }) {
+	const freeW = Math.max(0, view.width - w)
+	const freeH = Math.max(0, view.height - h)
+	left = Math.max(0, Math.min(freeW, left))
+	top = Math.max(0, Math.min(freeH, top))
+	callPos.value = { x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+// Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
+// pointer meanwhile (else Jitsi takes the moves).
+function startCallDrag(event, kind = "move") {
+	if (event.button !== 0) return
+	event.preventDefault()
+	const { left, top, w, h } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h } }
+	window.addEventListener("pointermove", moveCall)
+	window.addEventListener("pointerup", stopCallDrag)
+	window.addEventListener("pointercancel", stopCallDrag)
+}
+function moveCall(event) {
+	const drag = callDrag.value
+	if (!drag) return
+	const dx = event.clientX - drag.x
+	const dy = event.clientY - drag.y
+	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
+}
+function stopCallDrag() {
+	callDrag.value = null
+	window.removeEventListener("pointermove", moveCall)
+	window.removeEventListener("pointerup", stopCallDrag)
+	window.removeEventListener("pointercancel", stopCallDrag)
+	try {
+		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
+	} catch {
+		// private window: the place lasts until the reload
+	}
+}
+// Ophice closed in the middle of a drag: no listeners left behind.
+onBeforeUnmount(() => {
+	if (callDrag.value) stopCallDrag()
+})
+
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el
 	else delete bubbleRefs[user]
@@ -1642,13 +1713,12 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	// With the video call the bubble is wider and about 200px taller (#2059).
-	const withVideo = bubble.user === videoUser.value
-	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	// Only the chat sits here; with the call the bubble is on the stage (callBubbleStyle, #2108).
+	const width = BUBBLE_WIDTH
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 520 : 270)) {
+	if (top * t < 270) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
@@ -1962,7 +2032,9 @@ let windowWatch = null
 function popOut() {
 	const area = meetingArea.value
 	if (!area) return
-	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
+	// Straight in, mic and camera on, my name filled in (#2108).
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
+	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
 		meetingWindow.focus()
@@ -2108,6 +2180,7 @@ const areaChatStyle = computed(() => (tileRects.value?.chat ? rectStyle(tileRect
 // --- People list (#2063) and "chat with" (list or map).
 
 const PEOPLE_KEY = "phamos_ophice_people_open"
+const SIDEBAR_KEY = "phamos_ophice_sidebar_open"
 const PEOPLE_REFRESH_MS = 15000
 const people = ref([])
 const hideDetails = ref(false)
@@ -2164,6 +2237,16 @@ function readFlag(key, fallback) {
 		return fallback
 	}
 }
+
+// The right sidebar (PM, 2026-11-25): folded to icons by default, remembered in this browser.
+const sideCollapsed = ref(!readFlag(SIDEBAR_KEY, false))
+watch(sideCollapsed, (value) => {
+	try {
+		localStorage.setItem(SIDEBAR_KEY, value ? "0" : "1")
+	} catch {
+		// private window: folded again after a reload
+	}
+})
 
 /** Keep the people list open, or fold it back to its chips (#2091). */
 function setPeoplePinned(value) {
