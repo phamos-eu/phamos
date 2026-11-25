@@ -3,6 +3,7 @@ import {
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
 	CALL_MIN_W,
+	JITSI_TOOLBAR_BUTTONS,
 	callBox,
 	callMaxHeight,
 	encounterCallWindowName,
@@ -12,6 +13,12 @@ import {
 	qualitySync,
 	resizeCall,
 } from "./ophiceCall.js"
+
+describe("JITSI_TOOLBAR_BUTTONS", () => {
+	it("always has screen sharing next to mic, camera and hang-up", () => {
+		expect(JITSI_TOOLBAR_BUTTONS).toEqual(expect.arrayContaining(["microphone", "camera", "desktop", "hangup"]))
+	})
+})
 
 describe("jitsiCallUrl", () => {
 	const ON = "config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false"
