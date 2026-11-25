@@ -46,6 +46,7 @@
 				<MeetingHuddle
 					v-if="inCall && meChip"
 					class="m-2 mb-0 justify-center"
+					compact
 					:area="huddleArea"
 					:people="[meChip, peer]"
 					:me="me"
