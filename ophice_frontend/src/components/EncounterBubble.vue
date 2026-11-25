@@ -122,6 +122,7 @@
 					type="button"
 					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
 					:title="__('Open the video call with {0} in its own window', [firstName])"
+					:aria-label="__('Open the video call with {0} in its own window', [firstName])"
 					data-testid="open-call"
 					@click="emit('call')"
 				>
@@ -131,6 +132,7 @@
 					type="button"
 					class="flex h-8 w-8 items-center justify-center rounded-md text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
 					:title="__('Close the chat and walk on (Esc)')"
+					:aria-label="__('Close the chat and walk on (Esc)')"
 					data-testid="close-call"
 					@click="emit('close')"
 				>
