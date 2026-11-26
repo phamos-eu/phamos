@@ -3156,3 +3156,4 @@ Missing: {0},Fehlt: {0}
 Assigned {0}: {1},{0} zugewiesen: {1}
 Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
 The screenshot was read too.,Der Screenshot wurde mitgelesen.
+"the model call failed ({0})",der Aufruf des Modells ist fehlgeschlagen ({0})
