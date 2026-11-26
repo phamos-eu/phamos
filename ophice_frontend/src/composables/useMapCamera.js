@@ -32,8 +32,10 @@ function prefersReducedMotion() {
  * @param {() => number} [options.startZoom]  the map editor's starting zoom, when nothing is stored
  * @param {number} [options.pad]  room around the map (px)
  * @param {number} [options.minTile]
+ * @param {boolean} [options.overscroll]  the view may go past the map's edges, up to half its size,
+ *   so any point (my chip) can sit in the middle (the mini map, #2155)
  */
-export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4 }) {
+export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4, overscroll = false }) {
 	// The view's size: a reactive object, or a function returning one (a derived size).
 	const view = {
 		get width() {
@@ -81,10 +83,14 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 	})
 	const size = computed(() => ({ width: canvas.value.w * tile.value, height: canvas.value.h * tile.value }))
 	const origin = computed(() => ({ x: -canvas.value.x * tile.value, y: -canvas.value.y * tile.value }))
-	const bounds = computed(() => ({
-		x: panBounds(view.width, size.value.width, pad),
-		y: panBounds(view.height, size.value.height, pad),
-	}))
+	const bounds = computed(() =>
+		overscroll
+			? {
+					x: { min: view.width / 2 - size.value.width, max: view.width / 2 },
+					y: { min: view.height / 2 - size.value.height, max: view.height / 2 },
+				}
+			: { x: panBounds(view.width, size.value.width, pad), y: panBounds(view.height, size.value.height, pad) }
+	)
 	const transform = computed(() => `translate3d(${pan.x + over.x}px, ${pan.y + over.y}px, 0)`)
 
 	function clampPan() {
