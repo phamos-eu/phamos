@@ -12,13 +12,19 @@ Object.assign(GitLabIssueDashboard.prototype, {
     getFilterContext() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
         const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+        let exact_from_date = this.filters.from_date.get_value() || defaultFromDate;
+        let exact_to_date = this.filters.to_date.get_value() || defaultToDate;
+        if (exact_from_date > exact_to_date) [exact_from_date, exact_to_date] = [exact_to_date, exact_from_date];
         // Snap to full months, matching _resolve_date_range on the server.
-        const from_date = this.computeMonthDateRange((this.filters.from_date.get_value() || defaultFromDate).slice(0, 7)).from_date;
-        const to_date = this.computeMonthDateRange((this.filters.to_date.get_value() || defaultToDate).slice(0, 7)).to_date;
+        const from_date = this.computeMonthDateRange(exact_from_date.slice(0, 7)).from_date;
+        const to_date = this.computeMonthDateRange(exact_to_date.slice(0, 7)).to_date;
         return {
             projects,
             from_date,
             to_date,
+            // Exact picked dates, used by the Lead/Touch/Cycle Time cards.
+            exact_from_date,
+            exact_to_date,
             issue_scope: this.normalizeIssueScopeValue(this.filters.issue_scope.get_value()),
         };
     },
@@ -335,8 +341,8 @@ Object.assign(GitLabIssueDashboard.prototype, {
         };
 
         if (period === "filtered") {
-            params.from_date = filterCtx.from_date;
-            params.to_date = filterCtx.to_date;
+            params.from_date = filterCtx.exact_from_date;
+            params.to_date = filterCtx.exact_to_date;
         } else {
             params.rolling_months = rollingMonthsMap[period];
         }
@@ -367,8 +373,8 @@ Object.assign(GitLabIssueDashboard.prototype, {
         };
 
         if (period === "filtered") {
-            params.from_date = filterCtx.from_date;
-            params.to_date = filterCtx.to_date;
+            params.from_date = filterCtx.exact_from_date;
+            params.to_date = filterCtx.exact_to_date;
         } else {
             params.rolling_months = rollingMonthsMap[period];
         }
@@ -405,8 +411,8 @@ Object.assign(GitLabIssueDashboard.prototype, {
         };
 
         if (period === "filtered") {
-            params.from_date = filterCtx.from_date;
-            params.to_date = filterCtx.to_date;
+            params.from_date = filterCtx.exact_from_date;
+            params.to_date = filterCtx.exact_to_date;
         } else {
             params.rolling_months = rollingMonthsMap[period];
         }
