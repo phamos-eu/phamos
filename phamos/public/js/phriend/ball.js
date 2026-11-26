@@ -218,12 +218,15 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @keyframes hand-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 @keyframes hand-flex { from { transform: rotate(0) scale(1); } to { transform: rotate(-12deg) scale(1.2); } }
 @keyframes hand-launch { 0% { transform: none; } 30% { transform: translate(-2px, 2px); } 100% { transform: translate(14px, -26px); opacity: 0; } }
-.badge {
+.badge, .badge-testing {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;
 	line-height: 20px; text-align: center; cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg);
 }
-.badge:empty { display: none; }
+.badge:empty, .badge-testing:empty { display: none; }
+/* Tickets from this page Testing on Production, under the red badge; GitLab's label colour.
+   Its own class, not .badge, so the red badge's lookup can never pick it up (AI review of !1322). */
+.badge-testing { top: 20px; background: #5b2a86; }
 /* The shortcut, small and light under the feet: an invitation to try it (PM, 2026-11-15). */
 .keys { position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
 	padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none;
@@ -326,6 +329,7 @@ export class Ball {
 				<button type="button" class="waiting" hidden></button>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
+				<button type="button" class="badge-testing"></button>
 			</div>
 			<div class="layer"></div>`;
 		document.body.appendChild(this.host);
@@ -350,6 +354,7 @@ export class Ball {
 		this.badge = this.shadow.querySelector(".badge");
 		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
+		this.testing_badge = this.shadow.querySelector(".badge-testing");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
@@ -371,6 +376,11 @@ export class Ball {
 		this.badge.addEventListener("click", (e) => {
 			e.stopPropagation();
 			options.on_badge_click && options.on_badge_click();
+		});
+		this.testing_badge.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.testing_badge.addEventListener("click", (e) => {
+			e.stopPropagation();
+			options.on_testing_badge_click && options.on_testing_badge_click();
 		});
 		this.bubble.addEventListener("pointerdown", (e) => e.stopPropagation());
 		this.waiting.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -828,5 +838,13 @@ export class Ball {
 		this.badge.textContent = count ? String(count) : "";
 		this.badge.title = title || "";
 		this.badge.setAttribute("aria-label", title || "");
+	}
+
+	// color: the label's colour as GitLab has it ("#rrggbb"); empty keeps the CSS purple
+	set_testing_badge(count, title, color) {
+		this.testing_badge.textContent = count ? String(count) : "";
+		this.testing_badge.title = title || "";
+		this.testing_badge.setAttribute("aria-label", title || "");
+		this.testing_badge.style.background = color || "";
 	}
 }
