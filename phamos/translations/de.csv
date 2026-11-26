@@ -3139,3 +3139,4 @@ AI Agent Run {0} not found.,KI-Agenten-Lauf {0} nicht gefunden.
 The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}).
 Issue Assistant finished,Issue-Assistent fertig
 Issue Assistant failed,Issue-Assistent fehlgeschlagen
+"Issue Assistant: {0}",Issue-Assistent: {0}
