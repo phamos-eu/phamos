@@ -153,9 +153,37 @@ def ensure_task_fields():
 	create_custom_fields({"Task": [{**field, "module": MODULE} for field in TASK_FIELDS]}, update=True)
 
 
+def expand_issue_sections():
+	"""Every section on the Issue form open, never collapsible (#2157).
+
+	A Property Setter for each standard Section Break that ERPNext makes collapsible, read from
+	the DocFields, so a section ERPNext makes collapsible later is covered on the next migrate.
+	Our own sections are not collapsible at their source (custom fields). With collapsible off,
+	Frappe ignores `collapsible_depends_on` (ERPNext opens "Details" only on closed issues).
+	"""
+	sections = frappe.get_all(
+		"DocField",
+		filters={"parent": "Issue", "parenttype": "DocType", "fieldtype": "Section Break", "collapsible": 1},
+		pluck="fieldname",
+	)
+	for fieldname in sections:
+		existing = frappe.db.get_value(
+			"Property Setter",
+			{"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"},
+			["name", "value"],
+			as_dict=True,
+		)
+		if existing and existing.value == "0":
+			continue
+		setter = make_property_setter("Issue", fieldname, "collapsible", "0", "Check")
+		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
+
+
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
+	ensure_module()
+	expand_issue_sections()
 
 
 def after_install():
