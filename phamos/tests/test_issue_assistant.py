@@ -430,6 +430,7 @@ class TestClassify(IssueAssistantTestCase):
 			run = runner.run_now("Issue", doc.name, trigger="Insert")
 		self.assertEqual(run.status, "Completed", run.error)
 		self.assertIn("TimeoutError", run.summary)
+		self.assertNotIn("slow", run.run_flags)
 		self.assertIn(doc.name, run.summary)
 
 	def test_saving_keeps_the_assistants_assignment(self):
@@ -437,6 +438,24 @@ class TestClassify(IssueAssistantTestCase):
 		self.classify(doc)
 		self.assertEqual(frappe.db.get_value("Issue", doc.name, "issue_type"), self.issue_type)
 		self.assertIn(self.assistant, frappe.parse_json(frappe.db.get_value("Issue", doc.name, "_assign")))
+
+	def test_field_filled_meanwhile_is_not_overwritten(self):
+		from phamos.ai_agents.agents import issue_classify
+
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		other_type = self.ensure_issue_type("Assistant Other")
+		frappe.db.set_value("Issue", doc.name, "issue_type", other_type)  # a person, after the run loaded it
+		fields = issue_classify.apply_fields(doc, self.answer(), {"issue_types": [self.issue_type], "priorities": ["High"]})
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "issue_type"), other_type)
+		self.assertNotIn("issue_type", fields)
+
+	def test_odd_person_answer_is_ignored(self):
+		answer = self.answer()
+		answer["person"]["user"] = [DESK_USER]
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER, project=self.project, priority="High")
+		run = self.classify(doc, answer)
+		self.assertIn("wrong VAT", run.summary)
+		self.assertNotIn(DESK_USER, self.assignees(doc))
 
 	def test_system_prompt_marks_the_issue_as_data(self):
 		from phamos.ai_agents.agents import issue_classify

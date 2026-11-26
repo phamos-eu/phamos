@@ -62,7 +62,8 @@ def run_classify(ctx, skill):
 		message = _("the model call failed ({0})").format(type(e).__name__)
 		ctx.analysis["classify"] = {"error": message}
 		return SkillResult(status=FAILED, message=message,
-			flags=[{"code": "llm_failed", "severity": "warn", "message": str(e)[:500]}])
+			# only the error type on the run; the details (maybe the provider's response) stay in the Error Log
+			flags=[{"code": "llm_failed", "severity": "warn", "message": message}])
 	ctx.llm_calls += 1
 	ctx.llm_model = model
 	answer = parse_answer(answer)
@@ -241,18 +242,24 @@ def apply_fields(doc, answer, options):
 	# the reporter's priority is never changed (decision 2); only an empty one is filled
 	if value and item.get("confidence") == STRONG and not doc.get("priority"):
 		changes["priority"] = value
-	if changes:
-		save_changes(doc, changes)
-	return list(changes)
+	return save_changes(doc, changes, lambda d, field: type_is_empty(d) if field == "issue_type" else not d.get(field))
 
 
-def save_changes(doc, changes):
-	"""Save under the run's user (the assistant, write on Issue by its role), with the version history.
-	Reloaded first: an earlier step may have changed the Issue in the database (the gate's assignment
-	writes `_assign`), and saving the stale copy would undo it (AI review on !1343)."""
+def save_changes(doc, changes, still_empty):
+	"""Save the changes whose field is still empty, under the run's user (the assistant, write on Issue by
+	its role), with the version history. Returns the fields set.
+
+	Reloaded first: an earlier step or a person may have changed the Issue in the database meanwhile (the
+	gate's assignment writes `_assign`); saving the stale copy would undo that, and a field someone filled
+	meanwhile is no longer empty (AI review on !1343)."""
+	if not changes:
+		return []
 	doc.reload()
-	doc.update(changes)
-	doc.save()
+	changes = {field: value for field, value in changes.items() if still_empty(doc, field)}
+	if changes:
+		doc.update(changes)
+		doc.save()
+	return list(changes)
 
 
 def apply_person(doc, answer, candidates):
@@ -260,7 +267,7 @@ def apply_person(doc, answer, candidates):
 	strong confidence and priority High (decision 4)."""
 	item = answer.get("person") if isinstance(answer.get("person"), dict) else {}
 	user = item.get("user")
-	if user not in candidates:
+	if not isinstance(user, str) or user not in candidates:  # the model may answer a list or an object
 		return None
 	assigned = False
 	if item.get("confidence") == STRONG and doc.get("priority") == "High":
