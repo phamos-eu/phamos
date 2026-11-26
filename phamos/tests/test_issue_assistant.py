@@ -589,6 +589,63 @@ class TestIdentify(IssueAssistantTestCase):
 		self.run_assistant(doc)
 		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), project)
 
+	def test_phriend_default_project_set_again_by_a_person_stays(self):
+		implementation = self.make_implementation()
+		self.make_project(implementation)
+		default = frappe.get_doc({"doctype": "Project", "project_name": "Issue Assistant Default Project"}).insert(
+			ignore_permissions=True).name
+		frappe.db.set_single_value("Phriend Settings", "default_project", default)
+		doc = self.issue(raised_by=self.CONTACT_EMAIL, phriend_type="Bug")
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(DESK_USER)
+		doc.reload()
+		doc.project = default  # a person picks the default on purpose: a version with "project"
+		doc.save(ignore_permissions=True, ignore_version=False)  # tests skip versions by default
+		frappe.set_user("Administrator")
+		self.run_assistant(doc)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), default)
+
+	def test_customer_confirmed_by_a_person_is_not_asked_again(self):
+		doc = self.issue(raised_by=self.SHARED_EMAIL)
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(DESK_USER)
+		doc.reload()
+		chosen = CUSTOMER if doc.customer == self.SECOND_CUSTOMER else self.SECOND_CUSTOMER
+		doc.customer = chosen
+		doc.save(ignore_permissions=True, ignore_version=False)
+		frappe.set_user("Administrator")
+		run = self.run_assistant(doc)
+		self.assertNotIn(frappe._("Which {0} is it: {1}?").split(":")[0].format(frappe._("Customer")), run.summary)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "customer"), chosen)
+
+	def test_the_assistants_own_change_is_not_a_hand_change(self):
+		from phamos.ai_agents.agents import issue_identify
+
+		doc = self.issue(raised_by=WEBSITE_USER)
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(self.assistant)
+		doc.reload()
+		doc.customer = CUSTOMER
+		doc.save(ignore_permissions=True, ignore_version=False)
+		self.assertTrue(frappe.db.exists("Version", {"ref_doctype": "Issue", "docname": doc.name}))
+		frappe.set_user("Administrator")
+		self.assertFalse(issue_identify.changed_by_hand(doc, "customer"))
+		self.assertFalse(issue_identify.changed_by_hand(doc, "project"))
+
+	def test_contact_is_filled_for_the_issues_own_customer(self):
+		# ERPNext fills the contact only when the Issue has no Customer yet
+		doc = self.issue(raised_by=self.CONTACT_EMAIL, customer=CUSTOMER)
+		self.assertFalse(doc.contact)
+		self.run_assistant(doc)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "contact"), self.contact)
+
+	def test_stakeholder_of_another_customer_is_only_asked(self):
+		self.make_implementation(customer=self.SECOND_CUSTOMER, stakeholder_email=self.STAKEHOLDER_EMAIL)
+		doc = self.issue(raised_by=self.STAKEHOLDER_EMAIL, customer=CUSTOMER)
+		run = self.run_assistant(doc)
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "custom_implementation"))
+		self.assertIn(self.IMPLEMENTATION, run.summary)
+
 	def test_gate_is_checked_again_after_the_customer_is_set(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
 		# a stakeholder address: ERPNext knows no Customer for it, the assistant finds it

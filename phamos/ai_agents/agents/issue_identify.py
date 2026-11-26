@@ -88,7 +88,10 @@ def identify(doc):
 		out["customer"] = _result(confidence=REVIEW, candidates=list(party.customers), via="contact")
 	else:
 		out["customer"] = _result()
-	contact_strong = party.contact and out["customer"]["via"] == "contact" and out["customer"]["confidence"] == STRONG
+	# the sender's Contact is strong when it is the found Customer's: found through it, or the Issue's own Customer
+	# is one of its links (AI review on !1345)
+	contact_strong = bool(party.contact) and out["customer"]["confidence"] == STRONG and (
+		out["customer"]["via"] == "contact" or out["customer"]["value"] in (party.customers or []))
 	out["contact"] = _result(party.contact, STRONG if contact_strong else NONE, via="email")
 
 	out["implementation"] = find_implementation(doc, out["customer"], email)
@@ -114,11 +117,20 @@ def find_implementation(doc, customer, email):
 	if email:
 		names = frappe.get_all("Implementation Stakeholder", filters={"parenttype": "Implementation",
 			"email": email}, pluck="parent", distinct=True)
-		names = [n for n in names if frappe.db.get_value("Implementation", n, "status") not in CLOSED_IMPLEMENTATION]
-		if len(names) == 1:
-			return _result(names[0], STRONG, via="stakeholder")
-		if names:
-			return _result(confidence=REVIEW, candidates=sorted(names), via="stakeholder")
+		rows = frappe.get_all("Implementation", filters={"name": ("in", names or [""]),
+			"status": ("not in", CLOSED_IMPLEMENTATION)}, fields=["name", "customer"], order_by="name asc")
+		if customer["value"]:
+			# a known Customer (also ERPNext's pick) only takes its own Implementations; another Customer's
+			# becomes a question, never a write (AI review on !1345)
+			own = [r.name for r in rows if r.customer == customer["value"]]
+			if len(own) == 1 and customer["confidence"] == STRONG:
+				return _result(own[0], STRONG, via="stakeholder")
+			if rows:
+				return _result(confidence=REVIEW, candidates=[r.name for r in rows], via="stakeholder")
+		elif len(rows) == 1:
+			return _result(rows[0].name, STRONG, via="stakeholder")
+		elif rows:
+			return _result(confidence=REVIEW, candidates=[r.name for r in rows], via="stakeholder")
 	return _result()
 
 
@@ -137,9 +149,27 @@ def find_project(doc, implementation):
 
 
 def changed_by_hand(doc, field):
-	"""Whether the field was changed after the Issue was created (a version mentions it)."""
-	return bool(frappe.db.exists("Version", {"ref_doctype": "Issue", "docname": doc.name,
-		"data": ("like", f'%"{field}"%')}))
+	"""Whether someone other than the assistant changed the field after the Issue was created.
+
+	Reads the Issue's versions (Issue has track_changes): a version whose "changed" list names the field,
+	saved by anyone but the assistant's user. The assistant's own writes don't count, so they never lock a
+	value it set (AI review on !1345). The LIKE only narrows the rows; the JSON decides.
+	"""
+	from phamos.setup.issue_assistant import ASSISTANT_NAME
+
+	assistant = frappe.db.get_value("AI Agent", ASSISTANT_NAME, "user")
+	rows = frappe.get_all("Version", filters={"ref_doctype": "Issue", "docname": doc.name,
+		"data": ("like", f'%"{field}"%')}, fields=["owner", "data"])
+	for row in rows:
+		if row.owner == assistant:
+			continue
+		try:
+			changed = (frappe.parse_json(row.data) or {}).get("changed") or []
+		except Exception:
+			return True  # unreadable: assume a person changed it, so nothing is overwritten
+		if any(isinstance(c, (list, tuple)) and c and c[0] == field for c in changed):
+			return True
+	return False
 
 
 def project_is_empty(doc):
