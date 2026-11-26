@@ -338,10 +338,10 @@ export class Ball {
 		this.menu = this.shadow.querySelector(".menu");
 		this.bubble_content = this.bubble.querySelector(".content");
 		this.bubble_shape = this.bubble.querySelector(".shape");
-		this.badge = this.shadow.querySelector(".badge:not(.testing)");
-		this.testing_badge = this.shadow.querySelector(".badge.testing");
+		this.badge = this.shadow.querySelector(".badge");
 		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
+		this.testing_badge = this.shadow.querySelector(".badge.testing");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
