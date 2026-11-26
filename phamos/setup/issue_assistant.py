@@ -18,6 +18,7 @@ ASSISTANT_EMAIL = "issue-assistant@phamos.eu"
 SETTINGS = "Issue Assistant Settings"
 HANDLERS = "phamos.ai_agents.agents.issue"
 GATE_SKILL_NAME = "Check AI gate"
+CLASSIFY_SKILL_NAME = "Classify with AI model"
 CUSTOMER_SECTION = "custom_implementation_specific"
 AI_ALLOWED_FIELD = "custom_ai_processing_allowed"
 
@@ -75,6 +76,7 @@ def after_migrate():
 	bot = ensure_raven_bot()
 	ensure_settings(user)
 	ensure_agent(user, bot)
+	ensure_classify_skill()
 	ensure_customer_fields()
 
 
@@ -180,6 +182,28 @@ def ensure_agent(user, bot):
 				"the AI model: sensitive page, the Customer's \"AI processing allowed\", internal or unknown sender.",
 			}
 		).insert(ignore_permissions=True)
+
+
+def ensure_classify_skill():
+	"""The model's step (#2113). Runs only when the gate allowed it (checked in the handler too)."""
+	if frappe.db.exists("AI Skill", {"agent": ASSISTANT_NAME, "handler": "classify"}):
+		return
+	frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": CLASSIFY_SKILL_NAME,
+			"agent": ASSISTANT_NAME,
+			"enabled": 1,
+			"phase": "Classify",
+			"order": 10,
+			"handler": "classify",
+			"gate_on_previous": 1,
+			"on_fail": "Continue",
+			"description": "The AI model reads the Issue (text and Phriend screenshot) and picks Issue Type, Priority "
+			"and a person from lists built in code; writes only empty fields on strong confidence, never the "
+			"reporter's priority; assigns the person itself only on strong confidence and priority High.",
+		}
+	).insert(ignore_permissions=True)
 
 
 def ensure_customer_fields():

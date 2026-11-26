@@ -71,13 +71,23 @@ def ocr_pdf(pdf_content):
 	return "\n\n".join(page.get("markdown") or "" for page in response.json().get("pages") or [])
 
 
-def chat_json(prompt, model=None, system=None):
-	"""Ask a chat model for a JSON object and return it parsed."""
+def chat_json(prompt, model=None, system=None, images=None):
+	"""Ask a chat model for a JSON object and return it parsed.
+
+	images: [(content_type, bytes)] sent with the prompt, for a vision model (e.g. a Phriend
+	screenshot, #2113). Mistral is the only provider; the agent's model or phamos Settings decide.
+	"""
 	settings = _require_settings()
 	model = model or settings["model"]
 	if "ocr" in model.lower():  # OCR models cannot chat
 		model = CHAT_MODEL_DEFAULT
-	messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+	content = prompt
+	if images:
+		content = [{"type": "text", "text": prompt}] + [
+			{"type": "image_url", "image_url": f"data:{ctype};base64,{base64.b64encode(data).decode()}"}
+			for ctype, data in images
+		]
+	messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": content}]
 	response = requests.post(
 		f"{_api_base(settings)}/chat/completions",
 		json={"model": model, "messages": messages, "response_format": {"type": "json_object"}, "temperature": 0},
