@@ -315,6 +315,23 @@ def get_manual_run_info(issue):
 	}
 
 
+@frappe.whitelist()
+def get_run_result(run):
+	"""Status and brief of an assistant run on an Issue, for the dialog after a manual start.
+	Readable by whoever may read the Issue."""
+	from phamos.ai_agents import runner
+
+	row = frappe.db.get_value(runner.RUN_DOCTYPE, run,
+		["name", "reference_doctype", "reference_name", "status", "summary", "error", "manual_override",
+			"analysis"], as_dict=True)
+	if not row or row.reference_doctype != "Issue":
+		frappe.throw(_("AI Agent Run {0} not found.").format(run), frappe.DoesNotExistError)
+	frappe.get_doc("Issue", row.reference_name).check_permission("read")
+	analysis = frappe.parse_json(row.pop("analysis") or "{}") or {}
+	row["assigned"] = analysis.get("assigned") or []
+	return row
+
+
 AUTO_KEYS = ("settings_enabled", "agent_enabled", "project_scope", "issue_type_scope")
 
 

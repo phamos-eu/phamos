@@ -276,3 +276,15 @@ class TestManualRun(IssueAssistantTestCase):
 		frappe.set_user(WEBSITE_USER)
 		with self.assertRaises(frappe.PermissionError):
 			assistant.start_manual_run(doc.name)
+
+	def test_run_result_shows_the_brief(self):
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		run = runner.run_now("Issue", doc.name, trigger="Manual", override_reasons=["x"])
+		result = assistant.get_run_result(run.name)
+		self.assertEqual((result.status, result.manual_override), ("Completed", 1))
+		self.assertIn(doc.name, result.summary)
+		self.assertIn(self.assistant, result.assigned)
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(WEBSITE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			assistant.get_run_result(run.name)
