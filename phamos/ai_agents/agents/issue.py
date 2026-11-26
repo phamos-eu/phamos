@@ -149,19 +149,33 @@ def assign(doc, assistant_user):
 	return added
 
 
-def run_check_gate(ctx, skill):
-	"""Skill "Check AI gate" (phase Extract): assignment and the gate."""
-	assigned = assign(ctx.doc, ctx.agent.user)
+def gate_for(ctx):
+	"""The gate for this run: model_allowed, or allowed by a manual override (#2154). Also called again
+	by Identify (#2112) after it set the Customer."""
 	gate = model_allowed(ctx.doc)
 	if ctx.run.get("manual_override") and not gate["allowed"]:
 		# started by hand: the user's decision counts, the check's own answer stays on the run
 		gate = {**gate, "allowed": True, "reason": MANUAL_OVERRIDE, "checked_reason": gate["reason"],
 			"by": ctx.run.triggered_by}
+	return gate
+
+
+def run_check_gate(ctx, skill):
+	"""Skill "Check AI gate" (phase Extract): assignment and the gate."""
+	assigned = assign(ctx.doc, ctx.agent.user)
+	gate = gate_for(ctx)
 	ctx.analysis["gate"] = gate
 	ctx.analysis["assigned"] = assigned
 	ctx.analysis["reporter"] = reporter_user(ctx.doc)
 	ctx.flags.append({"code": f"gate_{gate['reason']}", "severity": "info", "message": gate_text(gate)})
 	return SkillResult(status=PASSED, message=gate_text(gate), output={"gate": gate, "assigned": assigned})
+
+
+def run_identify(ctx, skill):
+	"""Skill "Identify sender and links" (#2112), in its own module."""
+	from phamos.ai_agents.agents import issue_identify
+
+	return issue_identify.run_identify(ctx, skill)
 
 
 def run_classify(ctx, skill):
@@ -171,7 +185,7 @@ def run_classify(ctx, skill):
 	return issue_classify.run_classify(ctx, skill)
 
 
-SKILLS = {"check_gate": run_check_gate, "classify": run_classify}
+SKILLS = {"check_gate": run_check_gate, "identify": run_identify, "classify": run_classify}
 
 
 def get_party(doc):
@@ -221,8 +235,9 @@ def brief_lines(ctx):
 		_("Source: {0}").format(source_text(ctx.doc)),
 		gate_text(gate) if gate else _("AI model not used: the check could not run."),
 	]
-	from phamos.ai_agents.agents import issue_classify
+	from phamos.ai_agents.agents import issue_classify, issue_identify
 
+	lines.extend(issue_identify.brief_lines(ctx))
 	lines.extend(issue_classify.brief_lines(ctx))
 	if ctx.run.trigger == "Manual":
 		by = frappe.utils.get_fullname(ctx.run.triggered_by)
