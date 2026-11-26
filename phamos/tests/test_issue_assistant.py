@@ -308,7 +308,7 @@ class TestClassify(IssueAssistantTestCase):
 		super().setUp()
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
 		self.project = frappe.get_doc(
-			{"doctype": "Project", "project_name": "Issue Assistant Classify Test", "customer": CUSTOMER,
+			{"doctype": "Project", "project_owner": "Administrator", "project_name": "Issue Assistant Classify Test", "customer": CUSTOMER,
 			 "users": [{"user": DESK_USER}]}
 		).insert(ignore_permissions=True).name
 		if not frappe.db.exists("Customer", self.OTHER_CUSTOMER):
@@ -518,7 +518,7 @@ class TestIdentify(IssueAssistantTestCase):
 		return self.IMPLEMENTATION
 
 	def make_project(self, implementation, name="Issue Assistant Identify Project"):
-		return frappe.get_doc({"doctype": "Project", "project_name": name, "status": "Open",
+		return frappe.get_doc({"doctype": "Project", "project_owner": "Administrator", "project_name": name, "status": "Open",
 			"custom_implementation": implementation}).insert(ignore_permissions=True).name
 
 	def test_contact_of_one_customer_sets_customer_and_contact(self):
@@ -579,7 +579,7 @@ class TestIdentify(IssueAssistantTestCase):
 	def test_human_project_stays_and_phriend_default_is_replaced(self):
 		implementation = self.make_implementation()
 		project = self.make_project(implementation)
-		other = frappe.get_doc({"doctype": "Project", "project_name": "Issue Assistant Human Project"}).insert(
+		other = frappe.get_doc({"doctype": "Project", "project_owner": "Administrator", "project_name": "Issue Assistant Human Project"}).insert(
 			ignore_permissions=True).name
 		doc = self.issue(raised_by=self.CONTACT_EMAIL, project=other)
 		self.run_assistant(doc)
