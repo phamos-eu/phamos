@@ -3142,3 +3142,17 @@ The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}
 Issue Assistant finished,Issue-Assistent fertig
 Issue Assistant failed,Issue-Assistent fehlgeschlagen
 "Issue Assistant: {0}",Issue-Assistent: {0}
+AI model not used: the gate did not allow it.,KI-Modell nicht genutzt: Die Prüfung hat es nicht erlaubt.
+AI model {0} read the Issue.,KI-Modell {0} hat die Anfrage gelesen.
+account manager of {0},Account Manager von {0}
+user with permission on {0},Benutzer mit Berechtigung auf {0}
+internal stakeholder of {0},interner Stakeholder von {0}
+member of project {0},Mitglied im Projekt {0}
+worked on recent Issues of {0},hat an letzten Anfragen von {0} gearbeitet
+AI model not available: {0},KI-Modell nicht verfügbar: {0}
+Missing: {0},Fehlt: {0}
+{0} set to {1}: {2},{0} auf {1} gesetzt: {2}
+{0}: suggests {1} instead of {2}: {3},{0}: schlägt {1} statt {2} vor: {3}
+Assigned {0}: {1},{0} zugewiesen: {1}
+Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
+The screenshot was read too.,Der Screenshot wurde mitgelesen.
