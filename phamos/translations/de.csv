@@ -3137,3 +3137,8 @@ Manual Override,Manueller Override
 Override Reasons,Override-Gründe
 Started by hand although the automatic start or the AI gate would not have run it.,"Von Hand gestartet, obwohl der automatische Start oder die KI-Prüfung ihn nicht ausgeführt hätte."
 The checks the manual start went past.,"Die Prüfungen, an denen der manuelle Start vorbeiging."
+AI Agent Run {0} not found.,KI-Agenten-Lauf {0} nicht gefunden.
+The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}).
+Issue Assistant finished,Issue-Assistent fertig
+Issue Assistant failed,Issue-Assistent fehlgeschlagen
+"Issue Assistant: {0}",Issue-Assistent: {0}

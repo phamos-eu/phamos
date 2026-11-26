@@ -84,6 +84,7 @@ function phamos_issue_assistant_dialog(frm) {
 									: __("Issue Assistant started"),
 								indicator: "green",
 							});
+							phamos_issue_assistant_wait(frm, out.run);
 						},
 						always() {
 							d.enable_primary_action();
@@ -133,4 +134,66 @@ function phamos_issue_assistant_checks_html(info) {
 			· ${esc(frappe.datetime.str_to_user(run.creation))}</div>`;
 	}
 	return html;
+}
+
+// After a manual start: wait for the run (background job), then show its brief and reload the
+// form, so the user sees what the assistant did. Polls instead of relying on realtime, which is
+// not always running on a local bench.
+function phamos_issue_assistant_wait(frm, run, tries = 0) {
+	const issue = frm.doc.name;
+	setTimeout(() => {
+		frappe.call({
+			method: "phamos.ai_agents.agents.issue.get_run_result",
+			args: { run },
+			callback(r) {
+				const res = r.message || {};
+				if (["Queued", "Running"].includes(res.status)) {
+					if (tries < 60) phamos_issue_assistant_wait(frm, run, tries + 1);
+					else frappe.show_alert({ message: __("The Issue Assistant is still running ({0}).", [run]), indicator: "orange" });
+					return;
+				}
+				// the user may have moved on while the run worked: no modal on another page then
+				// (cur_frm keeps the last form after leaving it, so check the route)
+				const [view, doctype, name] = frappe.get_route();
+				const still_here = view === "Form" && doctype === "Issue" && name === issue;
+				phamos_issue_assistant_result(res, run, still_here);
+				if (still_here) frm.reload_doc();
+			},
+		});
+	}, 2000);
+}
+
+function phamos_issue_assistant_result(res, run, as_dialog) {
+	const esc = frappe.utils.escape_html;
+	// the run's text fields are stored HTML-escaped by Frappe; decode once before escaping for display
+	const decode = (text) => $("<textarea>").html(text || "").text();
+	const name = res.name || run;
+	const link = `<a href="/app/ai-agent-run/${encodeURIComponent(name)}">${esc(name)}</a>`;
+	// AI Agent Run ends in Completed or Failed; anything else is shown as it is, not as a failure
+	const title =
+		res.status === "Completed"
+			? __("Issue Assistant finished")
+			: res.status === "Failed"
+			? __("Issue Assistant failed")
+			: __("Issue Assistant: {0}", [__(res.status || "Unknown")]);
+	const indicator = res.status === "Completed" ? "green" : res.status === "Failed" ? "red" : "orange";
+	if (!as_dialog) {
+		frappe.show_alert({ message: `${esc(title)} (${link})`, indicator }, 10);
+		return;
+	}
+	const lines = decode(res.summary).split("\n").filter(Boolean);
+	let html = `<p>${__("AI Agent Run")}: ${link} · ${esc(__(res.status || "Unknown"))}${
+		res.manual_override ? " · " + __("Manual Override") : ""
+	}</p>`;
+	if (res.error) html += `<p class="text-danger">${esc(decode(res.error))}</p>`;
+	if (lines.length) {
+		html += `<p><strong>${esc(lines[0])}</strong></p><ul>${lines
+			.slice(1)
+			.map((l) => `<li>${esc(l)}</li>`)
+			.join("")}</ul>`;
+	}
+	if (res.assigned && res.assigned.length) {
+		html += `<p>${__("Assigned To")}: ${res.assigned.map(esc).join(", ")}</p>`;
+	}
+	frappe.msgprint({ title, indicator, message: html });
 }
