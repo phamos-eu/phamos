@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 13:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "AISK-.####",
+ "field_order": [
+  "skill_name",
+  "agent",
+  "enabled",
+  "column_break_main",
+  "phase",
+  "order",
+  "origin",
+  "dismissed",
+  "occurrences",
+  "source_run",
+  "suggestion_key",
+  "scope_section",
+  "party_doctype",
+  "party",
+  "column_break_scope",
+  "condition",
+  "gate_on_previous",
+  "what_section",
+  "handler",
+  "on_fail",
+  "column_break_what",
+  "min_confidence",
+  "params",
+  "rules_section",
+  "prompt_rules",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "skill_name",
+   "fieldtype": "Data",
+   "label": "Skill Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "label": "Agent",
+   "options": "AI Agent",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "phase",
+   "fieldtype": "Select",
+   "label": "Phase",
+   "options": "Extract\nIdentify\nClassify\nEnrich\nDecide\nAct",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Skills run phase by phase in this order; within a phase by Order."
+  },
+  {
+   "fieldname": "order",
+   "fieldtype": "Int",
+   "label": "Order",
+   "default": "10"
+  },
+  {
+   "fieldname": "origin",
+   "fieldtype": "Select",
+   "label": "Origin",
+   "options": "Manual\nSuggested\nLearned",
+   "default": "Manual",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "scope_section",
+   "fieldtype": "Section Break",
+   "label": "When"
+  },
+  {
+   "fieldname": "party_doctype",
+   "fieldtype": "Link",
+   "label": "Only For Party Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "label": "Only For Party",
+   "options": "party_doctype",
+   "in_standard_filter": 1,
+   "description": "Limit the skill to one supplier (or customer, employee …). Empty: applies to every document."
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "condition",
+   "fieldtype": "Code",
+   "label": "Condition",
+   "options": "PythonExpression",
+   "description": "Optional Python expression, e.g. doc.sum > 1000. Available: doc, party, analysis, flags, nowdate, frappe.utils. Empty: always."
+  },
+  {
+   "fieldname": "gate_on_previous",
+   "fieldtype": "Check",
+   "label": "Only If Earlier Phases Passed",
+   "default": "0"
+  },
+  {
+   "fieldname": "what_section",
+   "fieldtype": "Section Break",
+   "label": "What"
+  },
+  {
+   "fieldname": "handler",
+   "fieldtype": "Data",
+   "label": "Handler",
+   "description": "Code step the skill runs (see the agent's handler module). Empty: the skill only adds its prompt rules to the phase."
+  },
+  {
+   "fieldname": "on_fail",
+   "fieldtype": "Select",
+   "label": "If It Fails",
+   "options": "Continue\nStop Run",
+   "default": "Continue"
+  },
+  {
+   "fieldname": "column_break_what",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "min_confidence",
+   "fieldtype": "Percent",
+   "label": "Minimum Confidence",
+   "description": "A result below this confidence counts as failed."
+  },
+  {
+   "fieldname": "params",
+   "fieldtype": "JSON",
+   "label": "Parameters",
+   "description": "Handler-specific settings."
+  },
+  {
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Prompt Rules"
+  },
+  {
+   "fieldname": "prompt_rules",
+   "fieldtype": "Table",
+   "label": "Prompt Rules",
+   "options": "AI Prompt Rule"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "dismissed",
+   "fieldtype": "Check",
+   "label": "Dismissed",
+   "default": "0",
+   "depends_on": "eval:doc.origin=='Suggested'",
+   "description": "A suggestion someone rejected; it is not suggested again."
+  },
+  {
+   "fieldname": "occurrences",
+   "fieldtype": "Int",
+   "label": "Occurrences",
+   "read_only": 1,
+   "depends_on": "eval:doc.origin!='Manual'",
+   "description": "How often the correction behind this suggestion happened."
+  },
+  {
+   "fieldname": "source_run",
+   "fieldtype": "Link",
+   "label": "Source Run",
+   "options": "AI Agent Run",
+   "read_only": 1,
+   "depends_on": "eval:doc.origin!='Manual'"
+  },
+  {
+   "fieldname": "suggestion_key",
+   "fieldtype": "Data",
+   "label": "Suggestion Key",
+   "read_only": 1,
+   "hidden": 1,
+   "search_index": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-17 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AI Agents",
+ "name": "AI Skill",
+ "owner": "Administrator",
+ "naming_rule": "Expression (old style)",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1
+  },
+  {
+   "role": "AI Accountant",
+   "read": 1,
+   "create": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "skill_name",
+ "track_changes": 1,
+ "show_title_field_in_link": 1
+}
