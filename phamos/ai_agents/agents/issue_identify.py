@@ -36,10 +36,11 @@ def run_identify(ctx, skill):
 	if found["project"]["confidence"] == STRONG and project_is_empty(doc):
 		if found["project"]["value"] != doc.get("project"):
 			changes["project"] = found["project"]["value"]
-	if changes:
-		from phamos.ai_agents.agents.issue_classify import save_changes
+	from phamos.ai_agents.agents.issue_classify import save_changes
 
-		save_changes(doc, changes)
+	# reloaded inside; a field a person filled meanwhile is left alone
+	changes = {f: changes[f] for f in save_changes(doc, changes,
+		lambda d, field: project_is_empty(d) if field == "project" else not d.get(field))}
 	found["fields_set"] = list(changes)
 	ctx.analysis["identify"] = found
 	if "customer" in changes or "custom_implementation" in changes:
