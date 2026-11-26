@@ -1,24 +1,24 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
+  projects: { type: Array, required: true }, // get_dev_all_projects rows, last used first
 });
 const emit = defineEmits(["confirm", "skip", "close"]);
 
 const project = ref("");
 const projectLabel = ref("");
-const projectResults = ref([]);
 const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
-const percentBillable = ref(0);
+const percentBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const activityType = ref("");
 const goalRef = ref(null);
 const liveNow = ref(new Date());
 
 let liveInterval = null;
-let searchTimer = null;
 
 const ACTIVITY_TYPES = ["Working Alone", "Working with Customer", "Working With Team"];
 
@@ -30,34 +30,28 @@ const billableOptions = [
   { value: 0,   label: "0%"   },
 ];
 
-onMounted(async () => {
+onMounted(() => {
   goalRef.value?.focus();
   liveInterval = setInterval(() => { liveNow.value = new Date(); }, 1000);
-  await fetchProjects("");
 });
 
-onUnmounted(() => { clearInterval(liveInterval); clearTimeout(searchTimer); });
+onUnmounted(() => clearInterval(liveInterval));
 
-async function fetchProjects(term) {
-  const filters = [["status", "=", "Open"]];
-  if (term) filters.push(["project_name", "like", `%${term}%`]);
-  const r = await frappe.call({
-    method: "frappe.client.get_list",
-    args: { doctype: "Project", filters, fields: ["name", "project_name"], limit: 50, order_by: "project_name asc" },
-  });
-  projectResults.value = r.message || [];
-}
+const projectResults = computed(() => {
+  const q = projectLabel.value.trim().toLowerCase();
+  return props.projects
+    .filter((p) => p.status === "Open")
+    .filter((p) => !q || `${p.project_name || ""} ${p.name}`.toLowerCase().includes(q))
+    .slice(0, 50);
+});
 
 function onSearchInput() {
   project.value = "";
   showDropdown.value = true;
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => fetchProjects(projectLabel.value), 300);
 }
 
 function onSearchFocus() {
   showDropdown.value = true;
-  if (!projectResults.value.length) fetchProjects(projectLabel.value);
 }
 
 function onSearchBlur() {
@@ -68,6 +62,8 @@ function selectProject(p) {
   project.value = p.name;
   projectLabel.value = p.project_name || p.name;
   showDropdown.value = false;
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  percentBillable.value = percentBillablePreset(p.percent_billable);
 }
 
 const breakDuration = computed(() => {

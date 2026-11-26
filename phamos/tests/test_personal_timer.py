@@ -60,6 +60,7 @@ class TestPersonalTimer(FrappeTestCase):
 					"status": "Open",
 					"task_in_timesheet_record": task_rule,
 					"percent_billable": "75",
+					"project_owner": "Administrator",
 				}
 			)
 			.insert(ignore_permissions=True)

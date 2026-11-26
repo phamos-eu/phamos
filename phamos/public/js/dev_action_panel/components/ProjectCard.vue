@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed } from "vue";
+import { PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   project: Object,
-  mode: String, // 'my' | 'all'
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
   activeIssueSession: Object,
@@ -19,7 +19,7 @@ const loadingSessions = ref(false);
 const startGoal = ref("");
 const expectedHours = ref(1);
 const stopResult = ref("");
-const stopBillable = ref(100);
+const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopActivityType = ref("");
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
 
@@ -59,7 +59,13 @@ async function toggleSessions() {
 }
 
 function openStart() { panel.value = panel.value === "start" ? null : "start"; }
-function openStop()  { panel.value = panel.value === "stop"  ? null : "stop"; }
+function openStop()  {
+  panel.value = panel.value === "stop" ? null : "stop";
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  stopBillable.value = percentBillablePreset(
+    (isActive.value && props.activeProjectSession?.project_percent_billable) || props.project.percent_billable
+  );
+}
 function closePanel() { panel.value = null; }
 
 function confirmStart() {
@@ -93,7 +99,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
       'pc--active':  isActive,
       'pc--running': sessionState === 'running',
       'pc--paused':  sessionState === 'paused',
-      'pc--blocked': hasAnySession && !isActive && mode === 'my',
+      'pc--blocked': hasAnySession && !isActive,
     }"
   >
     <div class="pc__body">
@@ -142,7 +148,15 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
           </span>
           <span class="pc__info-flex"></span>
 
-          <template v-if="mode === 'my'">
+          <!-- One list: every project can be assigned to me and timed -->
+          <button
+            v-if="!project.is_assigned"
+            class="pc__btn pc__btn--assign"
+            @click="emit('assign', project)"
+          >
+            Assign to me
+          </button>
+          <span v-else class="pc__assigned-badge">Assigned</span>
             <span v-if="isActive" class="pc__timer" :class="sessionState === 'running' ? 'timer--green' : 'timer--amber'">
               {{ fmtElapsed(projectElapsedSeconds) }}
             </span>
@@ -168,18 +182,6 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               Start
             </button>
-          </template>
-
-          <template v-else>
-            <button
-              v-if="!project.is_assigned"
-              class="pc__btn pc__btn--assign"
-              @click="emit('assign', project)"
-            >
-              Assign to me
-            </button>
-            <span v-else class="pc__assigned-badge">Assigned</span>
-          </template>
         </div>
       </div>
     </div>

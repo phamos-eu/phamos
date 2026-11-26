@@ -23,6 +23,7 @@ from frappe import _
 from frappe.utils import cint, get_datetime, now_datetime
 
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
+from phamos.phamos.timesheet_utils import billing_context, percent_billable_or_preset
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
@@ -115,7 +116,7 @@ def _session():
 		# does; the cockpit sends the user to Desk to submit it (#1767).
 		state = "stopped"
 	project = frappe.db.get_value(
-		"Project", doc.project, ["project_name", "percent_billable"], as_dict=True
+		"Project", doc.project, ["project_name"], as_dict=True
 	) or frappe._dict()
 	plan = _break_plan(doc.name)
 	return {
@@ -128,7 +129,7 @@ def _session():
 		"open_row_from": next((row.from_time for row in reversed(rows) if not row.to_time), None),
 		"project": doc.project,
 		"project_name": project.get("project_name") or doc.project,
-		"project_percent_billable": project.get("percent_billable") or "100",
+		"project_percent_billable": billing_context(doc.project)["percent_billable"],
 		"customer": doc.customer,
 		"task": doc.task,
 		"task_subject": frappe.db.get_value("Task", doc.task, "subject") if doc.task else None,
@@ -258,7 +259,7 @@ def get_timer_project_info(project):
 		)
 	return {
 		"project": project,
-		"percent_billable": frappe.db.get_value("Project", project, "percent_billable") or "100",
+		"percent_billable": billing_context(project)["percent_billable"],
 		"task_rule": rule,
 		"tasks": tasks,
 	}
@@ -336,8 +337,9 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 	return get_timer_state()
 
 
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, gitlab_issue_ref=None):
 	doc = _own_record(name)
+	percent_billable = percent_billable_or_preset(percent_billable, doc.project)
 	result = (result or "").strip()
 	if not result:
 		frappe.throw(_("Please describe what you accomplished."))
@@ -355,6 +357,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
 		percent_billable=percent_billable,
 		activity_type=activity_type,
 		manual_end_time=manual_end_time or None,
+		gitlab_issue_ref=gitlab_issue_ref or None,
 	)
 	return {"outcome": outcome, "state": get_timer_state()}
 
