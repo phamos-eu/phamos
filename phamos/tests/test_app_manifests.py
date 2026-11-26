@@ -32,6 +32,7 @@ FRONTENDS = {
 	"general_management_frontend": "/general-management-cockpit",
 	"personal_frontend": "/personal-cockpit",
 	"scan_frontend": "/scan",
+	"implementation_frontend": "/implementation-cockpit",
 }
 
 # Scopes of apps from other Frappe apps on the same site; ours must not overlap them.

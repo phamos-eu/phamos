@@ -206,6 +206,10 @@ class TestDapStartProjectTimer(FrappeTestCase):
 				side_effect=[employee, "CUST-001"],
 			),
 			patch(
+				"phamos.phamos.page.dev_action_panel.dev_action_panel.billing_context",
+				return_value={"percent_billable": "75"},
+			),
+			patch(
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.frappe.get_all",
 				return_value=[],
 			),
@@ -232,6 +236,7 @@ class TestDapStartProjectTimer(FrappeTestCase):
 		self.assertEqual(fake.employee, "EMP-001")
 		self.assertEqual(fake.activity_type, "Development")
 		self.assertEqual(fake.expected_time, 1800)
+		self.assertEqual(fake.percent_billable, "75")
 		self.assertFalse(getattr(fake, "gitlab_issue", None))
 		self.assertEqual(len(fake.item), 1)
 

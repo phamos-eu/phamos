@@ -215,6 +215,19 @@
 .wp-lead { margin: 0 0 12px; font-size: 17px; line-height: 1.55; color: var(--wp-ink); }
 .wp-body { color: var(--wp-ink-2); font-size: 15px; line-height: 1.65; }
 .wp-related { margin: 0 0 44px; }  /* sections are separated by space, not lines */
+/* FAQ (phamos/phamos#1823): look of the "Section with Collapsible Content" web block (phamos.eu/services):
+   no boxes, a thin line under each question, "+" on the right that turns into "−" when open. */
+.wp-faq { max-width: 760px; margin: 0 0 44px; }
+.wp-faq h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 4px; }
+.wp-faq-item { border-bottom: 1px solid var(--wp-line); }
+.wp-faq-item summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; list-style: none; cursor: pointer; }
+.wp-faq-item summary::-webkit-details-marker { display: none; }
+.wp-faq-question { color: var(--wp-ink-2); font-size: 17px; font-weight: 600; line-height: 1.4; }
+.wp-faq-icon { flex: none; fill: none; stroke: var(--wp-muted); stroke-width: 1.5; stroke-linecap: round; }
+.wp-faq-item[open] .wp-faq-v { display: none; }
+.wp-faq-answer { padding: 0 36px 20px 0; }
+.wp-faq-answer > :first-child { margin-top: 0; }
+.wp-faq-answer > :last-child { margin-bottom: 0; }
 .wp-section-intro { max-width: 760px; margin: -4px 0 16px; color: var(--wp-muted); font-size: 15px; line-height: 1.6; }
 .wp-related-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .wp-external-links { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; margin: 32px 0 0; padding: 0; }

@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 21:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "feature",
+  "title",
+  "status",
+  "priority",
+  "planned_start",
+  "target_date",
+  "target_level",
+  "estimated_hours"
+ ],
+ "fields": [
+  {
+   "fieldname": "feature",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Feature",
+   "options": "Implementation Feature"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status"
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Data",
+   "label": "Priority"
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Planned Start"
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Target Date"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "Int",
+   "label": "Target Level"
+  },
+  {
+   "fieldname": "estimated_hours",
+   "fieldtype": "Float",
+   "label": "Estimated Hours"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 21:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Baseline Feature",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

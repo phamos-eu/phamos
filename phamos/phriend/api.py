@@ -7,17 +7,21 @@ import base64
 import binascii
 import json
 import re
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import frappe
 import requests
 from frappe import _
 from frappe.desk.form.assign_to import add as assign_to
-from frappe.utils import cstr, escape_html, get_url, pretty_date, to_markdown
+from frappe.utils import cint, cstr, escape_html, get_url, pretty_date, to_markdown
 from frappe.utils.password import get_decrypted_password
 
+from phamos.phriend import events as phriend_events
+from phamos.phriend import feedback as phriend_feedback
+from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import shortcut as phriend_shortcut
-from phamos.phriend.boot import is_for_user
+from phamos.phriend import voice as phriend_voice
+from phamos.phriend.boot import is_for_user, web_boot
 from phamos.phriend.gitlab_issues import link_created
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
@@ -117,6 +121,34 @@ def create_report(
 	)
 
 
+IMPLEMENTATION_COCKPIT_ROUTE = "implementation-cockpit/"
+
+
+def report_implementation(settings, route, ref_doctype, ref_docname, source=None):
+	"""The Implementation a report belongs to, so the Implementation Cockpit can show it (#1671).
+
+	In this order: the implementation of the Implementation Cockpit page it was made on; the
+	implementation of the record it was made on; the Implementation of this system (Phriend
+	Settings). A report from another system has neither page nor record here, so it gets none
+	until that system's Implementation is known (#1937, #1953).
+	"""
+	if source:
+		return None
+	route = cstr(route).lstrip("/")
+	if route.startswith(IMPLEMENTATION_COCKPIT_ROUTE):
+		name = unquote(route[len(IMPLEMENTATION_COCKPIT_ROUTE) :].split("/", 1)[0])
+		if name and frappe.db.exists("Implementation", name):
+			return name
+	if ref_doctype and ref_docname:
+		if ref_doctype == "Implementation":
+			return ref_docname
+		if frappe.get_meta(ref_doctype).has_field("custom_implementation"):
+			value = frappe.db.get_value(ref_doctype, ref_docname, "custom_implementation")
+			if value:
+				return value
+	return settings.get("system_implementation") or None
+
+
 def make_report(settings, fields, reporter, reporter_name, reporter_email, source=None):
 	"""The Issue for one report, with its screenshot and ToDo. Returns {"name"}.
 
@@ -170,6 +202,7 @@ def make_report(settings, fields, reporter, reporter_name, reporter_email, sourc
 	issue.phriend_page_url = page_url
 	issue.phriend_ref_doctype = ref_doctype
 	issue.phriend_ref_docname = linked_docname
+	issue.custom_implementation = report_implementation(settings, route, ref_doctype, linked_docname, source)
 	issue.phriend_context = _pretty_json(f["context"])
 	if source:
 		issue.phriend_source_system = source["system"]
@@ -246,6 +279,102 @@ def set_my_shortcut(shortcut=None):
 	return phriend_shortcut.user_shortcut()
 
 
+def _check_quiet_allowed():
+	settings = _check_allowed()
+	if not cint(settings.get("quiet_mode")):
+		frappe.throw(_("Leave me in peace is switched off in Phriend Settings"), frappe.PermissionError)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_my_quiet(until=None, minutes=None):
+	"""Leave me in peace (#2010) for the current user: minutes (counted on the server), or until
+	"forever", a time in epoch ms (at most the rest of today), or empty to call Phriend back.
+	Returns the user's quiet state."""
+	_check_quiet_allowed()
+	state = phriend_quiet.set_quiet(until, minutes)
+	phriend_events.send_quiet_state(state)  # the user's other tabs (#2012)
+	return state
+
+
+@frappe.whitelist(methods=["POST"])
+def set_my_warning_mute(minutes=0):
+	"""Mute Phriend's red warnings for 30, 60 or 90 minutes (#2010); 0 to hear them again."""
+	_check_quiet_allowed()
+	state = phriend_quiet.set_warning_mute(minutes)
+	phriend_events.send_quiet_state(state)  # the user's other tabs (#2012)
+	return state
+
+
+@frappe.whitelist(methods=["POST"])
+def claim_my_bubble(day=None):
+	"""One voice (#2011): may Phriend open a bubble by itself now? Uses one of the current user's
+	bubbles for today (day: the browser's local date). Returns the day's count and "granted"."""
+	settings = _check_allowed()
+	if not cint(settings.get("one_voice")):
+		frappe.throw(_("One voice is switched off in Phriend Settings"), frappe.PermissionError)
+	return phriend_voice.claim(settings, day)
+
+
+def _check_feedback_allowed():
+	settings = _check_allowed()
+	if not phriend_feedback.is_on(settings):
+		frappe.throw(_("Rating questions are switched off in Phriend Settings"), frappe.PermissionError)
+	return settings
+
+
+@frappe.whitelist(methods=["POST"])
+def get_my_feedback_requests():
+	"""The current user's open rating questions (#2014). Fetched after the page loads, not in the
+	boot: Desk caches the boot per user, and a new question would not show until that cache is
+	cleared."""
+	_check_feedback_allowed()
+	return phriend_feedback.open_requests()
+
+
+@frappe.whitelist(methods=["POST"])
+def answer_feedback(name=None, rating=None, comment=None):
+	"""Rating a fix (#2014): the current user's answer to one of their questions."""
+	_check_feedback_allowed()
+	return phriend_feedback.answer(cstr(name), rating, comment)
+
+
+@frappe.whitelist(methods=["POST"])
+def defer_feedback(name=None):
+	"""The question was closed without an answer: ask again another day (at most 3 times)."""
+	_check_feedback_allowed()
+	return phriend_feedback.defer(cstr(name))
+
+
+@frappe.whitelist(methods=["POST"])
+def decline_feedback(name=None):
+	"""'No thanks': never ask this question again."""
+	_check_feedback_allowed()
+	return phriend_feedback.decline(cstr(name))
+
+
+@frappe.whitelist(methods=["POST"])
+def ask_feedback_now(issue=None, round=None):
+	"""Debug (phriend.ask_rating): ask the rating question for one report now, whether or not it
+	is live. For those who may change Phriend Settings."""
+	_check_feedback_allowed()
+	frappe.has_permission("Phriend Settings", "write", throw=True)
+	round_ = cstr(round) or phriend_feedback.FIRST
+	if round_ not in (phriend_feedback.FIRST, phriend_feedback.LATER):
+		frappe.throw(_("Round is First impression or Battle tested."))
+	return phriend_feedback.ask(cstr(issue), round_, phriend_feedback.live_since(cstr(issue)))
+
+
+@frappe.whitelist(methods=["POST"])
+def send_test_event(kind=None):
+	"""Debug (phriend.emit, #2012): a sample event of `kind` to the current user's own Phriend.
+	For those who may change Phriend Settings, while events are on."""
+	settings = _check_allowed()
+	frappe.has_permission("Phriend Settings", "write", throw=True)
+	if not cint(settings.get("events")):
+		frappe.throw(_("Events are switched off in Phriend Settings"), frappe.PermissionError)
+	return phriend_events.test_event(cstr(kind))
+
+
 def _open_report_filters(route, ref_doctype, ref_docname):
 	"""Filters for open Phriend reports about one record, a DocType, or a page; None for none.
 
@@ -282,6 +411,29 @@ def _may_read(doctype, name=None):
 		# an unknown DocType or record: nothing to say about it
 		frappe.clear_last_message()
 		return False
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_web_boot():
+	"""Whether the Phriend ball shows on the website pages, and what it needs (#2104).
+
+	The website has no Desk boot: phriend_web.bundle.js asks here, and only for users whose
+	`system_user` cookie says Desk user. None for everyone Phriend is not for, Guests included
+	(a stale cookie after logout must not raise an error).
+	"""
+	return web_boot()
+
+
+@frappe.whitelist(methods=["GET"])
+def get_web_translations():
+	"""Phriend's words in the user's language, for the website pages (#2104): the table the
+	cockpits boot with. Fetched once per language and phamos version; empty when Phriend is not
+	for the user."""
+	from phamos.www.spa_boot import spa_translations
+
+	if not web_boot():
+		return {}
+	return spa_translations(frappe.local.lang)
 
 
 @frappe.whitelist()
@@ -558,6 +710,8 @@ def create_gitlab_issue(issue, labels=None, title=None):
 			f'<a href="{escape_html(web_url)}" target="_blank">{escape_html(reference)}</a>'
 		),
 	)
+	# tell the reporter's Phriend (#2012)
+	phriend_events.gitlab_issue_created(doc, web_url, reference)
 	# no record: the GitLab Project is not synced to ERPNext yet, or linking failed (both logged)
 	return {"web_url": web_url, "iid": created.get("iid"), "reference": reference, "gitlab_issue": record}
 

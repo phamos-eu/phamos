@@ -101,7 +101,8 @@ class TestGeneralManagementAccess(FrappeTestCase):
 		taken = {
 			frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_department")
 			for prefix, _color in COCKPITS.values()
-			if prefix not in ("general_management", "personal")
+			# cockpits without a department of their own
+			if prefix not in ("general_management", "personal", "implementation")
 		}
 		departments = [
 			name
@@ -266,6 +267,33 @@ class TestCompanyTasks(FrappeTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			gm.get_company_task(self.other_task)
 
+	def test_dependencies_in_the_task_panel(self):
+		# #2000: the side panel lists, adds and removes predecessors.
+		first = self._task("GM first", self.own)
+		gm.add_task_dependency(self.own_task, first)
+
+		deps = gm.get_task(self.own_task)["dependencies"]
+		self.assertEqual([d["name"] for d in deps], [first])
+		self.assertEqual(deps[0]["subject"], "_Test company GM first")
+		self.assertTrue(deps[0]["readable"])
+
+		detail = gm.remove_task_dependency(self.own_task, first)
+		self.assertEqual(detail["dependencies"], [])
+		self.assertEqual(frappe.get_doc("Task", self.own_task).depends_on, [])
+		# Removing it again changes nothing.
+		self.assertEqual(gm.remove_task_dependency(self.own_task, first)["dependencies"], [])
+
+	def test_dependency_search_stays_in_the_cockpit(self):
+		first = self._task("GM first", self.own)
+		found = [t["name"] for t in gm.search_dependency_candidates(self.own_task, "_Test company")]
+		self.assertIn(first, found)
+		self.assertNotIn(self.own_task, found)
+		self.assertNotIn(self.sales_task, found)
+
+		gm.add_task_dependency(self.own_task, first)
+		found = [t["name"] for t in gm.search_dependency_candidates(self.own_task, "_Test company")]
+		self.assertNotIn(first, found)
+
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
 		with self.assertRaises(frappe.PermissionError):
@@ -385,6 +413,7 @@ class TestCompanyAppointments(FrappeTestCase):
 
 	def test_update_and_delete(self):
 		saved = gm.save_appointment(self._appointment())
+		self.run_jobs()
 		updated = gm.save_appointment(self._appointment(name=saved["name"], subject="All-hands, moved"))
 		self.assertEqual(updated["name"], saved["name"])
 		self.assertEqual(updated["subject"], "All-hands, moved")
@@ -395,6 +424,40 @@ class TestCompanyAppointments(FrappeTestCase):
 		self.run_jobs()
 		self.delete.assert_called()
 		self.assertNotIn(saved["name"], [a["name"] for a in gm.get_company_appointments()["appointments"]])
+
+	def test_an_appointment_cannot_change_while_its_invite_is_being_sent(self):
+		"""A second save would start a second job with the same version, which can mark the first
+		one failed after its wait (review of !1231)."""
+		saved = gm.save_appointment(self._appointment())
+		self.assertTrue(saved["sending"])
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(name=saved["name"], subject="Changed meanwhile"))
+		with self.assertRaises(frappe.ValidationError):
+			gm.delete_appointment(saved["name"])
+
+		self.run_jobs()
+		listed = {a["name"]: a for a in gm.get_company_appointments()["appointments"]}
+		self.assertFalse(listed[saved["name"]]["sending"])
+		gm.save_appointment(self._appointment(name=saved["name"], subject="Changed afterwards"))
+
+	def test_a_row_left_pending_by_a_dead_job_can_change_again(self):
+		from phamos.events import team_daily_schedule
+
+		saved = gm.save_appointment(self._appointment())
+		long_ago = frappe.utils.add_to_date(
+			frappe.utils.now_datetime(), seconds=-team_daily_schedule.MAX_ROW_SEND_SECONDS - 1
+		)
+		frappe.db.set_value("Team Daily Schedule", saved["name"], "mailcow_last_sync_at", long_ago)
+		gm.save_appointment(self._appointment(name=saved["name"], subject="Job died, try again"))
+
+	def test_a_cancelled_incomplete_row_is_not_being_sent(self):
+		"""After an incomplete row's cancel it is unsynced, error-free and freshly stamped, like a pending one."""
+		from phamos.events import team_daily_schedule
+
+		row = frappe._dict(mailcow_synced=0, mailcow_last_error="", mailcow_last_sync_at=frappe.utils.now_datetime())
+		self.assertFalse(team_daily_schedule.row_is_being_sent(row))
+		row.update(subject="All-hands", start="2026-12-01 10:00:00", end="2026-12-01 11:00:00")
+		self.assertTrue(team_daily_schedule.row_is_being_sent(row))
 
 	def test_refuses_rows_outside_the_company_and_bad_input(self):
 		with self.assertRaises(frappe.ValidationError):
@@ -414,6 +477,16 @@ class TestCompanyAppointments(FrappeTestCase):
 			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on=""))
 		with self.assertRaises(frappe.ValidationError):
 			gm.save_appointment(self._appointment(repeat_this_event=1, repeat_on="Weekly", repeat_till="2026-11-01"))
+
+	def test_a_weekly_start_on_an_unticked_weekday_stays(self):
+		"""The chosen start is the first appointment, also when its weekday isn't ticked; the repeat
+		continues on the ticked days after it (Wolfram, 2026-11-19). 2026-12-01 is a Tuesday."""
+		saved = gm.save_appointment(
+			self._appointment(repeat_this_event=1, repeat_on="Weekly", monday=1, thursday=1, repeat_till="2026-12-01")
+		)
+		self.assertEqual(str(saved["start"]), "2026-12-01 10:00:00")
+		self.assertEqual(str(saved["end"]), "2026-12-01 11:00:00")
+		self.assertEqual((saved["monday"], saved["tuesday"], saved["thursday"]), (1, 0, 1))
 
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))

@@ -71,6 +71,11 @@
   "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
+  "wip_limits_section",
+  "max_parallel_chapters",
+  "column_break_wip_limits",
+  "max_parallel_features",
+  "team_capacity_share",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -586,6 +591,37 @@
    "fieldname": "rank_html",
    "fieldtype": "HTML",
    "label": "Rank"
+  },
+  {
+   "fieldname": "wip_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Agreed WIP Limits",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "max_parallel_chapters",
+   "fieldtype": "Int",
+   "label": "Max Chapters in Progress",
+   "description": "How many chapters may be In Progress at the same time, as agreed with the customer in a regular session. 0 means no limit. Exceeding it shows a warning; nothing is blocked.",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_wip_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_parallel_features",
+   "fieldtype": "Int",
+   "label": "Max Features in Progress",
+   "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit.",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "team_capacity_share",
+   "fieldtype": "Percent",
+   "label": "Team Capacity Share",
+   "non_negative": 1,
+   "description": "The share of the team's capacity agreed for this implementation, because teams work for several customers. Used by the realistic check of releases."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -633,9 +669,28 @@
   {
    "link_doctype": "Stakeholder Meeting",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Feature",
+   "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Change",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Baseline",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Release",
+   "link_fieldname": "implementation",
+   "group": "Planning"
   }
  ],
- "modified": "2026-10-20 10:00:00.000000",
+ "modified": "2026-11-18 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

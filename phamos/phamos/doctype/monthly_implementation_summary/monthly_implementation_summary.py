@@ -20,6 +20,11 @@ YEAR_MIN = 2000
 YEAR_MAX = 2100
 
 
+def _get_hour_uom():
+	# version-15 has no configurable hour UOM yet (Phamos Settings "hour_uom", #1503 on develop)
+	return "Hour"
+
+
 def _so_hour_items(sales_order):
 	if not sales_order:
 		frappe.throw(frappe._("Sales Order is required."))
@@ -67,6 +72,105 @@ def _so_row_qty_str(v):
 	"""String for Sales Order Status Data fields — avoids 100 vs 100.0 after submit."""
 	f = flt(v)
 	return str(int(f)) if f == int(f) else ("%.6f" % f).rstrip("0").rstrip(".") or "0"
+
+
+# The Delivery Note / Sales Invoice points at its MIS; the MIS keeps no link back (#1987).
+# A link from the MIS to them made a submitted MIS block cancelling them.
+MIS_LINK_FIELD = "custom_monthly_implementation_summary"
+DN_LINE_MIS_FIELD = "custom_against_monthly_implementation_summary"
+
+
+def _counts_as_delivered(dn):
+	return (dn.status or "") not in ("Draft", "Cancelled")
+
+
+def _delivery_notes_of_mis(mis_name):
+	"""The Delivery Notes that point at this MIS (header field, or a line the MIS created), any
+	docstatus, oldest first. Hours: the lines the MIS created; without such lines, the lines in the
+	hour UOM."""
+	if not mis_name:
+		return []
+	names = set(frappe.get_all("Delivery Note", filters={MIS_LINK_FIELD: mis_name}, pluck="name"))
+	names.update(frappe.get_all(
+		"Delivery Note Item",
+		filters={"parenttype": "Delivery Note", DN_LINE_MIS_FIELD: mis_name},
+		pluck="parent",
+		distinct=True,
+	))
+	if not names:
+		return []
+	names = list(names)
+	lines_by_dn = {}
+	for line in frappe.get_all(
+		"Delivery Note Item",
+		filters={"parenttype": "Delivery Note", "parent": ["in", names]},
+		fields=["parent", "qty", "uom", "stock_uom", "against_sales_order", DN_LINE_MIS_FIELD],
+		order_by="idx asc",
+	):
+		lines_by_dn.setdefault(line.parent, []).append(line)
+	hour_uom = _get_hour_uom()
+	out = []
+	for dn in frappe.get_all(
+		"Delivery Note",
+		filters={"name": ["in", names]},
+		fields=["name", "docstatus", "status", "grand_total", "posting_date", "project"],
+		order_by="posting_date asc, creation asc",
+	):
+		lines = lines_by_dn.get(dn.name, [])
+		counted = [l for l in lines if l.get(DN_LINE_MIS_FIELD) == mis_name] or [
+			l for l in lines
+			if (l.uom or "").strip() == hour_uom or (l.stock_uom or "").strip() == hour_uom
+		]
+		out.append(frappe._dict(
+			delivery_note=dn.name,
+			docstatus=cint(dn.docstatus),
+			status=dn.status or "",
+			grand_total=flt(dn.grand_total),
+			posting_date=dn.posting_date,
+			project=dn.project or "",
+			sales_order=next((l.against_sales_order for l in lines if l.against_sales_order), ""),
+			hours=flt(sum(flt(l.qty) for l in counted), 2),
+		))
+	return out
+
+
+def _sales_invoices_of_mis(mis_name, delivery_notes=None):
+	"""The Sales Invoices that point at this MIS or bill one of its Delivery Notes, any docstatus,
+	each with the Delivery Notes it bills (`delivery_notes`)."""
+	if not mis_name:
+		return []
+	if delivery_notes is None:
+		delivery_notes = _delivery_notes_of_mis(mis_name)
+	names = set(frappe.get_all("Sales Invoice", filters={MIS_LINK_FIELD: mis_name}, pluck="name"))
+	dns_by_si = {}
+	dn_names = [d.delivery_note for d in delivery_notes]
+	if dn_names:
+		for row in frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parenttype": "Sales Invoice", "delivery_note": ["in", dn_names]},
+			fields=["parent", "delivery_note"],
+			distinct=True,
+		):
+			names.add(row.parent)
+			dns_by_si.setdefault(row.parent, set()).add(row.delivery_note)
+	if not names:
+		return []
+	return [
+		frappe._dict(
+			sales_invoice=si.name,
+			docstatus=cint(si.docstatus),
+			status=si.status or "",
+			grand_total=flt(si.grand_total),
+			posting_date=si.posting_date,
+			delivery_notes=sorted(dns_by_si.get(si.name, ())),
+		)
+		for si in frappe.get_all(
+			"Sales Invoice",
+			filters={"name": ["in", list(names)]},
+			fields=["name", "docstatus", "status", "grand_total", "posting_date"],
+			order_by="posting_date asc, creation asc",
+		)
+	]
 
 
 class MonthlyImplementationSummary(Document):
@@ -164,18 +268,12 @@ class MonthlyImplementationSummary(Document):
 		prev_submitting = frappe.flags.get("mis_submitting")
 		frappe.flags.mis_submitting = self.name
 		try:
-			for row in (self.mis_delivery_notes or []):
-				dn_name = row.delivery_note
-				if not dn_name or not frappe.db.exists("Delivery Note", dn_name):
+			for dn in _delivery_notes_of_mis(self.name):
+				if dn.docstatus != 0:
 					continue
-				dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
-				if dn_status != 0:
-					continue
+				dn_name = dn.delivery_note
 				try:
-					dn_doc = frappe.get_doc("Delivery Note", dn_name)
-					dn_doc.submit()
-					row.status = dn_doc.status or ""
-					row.grand_total = flt(dn_doc.grand_total)
+					frappe.get_doc("Delivery Note", dn_name).submit()
 				except Exception as e:
 					errors.append(f"{frappe.bold(dn_name)}: {str(e)}")
 		finally:
@@ -213,21 +311,17 @@ class MonthlyImplementationSummary(Document):
 		rows = self.sales_order_status_information or []
 		if any((r.status or "") not in ("Completed", "Closed") for r in rows):
 			return False
-		sales_orders, delivery_notes = set(), set()
-		for row in (self.mis_delivery_notes or []):
-			if row.sales_order:
-				sales_orders.add(row.sales_order)
-			if row.delivery_note:
-				delivery_notes.add(row.delivery_note)
+		delivery_notes = _delivery_notes_of_mis(self.name)
+		sales_orders = {dn.sales_order for dn in delivery_notes if dn.sales_order}
 		if not sales_orders and not delivery_notes and rows:
 			return False
 		for so in sales_orders:
 			if frappe.db.get_value("Sales Order", so, "status") not in ("Completed", "Closed"):
 				return False
 		for dn in delivery_notes:
-			if cint(frappe.db.get_value("Delivery Note", dn, "docstatus") or 0) == 2:
+			if dn.docstatus == 2:
 				continue
-			if frappe.db.get_value("Delivery Note", dn, "status") not in ("Completed", "Closed"):
+			if dn.status not in ("Completed", "Closed"):
 				return False
 		self._set_status("Closed", frappe._("Auto-closed: all linked Sales Orders / Delivery Notes are fulfilled."))
 		return True
@@ -235,8 +329,6 @@ class MonthlyImplementationSummary(Document):
 	def _sync_snapshot(self):
 		"""Fields sync_and_auto_close may touch — used to skip saving when nothing changed."""
 		return (
-			tuple((r.delivery_note, r.status, flt(r.grand_total)) for r in (self.mis_delivery_notes or [])),
-			tuple((r.sales_invoice, r.status, flt(r.grand_total)) for r in (self.mis_sales_invoices or [])),
 			tuple(
 				(r.sales_order, r.status, r.total_hrs, r.delivered_total_hrs, r.remaining_hrs)
 				for r in (self.sales_order_status_information or [])
@@ -249,20 +341,6 @@ class MonthlyImplementationSummary(Document):
 		if self.is_closed():
 			return False
 		before = self._sync_snapshot()
-		for row in (self.mis_delivery_notes or []):
-			if not row.delivery_note:
-				continue
-			live = frappe.db.get_value("Delivery Note", row.delivery_note, ["status", "grand_total"], as_dict=True)
-			if live and (row.status != (live.status or "") or flt(row.grand_total) != flt(live.grand_total)):
-				row.status = live.status or ""
-				row.grand_total = flt(live.grand_total)
-		for row in (self.mis_sales_invoices or []):
-			if not row.sales_invoice:
-				continue
-			live = frappe.db.get_value("Sales Invoice", row.sales_invoice, ["status", "grand_total"], as_dict=True)
-			if live and (row.status != (live.status or "") or flt(row.grand_total) != flt(live.grand_total)):
-				row.status = live.status or ""
-				row.grand_total = flt(live.grand_total)
 		if not self.is_closed():
 			self._set_sales_order_status_information()
 			self.populate_financial_history_fields()
@@ -297,11 +375,9 @@ class MonthlyImplementationSummary(Document):
 		self.open_so = 0
 
 	def _recalculate_delivered_hours(self):
+		delivery_notes = [] if self.is_new() else _delivery_notes_of_mis(self.name)
 		self.delivered_hours = flt(
-			sum(
-				flt(r.hours) for r in (self.mis_delivery_notes or [])
-				if r.delivery_note and (r.status or "") not in ("Draft", "Cancelled")
-			),
+			sum(dn.hours for dn in delivery_notes if _counts_as_delivered(dn)),
 			2,
 		)
 		self.remaining_billable_hours = flt(flt(self.billable_hours) - self.delivered_hours, 2)
@@ -393,7 +469,6 @@ class MonthlyImplementationSummary(Document):
 		dn.run_method("calculate_taxes_and_totals")
 		dn.insert()
 		total_hours = flt(sum(hours_by_detail.values()))
-		_add_or_update_mis_dn_row(self.name, dn.name, sales_order, total_hours, project)
 		_mirror_dn_items_into_mis(self.name, dn.name)
 		if not skip_default_stamp:
 			self._stamp_timesheets_for_delivered_hours(dn.name, total_hours, project)
@@ -593,9 +668,9 @@ class MonthlyImplementationSummary(Document):
 
 def _delivered_hours_by_project(doc):
 	totals = {}
-	for r in doc.mis_delivery_notes or []:
-		if r.delivery_note and r.project and (r.status or "") not in ("Draft", "Cancelled"):
-			totals[r.project] = flt(totals.get(r.project, 0)) + flt(r.hours)
+	for dn in _delivery_notes_of_mis(doc.name):
+		if dn.project and _counts_as_delivered(dn):
+			totals[dn.project] = flt(totals.get(dn.project, 0)) + dn.hours
 	return totals
 
 
@@ -632,9 +707,9 @@ def _parse_allocations(allocations):
 def _existing_draft_dn_hours(doc):
 	"""Sum of hours already sitting in draft Delivery Notes for this MIS, keyed by Sales Order."""
 	totals = {}
-	for r in doc.mis_delivery_notes or []:
-		if r.status == "Draft" and r.sales_order:
-			totals[r.sales_order] = flt(totals.get(r.sales_order, 0)) + flt(r.hours)
+	for dn in _delivery_notes_of_mis(doc.name):
+		if dn.docstatus == 0 and dn.sales_order:
+			totals[dn.sales_order] = flt(totals.get(dn.sales_order, 0)) + dn.hours
 	return totals
 
 
@@ -783,37 +858,6 @@ def create_dns_from_allocations(docname: str, project: str, allocations):
 	return {"status": "ok", "created": created}
 
 
-def _add_or_update_mis_dn_row(docname, dn_name, sales_order=None, hours=None, project=None):
-	if not docname or not dn_name:
-		return
-	dn_doc = frappe.get_doc("Delivery Note", dn_name)
-	doc = frappe.get_doc("Monthly Implementation Summary", docname)
-	doc.reload()
-	existing = next(
-		(r for r in (doc.mis_delivery_notes or []) if r.delivery_note == dn_name),
-		None,
-	)
-	data = {
-		"delivery_note": dn_name,
-		"sales_order": sales_order,
-		"status": dn_doc.status or "",
-		"grand_total": flt(dn_doc.grand_total),
-		"posting_date": dn_doc.posting_date,
-	}
-	if hours is not None:
-		data["hours"] = flt(hours, 2)
-	if project is not None:
-		data["project"] = project
-	if existing:
-		for k, v in data.items():
-			setattr(existing, k, v)
-	else:
-		doc.append("mis_delivery_notes", data)
-	doc.flags.ignore_permissions = True
-	doc.flags.ignore_validate_update_after_submit = True
-	doc.save()
-
-
 @frappe.whitelist()
 def set_mis_open_status(docname: str, closed):
 	_require_docname(docname)
@@ -823,7 +867,7 @@ def set_mis_open_status(docname: str, closed):
 
 
 
-def _submit_docs_in_mis(docname, names, doctype, child_table, child_fieldname):
+def _submit_docs_in_mis(docname, names, doctype, child_fieldname, allowed_fn):
 	"""Shared body for submit_delivery_notes_in_mis / submit_sales_invoices_in_mis."""
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
@@ -833,7 +877,7 @@ def _submit_docs_in_mis(docname, names, doctype, child_table, child_fieldname):
 	if not target_names:
 		return {"submitted": 0, "already_submitted": 0, "failed": 0, "failed_details": []}
 
-	allowed = {(row.get(child_fieldname) or "") for row in (doc.get(child_table) or []) if row.get(child_fieldname)}
+	allowed = allowed_fn(doc.name)
 
 	submitted = 0
 	already_submitted = 0
@@ -857,14 +901,6 @@ def _submit_docs_in_mis(docname, names, doctype, child_table, child_fieldname):
 			target_doc = frappe.get_doc(doctype, name)
 			target_doc.check_permission("submit")
 			target_doc.submit()
-			for row in (doc.get(child_table) or []):
-				if row.get(child_fieldname) == name:
-					frappe.db.set_value(
-						row.doctype, row.name,
-						{"status": target_doc.status or "", "grand_total": flt(target_doc.grand_total)},
-						update_modified=False,
-					)
-					break
 			submitted += 1
 		except Exception as e:
 			failed_details.append({child_fieldname: name, "error": str(e)})
@@ -879,12 +915,18 @@ def _submit_docs_in_mis(docname, names, doctype, child_table, child_fieldname):
 
 @frappe.whitelist()
 def submit_delivery_notes_in_mis(docname: str, delivery_notes):
-	return _submit_docs_in_mis(docname, delivery_notes, "Delivery Note", "mis_delivery_notes", "delivery_note")
+	return _submit_docs_in_mis(
+		docname, delivery_notes, "Delivery Note", "delivery_note",
+		lambda mis: {dn.delivery_note for dn in _delivery_notes_of_mis(mis)},
+	)
 
 
 @frappe.whitelist()
 def submit_sales_invoices_in_mis(docname: str, sales_invoices):
-	return _submit_docs_in_mis(docname, sales_invoices, "Sales Invoice", "mis_sales_invoices", "sales_invoice")
+	return _submit_docs_in_mis(
+		docname, sales_invoices, "Sales Invoice", "sales_invoice",
+		lambda mis: {si.sales_invoice for si in _sales_invoices_of_mis(mis)},
+	)
 
 
 def _find_existing_sales_invoice_for_delivery_note(delivery_note):
@@ -1228,31 +1270,9 @@ def create_sales_invoice_from_mis(docname: str, delivery_note: str = None):
 	if existing_si:
 		existing_si_docstatus = cint(frappe.db.get_value("Sales Invoice", existing_si, "docstatus") or 0)
 		if existing_si_docstatus == 0:
-			# Draft SI exists — link it to MIS and return it
-			si_doc = frappe.get_doc("Sales Invoice", existing_si)
-			doc.reload()
-			dn_sales_order = None
-			for row in (doc.mis_delivery_notes or []):
-				if row.delivery_note == delivery_note:
-					dn_sales_order = row.sales_order
-					break
-			doc.reload()
-			existing_si_row = next(
-				(r for r in (doc.mis_sales_invoices or []) if r.sales_invoice == existing_si),
-				None,
-			)
-			if not existing_si_row:
-				doc.append("mis_sales_invoices", {
-					"sales_invoice": existing_si,
-					"delivery_note": delivery_note,
-					"sales_order": dn_sales_order,
-					"status": si_doc.status or "",
-					"grand_total": flt(si_doc.grand_total),
-					"posting_date": si_doc.posting_date,
-				})
-				doc.flags.ignore_permissions = True
-				doc.flags.ignore_validate_update_after_submit = True
-				doc.save()
+			# Draft SI exists: point it at this MIS (if it points nowhere yet) and return it
+			if not frappe.db.get_value("Sales Invoice", existing_si, MIS_LINK_FIELD):
+				frappe.db.set_value("Sales Invoice", existing_si, MIS_LINK_FIELD, doc.name, update_modified=False)
 			return {"status": "ok", "sales_invoice": existing_si}
 		si_link = frappe.utils.get_link_to_form("Sales Invoice", existing_si)
 		frappe.throw(
@@ -1271,31 +1291,8 @@ def create_sales_invoice_from_mis(docname: str, delivery_note: str = None):
 			)
 		)
 
+	si_doc.set(MIS_LINK_FIELD, doc.name)
 	si_doc.insert()
-
-	# Add a mis_sales_invoices row referencing the delivery note and its sales order
-	doc.reload()
-	dn_sales_order = None
-	for row in (doc.mis_delivery_notes or []):
-		if row.delivery_note == delivery_note:
-			dn_sales_order = row.sales_order
-			break
-	existing_si_row = next(
-		(r for r in (doc.mis_sales_invoices or []) if r.sales_invoice == si_doc.name),
-		None,
-	)
-	if not existing_si_row:
-		doc.append("mis_sales_invoices", {
-			"sales_invoice": si_doc.name,
-			"delivery_note": delivery_note,
-			"sales_order": dn_sales_order,
-			"status": si_doc.status or "",
-			"grand_total": flt(si_doc.grand_total),
-			"posting_date": si_doc.posting_date,
-		})
-		doc.flags.ignore_permissions = True
-		doc.flags.ignore_validate_update_after_submit = True
-		doc.save()
 
 	return {"status": "ok", "sales_invoice": si_doc.name}
 
@@ -1371,9 +1368,9 @@ def _implementations_for_sales_invoice(si):
 def _mis_after_dn_submit(dn):
 	"""(mis_names_get_timesheet_stamp, mis_names_to_save) for this submitted Delivery Note."""
 	stamp = set()
-	for n in frappe.get_all("MIS Delivery Note", filters={"delivery_note": dn.name}, pluck="parent"):
-		if n and cint(frappe.db.get_value("Monthly Implementation Summary", n, "docstatus")) != 2:
-			stamp.add(n)
+	n = dn.get(MIS_LINK_FIELD)
+	if n and cint(frappe.db.get_value("Monthly Implementation Summary", n, "docstatus")) != 2:
+		stamp.add(n)
 	for n in frappe.get_all(
 		"Delivery Note Item",
 		filters={"parent": dn.name, "custom_against_monthly_implementation_summary": ["is", "set"]},
@@ -1412,6 +1409,7 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 		if mis_name in stamp:
 			_mirror_dn_items_into_mis(mis_name, dn_name)
 			m.reload()  # mirror wrote delivery_note_item via a separate doc instance — pick it back up
+			_restamp_amended_delivery_note(m, doc)
 			m._sync_timesheet_delivery_note_column()  # windowed per-DN stamps, not a blanket overwrite
 			m.flags.ignore_permissions = True
 			m.flags.ignore_validate_update_after_submit = True
@@ -1420,6 +1418,44 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 			m.sync_and_auto_close()
 		except Exception:
 			frappe.log_error(title="MIS refresh after Delivery Note submit", message=frappe.get_traceback())
+
+
+def _restamp_amended_delivery_note(mis, dn):
+	"""Cancelling a Delivery Note cleared its Timesheet stamps (clear_timesheet_stamps_on_delivery_note_cancel);
+	its amendment delivers the same hours again, so stamp the MIS's open Timesheets for it as the MIS does
+	for a new Delivery Note.
+
+	Only reached for a MIS in `_mis_after_dn_submit`'s stamp set, i.e. found through the DN's own MIS link
+	(header or line field, both copied on Amend), the same link `_delivery_notes_of_mis` reads.
+	Timesheets already stamped with this DN: it ran before (e.g. a retried hook), don't stamp twice."""
+	if not dn.get("amended_from") or frappe.db.exists("Timesheet", {"custom_delivery_note": dn.name}):
+		return
+	own = next((d for d in _delivery_notes_of_mis(mis.name) if d.delivery_note == dn.name), None)
+	if not own or own.hours <= 0:
+		return
+	# version-15 stamps by cumulative window (_stamp_rows_in_window), which counts this amendment as
+	# delivered already. Stamp this project's open Timesheets in table order for its hours instead.
+	remaining = own.hours
+	for row in mis.timesheets_table or []:
+		if remaining <= 0.0001:
+			break
+		if row.project != own.project or not row.timesheet or flt(row.billable_hours) <= 0:
+			continue
+		if frappe.db.get_value("Timesheet", row.timesheet, "custom_delivery_note"):
+			continue
+		frappe.db.set_value("Timesheet", row.timesheet, "custom_delivery_note", dn.name, update_modified=False)
+		remaining = flt(remaining - flt(row.billable_hours), 2)
+
+
+def clear_timesheet_stamps_on_delivery_note_cancel(doc, method=None):
+	"""A cancelled Delivery Note no longer delivers its Timesheets: clear their stamp, so they are open for
+	the next Delivery Note and the submitted Timesheets don't block the cancel (#1987). Runs in on_cancel,
+	before Frappe's link check. The MIS Timesheets column only mirrors the stamp (Data, no link)."""
+	if not doc or getattr(doc, "doctype", None) != "Delivery Note":
+		return
+	frappe.db.set_value("Timesheet", {"custom_delivery_note": doc.name}, "custom_delivery_note", None,
+		update_modified=False)
+	frappe.db.set_value("Timesheets", {"delivery_note": doc.name}, "delivery_note", None, update_modified=False)
 
 
 def _sync_and_auto_close_mis(mis_names):
@@ -1445,11 +1481,43 @@ def auto_close_fulfilled_mis():
 
 def sync_mis_status_for_source_doc(doc, method=None):
 	if doc.doctype == "Delivery Note":
-		mis_names = set(frappe.get_all("MIS Delivery Note", filters={"delivery_note": doc.name}, pluck="parent"))
+		mis_names = {doc.get(MIS_LINK_FIELD)}
 		mis_names.update(_open_mis_for_implementations(_implementations_for_delivery_note(doc)))
 	elif doc.doctype == "Sales Invoice":
-		mis_names = set(frappe.get_all("MIS Sales Invoice", filters={"sales_invoice": doc.name}, pluck="parent"))
+		mis_names = {doc.get(MIS_LINK_FIELD)}
+		dns = {item.delivery_note for item in (doc.get("items") or []) if item.get("delivery_note")}
+		if dns:
+			mis_names.update(frappe.get_all(
+				"Delivery Note", filters={"name": ["in", list(dns)]}, pluck=MIS_LINK_FIELD,
+			))
 		mis_names.update(_open_mis_for_implementations(_implementations_for_sales_invoice(doc)))
 	else:
-		mis_names = _open_mis_for_implementations([getattr(doc, "custom_implementation", None)])
+		mis_names = set(_open_mis_for_implementations([getattr(doc, "custom_implementation", None)]))
+	mis_names.discard(None)
 	_sync_and_auto_close_mis(mis_names)
+
+
+@frappe.whitelist()
+def get_deliveries_overview(docname: str):
+	"""Read-only overview of the Delivery Notes that point at this MIS and their Sales Invoices.
+	Read live: the MIS stores no link to them (#1987)."""
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+	delivery_notes = _delivery_notes_of_mis(doc.name)
+	invoices = _sales_invoices_of_mis(doc.name, delivery_notes)
+	rows = []
+	for dn in delivery_notes:
+		row = dict(dn)
+		row["sales_invoices"] = [
+			{"sales_invoice": si.sales_invoice, "status": si.status, "docstatus": si.docstatus}
+			for si in invoices
+			if dn.delivery_note in si.delivery_notes
+		]
+		rows.append(row)
+	return {
+		"rows": rows,
+		"delivered_hours": flt(sum(dn.hours for dn in delivery_notes if _counts_as_delivered(dn)), 2),
+		"billable_hours": flt(doc.billable_hours, 2),
+		"not_invoiced_hours": flt(sum(dn.hours for dn in delivery_notes if dn.status == "To Bill"), 2),
+	}

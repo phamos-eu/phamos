@@ -65,7 +65,7 @@ const GROUPS = [
 	{
 		title: "Dialogs",
 		rows: [
-			{ what: "Save or confirm", keys: [`${MOD}+Enter`] },
+			{ what: "Save or confirm", keys: [`${MOD}+S`, `${MOD}+Enter`] },
 			{ what: "Close", keys: ["Esc"] },
 		],
 	},

@@ -17,6 +17,19 @@ from phamos.tests.marketing_fixtures import ensure_company
 MAILBOX = "department-events@example.com"
 
 
+class FakeClock:
+	"""Stands in for the `time` module in team_daily_schedule: sleep() moves the clock on at once."""
+
+	def __init__(self):
+		self.now = 0
+
+	def monotonic(self):
+		return self.now
+
+	def sleep(self, seconds):
+		self.now += seconds
+
+
 def ensure_email_account():
 	"""A bare row is enough: the sync only reads email_id, and a real insert would try to log in."""
 	if not frappe.db.exists("Email Account", MAILBOX):
@@ -110,7 +123,12 @@ class TestDepartmentEventSchedule(EventScheduleCase):
 		department.reload()
 		department.event_schedule = [r for r in department.event_schedule if r.name != row.name]
 		department.save()
-		self.delete.assert_called_once_with(uid, MAILBOX)
+		self.delete.assert_called_once_with(uid, MAILBOX, wait=False)
+
+	def test_a_desk_save_does_not_wait_minutes_for_mailcow(self):
+		"""Desk saves run the sync inside the web request: short calls, no waiting (review of !1231)."""
+		self.save_department_with_event()
+		self.assertFalse(self.put.call_args.kwargs["wait"])
 
 	def test_saving_again_does_not_resend_an_unchanged_event(self):
 		self.save_department_with_event()
@@ -141,6 +159,31 @@ class TestDepartmentEventSchedule(EventScheduleCase):
 		self.put.assert_not_called()
 
 
+class TestWeeklyStartDay(EventScheduleCase):
+	"""The chosen start is always the first appointment; after it the repeat runs on the ticked
+	weekdays (#1991). 2026-12-03 is a Thursday."""
+
+	def test_a_start_outside_the_weekdays_stays_and_is_an_occurrence(self):
+		department = frappe.get_doc("Department", self.department)
+		department.append(
+			"event_schedule",
+			self.event(
+				start="2026-12-03 10:00:00",
+				end="2026-12-03 11:00:00",
+				repeat_this_event=1,
+				repeat_on="Weekly",
+				monday=1,
+				wednesday=1,
+			),
+		)
+		department.save()
+		row = department.event_schedule[-1]
+		self.assertEqual(str(frappe.db.get_value("Team Daily Schedule", row.name, "start")), "2026-12-03 10:00:00")
+		ics = self.put.call_args.args[1]
+		self.assertIn("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", ics)
+		self.assertRegex(ics, r"(?m)^RDATE;TZID=[^:]+:20261203T100000\r$")
+
+
 class TestBackgroundSync(EventScheduleCase):
 	"""With the background flag (the cockpit's saves, decision 10 in #1949), Mailcow is called by a
 	job after the commit, not in the request."""
@@ -160,6 +203,12 @@ class TestBackgroundSync(EventScheduleCase):
 		self.assertEqual(len(jobs), 1)
 		kwargs = jobs[0].kwargs
 		self.assertTrue(kwargs["enqueue_after_commit"])
+		# minutes of waiting must not hold up the short queue's quick jobs (review of !1231)
+		self.assertEqual(kwargs["queue"], "long")
+		# and the job may run long enough for every call it makes to wait out a slow Mailcow
+		calls = team_daily_schedule._mailcow_calls(kwargs["plan"])
+		self.assertGreaterEqual(calls, 1)
+		self.assertGreaterEqual(kwargs["timeout"], team_daily_schedule.SYNC_JOB_TIMEOUT_PER_CALL * calls)
 		self.enqueue.reset_mock()
 		with patch.object(frappe, "publish_realtime") as publish, patch.object(frappe.db, "commit"):
 			team_daily_schedule.run_sync_plan_in_background(kwargs["doctype"], kwargs["name"], kwargs["plan"], kwargs["user"])
@@ -174,7 +223,27 @@ class TestBackgroundSync(EventScheduleCase):
 
 		self.run_job()
 		self.put.assert_called_once()
+		self.assertTrue(self.put.call_args.kwargs["wait"])
 		self.assertEqual(frappe.db.get_value("Team Daily Schedule", row.name, "mailcow_synced"), 1)
+
+	def test_the_job_keeps_its_rows_marked_while_it_works(self):
+		"""A job that started late (busy long queue) or reaches a row after slow earlier ones must
+		still show the row as being sent, so the cockpit refuses a second save (AI review of !1231)."""
+		_, row = self.save_department_with_event(background=True)
+		long_ago = frappe.utils.add_to_date(
+			frappe.utils.now_datetime(), seconds=-team_daily_schedule.MAX_ROW_SEND_SECONDS - 1
+		)
+		frappe.db.set_value("Team Daily Schedule", row.name, "mailcow_last_sync_at", long_ago)
+		seen = []
+
+		def put(*args, **kwargs):
+			seen.append(team_daily_schedule.row_is_being_sent(frappe.get_doc("Team Daily Schedule", row.name)))
+			return True, None
+
+		self.put.side_effect = put
+		self.run_job()
+		self.assertEqual(seen, [True])
+		self.assertFalse(team_daily_schedule.row_is_being_sent(frappe.get_doc("Team Daily Schedule", row.name)))
 
 	def test_a_removed_row_is_cancelled_by_the_job(self):
 		_, row = self.save_department_with_event(background=True)
@@ -187,7 +256,7 @@ class TestBackgroundSync(EventScheduleCase):
 		department.save()
 		self.delete.assert_not_called()
 		self.run_job()
-		self.delete.assert_called_once_with(uid, MAILBOX)
+		self.delete.assert_called_once_with(uid, MAILBOX, wait=True)
 
 	def test_a_failed_send_shows_the_error(self):
 		self.put.return_value = (False, "Mailcow PUT failed (503)")
@@ -321,19 +390,91 @@ class TestReadableSyncError(FrappeTestCase):
 			team_daily_schedule._http_error_message("PUT", MAILBOX, response), "Mailcow PUT failed (503): Service Unavailable"
 		)
 
-	def _put_that_times_out(self, stored_text, stored_status=200):
+	def _put_that_times_out(self, stored_text, stored_status=200, answers=None, wait=True):
+		"""A PUT that runs into the read timeout, then GETs that return `answers` in turn (or the
+		stored event every time). Runs on a fake clock, so the wait after the timeout takes no time."""
 		import requests
 		from types import SimpleNamespace
 
 		ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:uid-1\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		stored = SimpleNamespace(status_code=stored_status, text=stored_text)
+		get = {"side_effect": answers} if answers else {"return_value": stored}
+		self.clock = FakeClock()
 		with (
 			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule, "time", self.clock),
 			patch.object(team_daily_schedule.requests, "put", side_effect=requests.ReadTimeout("Read timed out")),
-			patch.object(
-				team_daily_schedule.requests, "get", return_value=SimpleNamespace(status_code=stored_status, text=stored_text)
-			),
+			patch.object(team_daily_schedule.requests, "get", **get) as self.get,
 		):
-			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX)
+			return team_daily_schedule._put_ics_upsert("uid-1", ics, MAILBOX, wait=wait)
+
+	def test_an_invite_that_arrives_minutes_later_counts_as_sent(self):
+		"""Production: 15 attendees, no answer within 120 s, in the calendar a few minutes later."""
+		from types import SimpleNamespace
+
+		missing = SimpleNamespace(status_code=404, text="")
+		arrived = SimpleNamespace(status_code=200, text="DTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\n")
+		ok, error = self._put_that_times_out("", answers=[missing, missing, missing, arrived])
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+		self.assertEqual(self.get.call_count, 4)
+		self.assertEqual(self.clock.now, 3 * team_daily_schedule.VERIFY_INTERVAL)
+
+	def test_the_wait_after_a_timeout_ends_and_names_it(self):
+		ok, error = self._put_that_times_out("", stored_status=404)
+		self.assertFalse(ok)
+		self.assertIn("still not in", error)
+		self.assertIn("5 minutes later", error)
+		self.assertGreaterEqual(self.clock.now, team_daily_schedule.VERIFY_WINDOW)
+		self.assertLess(self.clock.now, team_daily_schedule.VERIFY_WINDOW + team_daily_schedule.VERIFY_INTERVAL)
+
+	def test_inside_a_request_a_timeout_looks_once_and_does_not_wait(self):
+		ok, error = self._put_that_times_out("", stored_status=404, wait=False)
+		self.assertFalse(ok)
+		self.assertEqual(self.get.call_count, 1)
+		self.assertEqual(self.clock.now, 0)
+		self.assertIn("did not answer within 30 s", error)
+		self.assertIn("may still be working on it", error)
+
+	def _delete_that_times_out(self, answers):
+		import requests
+
+		self.clock = FakeClock()
+		with (
+			patch.object(team_daily_schedule, "dav_password", return_value="secret"),
+			patch.object(team_daily_schedule, "time", self.clock),
+			patch.object(team_daily_schedule.requests, "delete", side_effect=requests.ReadTimeout("Read timed out")),
+			patch.object(team_daily_schedule.requests, "get", side_effect=answers),
+		):
+			return team_daily_schedule._delete_uid_for_mailbox("uid-1", MAILBOX, wait=True)
+
+	def test_a_slow_cancel_counts_as_done_once_the_event_is_gone(self):
+		from types import SimpleNamespace
+
+		still_there = SimpleNamespace(status_code=200, text="BEGIN:VEVENT")
+		ok, error = self._delete_that_times_out([still_there, SimpleNamespace(status_code=404, text="")])
+		self.assertTrue(ok)
+		self.assertIsNone(error)
+
+	def test_a_slow_cancel_whose_event_stays_is_an_error(self):
+		from types import SimpleNamespace
+
+		still_there = SimpleNamespace(status_code=200, text="BEGIN:VEVENT")
+		ok, error = self._delete_that_times_out(lambda *args, **kwargs: still_there)
+		self.assertFalse(ok)
+		self.assertIn("was still in", error)
+
+	def test_the_job_has_time_for_every_wait(self):
+		plan = {
+			"removed": [{"uid": "u0", "mailbox": MAILBOX}],
+			"rows": [
+				{"action": "put", "row": "r1", "mailbox": MAILBOX, "old_mailbox": None},
+				{"action": "put", "row": "r2", "mailbox": MAILBOX, "old_mailbox": "old@example.com"},
+			],
+		}
+		self.assertEqual(team_daily_schedule._mailcow_calls(plan), 4)
+		one_call = sum(team_daily_schedule.PUT_TIMEOUT) + team_daily_schedule.VERIFY_WINDOW
+		self.assertGreater(team_daily_schedule.SYNC_JOB_TIMEOUT_PER_CALL, one_call)
 
 	def test_a_slow_answer_counts_as_sent_when_the_calendar_has_this_version(self):
 		ok, error = self._put_that_times_out("BEGIN:VEVENT\r\nDTSTAMP:20261118T080000Z\r\nSEQUENCE:3\r\nEND:VEVENT\r\n")

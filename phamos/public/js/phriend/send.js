@@ -28,7 +28,7 @@ export class Sender {
 		this.sending = report;
 		ball.set_pending(true);
 		ball.set_busy(true);
-		ball.say(escape_html(__("Sending…")), 0);
+		ball.say(escape_html(__("Sending…")), 0, "fingers_crossed");
 		try {
 			const args = report.args_value || (report.args_value = await report.args());
 			const result = await call(METHOD, args, host.csrf_token());
@@ -39,10 +39,17 @@ export class Sender {
 			ball.hop();
 			// a system with a target system sends the report there and gets that Issue's address back
 			const url = result.url || host.issue_url(result.name);
+			// follow it where its status is shown, for users who may open the Implementation Cockpit (#1671)
+			const follow =
+				host.open_status && !result.url
+					? ` · <button type="button" class="link" data-follow>${escape_html(__("Follow its status"))}</button>`
+					: "";
 			ball.say(
-				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>`,
-				8000
+				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>${follow}`,
+				follow ? 12000 : 8000,
+				"thumbs_up"
 			);
+			if (follow) this.phriend.bind_bubble_link("[data-follow]", () => host.open_status({ issue: result.name }));
 			this.phriend.refresh_badge();
 		} catch (error) {
 			const e = error instanceof RequestError ? error : new RequestError("server", error && error.message);
@@ -96,7 +103,7 @@ export class Sender {
 			forbidden: `${escape_html(__("You're not allowed to send Phriend reports."))} ${escape_html(error.message || "")} ${link("data-discard-report", __("Discard"))}`,
 			server: `${escape_html(__("Sending didn't work:"))} ${escape_html(String(error.message || __("unknown error")).replace(/[.\s]+$/, ""))}. ${kept} ${again} · ${edit}`,
 		}[error.kind];
-		const bubble = ball.say(text, 0);
+		const bubble = ball.say(text, 0, "point_up");
 		const on = (selector, callback) => {
 			const el = bubble.querySelector(selector);
 			if (el) el.addEventListener("click", callback);
