@@ -405,6 +405,12 @@ has_permission = {
 
 # Raven opens its Issue links in the matching cockpit instead of Desk (#1614).
 raven_document_link_override = "phamos.api.issue_chat.document_link"
+# The record chat (and the Issue Assistant's briefs in it) in the Desk activity timeline (#2158).
+additional_timeline_content = {
+	"Issue": ["phamos.api.issue_chat.get_timeline_content"],
+	"Task": ["phamos.api.issue_chat.get_timeline_content"],
+	"Idea": ["phamos.api.issue_chat.get_timeline_content"],
+}
 
 doc_events = {
 	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
