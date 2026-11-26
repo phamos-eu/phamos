@@ -1128,8 +1128,9 @@ def open_encounter(with_user):
 		frappe.throw(_("Nobody to chat with here."))
 	mine, theirs = _position_of(me), _position_of(with_user)
 	if not theirs:
-		# Reloading or gone (#2161): standing next to them is not the problem.
-		frappe.throw(_("{0} is not on the map right now.").format(frappe.utils.get_fullname(with_user)))
+		# Reloading or gone (#2161): standing next to them is not the problem. No name: `with_user`
+		# comes from the caller, and the reply must not turn any e-mail address into a full name.
+		frappe.throw(_("Not on the map right now."))
 	if not mine or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
 		frappe.throw(_("Move closer to chat."))
 	if _call_area_at(mine) or _call_area_at(theirs):
@@ -1530,7 +1531,8 @@ def burn_due_encounters():
 	def part_if_alone(doc):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
 			doc = _locked(doc)
-			if doc:
+			# Still open: the other page may have parted it while this one waited.
+			if doc and doc.status == "Open":
 				_start_parting(doc)
 
 	_each(
@@ -1562,7 +1564,8 @@ def _part_all_mine(user):
 	for doc in _by_pair(rows):
 		# The other page notices that I left and parts at the same moment (#2161).
 		doc = _locked(doc)
-		if doc:
+		# Still open: the other page may have parted it while this one waited.
+		if doc and doc.status == "Open":
 			_start_parting(doc)
 
 
