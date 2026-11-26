@@ -873,10 +873,10 @@ def _upload_screenshot(api, headers, file_url, sudo=None):
 	content = file_doc.get_content()
 	if isinstance(content, str):
 		content = content.encode()
-	return _upload_image(api, headers, file_doc.file_name, content)
+	return _upload_image(api, headers, file_doc.file_name, content, sudo)
 
 
-def _upload_image(api, headers, file_name, content):
+def _upload_image(api, headers, file_name, content, sudo=None):
 	"""Upload an image to the GitLab project; returns the markdown that shows it."""
 	mimetype = "image/jpeg" if file_name.endswith(".jpg") else "image/png"
 	response = requests.post(
