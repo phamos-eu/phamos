@@ -80,10 +80,12 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual((first.fieldname, first.label), (setup.IMPLEMENTATION_SECTION, "Implementation Specific"))
 		# the section and the team come from phamos/cockpits/setup.py, which setup.ensure_issue_fields
 		# runs first; the section shows on every Issue and starts with the team (#1955); Phriend's fields follow
-		# and carry the condition themselves
+		# and carry the condition themselves; the Implementation shows on every Issue, after the team (#2112)
 		self.assertFalse(first.depends_on)
 		self.assertEqual(meta.fields[1].fieldname, setup.TEAM_FIELD)
-		self.assertEqual(meta.fields[2].fieldname, "phriend_reported_by")
+		self.assertEqual(meta.fields[2].fieldname, "custom_implementation")
+		self.assertFalse(meta.fields[2].depends_on)
+		self.assertEqual(meta.fields[3].fieldname, "phriend_reported_by")
 		self.assertEqual(meta.get_field("phriend_reported_by").depends_on, setup.PHRIEND_OR_GITLAB)
 		self.assertEqual(meta.get_field("phriend_type").depends_on, setup.ONLY_PHRIEND)
 		self.assertEqual(frappe.db.get_value("Custom Field", {"dt": "Issue", "fieldname": "phriend_type"}, "module"),

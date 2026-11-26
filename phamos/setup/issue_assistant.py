@@ -18,6 +18,7 @@ ASSISTANT_EMAIL = "issue-assistant@phamos.eu"
 SETTINGS = "Issue Assistant Settings"
 HANDLERS = "phamos.ai_agents.agents.issue"
 GATE_SKILL_NAME = "Check AI gate"
+IDENTIFY_SKILL_NAME = "Identify sender and links"
 CLASSIFY_SKILL_NAME = "Classify with AI model"
 CUSTOMER_SECTION = "custom_implementation_specific"
 AI_ALLOWED_FIELD = "custom_ai_processing_allowed"
@@ -76,6 +77,7 @@ def after_migrate():
 	bot = ensure_raven_bot()
 	ensure_settings(user)
 	ensure_agent(user, bot)
+	ensure_identify_skill()
 	ensure_classify_skill()
 	ensure_customer_fields()
 
@@ -182,6 +184,27 @@ def ensure_agent(user, bot):
 				"the AI model: sensitive page, the Customer's \"AI processing allowed\", internal or unknown sender.",
 			}
 		).insert(ignore_permissions=True)
+
+
+def ensure_identify_skill():
+	"""Sender, Customer, Contact, Implementation and Project in code (#2112), before Classify."""
+	if frappe.db.exists("AI Skill", {"agent": ASSISTANT_NAME, "handler": "identify"}):
+		return
+	frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": IDENTIFY_SKILL_NAME,
+			"agent": ASSISTANT_NAME,
+			"enabled": 1,
+			"phase": "Identify",
+			"order": 10,
+			"handler": "identify",
+			"on_fail": "Continue",
+			"description": "Finds the sender's Employee, Contact and Customer, then the Implementation and the open "
+			"Project, in code. Fills only empty fields on a strong match (Phriend's default project counts as "
+			"empty); asks in the brief when there are several candidates; checks the AI gate again afterwards.",
+		}
+	).insert(ignore_permissions=True)
 
 
 def ensure_classify_skill():
