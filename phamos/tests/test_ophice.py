@@ -321,8 +321,9 @@ class OphiceEncounterTestCase(FrappeTestCase):
 	def test_other_not_on_the_map_is_said_so(self):
 		# #2161: they were reloading; "Move closer to chat" sent me looking for a problem that wasn't there.
 		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
-		with self.assertRaisesRegex(frappe.ValidationError, "^Not on the map right now.$"):
+		with self.assertRaises(frappe.ValidationError) as raised:
 			self._open(self.A, self.B)
+		self.assertEqual(str(raised.exception), "Not on the map right now.")
 
 	def test_messages_reach_both_and_stay_private(self):
 		encounter = self._open(self.A, self.B)["encounter"]
