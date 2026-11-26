@@ -4,6 +4,7 @@
 """Every section on the Issue form is open, never collapsible (#2157)."""
 
 import frappe
+from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.cockpits import setup as cockpits_setup
@@ -48,3 +49,16 @@ class TestIssueSectionsExpanded(FrappeTestCase):
 			"Property Setter", {"doc_type": "Issue", "property": "collapsible", "field_name": "sb_details"}
 		)
 		self.assertEqual(count, 1)
+
+	def test_a_setter_that_makes_a_section_collapsible_is_replaced(self):
+		make_property_setter("Issue", "sb_details", "collapsible", "1", "Check")
+		cockpits_setup.ensure_issue_fields()
+		setters = frappe.get_all(
+			"Property Setter",
+			filters={"doc_type": "Issue", "property": "collapsible", "field_name": "sb_details"},
+			fields=["value", "module"],
+		)
+		self.assertEqual(len(setters), 1)
+		self.assertEqual(setters[0].value, "0")
+		self.assertEqual(setters[0].module, cockpits_setup.MODULE)
+		self.assertNotIn("sb_details", self.collapsible_sections())
