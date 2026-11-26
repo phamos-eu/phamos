@@ -756,33 +756,43 @@ class TestIssueChat(FrappeTestCase):
 	def _timeline(self):
 		return issue_chat.get_timeline_content("Issue", self.issue.name)
 
-	def test_timeline_shows_the_chat_to_members_with_bot_messages(self):
+	def test_timeline_shows_only_the_chats_first_message_to_members(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
-		_send(channel_id, "Hello from the owner")
+		_send(channel_id, "a later message")
+		frappe.set_user(ASSIGNEE)
+		items = self._timeline()
+		self.assertEqual(len(items), 1)
+		self.assertIn("Chat about {0}:".format(self.issue.name), items[0]["content"])
+		self.assertNotIn("a later message", items[0]["content"])
+		self.assertIn(f"/raven/{WORKSPACE}/{channel_id}", items[0]["content"])
+
+	def test_timeline_leaves_the_sender_to_raven(self):
+		# OWNER started the chat: Raven's own timeline entry shows them their message
+		pc.ensure_issue_chat(self.issue.name)
+		self.assertEqual(self._timeline(), [])
+
+	def test_timeline_shows_a_chat_opened_by_a_bot_message(self):
+		frappe.set_user("Administrator")
+		channel = issue_chat._create_channel(self.issue)
+		issue_chat._ensure_members(channel, [OWNER])
 		frappe.get_doc(
-			{"doctype": "Raven Message", "channel_id": channel_id, "message_type": "Text",
+			{"doctype": "Raven Message", "channel_id": channel.name, "message_type": "Text",
 			 "is_bot_message": 1, "text": "<p>First look <script>alert(1)</script></p>"}
 		).insert(ignore_permissions=True)
-		html = "".join(item["content"] for item in self._timeline())
-		self.assertIn("Hello from the owner", html)
+		frappe.set_user(OWNER)
+		html = self._timeline()[0]["content"]
 		self.assertIn("First look", html)
 		self.assertNotIn("<script>", html)
-		self.assertIn(f"/raven/{WORKSPACE}/{channel_id}", html)
 
 	def test_timeline_hides_the_chat_from_non_members(self):
-		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
-		_send(channel_id, "members only")
+		pc.ensure_issue_chat(self.issue.name)
 		frappe.set_user(LATECOMER)
 		self.assertEqual(self._timeline(), [])
 
 	def test_timeline_without_chat_or_with_chat_off_is_empty(self):
 		self.assertEqual(self._timeline(), [])
 		pc.ensure_issue_chat(self.issue.name)
+		frappe.set_user(ASSIGNEE)
+		self.assertEqual(len(self._timeline()), 1)
 		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 0)
 		self.assertEqual(self._timeline(), [])
-
-	def test_timeline_does_not_repeat_what_raven_shows(self):
-		pc.ensure_issue_chat(self.issue.name)
-		# the chat's intro is a user message linked to the Issue: Raven's own entry shows it
-		texts = "".join(item["content"] for item in self._timeline())
-		self.assertNotIn("Chat about {0}:".format(self.issue.name), texts)

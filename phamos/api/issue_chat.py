@@ -925,11 +925,10 @@ def on_idea_vote_change(doc):
 		frappe.log_error(title=f"Record chat: could not follow the vote of Idea {doc.name}")
 
 
-# Desk activity timeline (#2158): Raven itself lists only messages that link to the record and were
-# sent by a real user (raven.api.raven_message.get_timeline_message_content). The record's own chat,
-# and the Issue Assistant's briefs in it, would never show. This adds the chat's messages, styled
-# like Raven's timeline entries, for members of the chat only (the chat is Private).
-TIMELINE_LIMIT = 100
+# Desk activity timeline (#2158): one card for the record's chat, its first message (the "Chat about
+# ..." link that Raven shows as a card of the record). Raven's own timeline entry
+# (raven.api.raven_message.get_timeline_message_content) shows a message of a Private channel only to
+# the one who sent it, so the other members of the chat never saw it. Members only, like the chat.
 
 
 def get_timeline_content(doctype, docname):
@@ -938,45 +937,32 @@ def get_timeline_content(doctype, docname):
 	channel = find_channel(doctype, docname)
 	if not channel or channel.name not in _member_channels([channel.name]):
 		return []
-	message = frappe.qb.DocType("Raven Message")
-	raven_user = frappe.qb.DocType("Raven User")
-	rows = (
-		frappe.qb.from_(message)
-		.left_join(raven_user)
-		.on(message.owner == raven_user.name)
-		.select(message.name, message.creation, message.owner, message.text, message.file,
-			message.message_type, message.is_bot_message, message.link_doctype, message.link_document,
-			raven_user.full_name)
-		.where(message.channel_id == channel.name)
-		.where(message.message_type != "System")
-		.orderby(message.creation, order=frappe.qb.desc)
-		.limit(TIMELINE_LIMIT)
-		.run(as_dict=True)
+	first = frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": channel.name, "message_type": ("!=", "System")},
+		fields=["name", "creation", "owner", "text", "is_bot_message", "link_doctype", "link_document"],
+		order_by="creation asc",
+		limit=1,
 	)
-	url = channel_url(channel.workspace, channel.name)
-	items = []
-	for row in rows:
-		# Raven's own timeline entry already shows a message that links to this record from a user
-		if row.link_doctype == doctype and str(row.link_document) == str(docname) and not row.is_bot_message:
-			continue
-		items.append({
-			"icon": "share",
-			"is_card": True,
-			"creation": row.creation,
-			"content": _timeline_html(row, url, doctype, docname),
-		})
-	return items
+	if not first:
+		return []
+	row = first[0]
+	# its sender already gets Raven's own entry for a message linked to the record
+	if row.owner == _raven_user(frappe.session.user) and row.link_doctype == doctype and not row.is_bot_message:
+		return []
+	return [{
+		"icon": "share",
+		"is_card": True,
+		"creation": row.creation,
+		"content": _timeline_html(row, channel_url(channel.workspace, channel.name), docname),
+	}]
 
 
-def _timeline_html(row, url, doctype, docname):
-	name = escape_html(row.full_name or get_fullname(row.owner) or row.owner)
-	channel_label = escape_html(_("Chat about {0}").format(docname))
+def _timeline_html(row, url, docname):
 	from frappe.utils.html_utils import sanitize_html
 
-	body = sanitize_html(row.text or "")
-	if row.file:
-		label = escape_html(row.file.rsplit("/", 1)[-1])
-		body += f'<div class="mt-1"><a class="text-muted small" href="{escape_html(row.file)}" target="_blank" rel="noopener noreferrer">{label}</a></div>'
+	name = escape_html(frappe.db.get_value("Raven User", row.owner, "full_name") or get_fullname(row.owner))
+	channel_label = escape_html(_("Chat about {0}").format(docname))
 	when = escape_html(frappe.utils.pretty_date(row.creation))
 	return (
 		'<div class="timeline-message-box" style="padding: 2px; overflow: hidden;">'
@@ -985,7 +971,8 @@ def _timeline_html(row, url, doctype, docname):
 		f'<i class="fa fa-lock"></i> {channel_label}</a>'
 		f'<span class="text-muted"> &nbsp;- {when}</span></div>'
 		f'<div><strong>{name}</strong></div>'
-		# message text is Raven's HTML, sanitised again above
-		f'<div style="display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;">{body}</div>'
+		# message text is Raven's HTML, sanitised again here
+		f'<div style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">'
+		f'{sanitize_html(row.text or "")}</div>'
 		"</div>"
 	)
