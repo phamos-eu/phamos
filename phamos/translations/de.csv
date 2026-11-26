@@ -1490,6 +1490,14 @@ Subject is required,Betreff ist erforderlich
 Expected start and end dates are required,Erwarteter Beginn und erwartetes Ende sind erforderlich
 Expected end date cannot be before start date,Das erwartete Ende darf nicht vor dem Beginn liegen
 Estimated time must be more than 0 hours,Die geschätzte Zeit muss mehr als 0 Stunden betragen
+used up,aufgebraucht
+no deliveries yet,noch keine Lieferungen
+Estimated time 1 week,Geschätzt noch 1 Woche
+Estimated time {0} weeks,Geschätzt noch {0} Wochen
+Estimated time 1 month,Geschätzt noch 1 Monat
+Estimated time {0} months,Geschätzt noch {0} Monate
+Delivered Hours: {0} hrs,Gelieferte Stunden: {0} Std.
+Remaining Hours: {0} / {1} hrs ({2}),Verbleibende Stunden: {0} / {1} Std. ({2})
 Task Owner is required,Aufgabenverantwortliche/r ist erforderlich
 Priority is required,Priorität ist erforderlich
 Task Type {0} does not exist,Aufgabentyp {0} existiert nicht
