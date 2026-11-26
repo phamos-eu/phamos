@@ -420,6 +420,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:call-starts-off="bubble.fromPeer && !bubble.callActive"
 						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
@@ -433,6 +434,7 @@
 						@move-start="startCallDrag"
 						@resize-start="startCallDrag"
 						@split-by="splitCallBy"
+						@call-activated="bubble.callActive = true"
 					/>
 				</Teleport>
 				<div
@@ -1799,6 +1801,10 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		loading: true,
 		error: "",
 		sending: false,
+		// The other person walked up (#2165): my call waits with mic and camera off for my first
+		// click on it. Kept here, so the call doesn't start off again after a remount.
+		fromPeer,
+		callActive: false,
 	})
 	bubbles[other.user] = bubble
 	try {

@@ -24,6 +24,55 @@ export function jitsiCallUrl(video, displayName = "") {
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
 }
 
+/**
+ * Start settings of the embedded call. Whoever walks up starts with mic and camera on, straight in
+ * without the pre-join screen (#2108). The person being approached (#2165) joins with both off,
+ * and Jitsi touches no device yet (disableInitialGUM: no camera light, no mic indicator) until
+ * their first click on the call (callActivation).
+ * @param {{ startOff?: boolean }} options
+ */
+export function jitsiStartConfig({ startOff = false } = {}) {
+	return {
+		startWithAudioMuted: startOff,
+		startWithVideoMuted: startOff,
+		...(startOff ? { disableInitialGUM: true } : {}),
+		prejoinPageEnabled: false,
+		prejoinConfig: { enabled: false },
+	}
+}
+
+/**
+ * The first click on a call that started off turns mic and camera on, once (#2165). A click
+ * before Jitsi joined waits for the join. Later clicks change nothing: a camera turned off again
+ * stays off.
+ * @param {{ isAudioMuted: () => Promise<boolean>, isVideoMuted: () => Promise<boolean>, run: (command: string) => void }} jitsi
+ */
+export function callActivation({ isAudioMuted, isVideoMuted, run }) {
+	let clicked = false
+	let joined = false
+	let done = false
+	async function turnOn() {
+		if (done || !clicked || !joined) return
+		done = true
+		if (await isAudioMuted()) run("toggleAudio")
+		if (await isVideoMuted()) run("toggleVideo")
+	}
+	return {
+		/** The user clicked the call. True only for the first click: the one that turns them on. */
+		click() {
+			if (clicked) return false
+			clicked = true
+			turnOn()
+			return true
+		},
+		/** Jitsi joined the room (videoConferenceJoined). */
+		joined() {
+			joined = true
+			return turnOn()
+		},
+	}
+}
+
 // Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is
 // screen sharing: always there, for everyone (#2136). No "videoquality" (Jitsi's performance
 // settings): our own quality button in the call's bar does that.

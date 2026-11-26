@@ -5,8 +5,10 @@ import {
 	CALL_HEADER,
 	CALL_MIN_W,
 	JITSI_TOOLBAR_BUTTONS,
+	callActivation,
 	callBox,
 	callMaxHeight,
+	jitsiStartConfig,
 	splitCall,
 	encounterCallWindowName,
 	jitsiCallUrl,
@@ -23,6 +25,71 @@ describe("JITSI_TOOLBAR_BUTTONS", () => {
 
 	it("leaves Jitsi's performance settings out: our own quality button does that", () => {
 		expect(JITSI_TOOLBAR_BUTTONS).not.toContain("videoquality")
+	})
+})
+
+describe("jitsiStartConfig", () => {
+	it("starts with mic and camera on, without the pre-join screen, for whoever walks up", () => {
+		expect(jitsiStartConfig()).toEqual({
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
+			prejoinPageEnabled: false,
+			prejoinConfig: { enabled: false },
+		})
+	})
+
+	it("starts the approached person with both off, and no device touched (#2165)", () => {
+		const config = jitsiStartConfig({ startOff: true })
+		expect(config.startWithAudioMuted).toBe(true)
+		expect(config.startWithVideoMuted).toBe(true)
+		expect(config.disableInitialGUM).toBe(true)
+		expect(config.prejoinConfig).toEqual({ enabled: false })
+	})
+})
+
+describe("callActivation", () => {
+	function jitsi({ audio = true, video = true } = {}) {
+		const run = vi.fn()
+		const activation = callActivation({
+			isAudioMuted: async () => audio,
+			isVideoMuted: async () => video,
+			run,
+		})
+		return { activation, run }
+	}
+
+	it("turns mic and camera on at the first click after the join", async () => {
+		const { activation, run } = jitsi()
+		await activation.joined()
+		expect(run).not.toHaveBeenCalled()
+		expect(activation.click()).toBe(true)
+		await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(2))
+		expect(run.mock.calls).toEqual([["toggleAudio"], ["toggleVideo"]])
+	})
+
+	it("keeps a click before the join until Jitsi joined", async () => {
+		const { activation, run } = jitsi()
+		activation.click()
+		await Promise.resolve()
+		expect(run).not.toHaveBeenCalled()
+		await activation.joined()
+		expect(run.mock.calls).toEqual([["toggleAudio"], ["toggleVideo"]])
+	})
+
+	it("only switches on what is off", async () => {
+		const { activation, run } = jitsi({ audio: false, video: true })
+		activation.click()
+		await activation.joined()
+		expect(run.mock.calls).toEqual([["toggleVideo"]])
+	})
+
+	it("acts once: later clicks change nothing", async () => {
+		const { activation, run } = jitsi()
+		activation.click()
+		await activation.joined()
+		expect(activation.click()).toBe(false)
+		await activation.joined()
+		expect(run).toHaveBeenCalledTimes(2)
 	})
 })
 
