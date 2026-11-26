@@ -469,6 +469,25 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("Ophice Encounter", overdue.name))
 		self.assertEqual(frappe.db.get_value("Ophice Encounter", open_one, "status"), "Parting")
 
+	def test_leaving_locks_pairs_in_one_order(self):
+		# Review of !1349: a request locking several pairs takes them sorted by pair key, so two
+		# such requests never wait for each other in a circle. A–C is the newer chat, so the
+		# list comes newest first (A–C before A–B) unless it is sorted.
+		self._put(self.C, 5, 6)
+		self._open(self.A, self.B)
+		frappe.db.sql("UPDATE `tabOphice Encounter` SET modified = modified - INTERVAL 1 MINUTE")
+		self._open(self.A, self.C)
+		lock = ophice._lock_pair
+		locked = []
+
+		def record(pair_key):
+			locked.append(pair_key)
+			lock(pair_key)
+
+		with patch.object(ophice, "_lock_pair", side_effect=record), patch.object(ophice.frappe, "publish_realtime"):
+			ophice._part_all_mine(self.A)
+		self.assertEqual(locked, [ophice._pair_key(self.A, self.B), ophice._pair_key(self.A, self.C)])
+
 	def test_leaving_the_page_parts(self):
 		doc = self._chat()
 		with patch.object(ophice.frappe, "publish_realtime"):
