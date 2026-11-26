@@ -159,6 +159,21 @@ class OphicePresenceTestCase(FrappeTestCase):
 		# Saved, so the next reload keeps it.
 		self.assertEqual(ophice._stored_position(), {"x": me["x"], "y": me["y"]})
 
+	def test_reload_spot_stays_out_of_spaces(self):
+		# Review of !1349: the free spot must not put me into a meeting space I did not walk into.
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.get_doc(
+			{"doctype": ophice.AREA_DOCTYPE, "title": "Room", "kind": "Meeting", "x": 9, "y": 7, "width": 6, "height": 3}
+		).insert(ignore_permissions=True)
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
+		ophice.save_my_position(10, 10)
+		self._put("someone@example.com", 10, 10)
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+			me = ophice.get_space()["me"]
+		# The tile right above (10, 9) is free but inside the room.
+		self.assertGreaterEqual(me["y"], 10)
+		self.assertGreaterEqual(ophice.math.hypot(me["x"] - 10, me["y"] - 10), ophice.START_SPOT_GAP)
+
 	def test_reload_next_to_someone_stays(self):
 		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
 		ophice.save_my_position(10, 10)
@@ -453,6 +468,25 @@ class OphiceEncounterTestCase(FrappeTestCase):
 				ophice.burn_due_encounters()
 		self.assertFalse(frappe.db.exists("Ophice Encounter", overdue.name))
 		self.assertEqual(frappe.db.get_value("Ophice Encounter", open_one, "status"), "Parting")
+
+	def test_leaving_locks_pairs_in_one_order(self):
+		# Review of !1349: a request locking several pairs takes them sorted by pair key, so two
+		# such requests never wait for each other in a circle. A–C is the newer chat, so the
+		# list comes newest first (A–C before A–B) unless it is sorted.
+		self._put(self.C, 5, 6)
+		self._open(self.A, self.B)
+		frappe.db.sql("UPDATE `tabOphice Encounter` SET modified = modified - INTERVAL 1 MINUTE")
+		self._open(self.A, self.C)
+		lock = ophice._lock_pair
+		locked = []
+
+		def record(pair_key):
+			locked.append(pair_key)
+			lock(pair_key)
+
+		with patch.object(ophice, "_lock_pair", side_effect=record), patch.object(ophice.frappe, "publish_realtime"):
+			ophice._part_all_mine(self.A)
+		self.assertEqual(locked, [ophice._pair_key(self.A, self.B), ophice._pair_key(self.A, self.C)])
 
 	def test_leaving_the_page_parts(self):
 		doc = self._chat()
