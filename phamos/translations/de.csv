@@ -3170,3 +3170,9 @@ Assigned {0}: {1},{0} zugewiesen: {1}
 Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
 The screenshot was read too.,Der Screenshot wurde mitgelesen.
 "the model call failed ({0})",der Aufruf des Modells ist fehlgeschlagen ({0})
+Identified: {0},Erkannt: {0}
+nothing set,nichts gesetzt
+Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: Mitarbeiter {0} (nur nach E-Mail-Adresse)
+{0} set: {1},{0} gesetzt: {1}
+Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
+(ERPNext picked {0}),(ERPNext hat {0} gewählt)

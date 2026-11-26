@@ -93,6 +93,13 @@ class TestSetup(IssueAssistantTestCase):
 		self.assertTrue(frappe.get_meta("Customer").has_field(setup.AI_ALLOWED_FIELD))
 		self.assertTrue(frappe.db.exists("User", self.assistant))
 
+	def test_implementation_shows_on_every_issue_first_in_the_section(self):
+		# the assistant fills it on e-mail Issues too (#2112), so it is no longer Phriend-only
+		fields = [f.fieldname for f in frappe.get_meta("Issue").fields]
+		# version-15 has no Team on Issue (#1955): the Implementation opens the section
+		self.assertEqual(fields[fields.index("custom_implementation_specific") + 1], "custom_implementation")
+		self.assertFalse(frappe.get_meta("Issue").get_field("custom_implementation").depends_on)
+
 	def test_role_cannot_delete_issues(self):
 		doc = self.issue(raised_by=DESK_USER)
 		self.assertTrue(frappe.has_permission("Issue", "write", doc=doc, user=self.assistant))
@@ -472,6 +479,131 @@ class TestClassify(IssueAssistantTestCase):
 		self.assertEqual(run.status, "Completed", run.error)
 		self.assertIn("Mistral is not configured", run.summary)
 		self.assertIn(doc.name, run.summary)
+
+
+class TestIdentify(IssueAssistantTestCase):
+	"""#2112: sender, Customer, Contact, Implementation and Project in code."""
+
+	SECOND_CUSTOMER = "Issue Assistant Second Customer"
+	CONTACT_EMAIL = "issue-assistant-contact@customer.example"
+	SHARED_EMAIL = "issue-assistant-shared@customer.example"
+	STAKEHOLDER_EMAIL = "issue-assistant-stakeholder@customer.example"
+	IMPLEMENTATION = "IA-IDENTIFY-TEST"
+
+	def setUp(self):
+		super().setUp()
+		if not frappe.db.exists("Customer", self.SECOND_CUSTOMER):
+			frappe.get_doc(
+				{"doctype": "Customer", "customer_name": self.SECOND_CUSTOMER,
+				 "customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}),
+				 "territory": frappe.db.get_value("Territory", {"is_group": 0})}
+			).insert(ignore_permissions=True)
+		self.contact = self.make_contact(self.CONTACT_EMAIL, [CUSTOMER])
+		self.make_contact(self.SHARED_EMAIL, [CUSTOMER, self.SECOND_CUSTOMER])
+
+	def make_contact(self, email, customers):
+		contact = frappe.get_doc({"doctype": "Contact", "first_name": email.split("@")[0],
+			"email_ids": [{"email_id": email, "is_primary": 1}],
+			"links": [{"link_doctype": "Customer", "link_name": c} for c in customers]})
+		return contact.insert(ignore_permissions=True).name
+
+	def make_implementation(self, customer=CUSTOMER, stakeholder_email=None):
+		doc = frappe.get_doc({"doctype": "Implementation", "name": self.IMPLEMENTATION, "customer": customer,
+			"status": "Open"})
+		doc.db_insert()
+		if stakeholder_email:
+			frappe.get_doc({"doctype": "Implementation Stakeholder", "parent": self.IMPLEMENTATION,
+				"parenttype": "Implementation", "parentfield": "stakeholders", "email": stakeholder_email,
+				"stakeholder_organisation": "Customer"}).db_insert()
+		return self.IMPLEMENTATION
+
+	def make_project(self, implementation, name="Issue Assistant Identify Project"):
+		return frappe.get_doc({"doctype": "Project", "project_name": name, "status": "Open",
+			"custom_implementation": implementation}).insert(ignore_permissions=True).name
+
+	def test_contact_of_one_customer_sets_customer_and_contact(self):
+		# ERPNext's Issue.set_lead_contact fills these at insert already; the assistant keeps them
+		doc = self.issue(raised_by=self.CONTACT_EMAIL)
+		run = self.run_assistant(doc)
+		doc.reload()
+		self.assertEqual((doc.customer, doc.contact), (CUSTOMER, self.contact))
+		self.assertNotIn(frappe._("Which {0} is it: {1}?").split(":")[0].format(frappe._("Customer")), run.summary)
+
+	def test_contact_of_two_customers_asks(self):
+		# ERPNext took one of the two Customers; the assistant keeps it and asks
+		doc = self.issue(raised_by=self.SHARED_EMAIL)
+		picked = doc.customer
+		run = self.run_assistant(doc)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "customer"), picked)
+		self.assertIn(self.SECOND_CUSTOMER, run.summary)
+		self.assertIn(frappe._("(ERPNext picked {0})").format(picked), run.summary)
+
+	def test_contact_of_two_customers_without_erpnext_sets_nothing(self):
+		doc = self.issue(raised_by=self.SHARED_EMAIL)
+		doc.db_set({"customer": None, "contact": None})
+		run = self.run_assistant(doc)
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "customer"))
+		self.assertIn(self.SECOND_CUSTOMER, run.summary)
+
+	def test_stakeholder_email_finds_implementation_and_its_project(self):
+		implementation = self.make_implementation(stakeholder_email=self.STAKEHOLDER_EMAIL)
+		project = self.make_project(implementation)
+		doc = self.issue(raised_by=self.STAKEHOLDER_EMAIL)
+		self.run_assistant(doc)
+		doc.reload()
+		self.assertEqual((doc.custom_implementation, doc.project, doc.customer), (implementation, project, CUSTOMER))
+
+	def test_several_open_projects_only_ask(self):
+		implementation = self.make_implementation()
+		self.make_project(implementation, "Issue Assistant Identify Project A")
+		self.make_project(implementation, "Issue Assistant Identify Project B")
+		doc = self.issue(raised_by=self.CONTACT_EMAIL)
+		run = self.run_assistant(doc)
+		doc.reload()
+		self.assertEqual(doc.custom_implementation, implementation)
+		self.assertFalse(doc.project)
+		self.assertIn("(Issue Assistant Identify Project A)", run.summary)
+
+	def test_employee_email_is_named_but_not_internal(self):
+		email = "issue-assistant-employee@example.com"
+		employee = frappe.get_doc({"doctype": "Employee", "first_name": "Assistant", "last_name": "Employee",
+			"gender": frappe.db.get_value("Gender", {}, "name"), "date_of_birth": "1990-01-01",
+			"date_of_joining": "2020-01-01", "company": frappe.db.get_value("Company", {}, "name"),
+			"status": "Active", "company_email": email}).insert(ignore_permissions=True)
+		doc = self.issue(raised_by=email)
+		run = self.run_assistant(doc)
+		self.assertIn(employee.employee_name, run.summary)
+		self.assertIn("gate_unknown_sender", run.run_flags)
+		self.assertFalse(frappe.parse_json(run.analysis)["gate"]["allowed"])
+
+	def test_human_project_stays_and_phriend_default_is_replaced(self):
+		implementation = self.make_implementation()
+		project = self.make_project(implementation)
+		other = frappe.get_doc({"doctype": "Project", "project_name": "Issue Assistant Human Project"}).insert(
+			ignore_permissions=True).name
+		doc = self.issue(raised_by=self.CONTACT_EMAIL, project=other)
+		self.run_assistant(doc)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), other)
+
+		frappe.db.set_single_value("Phriend Settings", "default_project", other)
+		doc = self.issue(raised_by=self.CONTACT_EMAIL, project=other, phriend_type="Bug")
+		self.run_assistant(doc)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), project)
+
+	def test_gate_is_checked_again_after_the_customer_is_set(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		# a stakeholder address: ERPNext knows no Customer for it, the assistant finds it
+		self.make_implementation(stakeholder_email=self.STAKEHOLDER_EMAIL)
+		doc = self.issue(raised_by=self.STAKEHOLDER_EMAIL)
+		self.assertFalse(doc.customer)
+		self.assertEqual(assistant.model_allowed(doc)["reason"], assistant.UNKNOWN_SENDER)
+		with patch("phamos.ai_agents.agents.issue_classify.llm.chat_json", return_value=({}, "m")) as chat:
+			run = self.run_assistant(doc)
+		gate = frappe.parse_json(run.analysis)["gate"]
+		self.assertEqual((gate["allowed"], gate["reason"]), (True, assistant.CUSTOMER_ALLOWED))
+		chat.assert_called_once()
+
+
 class TestConnections(IssueAssistantTestCase):
 	def test_runs_show_under_the_issue_connections(self):
 		from frappe.desk.notifications import get_open_count
