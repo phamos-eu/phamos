@@ -159,6 +159,21 @@ class OphicePresenceTestCase(FrappeTestCase):
 		# Saved, so the next reload keeps it.
 		self.assertEqual(ophice._stored_position(), {"x": me["x"], "y": me["y"]})
 
+	def test_reload_spot_stays_out_of_spaces(self):
+		# Review of !1349: the free spot must not put me into a meeting space I did not walk into.
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.get_doc(
+			{"doctype": ophice.AREA_DOCTYPE, "title": "Room", "kind": "Meeting", "x": 9, "y": 7, "width": 6, "height": 3}
+		).insert(ignore_permissions=True)
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
+		ophice.save_my_position(10, 10)
+		self._put("someone@example.com", 10, 10)
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+			me = ophice.get_space()["me"]
+		# The tile right above (10, 9) is free but inside the room.
+		self.assertGreaterEqual(me["y"], 10)
+		self.assertGreaterEqual(ophice.math.hypot(me["x"] - 10, me["y"] - 10), ophice.START_SPOT_GAP)
+
 	def test_reload_next_to_someone_stays(self):
 		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
 		ophice.save_my_position(10, 10)
