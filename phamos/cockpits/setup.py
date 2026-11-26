@@ -167,14 +167,13 @@ def expand_issue_sections():
 		pluck="fieldname",
 	)
 	for fieldname in sections:
-		existing = frappe.db.get_value(
-			"Property Setter",
-			{"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"},
-			["name", "value"],
-			as_dict=True,
+		current = frappe.db.get_value(
+			"Property Setter", {"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"}, "value"
 		)
-		if existing and existing.value == "0":
+		if current == "0":
 			continue
+		# A setter that makes the section collapsible again (set by hand in Customize Form) is
+		# replaced: make_property_setter inserts a new setter and deletes the old one, and returns it.
 		setter = make_property_setter("Issue", fieldname, "collapsible", "0", "Check")
 		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
 
