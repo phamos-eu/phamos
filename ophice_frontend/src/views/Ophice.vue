@@ -751,6 +751,7 @@ import { ringHue } from "../utils/ophiceColor.js"
 import { openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
 import { areaUnder, isTyping, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
+import { stepBlocked } from "../utils/ophiceStep.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
@@ -1385,6 +1386,12 @@ function nearestInRange() {
 	return best?.other || null
 }
 
+/** The chat bubble with this person, unless it only shows why it could not be opened. */
+function liveBubble(user) {
+	const bubble = bubbles[user]
+	return bubble && (bubble.loading || bubble.encounter) ? bubble : null
+}
+
 /** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
 function chatOnStop() {
 	joinAreaIfInside()
@@ -1394,7 +1401,8 @@ function chatOnStop() {
 	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
-	const bubble = bubbles[other.user]
+	const bubble = liveBubble(other.user)
+	// No chat yet, or the last try failed (#2161): try again.
 	if (!bubble) openBubble(other, { focus: true })
 	else if (!bubble.loading) focusBubble(other.user)
 	else bubble.focusOnOpen = true
@@ -1880,7 +1888,8 @@ function onEncounterStarted(message) {
 		pingWalkUp(other)
 		return
 	}
-	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
+	// A bubble that failed to open (e.g. they were reloading) gives way to their chat (#2161).
+	if (!other || liveBubble(other.user) || dismissed.has(other.user)) return
 	if (distanceTo(other) > PART_DISTANCE || inCallArea(me.value) || inCallArea(other)) return
 	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
@@ -3223,6 +3232,12 @@ function blocked(x, y) {
 	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
 }
 
+/** Walking from where my chip stands to x, y is blocked: only a step closer to someone, never away (#2160). */
+function stepBlockedTo(x, y) {
+	if (jump || flying.value) return false
+	return stepBlocked(others.value, me.value, { x, y }, MIN_DISTANCE)
+}
+
 // --- Jump (Space): a short hop forward that passes over other chips.
 
 const JUMP_MS = 420
@@ -3329,8 +3344,9 @@ function tick(now) {
 		const y = rawY < 0 ? maxY : rawY > maxY ? 0 : rawY
 		const wrapped = x !== rawX || y !== rawY
 		// Each axis on its own, so a chip slides along another one instead of sticking to it.
-		if (!blocked(x, me.value.y)) me.value.x = x
-		if (!blocked(me.value.x, y)) me.value.y = y
+		// Too close to someone already (e.g. both stepped at once): any step away is allowed (#2160).
+		if (!stepBlockedTo(x, me.value.y)) me.value.x = x
+		if (!stepBlockedTo(me.value.x, y)) me.value.y = y
 		// The view follows my chip near its edge (#2089); after a wrap it jumps to the other side.
 		if (wrapped) camera().place(me.value.x, me.value.y)
 		else camera().followChip(me.value.x, me.value.y)

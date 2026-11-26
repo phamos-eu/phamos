@@ -123,6 +123,8 @@ ARRIVAL_GAP_SECONDS = 5 * 60
 LAST_SEEN_CACHE_KEY = "phamos_ophice_last_seen"
 # Chips in the start space keep at least this distance (tiles) from each other.
 START_SPOT_GAP = 1.2
+# Closer than this (tiles, centres) is on top of each other: MIN_DISTANCE in Ophice.vue.
+CHIP_MIN_DISTANCE = 0.8
 # Area chat (#2062): what happens to what is written in an area.
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
@@ -399,6 +401,31 @@ def _free_spot(start, user):
 	}
 
 
+def _clear_spot(position, user):
+	"""This spot, or the nearest free one around it when someone else stands on it (#2160).
+
+	Back after a reload, my chip lands where it stood; someone may have walked there meanwhile.
+	On top of each other, the two chats and calls kept reopening.
+	"""
+	taken = [(c["x"], c["y"]) for c in _online(exclude=user)]
+	if all(math.hypot(position["x"] - tx, position["y"] - ty) >= CHIP_MIN_DISTANCE for tx, ty in taken):
+		return position
+	max_x, max_y = _cols() - 1, _rows() - 1
+	for radius in range(1, 6):
+		ring = [
+			(dx, dy)
+			for dx in range(-radius, radius + 1)
+			for dy in range(-radius, radius + 1)
+			if max(abs(dx), abs(dy)) == radius
+		]
+		for dx, dy in sorted(ring, key=lambda d: math.hypot(*d)):
+			x, y = position["x"] + dx, position["y"] + dy
+			if 0 <= x <= max_x and 0 <= y <= max_y and all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken):
+				return {"x": float(x), "y": float(y)}
+	# Crowded all around: stay; walking away is always possible on the page.
+	return position
+
+
 def _beam_key(user):
 	return f"phamos_ophice_beam:{user}"
 
@@ -424,7 +451,10 @@ def get_space():
 		position = _start_spot(user)
 		frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	else:
-		position = _stored_position() or _spawn()
+		stored = _stored_position() or _spawn()
+		position = _clear_spot(stored, user)
+		if position != stored:
+			frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	# Every re-join beams in (PM, 2026-11-22): a reload too, at the spot it had. Not a second tab
 	# while the chip is already on the map. The others see it with my first heartbeat.
 	beam_in = arriving or not _present(user)
@@ -480,10 +510,14 @@ def move(x, y, lift=0, beam=0):
 	_require_user()
 	user = frappe.session.user
 	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
-	if not isinstance(entry, dict) or _throttled():
+	if not isinstance(entry, dict):
 		return None
 	entry.update({"x": _clamp(x, _cols()), "y": _clamp(y, _rows()), "ts": time.time()})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, entry)
+	# Over the limit only the broadcast is dropped: the spot is kept, so the distance check of
+	# open_encounter sees where the chip stands (#2161).
+	if _throttled():
+		return None
 	message = {"user": user, "x": entry["x"], "y": entry["y"]}
 	if frappe.utils.cint(lift):
 		message["lift"] = 1
@@ -1079,7 +1113,10 @@ def open_encounter(with_user):
 	if not isinstance(with_user, str) or with_user == me or not frappe.db.get_value("User", with_user, "enabled"):
 		frappe.throw(_("Nobody to chat with here."))
 	mine, theirs = _position_of(me), _position_of(with_user)
-	if not mine or not theirs or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
+	if not theirs:
+		# Reloading or gone (#2161): standing next to them is not the problem.
+		frappe.throw(_("{0} is not on the map right now.").format(frappe.utils.get_fullname(with_user)))
+	if not mine or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
 		frappe.throw(_("Move closer to chat."))
 	if _call_area_at(mine) or _call_area_at(theirs):
 		frappe.throw(_("This space has its own meeting: use its call and chat."))
@@ -1339,11 +1376,26 @@ def _reindex_messages(names):
 		pass
 
 
+def _locked(doc):
+	"""Take the pair's lock, then read the encounter again; None when it ended meanwhile (#2161).
+
+	Both pages act on an encounter at the same moment: walking apart, closing the page, the
+	countdown reaching zero; the scheduler too. Burning deletes the row without waiting for its
+	lock ("being modified by another user"), so they go one after the other. The locking read
+	sees what the first one committed while this one waited.
+	"""
+	_lock_pair(_pair_key(doc.user_a, doc.user_b))
+	return frappe.db.get_value(ENCOUNTER_DOCTYPE, doc.name, ENCOUNTER_FIELDS, as_dict=True, for_update=True)
+
+
 @frappe.whitelist(methods=["POST"])
 def part_encounter(encounter):
 	"""The two chips walked apart: start the burn notice (both pages call this; once is enough)."""
 	_require_user()
-	doc = _require_party(encounter, ("Open", "Parting"))
+	doc = _locked(_require_party(encounter, ("Open", "Parting")))
+	if not doc:
+		# The other page parted first and the empty chat is gone.
+		return None
 	_start_parting(doc)
 	if not frappe.db.exists(ENCOUNTER_DOCTYPE, doc.name):
 		return None
@@ -1354,8 +1406,10 @@ def part_encounter(encounter):
 def save_encounter(encounter):
 	"""I want to keep this chat. Saved for real only when the other person says so too."""
 	_require_user()
-	# Locking read: when both press Save at the same moment, the second waits for the first and
-	# then sees its flag, so one of the two requests does the save (review of the release).
+	# When both press Save at the same moment, the second waits for the first and then sees its
+	# flag, so one of the two requests does the save (review of the release). The pair's lock
+	# keeps a burn from the other page or the scheduler out meanwhile (#2161).
+	_locked(_require_party(encounter, ("Parting",)))
 	doc = _require_party(encounter, ("Parting",), for_update=True)
 	field = "saved_by_a" if frappe.session.user == doc.user_a else "saved_by_b"
 	frappe.db.set_value(ENCOUNTER_DOCTYPE, doc.name, field, 1, update_modified=False)
@@ -1390,6 +1444,10 @@ def burn_if_due(encounter):
 	_require_user()
 	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True)
 	if not doc or frappe.session.user not in (doc.user_a, doc.user_b):
+		return {"burned": True}
+	# Both pages reach zero at the same moment: the second finds it gone (#2161).
+	doc = _locked(doc)
+	if not doc:
 		return {"burned": True}
 	# One second of slack for the page's clock.
 	if doc.status == "Parting" and get_datetime(doc.burn_at) <= add_to_date(now_datetime(), seconds=1):
@@ -1429,19 +1487,27 @@ def burn_due_encounters():
 	other person has left (tab closed, connection gone) without anyone walking away."""
 	from phamos.api.ophice_guest import purge_guests
 
+	def burn_if_still_due(doc):
+		# A page may have burned, saved or reopened it since the list was read (#2161).
+		doc = _locked(doc)
+		if doc and doc.status == "Parting" and get_datetime(doc.burn_at) <= now_datetime():
+			_burn_or_save(doc)
+
 	_each(
 		frappe.get_all(
 			ENCOUNTER_DOCTYPE,
 			filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
 			fields=ENCOUNTER_FIELDS,
 		),
-		_burn_or_save,
+		burn_if_still_due,
 		"burn encounter",
 	)
 
 	def part_if_alone(doc):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
-			_start_parting(doc)
+			doc = _locked(doc)
+			if doc:
+				_start_parting(doc)
 
 	_each(
 		frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS),
@@ -1468,7 +1534,10 @@ def _part_all_mine(user):
 	for doc in frappe.get_all(
 		ENCOUNTER_DOCTYPE, filters={"status": "Open"}, or_filters={"user_a": user, "user_b": user}, fields=ENCOUNTER_FIELDS
 	):
-		_start_parting(doc)
+		# The other page notices that I left and parts at the same moment (#2161).
+		doc = _locked(doc)
+		if doc:
+			_start_parting(doc)
 
 
 # --- Meeting areas (#2060).

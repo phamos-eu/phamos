@@ -3163,3 +3163,4 @@ Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: 
 {0} set: {1},{0} gesetzt: {1}
 Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
 (ERPNext picked {0}),(ERPNext hat {0} gewählt)
+{0} is not on the map right now.,{0} ist gerade nicht auf der Karte.
