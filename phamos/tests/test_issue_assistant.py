@@ -93,6 +93,12 @@ class TestSetup(IssueAssistantTestCase):
 		self.assertTrue(frappe.get_meta("Customer").has_field(setup.AI_ALLOWED_FIELD))
 		self.assertTrue(frappe.db.exists("User", self.assistant))
 
+	def test_implementation_shows_on_every_issue_after_the_team(self):
+		# the assistant fills it on e-mail Issues too (#2112), so it is no longer Phriend-only
+		fields = [f.fieldname for f in frappe.get_meta("Issue").fields]
+		self.assertEqual(fields[fields.index("custom_team") + 1], "custom_implementation")
+		self.assertFalse(frappe.get_meta("Issue").get_field("custom_implementation").depends_on)
+
 	def test_role_cannot_delete_issues(self):
 		doc = self.issue(raised_by=DESK_USER)
 		self.assertTrue(frappe.has_permission("Issue", "write", doc=doc, user=self.assistant))
