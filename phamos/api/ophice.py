@@ -410,6 +410,15 @@ def _clear_spot(position, user):
 	taken = [(c["x"], c["y"]) for c in _online(exclude=user)]
 	if all(math.hypot(position["x"] - tx, position["y"] - ty) >= CHIP_MIN_DISTANCE for tx, ty in taken):
 		return position
+	areas = _areas()
+
+	def area_at(x, y):
+		cx, cy = x + 0.5, y + 0.5
+		return next((a.name for a in areas if a.x <= cx < a.x + a.width and a.y <= cy < a.y + a.height), None)
+
+	# Stay in the space I was in (or outside all of them): a free spot must not put me into a
+	# meeting or cockpit space I did not walk into.
+	home = area_at(position["x"], position["y"])
 	max_x, max_y = _cols() - 1, _rows() - 1
 	for radius in range(1, 6):
 		ring = [
@@ -420,7 +429,12 @@ def _clear_spot(position, user):
 		]
 		for dx, dy in sorted(ring, key=lambda d: math.hypot(*d)):
 			x, y = position["x"] + dx, position["y"] + dy
-			if 0 <= x <= max_x and 0 <= y <= max_y and all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken):
+			if (
+				0 <= x <= max_x
+				and 0 <= y <= max_y
+				and area_at(x, y) == home
+				and all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken)
+			):
 				return {"x": float(x), "y": float(y)}
 	# Crowded all around: stay; walking away is always possible on the page.
 	return position
@@ -1376,6 +1390,12 @@ def _reindex_messages(names):
 		pass
 
 
+def _by_pair(rows):
+	"""Rows sorted by pair key. A request that locks several pairs (leaving the page, the
+	scheduler) takes them in one order, so two of them don't wait for each other in a circle."""
+	return sorted(rows, key=lambda r: _pair_key(r.user_a, r.user_b))
+
+
 def _locked(doc):
 	"""Take the pair's lock, then read the encounter again; None when it ended meanwhile (#2161).
 
@@ -1494,14 +1514,18 @@ def burn_due_encounters():
 			_burn_or_save(doc)
 
 	_each(
-		frappe.get_all(
-			ENCOUNTER_DOCTYPE,
-			filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
-			fields=ENCOUNTER_FIELDS,
+		_by_pair(
+			frappe.get_all(
+				ENCOUNTER_DOCTYPE,
+				filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
+				fields=ENCOUNTER_FIELDS,
+			)
 		),
 		burn_if_still_due,
 		"burn encounter",
 	)
+	# Releases this round's pair locks, so the next round takes its own in order again (_by_pair).
+	frappe.db.commit()
 
 	def part_if_alone(doc):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
@@ -1510,7 +1534,7 @@ def burn_due_encounters():
 				_start_parting(doc)
 
 	_each(
-		frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS),
+		_by_pair(frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS)),
 		part_if_alone,
 		"part encounter",
 	)
@@ -1531,9 +1555,11 @@ def _my_notices(user):
 
 
 def _part_all_mine(user):
-	for doc in frappe.get_all(
+	rows = frappe.get_all(
 		ENCOUNTER_DOCTYPE, filters={"status": "Open"}, or_filters={"user_a": user, "user_b": user}, fields=ENCOUNTER_FIELDS
-	):
+	)
+	# Pair locks are held until the request ends: always taken in the same order (_by_pair).
+	for doc in _by_pair(rows):
 		# The other page notices that I left and parts at the same moment (#2161).
 		doc = _locked(doc)
 		if doc:
