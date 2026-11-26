@@ -3,7 +3,7 @@
 
 """The phamos Issue Assistant (AI Agent on Issue, #1953): first point of contact for new Issues.
 
-Part one (#2111): intake. A new Issue in scope gets a run in the background. The run assigns the
+Part one (#2111): intake; the model's reading (#2113) is in issue_classify. A new Issue in scope gets a run in the background. The run assigns the
 assistant and a Desk-user reporter, decides in code whether the Issue may go to the AI model (the
 gate), and posts a brief in the Issue chat. Identifying the sender (#2112) and the model's own work
 (#2113) build on this.
@@ -164,7 +164,14 @@ def run_check_gate(ctx, skill):
 	return SkillResult(status=PASSED, message=gate_text(gate), output={"gate": gate, "assigned": assigned})
 
 
-SKILLS = {"check_gate": run_check_gate}
+def run_classify(ctx, skill):
+	"""Skill "Classify with AI model" (#2113), in its own module."""
+	from phamos.ai_agents.agents import issue_classify
+
+	return issue_classify.run_classify(ctx, skill)
+
+
+SKILLS = {"check_gate": run_check_gate, "classify": run_classify}
 
 
 def get_party(doc):
@@ -214,6 +221,9 @@ def brief_lines(ctx):
 		_("Source: {0}").format(source_text(ctx.doc)),
 		gate_text(gate) if gate else _("AI model not used: the check could not run."),
 	]
+	from phamos.ai_agents.agents import issue_classify
+
+	lines.extend(issue_classify.brief_lines(ctx))
 	if ctx.run.trigger == "Manual":
 		by = frappe.utils.get_fullname(ctx.run.triggered_by)
 		lines.append(_("Started by hand by {0} (manual override).").format(by) if ctx.run.get("manual_override")
