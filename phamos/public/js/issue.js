@@ -84,6 +84,7 @@ function phamos_issue_assistant_dialog(frm) {
 									: __("Issue Assistant started"),
 								indicator: "green",
 							});
+							phamos_issue_assistant_wait(frm, out.run);
 						},
 						always() {
 							d.enable_primary_action();
@@ -133,4 +134,52 @@ function phamos_issue_assistant_checks_html(info) {
 			· ${esc(frappe.datetime.str_to_user(run.creation))}</div>`;
 	}
 	return html;
+}
+
+// After a manual start: wait for the run (background job), then show its brief and reload the
+// form, so the user sees what the assistant did. Polls instead of relying on realtime, which is
+// not always running on a local bench.
+function phamos_issue_assistant_wait(frm, run, tries = 0) {
+	setTimeout(() => {
+		frappe.call({
+			method: "phamos.ai_agents.agents.issue.get_run_result",
+			args: { run },
+			callback(r) {
+				const res = r.message || {};
+				if (["Queued", "Running"].includes(res.status)) {
+					if (tries < 60) phamos_issue_assistant_wait(frm, run, tries + 1);
+					else frappe.show_alert({ message: __("The Issue Assistant is still running ({0}).", [run]), indicator: "orange" });
+					return;
+				}
+				phamos_issue_assistant_result(frm, res);
+				if (frm.doc.name === res.reference_name) frm.reload_doc();
+			},
+		});
+	}, 2000);
+}
+
+function phamos_issue_assistant_result(frm, res) {
+	const esc = frappe.utils.escape_html;
+	// the run's summary is stored HTML-escaped by Frappe; decode it once before escaping for display
+	const decode = (text) => $("<textarea>").html(text).text();
+	const lines = decode(res.summary || "").split("\n").filter(Boolean);
+	const link = `<a href="/app/ai-agent-run/${encodeURIComponent(res.name)}">${esc(res.name)}</a>`;
+	let html = `<p>${__("AI Agent Run")}: ${link} · ${esc(__(res.status))}${
+		res.manual_override ? " · " + __("Manual Override") : ""
+	}</p>`;
+	if (res.error) html += `<p class="text-danger">${esc(res.error)}</p>`;
+	if (lines.length) {
+		html += `<p><strong>${esc(lines[0])}</strong></p><ul>${lines
+			.slice(1)
+			.map((l) => `<li>${esc(l)}</li>`)
+			.join("")}</ul>`;
+	}
+	if (res.assigned && res.assigned.length) {
+		html += `<p>${__("Assigned To")}: ${res.assigned.map(esc).join(", ")}</p>`;
+	}
+	frappe.msgprint({
+		title: res.status === "Completed" ? __("Issue Assistant finished") : __("Issue Assistant failed"),
+		indicator: res.status === "Completed" ? "green" : "red",
+		message: html,
+	});
 }
