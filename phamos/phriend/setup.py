@@ -118,12 +118,12 @@ _FIELDS = [
 		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_screenshot_preview",
 	},
-	# where it happened + raw context, collapsed
+	# where it happened + raw context, open like every Issue section (#2157)
 	{
 		"fieldname": "phriend_context_section",
 		"label": "Phriend: Where It Happened",
 		"fieldtype": "Section Break",
-		"collapsible": 1,
+		"collapsible": 0,
 		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_screenshot",
 	},
