@@ -226,6 +226,7 @@ unit_tests_1:
       phamos.tests.test_set_timesheet_record_billable_hours
       phamos.tests.test_party_account
       phamos.tests.test_party_account_settings
+      phamos.tests.test_gitlab_issue_dashboard
 
 unit_tests_2:
   extends: .unit_tests
