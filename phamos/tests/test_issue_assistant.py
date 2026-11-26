@@ -288,3 +288,17 @@ class TestManualRun(IssueAssistantTestCase):
 		frappe.set_user(WEBSITE_USER)
 		with self.assertRaises(frappe.PermissionError):
 			assistant.get_run_result(run.name)
+
+
+class TestConnections(IssueAssistantTestCase):
+	def test_runs_show_under_the_issue_connections(self):
+		from frappe.desk.notifications import get_open_count
+
+		doc = self.issue(raised_by=WEBSITE_USER)
+		self.run_assistant(doc)
+		self.run_assistant(doc)
+		# a run of another doctype with the same name must not count (Dynamic Link)
+		frappe.get_doc({"doctype": "AI Agent Run", "agent": setup.ASSISTANT_NAME, "reference_doctype": "ToDo",
+			"reference_name": doc.name, "status": "Completed"}).db_insert()
+		counts = {row["doctype"]: row["count"] for row in get_open_count("Issue", doc.name)["count"]["external_links_found"]}
+		self.assertEqual(counts.get("AI Agent Run"), 2)
