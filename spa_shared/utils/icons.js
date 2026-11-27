@@ -3,11 +3,12 @@
 // falls back to Feather for every other name.
 
 export const CUSTOM_ICON_PATHS = {
-	// light bulb, after Lucide's "lightbulb" (ISC licence, a Feather fork)
+	// light bulb: the Idea Catcher's symbol (spa_shared/scripts/symbols/lightbulb.svg, #2202), so
+	// ideas look the same on the phone and in the cockpits
 	lightbulb: [
-		"M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5",
 		"M9 18h6",
-		"M10 22h4",
+		"M10 21.5h4",
+		"M12 2.5a6.5 6.5 0 0 0-3.9 11.7c.8.6 1.4 1.5 1.4 2.3h5c0-.8.6-1.7 1.4-2.3A6.5 6.5 0 0 0 12 2.5z",
 	],
 }
 
