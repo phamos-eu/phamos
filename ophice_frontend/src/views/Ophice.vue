@@ -241,6 +241,14 @@
 			>
 				{{ __("Click on the map where you want to meet · Esc to cancel") }}
 			</p>
+			<!-- Planting my flag (#2130): the next click on the map plants it. -->
+			<p
+				v-if="placingFlag"
+				class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+				data-testid="flag-hint"
+			>
+				{{ __("Click on the map where your flag should stand · Esc to cancel") }}
+			</p>
 			<!-- Selected people (PM, 2026-11-22): go to them, or set a meeting point for all. -->
 			<div
 				v-if="me && selectedUsers.length && !placingPin"
@@ -290,12 +298,17 @@
 				class="ophice-viewport overflow-hidden"
 				:class="[
 					meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0',
-					{ 'cursor-crosshair': placingPin },
+					{ 'cursor-crosshair': placingPin || placingFlag },
 				]"
 				:style="viewportStyle"
+				ref="viewportEl"
 				data-testid="map-viewport"
 				@pointerdown="onViewportDown"
-				@pointermove="camera().onPointerMove"
+				@pointermove="onViewportMove"
+				@pointerleave="placingFlag && (flagAim = null)"
+				@dragover="onFlagDragOver"
+				@dragleave="onFlagDragLeave"
+				@drop="onFlagDrop"
 				@pointerup="camera().onPointerUp"
 				@pointercancel="camera().onPointerUp"
 				@click.capture="camera().onClickCapture"
@@ -341,6 +354,20 @@
 					@draw="(rect) => (areaDraft = { ...rect })"
 					@pick="(area) => (areaDraft = { ...area })"
 					@change="reshapeArea"
+				/>
+				<!-- Flags (#2130): everyone's, my own to drag and dress. Under the chips. -->
+				<FlagLayer
+					:flags="flags"
+					:tile="tile"
+					:user="me.user"
+					:ghost="flagGhost"
+					:menu-open="flagMenuOpen"
+					:cell-from-point="cellFromPoint"
+					@aim="(cell) => (flagAim = cell)"
+					@drop="moveFlag"
+					@menu="(open) => (flagMenuOpen = open)"
+					@look="setFlagLook"
+					@take-down="takeDownFlag"
 				/>
 				<!-- Perimeters (#2056): touching circles = in conversation. Below the chips, no clicks. -->
 				<div
@@ -669,6 +696,9 @@
 			:status-open="statusOpen"
 			:bell="bell"
 			:bell-title="bellTitle"
+			:flag="myFlag"
+			:flag-color="flagColor"
+			:placing-flag="placingFlag"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -680,6 +710,8 @@
 			@open="openCockpit"
 			@status="toggleStatus()"
 			@bell="clickBell"
+			@flag-place="startFlagPlacing"
+			@flag-drag="(on) => (draggingFlag = on)"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -765,6 +797,8 @@ import {
 import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
+import FlagLayer from "../components/FlagLayer.vue"
+import { cellAt, flagBlocked } from "../utils/ophiceFlag.js"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
 import AreaChat from "../components/AreaChat.vue"
@@ -1312,6 +1346,14 @@ function onKeydown(event) {
 	}
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
 	// Esc: stop placing a meeting point, then clear the selection (PM, 2026-11-22).
+	// Esc: stop planting my flag, close its menu (#2130).
+	if (event.key === "Escape" && (placingFlag.value || flagMenuOpen.value)) {
+		event.preventDefault()
+		placingFlag.value = false
+		flagAim.value = null
+		flagMenuOpen.value = false
+		return
+	}
 	if (event.key === "Escape" && (placingPin.value || (selectedUsers.value.length && !chatWith.value))) {
 		event.preventDefault()
 		if (placingPin.value) placingPin.value = null
@@ -2483,9 +2525,10 @@ const selectedOnMap = computed(() => selectedUsers.value.filter(isOnMap))
 function onPersonClick(person, event, order = null, options = {}) {
 	// Placing a meeting point: a chip on the map only places it (onViewportClick); a click
 	// anywhere else (the list) stops placing and selects as usual.
-	if (placingPin.value) {
+	if (placingPin.value || placingFlag.value) {
 		if (event?.target?.closest?.("[data-testid=other-chip]")) return
 		placingPin.value = null
+		placingFlag.value = false
 	}
 	if (!person?.user || person.user === me.value?.user) return
 	if (event?.metaKey || event?.ctrlKey) {
@@ -2525,6 +2568,12 @@ function clearSelection() {
 function onViewportClick(event) {
 	if (placingPin.value) {
 		placePin(event)
+		return
+	}
+	if (placingFlag.value) {
+		placingFlag.value = false
+		flagAim.value = null
+		plantFlag(cellFromPoint(event.clientX, event.clientY))
 		return
 	}
 	if (event.target.closest?.("[data-testid=other-chip], [data-testid=my-chip], [data-no-pan], button")) return
@@ -2778,6 +2827,121 @@ function pinStyle(pin) {
 		height: `${tile.value}px`,
 		transform: `translate(${pin.x * tile.value}px, ${pin.y * tile.value}px)`,
 		"--pin-hue": ringHue(pin.by),
+	}
+}
+
+// --- My flag (#2129, #2130): planted from the sidebar (click then click, or drag and drop),
+// moved by dragging it on the map, dressed and taken down from its menu.
+
+const viewportEl = ref(null)
+const flags = ref([])
+const flagColor = ref("red")
+const placingFlag = ref(false)
+const draggingFlag = ref(false)
+const flagAim = ref(null)
+const flagMenuOpen = ref(false)
+const myFlag = computed(() => flags.value.find((f) => f.user === me.value?.user) || null)
+const flagGhost = computed(() => {
+	if (!flagAim.value || !me.value) return null
+	return {
+		...flagAim.value,
+		color: myFlag.value?.color || flagColor.value,
+		pattern: myFlag.value?.pattern || "plain",
+		blocked: Boolean(flagBlocked(flagAim.value, { areas: areas.value, flags: flags.value, user: me.value.user })),
+	}
+})
+
+/** The cell of the grid under a point of the screen, or null. */
+function cellFromPoint(clientX, clientY) {
+	const cam = camera()
+	const box = viewportEl.value?.getBoundingClientRect()
+	if (!box || !cam.tile.value || !me.value) return null
+	const x = (clientX - box.left - cam.pan.x - cam.origin.value.x) / cam.tile.value
+	const y = (clientY - box.top - cam.pan.y - cam.origin.value.y) / cam.tile.value
+	return cellAt(x, y, me.value.cols, me.value.rows)
+}
+
+function startFlagPlacing() {
+	chatWith.value = null
+	placingPin.value = null
+	placingFlag.value = !placingFlag.value
+	flagAim.value = null
+}
+
+function onViewportMove(event) {
+	camera().onPointerMove(event)
+	if (placingFlag.value) flagAim.value = cellFromPoint(event.clientX, event.clientY)
+}
+
+function onFlagDragOver(event) {
+	if (!draggingFlag.value) return
+	event.preventDefault()
+	if (event.dataTransfer) event.dataTransfer.dropEffect = "move"
+	flagAim.value = cellFromPoint(event.clientX, event.clientY)
+}
+function onFlagDragLeave(event) {
+	if (draggingFlag.value && !viewportEl.value?.contains(event.relatedTarget)) flagAim.value = null
+}
+function onFlagDrop(event) {
+	if (!draggingFlag.value) return
+	event.preventDefault()
+	draggingFlag.value = false
+	placingFlag.value = false
+	flagAim.value = null
+	plantFlag(cellFromPoint(event.clientX, event.clientY))
+}
+
+function upsertFlag(flag) {
+	if (!flag?.user) return
+	flags.value = [...flags.value.filter((f) => f.user !== flag.user), flag]
+}
+
+async function saveFlag(args, { thump = false } = {}) {
+	const before = flags.value
+	try {
+		const flag = await call(`${API}.set_my_flag`, args)
+		upsertFlag(flag)
+		// A soft thump as it goes into the ground (PM, 2026-11-27): for me only; the bell mutes it.
+		if (thump) encounterAlert.thump()
+	} catch (e) {
+		flags.value = before
+		toast.error(errorText(e) || __("Your flag could not be planted."))
+	}
+}
+
+function plantFlag(cell) {
+	if (!cell || !me.value) return
+	const why = flagBlocked(cell, { areas: areas.value, flags: flags.value, user: me.value.user })
+	if (why) {
+		toast.error(why === "area" ? __("A flag can't stand inside an area.") : __("There is already a flag on this spot."))
+		return
+	}
+	// Planted where it lands right away; the server's answer (or its refusal) follows.
+	upsertFlag({ ...(myFlag.value || { color: flagColor.value, pattern: "plain" }), user: me.value.user, full_name: me.value.full_name, ...cell })
+	saveFlag({ x: cell.x, y: cell.y }, { thump: true })
+}
+
+function moveFlag(cell) {
+	flagAim.value = null
+	if (!cell || (myFlag.value && cell.x === myFlag.value.x && cell.y === myFlag.value.y)) return
+	plantFlag(cell)
+}
+
+function setFlagLook(look) {
+	if (!myFlag.value) return
+	upsertFlag({ ...myFlag.value, ...look })
+	saveFlag(look)
+}
+
+async function takeDownFlag() {
+	flagMenuOpen.value = false
+	const before = flags.value
+	flags.value = flags.value.filter((f) => f.user !== me.value?.user)
+	try {
+		await call(`${API}.take_down_my_flag`)
+	} catch (e) {
+		flags.value = before
+		toast.error(errorText(e) || __("Your flag could not be taken down."))
 	}
 }
 
@@ -3220,6 +3384,8 @@ const SOCKET_EVENTS = [
 	["ophice_move", onRemoteMove],
 	["ophice_pin", upsertPin],
 	["ophice_pin_removed", onPinRemoved],
+	["ophice_flag", upsertFlag],
+	["ophice_flag_removed", (message) => (flags.value = flags.value.filter((f) => f.user !== message?.user))],
 	["ophice_leave", onRemoteLeave],
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
@@ -3443,6 +3609,8 @@ onMounted(async () => {
 		autoCockpit.value = data.auto_cockpit !== false
 		for (const notice of data.notices || []) upsertNotice(notice)
 		pins.value = data.pins || []
+		flags.value = data.flags || []
+		flagColor.value = data.flag_color || "red"
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("Ophice could not be loaded.")

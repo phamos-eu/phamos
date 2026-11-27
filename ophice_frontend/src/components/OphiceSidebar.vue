@@ -75,6 +75,37 @@
 				<span v-if="!collapsed" class="truncate">{{ statusLabel }}</span>
 			</button>
 			<p v-if="!collapsed" class="ophice-side__hint">{{ __("Be right back, or away until a time. Shown above your chip.") }}</p>
+			<!-- My flag (#2130): waits here until I plant it; click then click the map, or drag it there. -->
+			<button
+				v-if="!flag"
+				type="button"
+				class="ophice-side__row ophice-side__flag"
+				:class="{ 'ophice-side__row--on': placingFlag, 'ophice-side__row--icon': collapsed }"
+				draggable="true"
+				:title="__('Plant your flag: click it, then click on the map, or drag it onto the map')"
+				:aria-label="collapsed ? __('Plant your flag: click it, then click on the map, or drag it onto the map') : undefined"
+				:aria-pressed="placingFlag"
+				data-testid="flag-button"
+				@click="$emit('flag-place')"
+				@dragstart="onFlagDragStart"
+				@dragend="$emit('flag-drag', false)"
+			>
+				<span class="h-5 w-5 flex-shrink-0"><FlagIcon :color="flagColor" /></span>
+				<span v-if="!collapsed" class="truncate">{{ placingFlag ? __("Click on the map") : __("Plant your flag") }}</span>
+			</button>
+			<div
+				v-else
+				class="ophice-side__row ophice-side__row--static"
+				:class="{ 'ophice-side__row--icon': collapsed }"
+				:title="__('Your flag is planted. Drag it on the map to move it; click it for colour, pattern or to take it down.')"
+				data-testid="flag-planted"
+			>
+				<span class="h-5 w-5 flex-shrink-0"><FlagIcon :color="flag.color" :pattern="flag.pattern" /></span>
+				<span v-if="!collapsed" class="truncate">{{ __("Your flag is planted") }}</span>
+			</div>
+			<p v-if="!collapsed" class="ophice-side__hint">
+				{{ flag ? __("Drag it on the map to move it; click it for colour, pattern or to take it down.") : __("Click it, then click on the map, or drag it onto the map.") }}
+			</p>
 			<!-- Encounter alert (#2135): asks for browser notifications, mutes chime and notification. -->
 			<button
 				type="button"
@@ -213,6 +244,7 @@
 import { computed } from "vue"
 import { Dropdown, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import FlagIcon from "./FlagIcon.vue"
 
 const props = defineProps({
 	collapsed: { type: Boolean, default: true },
@@ -235,8 +267,12 @@ const props = defineProps({
 	/** the encounter alert (#2135): "ask", "on", "blocked" or "muted", and its tooltip */
 	bell: { type: String, default: "ask" },
 	bellTitle: { type: String, default: "" },
+	/** my planted flag (#2130), or null; the colour it gets when I plant it; placing it right now */
+	flag: { type: Object, default: null },
+	flagColor: { type: String, default: "red" },
+	placingFlag: { type: Boolean, default: false },
 })
-defineEmits([
+const emit = defineEmits([
 	"update:collapsed",
 	"open",
 	"status",
@@ -247,6 +283,8 @@ defineEmits([
 	"adjust",
 	"remove-background",
 	"bell",
+	"flag-place",
+	"flag-drag",
 ])
 
 const statusIcon = computed(() => (props.status?.kind === "away" ? "moon" : props.status ? "coffee" : "check-circle"))
@@ -262,6 +300,12 @@ const bellLabel = computed(
 			muted: __("Chat notifications muted"),
 		})[props.bell]
 )
+// Dragging my flag onto the map (#2130): the map takes it on drop.
+function onFlagDragStart(event) {
+	event.dataTransfer?.setData("text/x-ophice-flag", "1")
+	if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"
+	emit("flag-drag", true)
+}
 const moveHint = __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)")
 </script>
 
@@ -299,6 +343,13 @@ const moveHint = __("Move with WASD or the arrow keys, Shift to go faster, Space
 .ophice-side__row:hover:not(:disabled) {
 	background: var(--surface-gray-2);
 	color: var(--ink-gray-9);
+}
+.ophice-side__row--static:hover:not(:disabled) {
+	background: none;
+	color: var(--ink-gray-8);
+}
+.ophice-side__flag {
+	cursor: grab;
 }
 .ophice-side__row:disabled {
 	opacity: 0.5;

@@ -33,7 +33,7 @@ from zoneinfo import ZoneInfo
 
 import frappe
 from frappe import _
-from frappe.utils import add_to_date, escape_html, get_datetime, now_datetime, strip_html
+from frappe.utils import add_to_date, escape_html, flt, get_datetime, now_datetime, strip_html
 
 from phamos.cockpits.settings import COCKPITS as _COCKPITS
 
@@ -490,6 +490,9 @@ def get_space():
 		"background_layout": _background_layout(_background()),
 		"background_ratio": _background_ratio(_background()),
 		"areas": _areas(),
+		# Everyone's flags (#2130), and the colour a flag of mine gets before I choose one.
+		"flags": _flags(),
+		"flag_color": _default_flag_color(user),
 		# The map tools and the Debug menu are only shown to map editors (#2071).
 		"can_edit_map": can_edit_map(user),
 		# Cockpit spaces open their cockpit when I stop inside (#2076), unless I switched it off.
@@ -658,6 +661,129 @@ def save_my_position(x, y):
 	position = {"x": _clamp(x, _cols()), "y": _clamp(y, _rows())}
 	frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	return position
+
+
+# --- My flag (#2129, #2130): one flag per person, planted on a cell of the map.
+#
+# Stored per user as a user default (JSON): the cell (x, y), the cloth's colour and pattern. Not
+# a desk: the owner moves it or takes it down whenever they like. Not inside an area (spaces stay
+# free), not on a cell that already has a flag.
+
+FLAG_KEY = "phamos_ophice_flag"
+EVENT_FLAG = "ophice_flag"
+EVENT_FLAG_REMOVED = "ophice_flag_removed"
+# The same keys as FLAG_COLORS / FLAG_PATTERNS in ophice_frontend/src/utils/ophiceFlag.js.
+FLAG_COLORS = ("red", "orange", "amber", "green", "teal", "blue", "violet", "pink")
+FLAG_PATTERNS = ("plain", "dots", "stripes", "grid", "waves")
+
+
+def _default_flag_color(user):
+	"""A steady first colour per person, so a new flag does not need a choice before it is planted."""
+	return FLAG_COLORS[int(hashlib.md5(user.encode()).hexdigest(), 16) % len(FLAG_COLORS)]
+
+
+def _parse_flag(raw):
+	try:
+		data = json.loads(raw) if raw else None
+	except (TypeError, ValueError):
+		return None
+	if not isinstance(data, dict):
+		return None
+	try:
+		x, y = int(data.get("x")), int(data.get("y"))
+	except (TypeError, ValueError):
+		return None
+	return {
+		"x": max(0, min(_cols() - 1, x)),
+		"y": max(0, min(_rows() - 1, y)),
+		"color": data.get("color") if data.get("color") in FLAG_COLORS else FLAG_COLORS[0],
+		"pattern": data.get("pattern") if data.get("pattern") in FLAG_PATTERNS else FLAG_PATTERNS[0],
+	}
+
+
+def _flags():
+	"""Every planted flag of an enabled System User, with the owner's name."""
+	# Straight from the table, as for the status: the defaults' cache can outlive a test rollback.
+	rows = frappe.db.get_all(
+		"DefaultValue",
+		filters={"defkey": FLAG_KEY, "parent": ["not like", "\\_\\_%"]},
+		fields=["parent", "defvalue"],
+	)
+	if not rows:
+		return []
+	users = {
+		u.name: u.full_name
+		for u in frappe.get_all(
+			"User",
+			filters={"name": ["in", [r.parent for r in rows]], "enabled": 1, "user_type": "System User"},
+			fields=["name", "full_name"],
+		)
+	}
+	flags = []
+	for row in rows:
+		flag = _parse_flag(row.defvalue) if row.parent in users else None
+		if flag:
+			flags.append({**flag, "user": row.parent, "full_name": users[row.parent] or row.parent})
+	return flags
+
+
+def _flag_blocked(x, y, user):
+	"""Why a flag can't stand on cell x, y, or "" when it can."""
+	cx, cy = x + 0.5, y + 0.5
+	for area in frappe.get_all(AREA_DOCTYPE, fields=["x", "y", "width", "height"], limit=MAX_AREAS):
+		ax, ay = flt(area.x), flt(area.y)
+		if ax <= cx < ax + flt(area.width) and ay <= cy < ay + flt(area.height):
+			return _("A flag can't stand inside an area.")
+	if any(f["user"] != user and (f["x"], f["y"]) == (x, y) for f in _flags()):
+		return _("There is already a flag on this spot.")
+	return ""
+
+
+def _my_flag(user):
+	return _parse_flag(frappe.db.get_value("DefaultValue", {"parent": user, "defkey": FLAG_KEY}, "defvalue"))
+
+
+@frappe.whitelist(methods=["POST"])
+def set_my_flag(x=None, y=None, color=None, pattern=None):
+	"""Plant or move my flag (x, y: a cell), or change its colour or pattern.
+
+	Without x and y the flag stays where it is; a flag that is not planted yet needs them.
+	"""
+	_require_user()
+	user = frappe.session.user
+	flag = _my_flag(user)
+	if x is not None or y is not None:
+		try:
+			x, y = int(float(x)), int(float(y))
+		except (TypeError, ValueError):
+			frappe.throw(_("Choose a spot on the map."))
+		if not (0 <= x < _cols() and 0 <= y < _rows()):
+			frappe.throw(_("Choose a spot on the map."))
+		reason = _flag_blocked(x, y, user)
+		if reason:
+			frappe.throw(reason)
+		flag = {**(flag or {}), "x": x, "y": y}
+	elif not flag:
+		frappe.throw(_("Plant your flag on the map first."))
+	if color is not None and color not in FLAG_COLORS:
+		frappe.throw(_("Unknown colour."))
+	if pattern is not None and pattern not in FLAG_PATTERNS:
+		frappe.throw(_("Unknown pattern."))
+	flag["color"] = color or flag.get("color") or _default_flag_color(user)
+	flag["pattern"] = pattern or flag.get("pattern") or FLAG_PATTERNS[0]
+	frappe.defaults.set_user_default(FLAG_KEY, json.dumps(flag, separators=(",", ":")), user)
+	flag = {**flag, "user": user, "full_name": frappe.db.get_value("User", user, "full_name") or user}
+	_publish(EVENT_FLAG, flag)
+	return flag
+
+
+@frappe.whitelist(methods=["POST"])
+def take_down_my_flag():
+	"""Take my flag off the map; it waits in the sidebar again."""
+	_require_user()
+	user = frappe.session.user
+	frappe.defaults.clear_user_default(FLAG_KEY, user)
+	_publish(EVENT_FLAG_REMOVED, {"user": user})
 
 
 # --- Status (#2053): "Be right back" and "Away", with a note and a return time.
