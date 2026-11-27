@@ -21,6 +21,7 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
 from frappe.utils.html_utils import sanitize_html
 
+from phamos.phamos.doctype.implementation_chapter.critical_path import critical_path, dependency_conflict
 from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
 
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
@@ -996,4 +997,340 @@ def get_wbs(implementation):
 		"weight_hours": round(sum(n["weight_hours"] for n in all_nodes), 1),
 		"weighted": any(n["weight_hours"] for n in all_nodes),
 		"modules": tree,
+	}
+
+
+# Roadmap (#1694, data #2033): modules in their depth levels over time.
+CHAPTER_STATUSES_HIDDEN_FROM_CUSTOMERS = ("Draft", "Cancelled")
+# Draft chapters are not agreed yet and Cancelled ones won't happen: neither decides the end date.
+CHAPTER_STATUSES_ON_CRITICAL_PATH = ("Planned", "In Progress", "Blocked")
+ROADMAP_CHAPTER_FIELDS = (
+	"name",
+	"chapter_title",
+	"status",
+	"module",
+	"planned_start",
+	"target_date",
+	"current_level",
+	"target_level",
+)
+
+
+def _can_propose_dates():
+	"""Whether the Roadmap shows "Propose a date change". Off for everyone for now (#2219).
+
+	The button opened the Implementation Change form in Desk, where the new dates can't be
+	entered: the values are read-only there, so a saved change had none. #2219 brings a way to
+	propose a chapter's dates; then staff who may create an Implementation Change get the button
+	again (is_internal_user() and create permission).
+	"""
+	return False
+
+
+def _baseline_rows(implementation):
+	"""The current baseline and its chapter dates and levels by chapter, and the features it holds.
+
+	Read here rather than through `get_baseline_variance`: that one checks Desk read permission on
+	Implementation, which customers (website users) don't have, and reads every chapter again.
+	"""
+	baseline = frappe.db.get_value(
+		"Implementation Baseline",
+		{"implementation": implementation, "is_current": 1},
+		["name", "baseline_date"],
+		as_dict=True,
+	)
+	if not baseline:
+		return None, {}, set()
+	chapters = {
+		row.chapter: row
+		for row in frappe.get_all(
+			"Implementation Baseline Chapter",
+			filters={"parent": baseline.name, "parenttype": "Implementation Baseline"},
+			fields=["chapter", "planned_start", "target_date", "current_level"],
+		)
+	}
+	features = set(
+		frappe.get_all(
+			"Implementation Baseline Feature",
+			filters={"parent": baseline.name, "parenttype": "Implementation Baseline"},
+			pluck="feature",
+		)
+	)
+	return baseline, chapters, features
+
+
+def _target_reached(row):
+	"""A chapter (or module row) is done when it has reached its target level.
+
+	Chapters have no Done status; their level says how far they are (#2033 decision 7). Done
+	work has no slack and doesn't decide the end date any more.
+	"""
+	target = cint(row.target_level)
+	return bool(target) and cint(row.current_level) >= target
+
+
+def _days_between(then, now):
+	if not then or not now:
+		return None
+	return (getdate(now) - getdate(then)).days
+
+
+def _finished_dates(features):
+	"""{feature: date of its latest progress row with status Live}."""
+	finished = {}
+	for row in frappe.get_all(
+		"Implementation Feature Progress",
+		filters={"parent": ["in", features or [""]], "parenttype": "Implementation Feature", "status": "Live"},
+		fields=["parent", "date"],
+	):
+		if row.date and (row.parent not in finished or getdate(row.date) > getdate(finished[row.parent])):
+			finished[row.parent] = row.date
+	return finished
+
+
+def _roadmap_markers(implementation, features_by_name, visible_chapters):
+	"""GitLab milestones with a due date and the releases still planned, as dated markers.
+
+	A release tied to a chapter the viewer doesn't see (a Draft one, for customers) stays hidden
+	with it.
+	"""
+	projects = frappe.get_all("GitLab Project", filters={"implementation": implementation}, pluck="name")
+	milestones = (
+		frappe.get_all(
+			"GitLab Milestones",
+			filters={"gitlab_project": ["in", projects], "due_date": ["is", "set"]},
+			fields=["name", "title", "due_date", "state", "web_url"],
+			order_by="due_date asc",
+		)
+		if projects
+		else []
+	)
+	releases = frappe.get_all(
+		"Implementation Release",
+		filters={"implementation": implementation, "status": ["!=", "Cancelled"], "target_date": ["is", "set"]},
+		fields=["name", "title", "target_date", "chapter"],
+		order_by="target_date asc",
+	)
+	releases = [r for r in releases if not r.chapter or r.chapter in visible_chapters]
+	release_features = {}
+	for row in frappe.get_all(
+		"Implementation Release Feature",
+		filters={"parent": ["in", [r.name for r in releases] or [""]], "parenttype": "Implementation Release"},
+		fields=["parent", "feature"],
+	):
+		release_features.setdefault(row.parent, []).append(row.feature)
+
+	markers = [
+		{
+			"type": "milestone",
+			"name": m.name,
+			"title": m.title,
+			"date": m.due_date,
+			"state": m.state,
+			"web_url": m.web_url,
+		}
+		for m in milestones
+	]
+	for release in releases:
+		late = [
+			{"name": f.name, "title": f.title}
+			for f in (features_by_name.get(name) for name in release_features.get(release.name, []))
+			# a Live feature is done, however late: only open work can still miss the release
+			if f and f.status != "Live" and f.target_date and getdate(f.target_date) > getdate(release.target_date)
+		]
+		markers.append(
+			{
+				"type": "release",
+				"name": release.name,
+				"title": release.title,
+				"date": release.target_date,
+				"late_features": late,
+			}
+		)
+	return markers
+
+
+def _roadmap_dates(rows, markers):
+	"""Every date the Roadmap draws (bars, baseline bars, events, markers), for its initial range."""
+	dates = []
+	for row in rows:
+		for bar in row["bars"]:
+			dates += [bar["planned_start"], bar["target_date"]]
+			if bar["baseline"]:
+				dates += [bar["baseline"]["planned_start"], bar["baseline"]["target_date"]]
+		dates += [event["date"] for event in row["events"]]
+	dates += [marker["date"] for marker in markers]
+	return [getdate(value) for value in dates if value]
+
+
+@frappe.whitelist()
+def get_roadmap(implementation):
+	"""Everything the Roadmap draws: one row per module with its chapters as level-step bars,
+	features as events, chapter dependencies, the critical path, markers and the baseline.
+
+	Customers get the same picture without Draft and Cancelled chapters (#1694 decision 12).
+	The critical path runs through the agreed chapters only, for staff and customers alike, so
+	both see the same slack.
+	"""
+	_require_implementation(implementation)
+
+	internal = is_internal_user()
+	chapters = frappe.get_all(
+		"Implementation Chapter",
+		filters={"implementation": implementation},
+		fields=list(ROADMAP_CHAPTER_FIELDS),
+		order_by="planned_start asc, creation asc",
+	)
+	if not internal:
+		chapters = [c for c in chapters if c.status not in CHAPTER_STATUSES_HIDDEN_FROM_CUSTOMERS]
+	chapter_names = {c.name for c in chapters}
+	depends_on = {}
+	for row in frappe.get_all(
+		"Implementation Chapter Dependency",
+		filters={"parent": ["in", list(chapter_names) or [""]], "parenttype": "Implementation Chapter"},
+		fields=["parent", "chapter"],
+	):
+		if row.chapter not in depends_on.setdefault(row.parent, []):
+			depends_on[row.parent].append(row.chapter)
+
+	path = critical_path(
+		[
+			{
+				"name": c.name,
+				"planned_start": c.planned_start,
+				"target_date": c.target_date,
+				"depends_on": depends_on.get(c.name, []),
+			}
+			for c in chapters
+			if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH and not _target_reached(c)
+		]
+	)["items"]
+
+	baseline, baseline_chapters, baseline_features = _baseline_rows(implementation)
+
+	def chapter_bar(chapter):
+		then = baseline_chapters.get(chapter.name)
+		on_path = path.get(chapter.name, {})
+		done = _target_reached(chapter)
+		return {
+			"name": chapter.name,
+			"chapter": chapter.name,
+			"title": chapter.chapter_title or chapter.name,
+			"status": chapter.status,
+			"planned_start": chapter.planned_start,
+			"target_date": chapter.target_date,
+			# the level when the plan was agreed: where the level step starts (None without baseline)
+			"start_level": (cint(then.current_level) or None) if then else None,
+			"current_level": cint(chapter.current_level) or None,
+			"target_level": cint(chapter.target_level) or None,
+			"done": done,
+			"critical": False if done else on_path.get("critical"),
+			"slack_days": None if done else on_path.get("slack_days"),
+			"cycle": bool(on_path.get("cycle")),
+			"baseline": {
+				"planned_start": then.planned_start,
+				"target_date": then.target_date,
+				"shift_days": _days_between(then.target_date, chapter.target_date),
+			}
+			if then
+			else None,
+			"is_new": bool(baseline) and not then,
+		}
+
+	features = [f for f in _feature_rows(implementation) if f.status != "Dropped"]
+	features_by_name = {f.name: f for f in features}
+	finished = _finished_dates([f.name for f in features if f.status == "Live"])
+
+	def feature_events(feature):
+		common = {
+			"name": feature.name,
+			"title": feature.title,
+			"status": feature.status,
+			"is_new": bool(baseline) and feature.name not in baseline_features,
+		}
+		events = []
+		if feature.planned_start:
+			events.append({**common, "kind": "planned", "date": feature.planned_start})
+		if feature.status == "Live" and finished.get(feature.name):
+			events.append({**common, "kind": "finished", "date": finished[feature.name]})
+		return events
+
+	# Rows in the order of the Implementation's Modules table (Implementation Item). Saving a
+	# chapter adds a row for it there, often without a module; a chapter's module is its own
+	# `module`, else the module set on its row. Chapters of a module missing from the table get a
+	# row after the others; chapters and features without any module go to "No module".
+	items = frappe.get_all(
+		"Implementation Item",
+		filters={"parent": implementation, "parenttype": "Implementation", "parentfield": "modules"},
+		fields=["name", "module", "implementation_chapter", "planned_start", "target_date", "current_level", "target_level"],
+		order_by="idx asc",
+	)
+	# two rows pointing at the same chapter with different modules: the later row wins
+	module_of_chapter = {i.implementation_chapter: i.module for i in items if i.implementation_chapter and i.module}
+	rows = {}
+	for item in items:
+		# a row whose chapter the viewer doesn't see (Draft, for customers) would show up empty
+		# and give the chapter away
+		if item.module and (not item.implementation_chapter or item.implementation_chapter in chapter_names):
+			rows.setdefault(item.module, {"module": item.module, "label": item.module, "bars": [], "events": []})
+	no_module = {"bars": [], "events": []}
+	for chapter in chapters:
+		module = chapter.module or module_of_chapter.get(chapter.name)
+		if not module:
+			no_module["bars"].append(chapter_bar(chapter))
+			continue
+		rows.setdefault(module, {"module": module, "label": module, "bars": [], "events": []})
+		rows[module]["bars"].append(chapter_bar(chapter))
+	for item in items:
+		if item.module and not item.implementation_chapter:
+			# A module row without a chapter is planned on the Modules table only: a bar from its
+			# own dates and levels, outside the critical path. (A row with a chapter never shows its
+			# own dates: the chapter is the plan, and a hidden Draft chapter must stay hidden.)
+			rows[item.module]["bars"].append(
+				{
+					"name": f"item:{item.name}",
+					"chapter": None,
+					"title": item.module,
+					"status": None,
+					"planned_start": item.planned_start,
+					"target_date": item.target_date,
+					"start_level": None,
+					"current_level": cint(item.current_level) or None,
+					"target_level": cint(item.target_level) or None,
+					"done": _target_reached(item),
+					"critical": None,
+					"slack_days": None,
+					"cycle": False,
+					"baseline": None,
+					"is_new": False,
+				}
+			)
+	for feature in features:
+		if feature.module:
+			target = rows.setdefault(feature.module, {"module": feature.module, "label": feature.module, "bars": [], "events": []})
+		else:
+			target = no_module
+		target["events"].extend(feature_events(feature))
+	modules = list(rows.values())
+
+	# All links between the chapters shown, Draft ones included for staff; critical_path() only
+	# saw the agreed chapters, so its own list is not enough here.
+	by_name = {c.name: c for c in chapters}
+	dependencies = [
+		{"from": predecessor, "to": successor, "conflict": dependency_conflict(by_name[predecessor], by_name[successor])}
+		for successor, predecessors in depends_on.items()
+		for predecessor in predecessors
+		if predecessor in by_name and successor in by_name
+	]
+
+	markers = _roadmap_markers(implementation, features_by_name, chapter_names)
+	dates = _roadmap_dates([*modules, no_module], markers)
+	return {
+		"modules": modules,
+		"no_module": no_module,
+		"dependencies": dependencies,
+		"markers": markers,
+		"baseline": {"name": baseline.name, "baseline_date": baseline.baseline_date} if baseline else None,
+		"range": {"start": min(dates), "end": max(dates)} if dates else None,
+		"can_propose": _can_propose_dates(),
 	}
