@@ -91,7 +91,7 @@
 						<span
 							class="max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5"
 							:class="message.owner === me ? 'bg-surface-gray-4' : 'bg-surface-gray-2'"
-							>{{ message.text }}</span
+							><MessageText :text="message.text" /></span
 						>
 					</div>
 				</div>
@@ -160,6 +160,7 @@ import UserAvatar from "@spa/components/UserAvatar.vue"
 import VideoCall from "./VideoCall.vue"
 import MeetingHuddle from "./MeetingHuddle.vue"
 import PopOutIcon from "./PopOutIcon.vue"
+import MessageText from "./MessageText.vue"
 import { ringHue } from "../utils/ophiceColor.js"
 import { __ } from "@spa/utils/i18n.js"
 

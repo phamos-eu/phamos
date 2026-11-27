@@ -155,7 +155,7 @@
 						<span
 							class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 							:class="item.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
-						>{{ item.text }}</span>
+						><MessageText :text="item.text" /></span>
 						<span class="mt-0.5 text-[10px] text-ink-gray-4" :title="exactTime(item)" data-testid="area-chat-time">{{ timeOf(item) }}</span>
 					</div>
 				</template>
@@ -172,7 +172,7 @@
 				<span
 					class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 					:class="message.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
-				>{{ message.text }}</span>
+				><MessageText :text="message.text" /></span>
 				<span class="mt-0.5 text-[10px] text-ink-gray-4" :title="exactTime(message)">{{ timeOf(message) }}</span>
 			</div>
 		</div>
@@ -202,6 +202,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Button, call, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { clockTime, relativeTime, withinMinutes } from "../utils/ophiceTime.js"
+import MessageText from "./MessageText.vue"
 
 const props = defineProps({
 	/** { name, title, chat_mode } */

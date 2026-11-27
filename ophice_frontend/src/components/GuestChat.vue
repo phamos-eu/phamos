@@ -52,7 +52,7 @@
 				<span
 					class="max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm"
 					:class="message.owner === me ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2'"
-				>{{ message.text }}</span>
+				><MessageText :text="message.text" /></span>
 				<span class="mt-0.5 text-[10px] text-ink-gray-4" :title="clockTime(new Date(message.ts * 1000), new Date(0))">
 					{{ ago(message) }}
 				</span>
@@ -82,6 +82,7 @@ import { nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { Button, FeatherIcon, toast } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { clockTime, withinMinutes } from "../utils/ophiceTime.js"
+import MessageText from "./MessageText.vue"
 
 const props = defineProps({
 	/** the area's name, shown in the header and the mail subject */
