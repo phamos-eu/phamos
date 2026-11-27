@@ -79,7 +79,7 @@ def save_idea(text, client_id=None):
 		frappe.throw(_("Write or dictate your idea first."))
 	client_id = cstr(client_id).strip()[:64]
 	if client_id:
-		known = frappe.cache().get_value(_client_key(client_id))
+		known = frappe.cache().get_value(_client_key(client_id), expires=True)
 		if known and frappe.db.exists(DOCTYPE, {"name": known, "user": frappe.session.user}):
 			return {**_short(known), "duplicate": True}
 	idea = personal_ideas.create_idea(
@@ -127,7 +127,7 @@ def _embeddings(rows):
 	"""Vectors of the ideas, cached per idea and modified time so each text is sent only once."""
 	cache = frappe.cache()
 	keys = [f"phamos:idea_embedding:{row.name}:{row.modified}" for row in rows]
-	vectors = [cache.get_value(key) for key in keys]
+	vectors = [cache.get_value(key, expires=True) for key in keys]
 	missing = [i for i, vector in enumerate(vectors) if not vector]
 	if missing:
 		fresh = llm.embed([_embed_text(rows[i]) for i in missing])
