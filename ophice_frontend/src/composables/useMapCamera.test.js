@@ -79,3 +79,53 @@ describe("Ophice map pinch zoom (#2213)", () => {
 		expect(cam.dragging.value).toBe(false)
 	})
 })
+
+describe("Ophice map pinch with more fingers and chips (#2213 review)", () => {
+	it("ignores a third finger, and lifting it changes nothing", () => {
+		const cam = camera()
+		cam.setZoom(1.5)
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true })
+		cam.onPointerDown(touch(2, 250, 200))
+		cam.onPointerDown(touch(3, 50, 50))
+		cam.onPointerMove(touch(3, 10, 10))
+		expect(cam.zoom.value).toBe(1.5)
+		cam.onPointerUp(touch(3, 10, 10))
+		cam.onPointerMove(touch(2, 350, 200))
+		expect(cam.zoom.value).toBe(3)
+	})
+
+	it("ends the drag when the last pinch finger lifts, even with a third finger still down", () => {
+		const cam = camera()
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true })
+		cam.onPointerDown(touch(2, 250, 200))
+		cam.onPointerDown(touch(3, 50, 50))
+		cam.onPointerUp(touch(2, 250, 200))
+		cam.onPointerUp(touch(1, 150, 200))
+		expect(cam.dragging.value).toBe(false)
+	})
+
+	it("pinches with a first finger noted on a chip; that finger alone does not pan", () => {
+		const cam = camera()
+		cam.setZoom(1.5)
+		const pan = { ...cam.pan }
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true }, { pan: false })
+		cam.onPointerMove(touch(1, 120, 200))
+		expect(cam.pan).toEqual(pan)
+		cam.onPointerUp(touch(1, 120, 200))
+		expect(cam.dragging.value).toBe(false)
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true }, { pan: false })
+		cam.onPointerDown(touch(2, 250, 200))
+		cam.onPointerMove(touch(2, 300, 200))
+		expect(cam.zoom.value).toBe(2.25)
+	})
+
+	it("drops a touch that never ended when a new gesture starts", () => {
+		const cam = camera()
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true })
+		// no pointerup or pointercancel for finger 1
+		cam.onPointerDown({ ...touch(5, 100, 100), isPrimary: true })
+		expect(cam.isPressed()).toBe(true)
+		cam.onPointerUp(touch(5, 100, 100))
+		expect(cam.isPressed()).toBe(false)
+	})
+})
