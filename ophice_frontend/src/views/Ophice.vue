@@ -417,6 +417,7 @@
 						:video="bubble.user === videoUser ? bubble.video : null"
 						:display-name="me.full_name"
 						:in-window="!!bubble.inWindow"
+						:approached="!!bubble.approached"
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
@@ -668,7 +669,6 @@
 			:status-open="statusOpen"
 			:bell="bell"
 			:bell-title="bellTitle"
-			:call-start="callStart"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -680,7 +680,6 @@
 			@open="openCockpit"
 			@status="toggleStatus()"
 			@bell="clickBell"
-			@call-start="stepCallStart"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -760,11 +759,7 @@ import {
 	callBox,
 	encounterCallWindowName,
 	jitsiCallUrl,
-	nextCallStart,
-	pageStorage,
-	readCallStart,
 	resizeCall,
-	saveCallStart,
 	splitCall,
 } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
@@ -1602,6 +1597,9 @@ const bubbleRefs = {}
 const dismissed = new Set()
 // The open encounter with each chip, also while its bubble is closed (Esc): parting needs it.
 const encounterByUser = new Map()
+// Who walked up to me (#2168): they started the chat, so I join their call with mic and camera
+// off and untouched. Kept while they stand by (a ping in a cockpit opens the chat later).
+const approachedBy = new Set()
 const bubbleList = computed(() => Object.values(bubbles))
 
 // Video (#2059): one call at a time, with the nearest person whose chat is open.
@@ -1624,7 +1622,7 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", callStart.value)
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { muted: bubble.approached })
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1782,6 +1780,7 @@ function checkEncounters() {
 		if (distance > PART_DISTANCE) {
 			delete bubbles[other.user]
 			dismissed.delete(other.user)
+			approachedBy.delete(other.user)
 			partFrom(other.user)
 		}
 	}
@@ -1789,6 +1788,7 @@ function checkEncounters() {
 	for (const user of new Set([...Object.keys(bubbles), ...encounterByUser.keys()])) {
 		if (!others.value.some((o) => o.user === user && !o.offline)) {
 			delete bubbles[user]
+			approachedBy.delete(user)
 			partFrom(user)
 		}
 	}
@@ -1799,6 +1799,8 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		pendingText: "",
 		focusOnOpen: focus,
 		user: other.user,
+		// Walked up to (#2168): their call joins with my mic and camera off; walking up: on.
+		approached: fromPeer || approachedBy.has(other.user),
 		peer: { user: other.user, full_name: other.full_name, user_image: other.user_image },
 		encounter: null,
 		messages: [],
@@ -1886,13 +1888,6 @@ function alertEncounter(other) {
 // first: some browsers (Safari) suspend the sound again while the tab is in the background.
 const unlockAudio = () => encounterAlert.unlock()
 
-// Mic and camera when a call starts (#2168): asked first, off or on; kept in this browser.
-const callStart = ref(readCallStart(pageStorage()))
-function stepCallStart() {
-	callStart.value = nextCallStart(callStart.value)
-	saveCallStart(pageStorage(), callStart.value)
-}
-
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
 	// Away or be right back (#2168): nothing opens, no call (the server refuses it too).
@@ -1901,6 +1896,7 @@ function onEncounterStarted(message) {
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
 		// Already chatting with them (the bubble stays open behind the cockpit), or Esc closed it: no alert.
+		if (!bubbles[other.user]) approachedBy.add(other.user)
 		if (!bubbles[other.user] && !dismissed.has(other.user)) alertEncounter(other)
 		pingWalkUp(other)
 		return
@@ -2144,7 +2140,7 @@ function popOut() {
 	const area = meetingArea.value
 	if (!area) return
 	// Straight in, mic and camera on, my name filled in (#2108).
-	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "", callStart.value)
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
 	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
