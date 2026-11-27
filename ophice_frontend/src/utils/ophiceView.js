@@ -22,15 +22,6 @@ export function fitTile(width, height, cols, rows, pad = 16, min = 4) {
 	return Math.max(min, Math.floor(Math.min((width - 2 * pad) / cols, (height - 2 * pad) / rows)))
 }
 
-/**
- * The tile that makes the whole map (canvas rows) exactly as tall as the view, rounded up to the
- * next 1/100 px so no dark line is left at the bottom: the map always fills top to bottom.
- */
-export function fillHeightTile(height, rows, min = 4) {
-	if (!height || !rows) return 0
-	return Math.max(min, Math.ceil((height / rows) * 100) / 100)
-}
-
 /** An image of this ratio covering the grid, centred: { left, top, width, height } in tiles. */
 export function coverPlacement(ratio, cols, rows) {
 	const r = ratio > 0 ? ratio : cols / rows

@@ -8,7 +8,6 @@ import {
 	canvasRect,
 	clamp,
 	clampZoom,
-	fillHeightTile,
 	fitTile,
 	follow,
 	panBounds,
@@ -35,10 +34,8 @@ function prefersReducedMotion() {
  * @param {number} [options.minTile]
  * @param {boolean} [options.overscroll]  the view may go past the map's edges, up to half its size,
  *   so any point (my chip) can sit in the middle (the mini map, #2155)
- * @param {boolean} [options.fillHeight]  the map is always as tall as the view, or taller when
- *   zoomed: no dark band above or below it, however the window is sized (the big map)
  */
-export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4, overscroll = false, fillHeight = false }) {
+export function useMapCamera({ view: viewSource, grid, image, storageKey, startZoom = () => 1, pad = 16, minTile = 4, overscroll = false }) {
 	// The view's size: a reactive object, or a function returning one (a derived size).
 	const view = {
 		get width() {
@@ -76,7 +73,6 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 	}
 
 	const baseTile = computed(() => {
-		if (fillHeight) return fillHeightTile(view.height, canvas.value.h, minTile)
 		const { cols, rows } = grid()
 		return fitTile(view.width, view.height, cols, rows, pad, minTile)
 	})
@@ -93,11 +89,7 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 					x: { min: view.width / 2 - size.value.width, max: view.width / 2 },
 					y: { min: view.height / 2 - size.value.height, max: view.height / 2 },
 				}
-			: {
-					x: panBounds(view.width, size.value.width, pad),
-					// Filling the height: no room above or below, the map's edge is the view's edge.
-					y: panBounds(view.height, size.value.height, fillHeight ? 0 : pad),
-				}
+			: { x: panBounds(view.width, size.value.width, pad), y: panBounds(view.height, size.value.height, pad) }
 	)
 	const transform = computed(() => `translate3d(${pan.x + over.x}px, ${pan.y + over.y}px, 0)`)
 
