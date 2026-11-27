@@ -241,14 +241,34 @@
 			>
 				{{ __("Click on the map where you want to meet · Esc to cancel") }}
 			</p>
-			<!-- Planting my flag (#2130): the next click on the map plants it. -->
-			<p
-				v-if="placingFlag"
-				class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
-				data-testid="flag-hint"
-			>
-				{{ __("Click on the map where your flag should stand · Esc to cancel") }}
-			</p>
+			<!--
+				Planting my flag (#2130): the next click on the map plants it. The hint is big in the
+				middle (PM, 2026-11-27); once the mouse reaches it, it fades and waits small at the
+				bottom left, out of the way.
+			-->
+			<Transition name="ophice-flag-hint">
+				<div
+					v-if="placingFlag && !flagHintDocked"
+					class="absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4 rounded-2xl bg-black/80 px-7 py-5 text-white shadow-2xl"
+					data-testid="flag-hint"
+					@pointerenter="flagHintDocked = true"
+				>
+					<span class="h-12 w-12 flex-shrink-0"><FlagIcon :color="flagLook.color" :pattern="flagLook.pattern" /></span>
+					<span class="flex flex-col gap-1">
+						<span class="text-lg font-semibold">{{ __("Click on the map where your flag should stand") }}</span>
+						<span class="text-sm text-white/70">{{ __("Esc to cancel") }}</span>
+					</span>
+				</div>
+			</Transition>
+			<Transition name="ophice-flag-hint">
+				<p
+					v-if="placingFlag && flagHintDocked"
+					class="pointer-events-none absolute bottom-14 left-4 z-40 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+					data-testid="flag-hint-docked"
+				>
+					{{ __("Click on the map where your flag should stand · Esc to cancel") }}
+				</p>
+			</Transition>
 			<!-- Selected people (PM, 2026-11-22): go to them, or set a meeting point for all. -->
 			<div
 				v-if="me && selectedUsers.length && !placingPin"
@@ -798,6 +818,7 @@ import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import FlagLayer from "../components/FlagLayer.vue"
+import FlagIcon from "../components/FlagIcon.vue"
 import { cellAt, flagBlocked } from "../utils/ophiceFlag.js"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
@@ -2841,6 +2862,8 @@ const placingFlag = ref(false)
 const draggingFlag = ref(false)
 const flagAim = ref(null)
 const flagMenuOpen = ref(false)
+// The placing hint moved to the bottom left (the mouse went over it).
+const flagHintDocked = ref(false)
 const myFlag = computed(() => flags.value.find((f) => f.user === me.value?.user) || null)
 const flagGhost = computed(() => {
 	if (!flagAim.value || !me.value) return null
@@ -2867,6 +2890,7 @@ function startFlagPlacing() {
 	placingPin.value = null
 	placingFlag.value = !placingFlag.value
 	flagAim.value = null
+	flagHintDocked.value = false
 }
 
 function onViewportMove(event) {
@@ -4038,5 +4062,14 @@ onBeforeUnmount(() => {
 	.ophice-pin__icon {
 		animation: none;
 	}
+}
+/* The flag's placing hint (#2130): fades in the middle, fades in again small at the bottom left. */
+.ophice-flag-hint-enter-active,
+.ophice-flag-hint-leave-active {
+	transition: opacity 250ms ease-out;
+}
+.ophice-flag-hint-enter-from,
+.ophice-flag-hint-leave-to {
+	opacity: 0;
 }
 </style>
