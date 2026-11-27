@@ -1,0 +1,567 @@
+/* Idea Catcher (#2200). One page, two skins (#2205): <html data-platform="ios|android">.
+   Shared layout first; each skin only sets tokens and a few shapes. */
+
+:root {
+	--bg: #f5f5f7;
+	--surface: #ffffff;
+	--text: #1d1d1f;
+	--muted: #6e6e73;
+	--accent: #0a84ff;
+	--on-accent: #ffffff;
+	--tonal: rgba(10, 132, 255, 0.12);
+	--on-tonal: #0a63c9;
+	--line: rgba(60, 60, 67, 0.14);
+	--selected: rgba(10, 132, 255, 0.1);
+	--very-close: #1f8a3b;
+	--related: #b26b00;
+	--font: system-ui, sans-serif;
+	--radius: 16px;
+	--btn-radius: 999px;
+	--btn-height: 52px;
+	--sheet-radius: 28px;
+	--glass: var(--surface);
+	--glass-blur: none;
+	--glass-edge: transparent;
+	--shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+	color-scheme: light dark;
+}
+
+* {
+	box-sizing: border-box;
+	-webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font);
+	-webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.app {
+	display: flex;
+	flex-direction: column;
+	height: 100dvh;
+	padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+}
+
+.bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 56px;
+}
+
+.bar-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.bulb {
+	width: 28px;
+	height: 28px;
+	fill: #ffd60a;
+	stroke: var(--text);
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.queue-badge {
+	border: 0;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: var(--tonal);
+	color: var(--on-tonal);
+	font: 600 13px var(--font);
+}
+
+.capture {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 8px 0;
+}
+
+#text {
+	flex: 1;
+	width: 100%;
+	resize: none;
+	border: 0;
+	outline: none;
+	padding: 18px;
+	border-radius: var(--radius);
+	background: var(--glass);
+	-webkit-backdrop-filter: var(--glass-blur);
+	backdrop-filter: var(--glass-blur);
+	box-shadow: inset 0 0 0 1px var(--glass-edge);
+	color: var(--text);
+	font: 400 19px/1.45 var(--font);
+}
+
+#text::placeholder {
+	color: var(--muted);
+}
+
+.hint {
+	margin: 8px 4px 0;
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.actions {
+	padding: 8px 0 12px;
+}
+
+.btn {
+	border: 0;
+	cursor: pointer;
+	font: 600 17px var(--font);
+	border-radius: var(--btn-radius);
+	min-height: 44px;
+	padding: 0 20px;
+	position: relative;
+	overflow: hidden;
+	transition: transform 0.12s ease, opacity 0.2s ease, background 0.2s ease;
+}
+
+.btn:active {
+	transform: scale(0.97);
+}
+
+.btn:disabled {
+	opacity: 0.4;
+}
+
+.btn-primary {
+	width: 100%;
+	height: var(--btn-height);
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.btn-tonal {
+	flex: 1;
+	background: var(--tonal);
+	color: var(--on-tonal);
+}
+
+.btn-text {
+	background: transparent;
+	color: var(--accent);
+	padding: 0 8px;
+}
+
+/* --- sheet ------------------------------------------------------------------------------- */
+
+.scrim {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.32);
+	opacity: 0;
+	transition: opacity 0.25s ease;
+}
+
+.scrim.open {
+	opacity: 1;
+}
+
+.sheet {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	max-height: 85dvh;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+	border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+	background: var(--glass);
+	-webkit-backdrop-filter: var(--glass-blur);
+	backdrop-filter: var(--glass-blur);
+	box-shadow: var(--shadow), inset 0 1px 0 var(--glass-edge);
+	transform: translateY(100%);
+	transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet.open {
+	transform: translateY(0);
+}
+
+.grabber {
+	align-self: center;
+	width: 36px;
+	height: 5px;
+	border-radius: 3px;
+	background: var(--line);
+	margin-bottom: 4px;
+}
+
+.sheet-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.sheet-title {
+	font-size: 20px;
+	font-weight: 700;
+}
+
+.sheet-sub {
+	color: var(--muted);
+	font-size: 15px;
+	margin-top: 2px;
+}
+
+.section-label {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin: 4px 4px 6px;
+}
+
+.search {
+	width: 100%;
+	height: 40px;
+	border: 0;
+	outline: none;
+	padding: 0 14px;
+	border-radius: 12px;
+	background: var(--line);
+	color: var(--text);
+	font: 400 16px var(--font);
+}
+
+.list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	min-height: 0;
+	flex: 1;
+}
+
+.suggest .list {
+	flex: none;
+}
+
+.item {
+	position: relative;
+	padding: 12px 14px;
+	border-radius: 12px;
+	cursor: pointer;
+}
+
+.item + .item {
+	margin-top: 2px;
+}
+
+.item:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.item.selected {
+	background: var(--selected);
+}
+
+.item-title {
+	font-size: 16px;
+	font-weight: 600;
+	padding-right: 84px;
+}
+
+.item-sub {
+	color: var(--muted);
+	font-size: 14px;
+	margin-top: 2px;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.chip {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--line);
+	color: var(--muted);
+}
+
+.chip-very-close {
+	color: var(--very-close);
+	background: color-mix(in srgb, var(--very-close) 14%, transparent);
+}
+
+.chip-related {
+	color: var(--related);
+	background: color-mix(in srgb, var(--related) 14%, transparent);
+}
+
+.empty {
+	color: var(--muted);
+	padding: 12px 14px;
+	font-size: 15px;
+}
+
+.choose {
+	border-top: 1px solid var(--line);
+	padding-top: 10px;
+}
+
+.choose-title {
+	font-size: 14px;
+	color: var(--muted);
+	margin-bottom: 8px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.choose-buttons {
+	display: flex;
+	gap: 10px;
+}
+
+.choose-option {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.choose-buttons .btn {
+	height: 48px;
+	width: 100%;
+}
+
+.choose-help {
+	margin: 0 4px;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.35;
+	text-align: center;
+}
+
+/* --- toast ------------------------------------------------------------------------------- */
+
+.toast {
+	position: fixed;
+	left: 16px;
+	right: 16px;
+	bottom: calc(84px + env(safe-area-inset-bottom));
+	padding: 12px 16px;
+	border-radius: 14px;
+	background: rgba(30, 30, 32, 0.92);
+	color: #fff;
+	font-size: 15px;
+	text-align: center;
+	opacity: 0;
+	transform: translateY(8px);
+	transition: opacity 0.25s ease, transform 0.25s ease;
+	z-index: 10;
+}
+
+.toast.open {
+	opacity: 1;
+	transform: none;
+}
+
+/* --- iOS: Liquid-Glass-style ---------------------------------------------------------------- */
+/* Translucent surfaces over a soft colour wash, blur + saturation, a light inner edge. The real
+   lensing of Liquid Glass is native-only; this is the web approximation. */
+
+[data-platform="ios"] {
+	--font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+	--glass: rgba(255, 255, 255, 0.55);
+	--glass-blur: blur(24px) saturate(180%);
+	--glass-edge: rgba(255, 255, 255, 0.7);
+	--radius: 22px;
+	--sheet-radius: 34px;
+}
+
+[data-platform="ios"] body {
+	background:
+		radial-gradient(120% 60% at 0% 0%, rgba(255, 214, 10, 0.22), transparent 60%),
+		radial-gradient(100% 60% at 100% 100%, rgba(10, 132, 255, 0.18), transparent 60%),
+		var(--bg);
+	background-attachment: fixed;
+}
+
+[data-platform="ios"] .btn-primary {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%), var(--accent);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.45),
+		0 6px 18px rgba(10, 132, 255, 0.35);
+}
+
+[data-platform="ios"] .btn-tonal {
+	background: rgba(255, 255, 255, 0.5);
+	-webkit-backdrop-filter: blur(12px) saturate(180%);
+	backdrop-filter: blur(12px) saturate(180%);
+	box-shadow: inset 0 0 0 1px var(--glass-edge), 0 2px 8px rgba(0, 0, 0, 0.06);
+	color: var(--accent);
+}
+
+[data-platform="ios"] .scrim {
+	background: rgba(0, 0, 0, 0.18);
+}
+
+[data-platform="ios"] .toast {
+	background: rgba(255, 255, 255, 0.6);
+	-webkit-backdrop-filter: blur(24px) saturate(180%);
+	backdrop-filter: blur(24px) saturate(180%);
+	box-shadow: inset 0 0 0 1px var(--glass-edge), var(--shadow);
+	color: var(--text);
+	border-radius: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+	[data-platform="ios"] {
+		--bg: #000000;
+		--text: #f5f5f7;
+		--muted: #98989d;
+		--glass: rgba(44, 44, 46, 0.55);
+		--glass-edge: rgba(255, 255, 255, 0.14);
+		--line: rgba(235, 235, 245, 0.16);
+		--tonal: rgba(10, 132, 255, 0.22);
+		--on-tonal: #64b5ff;
+		--selected: rgba(10, 132, 255, 0.22);
+		--very-close: #32d74b;
+		--related: #ffb340;
+	}
+	[data-platform="ios"] .btn-tonal {
+		background: rgba(58, 58, 60, 0.55);
+		color: #64b5ff;
+	}
+	[data-platform="ios"] .toast {
+		background: rgba(44, 44, 46, 0.7);
+	}
+}
+
+/* --- Android: Material 3 ------------------------------------------------------------------ */
+
+[data-platform="android"] {
+	--font: Roboto, "Google Sans", system-ui, sans-serif;
+	--bg: #fef7ff;
+	--surface: #f3edf7;
+	--text: #1d1b20;
+	--muted: #49454f;
+	--accent: #6750a4;
+	--on-accent: #ffffff;
+	--tonal: #e8def8;
+	--on-tonal: #1d192b;
+	--line: #cac4d0;
+	--selected: #e8def8;
+	--glass: var(--surface);
+	--radius: 16px;
+	--btn-radius: 20px;
+	--btn-height: 56px;
+	--sheet-radius: 28px;
+	--shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+}
+
+[data-platform="android"] .bulb {
+	fill: #ffd8e4;
+}
+
+[data-platform="android"] .btn-primary {
+	border-radius: 16px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+	font-weight: 500;
+	letter-spacing: 0.01em;
+}
+
+[data-platform="android"] .btn:active {
+	transform: none;
+}
+
+/* Ripple-like state layer */
+[data-platform="android"] .btn::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: currentColor;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+[data-platform="android"] .btn:active::after {
+	opacity: 0.12;
+}
+
+[data-platform="android"] .search {
+	height: 56px;
+	border-radius: 28px;
+	background: #ece6f0;
+	padding: 0 20px;
+}
+
+[data-platform="android"] .grabber {
+	width: 32px;
+	height: 4px;
+	background: #79747e;
+	opacity: 0.4;
+}
+
+[data-platform="android"] .section-label {
+	text-transform: none;
+	letter-spacing: 0.01em;
+	color: var(--accent);
+	font-size: 14px;
+	font-weight: 500;
+}
+
+[data-platform="android"] .toast {
+	background: #322f35;
+	color: #f5eff7;
+	border-radius: 4px;
+	text-align: left;
+}
+
+@media (prefers-color-scheme: dark) {
+	[data-platform="android"] {
+		--bg: #141218;
+		--surface: #211f26;
+		--text: #e6e0e9;
+		--muted: #cac4d0;
+		--accent: #d0bcff;
+		--on-accent: #381e72;
+		--tonal: #4a4458;
+		--on-tonal: #e8def8;
+		--line: #49454f;
+		--selected: #4a4458;
+		--very-close: #7ddc8f;
+		--related: #ffb95c;
+	}
+	[data-platform="android"] .search {
+		background: #2b2930;
+	}
+	[data-platform="android"] .toast {
+		background: #e6e0e9;
+		color: #322f35;
+	}
+}

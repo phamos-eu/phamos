@@ -420,6 +420,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:call-starts-off="bubble.fromPeer"
 						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
@@ -761,6 +762,7 @@ import {
 	resizeCall,
 	splitCall,
 } from "../utils/ophiceCall.js"
+import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -993,7 +995,11 @@ const imageBox = computed(() =>
 /** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
 function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
-	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) {
+		// A finger on a chip does not pan, but it can pinch with a second finger (#2213).
+		if (event.pointerType === "touch") camera().onPointerDown(event, { pan: camera().isPressed() })
+		return
+	}
 	camera().onPointerDown(event)
 }
 
@@ -1318,6 +1324,8 @@ function onKeydown(event) {
 		return
 	}
 	if (!held.size && !event.repeat) {
+		// Started typing in the pause after a stop (#2171): that is a stop, open now.
+		if (event.key.length === 1 && event.code !== "Space" && !DIRECTIONS[event.key.toLowerCase()]) pendingStop.flush()
 		// Typed while the chat that just opened is still loading: keep it for the chat.
 		if (bufferWhileOpening(event)) return
 		// Esc said "walk on"; Enter brings the chat back while still next to the person.
@@ -1348,6 +1356,8 @@ function onKeydown(event) {
 	backFromStatus()
 	peopleSidebar.value?.fold()
 	held.add(key)
+	// Walking on: the stop before opens nothing (#2171).
+	pendingStop.cancel()
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
 	if (!frame) {
@@ -1392,8 +1402,15 @@ function liveBubble(user) {
 	return bubble && (bubble.loading || bubble.encounter) ? bubble : null
 }
 
-/** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
+// Passing by (#2171): a stop opens the chat, call or meeting only after a short pause (STOP_DELAY);
+// walking on, jumping or Go to within it opens nothing.
+const pendingStop = stopTimer(openOnStop, () => !held.size && !flying.value && !jump && !travel)
 function chatOnStop() {
+	pendingStop.stopped()
+}
+
+/** Stood still after a stop: next to someone, the chat opens (or gets the keyboard if already open). */
+function openOnStop() {
 	joinAreaIfInside()
 	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
 	// other person can still start one, which the mini map pings.
@@ -1618,7 +1635,8 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
+	// Approached (#2165): in its own window, too, mic and camera off until I turn them on.
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.fromPeer })
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1799,9 +1817,13 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		loading: true,
 		error: "",
 		sending: false,
+		// The other person walked up (#2165): my call joins at once, with mic and camera off.
+		fromPeer,
 	})
 	bubbles[other.user] = bubble
 	try {
+		// Starting a chat myself means I'm back (#2168): only Available people meet.
+		if (!fromPeer) await backFromStatus()
 		// The server checks that we really stand together: my latest spot goes first.
 		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
@@ -1880,6 +1902,8 @@ const unlockAudio = () => encounterAlert.unlock()
 
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
+	// Away or be right back (#2168): nothing opens, no call (the server refuses it too).
+	if (me.value?.status) return
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
@@ -2839,7 +2863,7 @@ function toggleStatus(event) {
 // For "back in 20 minutes": a slow clock is enough.
 const clock = ref(Date.now())
 const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
-let statusClearing = false
+let statusClearing = null
 
 const statusChips = computed(() => {
 	if (!me.value) return []
@@ -2866,14 +2890,15 @@ async function saveStatus(values) {
 	}
 }
 
-/** Moving means I'm back: the status goes. */
+/** Moving means I'm back: the status goes. Resolves once the server knows. */
 function backFromStatus() {
-	if (!me.value?.status || statusClearing) return
-	statusClearing = true
+	if (statusClearing) return statusClearing
+	if (!me.value?.status) return Promise.resolve()
 	me.value.status = null
-	call(`${API}.set_status`, { kind: "" })
+	statusClearing = call(`${API}.set_status`, { kind: "" })
 		.catch(() => {})
-		.finally(() => (statusClearing = false))
+		.finally(() => (statusClearing = null))
+	return statusClearing
 }
 
 function onRemoteStatus(message) {
@@ -3151,7 +3176,8 @@ async function sendFromPing(ping, text, done) {
 		} else {
 			const other = others.value.find((o) => o.user === ping.user)
 			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
-			if (!bubbles[other.user]?.encounter) await openBubble(other)
+			// Answering someone who came over (#2165): my call starts with mic and camera off.
+			if (!bubbles[other.user]?.encounter) await openBubble(other, { fromPeer: ping.kind === "walkup" })
 			const bubble = bubbles[other.user]
 			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
 			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
@@ -3172,7 +3198,7 @@ function openFromPing(ping) {
 	if (!other) return
 	nextTick(() => {
 		if (bubbles[other.user]) focusBubble(other.user)
-		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true })
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, fromPeer: ping.kind === "walkup" })
 	})
 }
 
@@ -3468,6 +3494,7 @@ function pinPhriend() {
 }
 
 onBeforeUnmount(() => {
+	pendingStop.cancel()
 	clearInterval(phriendTimer)
 	phriend?.ball?.pin(null)
 	clearInterval(clockTimer)

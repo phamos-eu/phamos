@@ -436,3 +436,12 @@ class TestIssuePlan(FrappeTestCase):
         self.assertFalse(script.accepts_summary("approved, but change the permission"))
         self.assertEqual(script.gate_kind("plan", None, 0), "question")
         self.assertEqual(script.gate_kind("question", "question", script.QUESTION_CAP), "summary")
+
+    def test_the_plan_prompt_uses_the_consultant_manager_and_developer(self):
+        script = _ci_script()
+        text = script.system_prompt()
+        self.assertIn("# Senior Functional Consultant", text)
+        self.assertIn("# Functional Manager", text)
+        self.assertIn("# Senior Developer", text)
+        self.assertIn("kind: question", text)
+        self.assertNotIn("disable-model-invocation", text)
