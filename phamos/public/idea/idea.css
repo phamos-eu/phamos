@@ -229,6 +229,325 @@ body {
 	padding: 0 8px;
 }
 
+/* --- views and tab bar (#2210) ------------------------------------------------------------ */
+
+.view {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.view.scroll {
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	gap: 12px;
+	padding: 4px 0 16px;
+}
+
+/* In a scrolling column the parts keep their full height; the view scrolls instead. */
+.view.scroll > * {
+	flex-shrink: 0;
+}
+
+.view.scroll > .list {
+	flex: none;
+	overflow: visible;
+}
+
+.back-btn {
+	border: 0;
+	background: transparent;
+	color: var(--accent);
+	padding: 4px 6px 4px 0;
+	margin-right: -6px;
+	cursor: pointer;
+	display: inline-flex;
+}
+
+.back-btn svg,
+.tab svg {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.back-btn svg {
+	width: 26px;
+	height: 26px;
+}
+
+.bar {
+	justify-content: flex-start;
+}
+
+.bar-actions {
+	margin-left: auto;
+}
+
+.tabbar {
+	display: flex;
+	justify-content: space-around;
+	gap: 4px;
+	padding: 6px 0 4px;
+	border-top: 1px solid var(--line);
+}
+
+.kb-open .tabbar {
+	display: none; /* the keyboard needs the room; the tabs come back when it closes */
+}
+
+.tab {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 0;
+	color: var(--muted);
+	text-decoration: none;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.tab svg {
+	width: 24px;
+	height: 24px;
+}
+
+.tab.active {
+	color: var(--accent);
+}
+
+.toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--muted);
+	font-size: 14px;
+	padding: 0 4px;
+}
+
+.item-link {
+	display: block;
+	color: inherit;
+	text-decoration: none;
+}
+
+.item-summary {
+	margin-top: 4px;
+}
+
+.chip-on {
+	color: var(--very-close);
+	background: color-mix(in srgb, var(--very-close) 14%, transparent);
+}
+
+/* -- one idea -- */
+
+.view[aria-busy="true"] > * {
+	visibility: hidden;
+}
+
+.title-input {
+	resize: none;
+	overflow: hidden;
+	width: 100%;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--text);
+	font: 700 22px/1.25 var(--font);
+	padding: 4px 2px;
+}
+
+.grow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.grow-stage {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.grow-stage .chip {
+	position: static;
+	align-self: flex-start;
+}
+
+.grow-job {
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.grow-buttons {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.stage-select {
+	height: 36px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--glass);
+	color: var(--text);
+	font: 500 14px var(--font);
+	padding: 0 8px;
+}
+
+.btn-small {
+	min-height: 36px;
+	font-size: 15px;
+	padding: 0 14px;
+}
+
+.editor-tools {
+	display: flex;
+	gap: 6px;
+}
+
+.editor-tools button {
+	min-width: 40px;
+	height: 36px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--glass);
+	color: var(--text);
+	font: 600 15px var(--font);
+	cursor: pointer;
+}
+
+.editor,
+.read-content {
+	min-height: 160px;
+	padding: 14px 16px;
+	border-radius: var(--radius);
+	background: var(--glass);
+	-webkit-backdrop-filter: var(--glass-blur);
+	backdrop-filter: var(--glass-blur);
+	box-shadow: inset 0 0 0 1px var(--glass-edge);
+	font: 400 17px/1.5 var(--font);
+	outline: none;
+	overflow-wrap: anywhere;
+}
+
+.editor h1,
+.editor h2,
+.editor h3,
+.read-content h1,
+.read-content h2,
+.read-content h3 {
+	font-size: 18px;
+	margin: 12px 0 4px;
+}
+
+.editor p,
+.read-content p {
+	margin: 0 0 8px;
+}
+
+.detail-actions .btn {
+	width: 100%;
+}
+
+.add-box,
+.vote-box {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--line);
+}
+
+.add-box textarea {
+	width: 100%;
+	resize: vertical;
+	border: 0;
+	outline: none;
+	padding: 12px 14px;
+	border-radius: 12px;
+	background: var(--line);
+	color: var(--text);
+	font: 400 16px/1.4 var(--font);
+}
+
+.add-box .choose-help {
+	text-align: left;
+}
+
+.vote-state {
+	margin: 0 4px;
+	color: var(--muted);
+	font-size: 14px;
+}
+
+/* -- up for vote -- */
+
+.read-title {
+	margin: 4px 2px 0;
+	font-size: 22px;
+	line-height: 1.25;
+}
+
+.read-meta {
+	margin: 0 2px;
+	color: var(--muted);
+	font-size: 14px;
+}
+
+.btn-voted {
+	background: var(--tonal);
+	color: var(--on-tonal);
+}
+
+[data-platform="ios"] .tabbar {
+	border-top: 0;
+	margin: 0 -4px 4px;
+	padding: 6px 4px;
+	border-radius: 999px;
+	background: var(--glass);
+	-webkit-backdrop-filter: var(--glass-blur);
+	backdrop-filter: var(--glass-blur);
+	box-shadow: inset 0 0 0 1px var(--glass-edge), 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-platform="android"] .tabbar {
+	margin: 0 -16px;
+	padding: 12px 0 8px;
+	border-top: 0;
+	background: var(--surface);
+}
+
+[data-platform="android"] .tab {
+	font-size: 12px;
+	font-weight: 500;
+}
+
+[data-platform="android"] .tab svg {
+	width: 56px;
+	height: 28px;
+	padding: 2px 16px;
+	border-radius: 16px;
+}
+
+[data-platform="android"] .tab.active {
+	color: var(--text);
+}
+
+[data-platform="android"] .tab.active svg {
+	background: var(--tonal);
+	color: var(--on-tonal);
+}
+
 /* --- sheet ------------------------------------------------------------------------------- */
 
 .scrim {
@@ -448,7 +767,7 @@ body {
 	position: fixed;
 	left: 16px;
 	right: 16px;
-	bottom: calc(84px + var(--kb, 0px) + env(safe-area-inset-bottom));
+	bottom: calc(140px + var(--kb, 0px) + env(safe-area-inset-bottom));
 	padding: 12px 16px;
 	border-radius: 14px;
 	background: rgba(30, 30, 32, 0.92);
