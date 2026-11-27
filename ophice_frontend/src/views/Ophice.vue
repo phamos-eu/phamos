@@ -420,6 +420,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:call-starts-off="bubble.fromPeer"
 						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
@@ -668,7 +669,6 @@
 			:status-open="statusOpen"
 			:bell="bell"
 			:bell-title="bellTitle"
-			:call-start="callStart"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -680,7 +680,6 @@
 			@open="openCockpit"
 			@status="toggleStatus()"
 			@bell="clickBell"
-			@call-start="stepCallStart"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -760,11 +759,7 @@ import {
 	callBox,
 	encounterCallWindowName,
 	jitsiCallUrl,
-	nextCallStart,
-	pageStorage,
-	readCallStart,
 	resizeCall,
-	saveCallStart,
 	splitCall,
 } from "../utils/ophiceCall.js"
 import { stopTimer } from "../utils/ophiceStop.js"
@@ -1636,7 +1631,8 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", callStart.value)
+	// Approached (#2165): in its own window, too, mic and camera off until I turn them on.
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.fromPeer })
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1817,6 +1813,8 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		loading: true,
 		error: "",
 		sending: false,
+		// The other person walked up (#2165): my call joins at once, with mic and camera off.
+		fromPeer,
 	})
 	bubbles[other.user] = bubble
 	try {
@@ -1897,13 +1895,6 @@ function alertEncounter(other) {
 // Browsers play sound only after a key press or click on the page. On every one, not just the
 // first: some browsers (Safari) suspend the sound again while the tab is in the background.
 const unlockAudio = () => encounterAlert.unlock()
-
-// Mic and camera when a call starts (#2168): asked first, off or on; kept in this browser.
-const callStart = ref(readCallStart(pageStorage()))
-function stepCallStart() {
-	callStart.value = nextCallStart(callStart.value)
-	saveCallStart(pageStorage(), callStart.value)
-}
 
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
@@ -2156,7 +2147,7 @@ function popOut() {
 	const area = meetingArea.value
 	if (!area) return
 	// Straight in, mic and camera on, my name filled in (#2108).
-	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "", callStart.value)
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
 	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
@@ -3181,7 +3172,8 @@ async function sendFromPing(ping, text, done) {
 		} else {
 			const other = others.value.find((o) => o.user === ping.user)
 			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
-			if (!bubbles[other.user]?.encounter) await openBubble(other)
+			// Answering someone who came over (#2165): my call starts with mic and camera off.
+			if (!bubbles[other.user]?.encounter) await openBubble(other, { fromPeer: ping.kind === "walkup" })
 			const bubble = bubbles[other.user]
 			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
 			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
@@ -3202,7 +3194,7 @@ function openFromPing(ping) {
 	if (!other) return
 	nextTick(() => {
 		if (bubbles[other.user]) focusBubble(other.user)
-		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true })
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, fromPeer: ping.kind === "walkup" })
 	})
 }
 
