@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
+	CALL_START_KEY,
+	CALL_START_MODES,
+	DEFAULT_CALL_START,
+	nextCallStart,
+	readCallStart,
+	saveCallStart,
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
 	CALL_HEADER,
@@ -42,6 +48,17 @@ describe("jitsiCallUrl", () => {
 		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
+	it("starts with both off, on Jitsi's pre-join screen only when asking (#2168)", () => {
+		const get = (start) => new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", start).split("#")[1])
+		for (const [start, prejoin] of [["off", "false"], ["ask", "true"]]) {
+			const settings = get(start)
+			expect(settings.get("config.startWithAudioMuted")).toBe("true")
+			expect(settings.get("config.startWithVideoMuted")).toBe("true")
+			expect(settings.get("config.prejoinConfig.enabled")).toBe(prejoin)
+			expect(settings.get("config.prejoinPageEnabled")).toBe(prejoin)
+		}
+	})
+
 	it("works without a name and tidies the host", () => {
 		expect(jitsiCallUrl({ domain: "https://jitsi.example.com/", room: "r1" })).toBe(`https://jitsi.example.com/r1#${ON}`)
 	})
@@ -56,6 +73,29 @@ describe("jitsiCallUrl", () => {
 		for (const domain of ["evil.com/x", "a@evil.com", "evil.com?x", ""]) {
 			expect(jitsiCallUrl({ domain, room: "r" })).toBe("")
 		}
+	})
+})
+
+describe("call start choice (#2168)", () => {
+	const store = (initial = {}) => {
+		const data = { ...initial }
+		return { getItem: (k) => data[k] ?? null, setItem: (k, v) => (data[k] = v), data }
+	}
+
+	it("asks by default, and when the stored value is unknown or the storage throws", () => {
+		expect(DEFAULT_CALL_START).toBe("ask")
+		expect(readCallStart(store())).toBe("ask")
+		expect(readCallStart(store({ [CALL_START_KEY]: "loud" }))).toBe("ask")
+		expect(readCallStart(null)).toBe("ask")
+		expect(readCallStart({ getItem: () => { throw new Error("blocked") } })).toBe("ask")
+	})
+
+	it("keeps the choice and steps ask → off → on → ask", () => {
+		const s = store()
+		saveCallStart(s, "off")
+		expect(readCallStart(s)).toBe("off")
+		expect(() => saveCallStart({ setItem: () => { throw new Error("full") } }, "on")).not.toThrow()
+		expect(CALL_START_MODES.map(nextCallStart)).toEqual(["off", "on", "ask"])
 	})
 })
 
