@@ -37,17 +37,30 @@
 	function fitToKeyboard() {
 		var vv = window.visualViewport
 		if (!vv) return
-		var kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+		// Pinch-zoom shrinks the visual viewport too; that is no keyboard.
+		var zoomed = vv.scale > 1.01
+		var kb = zoomed ? 0 : Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
 		root.style.setProperty("--vvh", vv.height + "px")
 		root.style.setProperty("--vv-top", vv.offsetTop + "px")
 		root.style.setProperty("--kb", kb + "px")
-		// Keyboard up: iOS reports it as --kb, Android as a much shorter visible area.
-		root.classList.toggle("kb-open", kb > 80 || vv.height < window.screen.height * 0.6)
+		// Keyboard up: a text field has the cursor, and iOS reports the keyboard as --kb while
+		// Android shows a much shorter visible area. A short desktop window alone is not enough.
+		var active = document.activeElement
+		var typing = !!active && (/^(INPUT|TEXTAREA)$/.test(active.tagName) || active.isContentEditable)
+		root.classList.toggle(
+			"kb-open",
+			!zoomed && typing && (kb > 80 || vv.height < window.screen.height * 0.6)
+		)
 	}
 	if (window.visualViewport) {
 		window.visualViewport.addEventListener("resize", fitToKeyboard)
 		window.visualViewport.addEventListener("scroll", fitToKeyboard)
 	}
+	// The class follows the cursor: in on focus, out when the field is left.
+	document.addEventListener("focusin", fitToKeyboard)
+	document.addEventListener("focusout", function () {
+		setTimeout(fitToKeyboard, 0)
+	})
 	fitToKeyboard()
 
 	document.querySelectorAll("[data-t]").forEach(function (el) {
@@ -446,16 +459,16 @@
 
 	installBtn.addEventListener("click", async function () {
 		if (!deferredInstall) return
+		// An install event can open its dialog only once. After "not now" Chrome fires a fresh
+		// beforeinstallprompt, and the listener above shows the button again.
 		var prompt = deferredInstall
 		deferredInstall = null
 		installBtn.hidden = true
-		prompt.prompt()
 		try {
-			var choice = await prompt.userChoice
-			if (choice && choice.outcome !== "accepted") installBtn.hidden = false
-			if (choice && choice.outcome !== "accepted") deferredInstall = prompt
+			prompt.prompt()
+			await prompt.userChoice
 		} catch (e) {
-			/* the browser closed the dialog */
+			/* the browser refused or closed the dialog */
 		}
 		focusText()
 	})
