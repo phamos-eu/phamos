@@ -85,6 +85,64 @@ body {
 	stroke-linejoin: round;
 }
 
+.bar-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.install-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font: 600 13px var(--font);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.install-btn svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.ios-hint {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 6px;
+	padding: 10px 12px;
+	border-radius: 14px;
+	background: var(--tonal);
+	color: var(--on-tonal);
+	font-size: 14px;
+	line-height: 1.35;
+}
+
+.ios-hint span {
+	flex: 1;
+}
+
+.ios-hint-close {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 22px;
+	line-height: 1;
+	padding: 0 4px;
+	cursor: pointer;
+}
+
 .queue-badge {
 	border: 0;
 	padding: 6px 12px;

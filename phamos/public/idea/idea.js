@@ -224,7 +224,14 @@
 
 	function focusText() {
 		setTimeout(function () {
-			text.focus()
+			// Not while the link sheet is open or another field (the search) has the cursor.
+			if (!sheet.hidden) return
+			var active = document.activeElement
+			if (active && active !== text && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return
+			text.focus({ preventScroll: true })
+			// Put the cursor after any text already there (e.g. text put back from the queue).
+			var end = text.value.length
+			text.setSelectionRange(end, end)
 		}, 50)
 	}
 
@@ -259,10 +266,10 @@
 		setTimeout(function () {
 			sheet.hidden = true
 			scrim.hidden = true
+			focusText()
 		}, 250)
 		current = null
 		if (message) toast(message)
-		focusText()
 	}
 
 	function row(idea, band) {
@@ -416,6 +423,77 @@
 			closeSheet()
 		}
 	})
+
+	// --- install as an app (#2217) -------------------------------------------------------------
+	// Chrome and Edge (desktop and Android) fire beforeinstallprompt when the page is installable
+	// (manifest with icons, start_url, standalone). Keep the event and offer it on our own button.
+	// iOS Safari has no such event, so it gets a one-time note about the share menu instead.
+
+	var installBtn = $("install")
+	var iosHint = $("ios-hint")
+	var deferredInstall = null
+	var IOS_HINT_KEY = "phamos_idea_ios_hint_dismissed"
+
+	function runningAsApp() {
+		return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
+	}
+
+	window.addEventListener("beforeinstallprompt", function (event) {
+		event.preventDefault()
+		deferredInstall = event
+		installBtn.hidden = runningAsApp()
+	})
+
+	installBtn.addEventListener("click", async function () {
+		if (!deferredInstall) return
+		var prompt = deferredInstall
+		deferredInstall = null
+		installBtn.hidden = true
+		prompt.prompt()
+		try {
+			var choice = await prompt.userChoice
+			if (choice && choice.outcome !== "accepted") installBtn.hidden = false
+			if (choice && choice.outcome !== "accepted") deferredInstall = prompt
+		} catch (e) {
+			/* the browser closed the dialog */
+		}
+		focusText()
+	})
+
+	window.addEventListener("appinstalled", function () {
+		deferredInstall = null
+		installBtn.hidden = true
+	})
+
+	function iosHintDismissed() {
+		try {
+			return localStorage.getItem(IOS_HINT_KEY) === "1"
+		} catch (e) {
+			return false
+		}
+	}
+
+	if (root.getAttribute("data-platform") === "ios" && !runningAsApp() && !iosHintDismissed()) {
+		iosHint.hidden = false
+	}
+	$("ios-hint-close").addEventListener("click", function () {
+		iosHint.hidden = true
+		try {
+			localStorage.setItem(IOS_HINT_KEY, "1")
+		} catch (e) {
+			/* private mode: it shows again next time */
+		}
+		focusText()
+	})
+
+	// --- focus (#2217) --------------------------------------------------------------------------
+	// The cursor waits in the box on open, on reload, and when the app comes back to the front.
+	// Phones raise the keyboard only on a tap; the cursor is placed either way.
+	window.addEventListener("pageshow", focusText)
+	document.addEventListener("visibilitychange", function () {
+		if (!document.hidden) focusText()
+	})
+	window.addEventListener("focus", focusText)
 
 	queueBadge.addEventListener("click", function () {
 		// The queue stays in localStorage, so leaving for the login page loses nothing.

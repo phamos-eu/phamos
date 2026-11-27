@@ -35,8 +35,20 @@
 					</svg>
 					<span data-t="Idea"></span>
 				</div>
-				<button class="queue-badge" id="queue" hidden></button>
+				<div class="bar-actions">
+					<button class="queue-badge" id="queue" hidden></button>
+					<!-- Shown when the browser offers to install the page as an app (#2217) -->
+					<button class="install-btn" id="install" hidden>
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+						<span data-t="Install app"></span>
+					</button>
+				</div>
 			</header>
+			<!-- iPhone/iPad Safari has no install event: explain the share menu once (#2217) -->
+			<div class="ios-hint" id="ios-hint" hidden>
+				<span data-t="Add to your Home Screen: tap Share, then 'Add to Home Screen'."></span>
+				<button class="ios-hint-close" id="ios-hint-close" aria-label="Close">&times;</button>
+			</div>
 
 			<main class="capture">
 				<textarea id="text" autofocus enterkeyhint="enter" autocapitalize="sentences" spellcheck="true"></textarea>
