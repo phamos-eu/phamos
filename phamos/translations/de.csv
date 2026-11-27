@@ -3193,6 +3193,14 @@ Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: 
 {0} set: {1},{0} gesetzt: {1}
 Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
 (ERPNext picked {0}),(ERPNext hat {0} gewählt)
+No Implementation,Keine Implementierung
+Set the Implementation on this Issue first. The GitLab project is taken from it.,Setzen Sie zuerst die Implementierung an dieser Anfrage. Das GitLab-Projekt wird daraus übernommen.
+No GitLab Project,Kein GitLab-Projekt
+GitLab Project,GitLab-Projekt
+No GitLab Project is linked to Implementation {0}. Link one in {1} first.,Mit der Implementierung {0} ist kein GitLab-Projekt verknüpft. Verknüpfen Sie zuerst eines unter {1}.
+GitLab Project {0} does not belong to Implementation {1},GitLab-Projekt {0} gehört nicht zur Implementierung {1}
+Implementation {0} has several GitLab Projects. Choose one.,Die Implementierung {0} hat mehrere GitLab-Projekte. Wählen Sie eines aus.
+Save the Issue first.,Speichern Sie zuerst die Anfrage.
 Not available right now.,Gerade nicht erreichbar.
 Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
 "Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
