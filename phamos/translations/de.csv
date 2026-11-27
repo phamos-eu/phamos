@@ -2720,7 +2720,7 @@ Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
-"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
+Whoever stops inside the area joins this meeting.,"Wer im Bereich stehen bleibt, tritt dieser Besprechung bei."
 The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
 The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
@@ -3081,3 +3081,15 @@ Answer,Antwort
 "Answer the question in the first sentence; details after it.","Beantworten Sie die Frage im ersten Satz; Einzelheiten danach."
 "Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.","Fragen und Antworten unten auf der Seite, zugeklappt. Eine Seite zeigt nur die Zeilen in ihrer eigenen Sprache; ohne Zeilen keine FAQ. Auch auf anonymen Seiten sichtbar: Nennen Sie niemanden, der nicht namentlich veröffentlicht ist."
 "One question and answer of a Web Profile page in one language (phamos/phamos#1823).","Eine Frage mit Antwort einer Web-Profil-Seite in einer Sprache (phamos/phamos#1823)."
+Join the call with:,Dem Anruf beitreten mit:
+Microphone on,Mikrofon an
+Microphone off,Mikrofon aus
+Camera on,Kamera an
+Camera off,Kamera aus
+Not available right now.,Gerade nicht erreichbar.
+Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
+Calls: ask for mic and camera,Anrufe: nach Mikrofon und Kamera fragen
+Calls: mic and camera off,Anrufe: Mikrofon und Kamera aus
+Calls: mic and camera on,Anrufe: Mikrofon und Kamera an
+Click to change.,Zum Ändern klicken.
+Join,Beitreten
