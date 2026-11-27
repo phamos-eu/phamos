@@ -1017,8 +1017,14 @@ ROADMAP_CHAPTER_FIELDS = (
 
 
 def _can_propose_dates():
-	"""Staff who may create an Implementation Change get "Propose a date change"; customers don't."""
-	return is_internal_user() and bool(frappe.has_permission("Implementation Change", "create"))
+	"""Whether the Roadmap shows "Propose a date change". Off for everyone for now (#2219).
+
+	The button opened the Implementation Change form in Desk, where the new dates can't be
+	entered: the values are read-only there, so a saved change had none. #2219 brings a way to
+	propose a chapter's dates; then staff who may create an Implementation Change get the button
+	again (is_internal_user() and create permission).
+	"""
+	return False
 
 
 def _baseline_rows(implementation):
