@@ -28,6 +28,7 @@ from phamos.cockpits.doctype.idea.idea import excerpt
 
 DOCTYPE = "Idea"
 TITLE_WORDS = 8
+MAX_TEXT = 20000  # characters; longer texts belong in the Personal Cockpit's editor
 CLIENT_ID_TTL = 7 * 24 * 3600  # an offline phone resends within a week at most
 LINK_MODES = ("spawned", "append")
 SEARCH_LIMIT = 20
@@ -77,6 +78,8 @@ def save_idea(text, client_id=None):
 	text = cstr(text).strip()
 	if not text:
 		frappe.throw(_("Write or dictate your idea first."))
+	if len(text) > MAX_TEXT:
+		frappe.throw(_("That is too long for a quick idea. Write it out in the Personal Cockpit."))
 	client_id = cstr(client_id).strip()[:64]
 	if client_id:
 		known = frappe.cache().get_value(_client_key(client_id), expires=True)
@@ -196,6 +199,16 @@ def suggest_ideas(name):
 	return {"enabled": True, "ideas": scored[:SUGGEST_LIMIT], "error": None}
 
 
+def _ancestors(name, limit=50):
+	"""Names of the ideas `name` grew out of, nearest first (bounded, in case of old loops)."""
+	seen = []
+	parent = frappe.db.get_value(DOCTYPE, name, "spawned_from")
+	while parent and parent not in seen and len(seen) < limit:
+		seen.append(parent)
+		parent = frappe.db.get_value(DOCTYPE, parent, "spawned_from")
+	return seen
+
+
 @frappe.whitelist(methods=["POST"])
 def link_idea(name, target, mode):
 	"""Tie the caught idea `name` to my idea `target`.
@@ -211,13 +224,19 @@ def link_idea(name, target, mode):
 	if doc.name == target_doc.name:
 		frappe.throw(_("An idea cannot come from itself."))
 	if mode == "spawned":
+		if doc.name in _ancestors(target_doc.name):
+			frappe.throw(_("{0} already grew out of this idea.").format(target_doc.title))
 		doc.spawned_from = target_doc.name
 		doc.flags.ignore_permissions = True
 		doc.save(ignore_version=True)
 		personal_ideas._publish(doc)
 		return {"name": doc.name, "target": _short(target_doc.name)}
 
-	stamp = format_datetime(now_datetime(), "dd.MM.yyyy HH:mm")
+	# Only a fresh catch is merged away: an idea someone wrote on or handed in for a vote keeps
+	# its history, sessions and votes, so it can only be linked.
+	if doc.vote_status or frappe.db.exists("Idea Writing Session", {"idea": doc.name}):
+		frappe.throw(_("This idea has its own history. Link it instead of adding it."))
+	stamp = format_datetime(now_datetime())  # the user's own date and time format
 	added = f"<p><em>{_('Added {0}').format(stamp)}</em></p>{doc.content or ''}"
 	target_doc.content = (target_doc.content or "") + added
 	target_doc.flags.ignore_permissions = True
@@ -225,5 +244,9 @@ def link_idea(name, target, mode):
 	personal_ideas._snapshot(target_doc, force=True)
 	personal_ideas._publish(target_doc)
 	# The caught idea lived only as long as it took to choose; its text now lives in the target.
+	# Ideas that grew out of it now grew out of the target (on_trash would otherwise unlink them).
+	frappe.db.set_value(
+		DOCTYPE, {"spawned_from": doc.name}, "spawned_from", target_doc.name, update_modified=False
+	)
 	frappe.delete_doc(DOCTYPE, doc.name, ignore_permissions=True, force=True)
 	return {"name": None, "target": _short(target_doc.name)}

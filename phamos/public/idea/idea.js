@@ -96,8 +96,14 @@
 		renderQueue(queue)
 	}
 
+	var needsLogin = false
+
 	function renderQueue(queue) {
 		queueBadge.hidden = !queue.length
+		if (needsLogin) {
+			queueBadge.textContent = __("Sign in to send {0}", [queue.length])
+			return
+		}
 		queueBadge.textContent =
 			queue.length === 1 ? __("1 idea waiting to send") : __("{0} ideas waiting to send", [queue.length])
 	}
@@ -119,10 +125,17 @@
 				var item = queue[0]
 				try {
 					made[item.client_id] = await call("save_idea", { text: item.text, client_id: item.client_id }, true)
+					needsLogin = false
 				} catch (error) {
 					// No connection or server down: keep it and try later. A refusal (4xx) will not get
 					// better by retrying, so the text goes back into the box instead of looping.
-					if (error.status && error.status >= 400 && error.status < 500 && error.status !== 403) {
+					// Signed out (session expired): keep everything and offer the login on the badge.
+					if (error.status === 401 || error.status === 403) {
+						needsLogin = true
+						renderQueue(queue)
+						break
+					}
+					if (error.status && error.status >= 400 && error.status < 500) {
 						queue.shift()
 						writeQueue(queue)
 						if (!text.value.trim()) text.value = item.text
@@ -202,6 +215,9 @@
 		})
 		loadList()
 		if (boot.ai_suggestions) loadSuggestions()
+		// With a mouse and keyboard, go on typing in the search; on a phone that would only raise
+		// the keyboard over the list.
+		if (!window.matchMedia("(pointer: coarse)").matches) search.focus()
 	}
 
 	function closeSheet(message) {
@@ -235,8 +251,17 @@
 			chip.textContent = __(band.charAt(0).toUpperCase() + band.slice(1))
 			li.appendChild(chip)
 		}
+		li.tabIndex = 0
+		li.setAttribute("role", "button")
 		li.addEventListener("click", function () {
 			pick(idea, li)
+		})
+		li.addEventListener("keydown", function (event) {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault()
+				pick(idea, li)
+				$("spawned").focus()
+			}
 		})
 		return li
 	}
@@ -268,7 +293,7 @@
 	function loadSuggestions() {
 		var box = $("suggest")
 		var ul = $("suggest-list")
-		ul.innerHTML = '<li class="empty">' + __("Looking for close ideas …") + "</li>"
+		fill(ul, [], false, __("Looking for close ideas …"))
 		box.hidden = false
 		call("suggest_ideas", { name: current.name })
 			.then(function (result) {
@@ -346,7 +371,24 @@
 		}, 3200)
 	}
 
-	queueBadge.addEventListener("click", flush)
+	// Keyboard (hardware keyboards, desktop): Cmd/Ctrl+Enter or Cmd/Ctrl+S saves, as cockpit dialogs
+	// confirm with Cmd/Ctrl+S (#2032); Esc closes the link sheet.
+	document.addEventListener("keydown", function (event) {
+		var mod = event.metaKey || event.ctrlKey
+		if (mod && (event.key === "Enter" || event.key === "s" || event.key === "S")) {
+			event.preventDefault()
+			if (sheet.hidden && !saveBtn.disabled) saveBtn.click()
+		} else if (event.key === "Escape" && !sheet.hidden) {
+			event.preventDefault()
+			closeSheet()
+		}
+	})
+
+	queueBadge.addEventListener("click", function () {
+		// The queue stays in localStorage, so leaving for the login page loses nothing.
+		if (needsLogin) window.location.href = "/login?redirect-to=/idea"
+		else flush()
+	})
 
 	renderQueue(readQueue())
 	updateSave()

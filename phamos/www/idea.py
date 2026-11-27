@@ -37,6 +37,7 @@ def get_context(context):
 	context.csrf_token = csrf_token
 	context.lang = lang
 	context.asset_version = asset_version()
+	# Goes into a <script> block: "</" is escaped so no translation text can close the tag.
 	context.boot = frappe.as_json(
 		{
 			"user": frappe.session.user,
@@ -44,5 +45,5 @@ def get_context(context):
 			"__messages": spa_translations(lang),
 			"ai_suggestions": ai_suggestions_enabled(),
 		}
-	)
+	).replace("</", "<\\/")
 	return context

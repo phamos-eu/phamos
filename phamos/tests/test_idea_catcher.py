@@ -124,3 +124,30 @@ class TestIdeaCatcher(FrappeTestCase):
 		sent = [text.split("\n")[0] for text in embed.call_args[0][0]]
 		self.assertNotIn("Bike leasing too", sent)
 		self.assertNotIn(far, [row["name"] for row in result["ideas"]])
+
+	# guards from the review
+
+	def test_grew_out_of_refuses_a_loop(self):
+		first = catcher.save_idea("First")["name"]
+		second = catcher.save_idea("Second")["name"]
+		catcher.link_idea(second, first, "spawned")
+		with self.assertRaises(frappe.ValidationError):
+			catcher.link_idea(first, second, "spawned")
+
+	def test_add_to_keeps_ideas_with_their_own_history(self):
+		target = self._mine("Target")
+		worked_on = self._mine("Worked on")
+		frappe.get_doc(
+			{"doctype": "Idea Writing Session", "idea": worked_on, "user": USER, "started_on": frappe.utils.now_datetime()}
+		).insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError):
+			catcher.link_idea(worked_on, target, "append")
+		self.assertTrue(frappe.db.exists("Idea", worked_on))
+
+	def test_add_to_moves_children_to_the_target(self):
+		target = self._mine("Target")
+		caught = catcher.save_idea("Caught")["name"]
+		child = self._mine("Child")
+		catcher.link_idea(child, caught, "spawned")
+		catcher.link_idea(caught, target, "append")
+		self.assertEqual(frappe.db.get_value("Idea", child, "spawned_from"), target)
