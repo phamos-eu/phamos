@@ -246,6 +246,10 @@ def link_idea(name, target, mode):
 		or frappe.db.exists("Idea Writing Session", {"idea": doc.name})
 	):
 		frappe.throw(_("This idea has its own history. Link it instead of adding it."))
+	# Its children move to the target below; a target that grew out of it (at any depth) would
+	# then point at itself or close a loop.
+	if doc.name in _ancestors(target_doc.name):
+		frappe.throw(_("{0} grew out of this idea. Link it instead of adding it.").format(target_doc.title))
 	stamp = format_datetime(now_datetime())  # the user's own date and time format
 	added = f"<p><em>{_('Added {0}').format(stamp)}</em></p>{doc.content or ''}"
 	target_doc.content = (target_doc.content or "") + added

@@ -170,3 +170,15 @@ class TestIdeaCatcher(FrappeTestCase):
 			catcher.suggest_ideas(new)
 		self.assertTrue(all(size <= catcher.EMBED_BATCH for size in calls))
 		self.assertEqual(sum(calls), 21)
+
+	def test_add_to_refuses_a_target_that_grew_out_of_it(self):
+		caught = catcher.save_idea("Caught")["name"]
+		child = catcher.save_idea("Child")["name"]
+		grandchild = catcher.save_idea("Grandchild")["name"]
+		catcher.link_idea(child, caught, "spawned")
+		catcher.link_idea(grandchild, child, "spawned")
+		for target in (child, grandchild):
+			with self.assertRaises(frappe.ValidationError):
+				catcher.link_idea(caught, target, "append")
+		self.assertEqual(frappe.db.get_value("Idea", child, "spawned_from"), caught)
+		self.assertEqual(frappe.db.get_value("Idea", grandchild, "spawned_from"), child)

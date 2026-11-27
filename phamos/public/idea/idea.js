@@ -53,6 +53,7 @@
 					if (!response.ok) {
 						var error = new Error(serverMessage(body) || response.statusText)
 						error.status = response.status
+						error.excType = body.exc_type
 						throw error
 					}
 					return body.message
@@ -129,16 +130,21 @@
 				} catch (error) {
 					// No connection or server down: keep it and try later. A refusal (4xx) will not get
 					// better by retrying, so the text goes back into the box instead of looping.
-					// Signed out or a stale CSRF token (400/401/403): keep everything; the badge offers
-					// the login, which also loads a fresh token.
-					if (error.status === 400 || error.status === 401 || error.status === 403) {
+					// Signed out (401/403) or a stale CSRF token (400 CSRFTokenError): keep everything;
+					// the badge offers the login, which also loads a fresh token.
+					if (
+						error.status === 401 ||
+						error.status === 403 ||
+						(error.status === 400 && error.excType === "CSRFTokenError")
+					) {
 						needsLogin = true
 						renderQueue(queue)
 						break
 					}
-					// Refused for good (417: validation, e.g. too long): out of the queue, but the text
-					// goes back into the box, after anything already typed there, so it is never lost.
-					if (error.status === 417) {
+					// Any other 4xx except timeout (408) and rate limit (429) is refused for good
+					// (validation, too large, unknown method): out of the queue so it cannot block the
+					// ideas behind it, and the text goes back into the box after anything typed there.
+					if (error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429) {
 						queue.shift()
 						writeQueue(queue)
 						text.value = text.value.trim() ? text.value + "\n\n" + item.text : item.text
