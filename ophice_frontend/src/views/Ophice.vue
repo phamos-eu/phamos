@@ -767,6 +767,7 @@ import {
 	saveCallStart,
 	splitCall,
 } from "../utils/ophiceCall.js"
+import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -1324,6 +1325,8 @@ function onKeydown(event) {
 		return
 	}
 	if (!held.size && !event.repeat) {
+		// Started typing in the pause after a stop (#2171): that is a stop, open now.
+		if (event.key.length === 1 && event.code !== "Space" && !DIRECTIONS[event.key.toLowerCase()]) pendingStop.flush()
 		// Typed while the chat that just opened is still loading: keep it for the chat.
 		if (bufferWhileOpening(event)) return
 		// Esc said "walk on"; Enter brings the chat back while still next to the person.
@@ -1354,6 +1357,8 @@ function onKeydown(event) {
 	backFromStatus()
 	peopleSidebar.value?.fold()
 	held.add(key)
+	// Walking on: the stop before opens nothing (#2171).
+	pendingStop.cancel()
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
 	if (!frame) {
@@ -1398,8 +1403,15 @@ function liveBubble(user) {
 	return bubble && (bubble.loading || bubble.encounter) ? bubble : null
 }
 
-/** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
+// Passing by (#2171): a stop opens the chat, call or meeting only after a short pause (STOP_DELAY);
+// walking on, jumping or Go to within it opens nothing.
+const pendingStop = stopTimer(openOnStop, () => !held.size && !flying.value && !jump && !travel)
 function chatOnStop() {
+	pendingStop.stopped()
+}
+
+/** Stood still after a stop: next to someone, the chat opens (or gets the keyboard if already open). */
+function openOnStop() {
 	joinAreaIfInside()
 	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
 	// other person can still start one, which the mini map pings.
@@ -3486,6 +3498,7 @@ function pinPhriend() {
 }
 
 onBeforeUnmount(() => {
+	pendingStop.cancel()
 	clearInterval(phriendTimer)
 	phriend?.ball?.pin(null)
 	clearInterval(clockTimer)
