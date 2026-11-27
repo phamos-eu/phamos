@@ -27,9 +27,10 @@
 // One "Create" menu in the top bar (#1592) for everything the Personal Cockpit shows: ToDos,
 // Issues, Tasks, Checklists, a timesheet timer, a check-in or check-out, a focus session and a
 // target. Each entry opens the dialog its own page uses.
-import { computed, reactive, ref, watch } from "vue"
+import { computed, h, reactive, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, Dropdown } from "frappe-ui"
+import CockpitIcon from "@spa/components/CockpitIcon.vue"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
@@ -38,6 +39,7 @@ import { requestTimerStart, timer } from "@spa/timerStore.js"
 import { shortcuts } from "@/shortcutsStore.js"
 import { notify } from "@spa/utils/notify.js"
 import { __ } from "@spa/utils/i18n.js"
+import { IDEA_ICON } from "@spa/utils/icons.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
 import { hasLeaveAccess } from "@/leaveStore.js"
@@ -56,6 +58,8 @@ const root = ref(null)
 const open = reactive({ todo: false, issue: false, task: false, checklist: false, focus: false, challenge: false })
 const formOptions = ref({ priorities: [], issue_types: [], shortlist_users: [], departments: [], projects: [] })
 let optionsLoaded = false
+// frappe-ui's Dropdown takes a Feather name or a component; the idea light bulb (#2207) is our own.
+const IdeaIcon = () => h(CockpitIcon, { name: IDEA_ICON })
 
 const groups = computed(() => {
 	const work = [
@@ -64,7 +68,7 @@ const groups = computed(() => {
 		{ label: __("Task"), icon: "check-square", onClick: () => (open.task = true) },
 		{ label: __("Checklist"), icon: "list", onClick: () => (open.checklist = true) },
 		// Ideas (#1771): the list page creates it and opens it
-		{ label: __("Idea"), icon: "feather", onClick: () => router.push({ name: "Ideas", query: { new: 1 } }) },
+		{ label: __("Idea"), icon: IdeaIcon, onClick: () => router.push({ name: "Ideas", query: { new: 1 } }) },
 	]
 	// My Leave (#1714): the page opens its Apply dialog
 	if (hasLeaveAccess()) {
