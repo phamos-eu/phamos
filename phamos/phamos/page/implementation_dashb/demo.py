@@ -23,8 +23,8 @@ ACTIVITY = "DEMO Chart Work"
 
 # name: (months with hours, months with a prediction)
 IMPLEMENTATIONS = {
-	"DEMO Impl A": (range(-8, 1), range(0, 7)),
-	"DEMO Impl B": ([m for m in range(-6, 1) if m != -3], [m for m in range(0, 6) if m != 2]),
+	"DEMO Impl A": (range(-8, 1), range(7)),
+	"DEMO Impl B": ([m for m in range(-6, 1) if m != -3], [m for m in range(6) if m != 2]),
 	"DEMO Impl C": (range(-8, -2), []),
 }
 INTERNAL = ("DEMO Internal", range(-5, 1))
