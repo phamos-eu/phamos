@@ -43,6 +43,18 @@ export function jitsiStartConfig({ startOff = false } = {}) {
 	}
 }
 
+/**
+ * How a chat with someone opens (#2165, #2168).
+ * - fromPeer: the other person walked up and started it; my page only follows.
+ * - answer: I answer someone who came over (a walk-up ping), by my own action.
+ * @returns {{ callOff: boolean, backToAvailable: boolean }} callOff: my call starts with mic and
+ *   camera off (I was approached); backToAvailable: my Away / Be right back status goes first,
+ *   because I start or answer it myself (the server only lets Available people meet).
+ */
+export function encounterOpening({ fromPeer = false, answer = false } = {}) {
+	return { callOff: fromPeer || answer, backToAvailable: !fromPeer }
+}
+
 // Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is
 // screen sharing: always there, for everyone (#2136). No "videoquality" (Jitsi's performance
 // settings): our own quality button in the call's bar does that.
