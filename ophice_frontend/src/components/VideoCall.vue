@@ -1,6 +1,6 @@
 <template>
-	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Joined with mic and camera on
-	     (#2108); the person being approached with both off until their first click (#2165). -->
+	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Mic and camera at the
+	     start as chosen in the sidebar (#2168): asked first, off, or on. -->
 	<div
 		class="relative w-full overflow-hidden bg-surface-gray-7"
 		:class="{ 'aspect-video': !fill }"
@@ -9,6 +9,46 @@
 		@mouseleave="pointerOver = false"
 	>
 		<div ref="host" class="h-full w-full" />
+		<!-- Asked first (#2168): nothing joins and no device turns on before Join. -->
+		<div
+			v-if="state === 'asking'"
+			class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white"
+			data-testid="call-ask"
+		>
+			<p class="text-sm">{{ __("Join the call with:") }}</p>
+			<div class="flex gap-2">
+				<button
+					type="button"
+					class="flex h-10 w-10 items-center justify-center rounded-full shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+					:class="askMic ? 'bg-black/60 hover:bg-black/80' : 'bg-red-600 hover:bg-red-500'"
+					:title="askMic ? __('Microphone on') : __('Microphone off')"
+					:aria-pressed="askMic"
+					data-testid="ask-mic"
+					@click="askMic = !askMic"
+				>
+					<FeatherIcon :name="askMic ? 'mic' : 'mic-off'" class="h-5 w-5" />
+				</button>
+				<button
+					type="button"
+					class="flex h-10 w-10 items-center justify-center rounded-full shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+					:class="askCamera ? 'bg-black/60 hover:bg-black/80' : 'bg-red-600 hover:bg-red-500'"
+					:title="askCamera ? __('Camera on') : __('Camera off')"
+					:aria-pressed="askCamera"
+					data-testid="ask-camera"
+					@click="askCamera = !askCamera"
+				>
+					<FeatherIcon :name="askCamera ? 'video' : 'video-off'" class="h-5 w-5" />
+				</button>
+			</div>
+			<button
+				type="button"
+				class="rounded-md bg-white px-4 py-1.5 text-sm font-medium text-ink-gray-9 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+				data-testid="ask-join"
+				@click="joinAsked"
+			>
+				{{ __("Join") }}
+			</button>
+		</div>
 		<!-- Never in Jitsi's way: no clicks, at the bottom edge, and gone after a while. -->
 		<p
 			v-if="state === 'failed' || (state === 'joining' && !quiet)"
@@ -16,20 +56,11 @@
 		>
 			{{ state === "failed" ? __("The video call could not be started.") : __("Joining the call…") }}
 		</p>
-		<!-- Approached (#2165): mic and camera wait for the first click on the call. -->
-		<p
-			v-if="ready && waiting"
-			class="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-xs text-white"
-			data-testid="start-off-hint"
-		>
-			<FeatherIcon name="video-off" class="h-3.5 w-3.5" />
-			{{ __("Your mic and camera are off. Click to turn them on.") }}
-		</p>
 		<!-- Browsers play the other person's audio only after a click inside the Jitsi frame
 		     (autoplay rule; keys pressed in Ophice don't count for that frame). -->
 		<!-- Clicks pass through to the video below, which is exactly the click the browser wants. -->
 		<p
-			v-else-if="ready && !frameClicked"
+			v-if="ready && !frameClicked"
 			class="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-xs text-white"
 			data-testid="sound-hint"
 		>
@@ -83,11 +114,11 @@ import { __ } from "@spa/utils/i18n.js"
 import {
 	JITSI_TOOLBAR_BUTTONS,
 	QUALITY_LEVELS,
-	callActivation,
-	jitsiStartConfig,
 	nextQualityLevel,
+	pageStorage,
 	qualityLevel,
 	qualitySync,
+	readCallStart,
 } from "../utils/ophiceCall.js"
 
 const props = defineProps({
@@ -97,62 +128,40 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** Fill the parent's height instead of keeping 16:9 (meeting view, #2061). */
 	fill: { type: Boolean, default: false },
-	/** Join with mic and camera off, no device touched, until the first click (approached, #2165). Read once. */
-	startOff: { type: Boolean, default: false },
 })
-const emit = defineEmits(["joined", "toggled", "stolen", "activated"])
+const emit = defineEmits(["joined", "toggled", "stolen"])
 
 const host = ref(null)
-const state = ref("joining")
+// Mic and camera at the start (#2168): read once, when the call opens.
+const start = readCallStart(pageStorage())
+const state = ref(start === "ask" ? "asking" : "joining")
+const askMic = ref(false)
+const askCamera = ref(false)
 // Jitsi shows its own progress; our label only bridges the first seconds.
 const quiet = ref(false)
 const quietTimer = setTimeout(() => (quiet.value = true), 8000)
 let api = null
 let disposed = false
-// Mic and camera start on: whoever joins a call wants to talk (#2108, replaces the start-off
-// decision of 2026-11-21). The browser still asks once for the permission. Jitsi reports every change.
-// Not for the person being approached (#2165): off until they click the call.
+// Mic and camera start as chosen (#2168; #2108 had them always on). The browser still asks once
+// for the permission. Jitsi reports every change.
 const ready = ref(false)
-const waiting = ref(props.startOff)
-const activation = callActivation({
-	isAudioMuted: () => api?.isAudioMuted() ?? Promise.resolve(false),
-	isVideoMuted: () => api?.isVideoMuted() ?? Promise.resolve(false),
-	run: (command) => api?.executeCommand(command),
-})
-/**
- * The first click on the call (anywhere on the bubble, or into the video): mic and camera on.
- * @param {number} delay  ms to wait first: a click into the video may be on Jitsi's own mic or
- *   camera button; once Jitsi switched that one on, only the other one is still off.
- */
-function activate(delay = 0) {
-	if (!waiting.value) return
-	waiting.value = false
-	emit("activated")
-	setTimeout(() => activation.click(), delay)
-}
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
 // and the keyboard goes back to Ophice ("stolen").
 const frameClicked = ref(false)
 const pointerOver = ref(false)
-const FRAME_CLICK_DELAY = 800
 function onWindowBlur() {
 	setTimeout(() => {
 		if (!host.value || !host.value.contains(document.activeElement)) return
-		if (pointerOver.value) {
-			frameClicked.value = true
-			// The focus moves on the press; Jitsi's button acts on the release.
-			activate(FRAME_CLICK_DELAY)
-		} else emit("stolen")
+		if (pointerOver.value) frameClicked.value = true
+		else emit("stolen")
 	})
 }
-const audioMuted = ref(props.startOff)
-const videoMuted = ref(props.startOff)
+const audioMuted = ref(start !== "on")
+const videoMuted = ref(start !== "on")
 
 function toggle(command) {
-	// The first click turns both on (#2165); toggling as well would switch this one off again.
-	if (waiting.value) activate()
-	else api?.executeCommand(command)
+	api?.executeCommand(command)
 	// The chat keeps the keyboard after a click on a switch.
 	emit("toggled")
 }
@@ -196,7 +205,20 @@ function loadJitsi(domain) {
 	return scripts[domain]
 }
 
-onMounted(async () => {
+onMounted(() => {
+	if (start !== "ask") join({ mic: start === "on", camera: start === "on" })
+})
+
+function joinAsked() {
+	state.value = "joining"
+	join({ mic: askMic.value, camera: askCamera.value })
+	// The chat keeps the keyboard.
+	emit("toggled")
+}
+
+async function join({ mic, camera }) {
+	audioMuted.value = !mic
+	videoMuted.value = !camera
 	try {
 		await loadJitsi(props.domain)
 	} catch {
@@ -211,7 +233,10 @@ onMounted(async () => {
 		height: "100%",
 		userInfo: { displayName: props.displayName },
 		configOverwrite: {
-			...jitsiStartConfig({ startOff: props.startOff }),
+			startWithAudioMuted: !mic,
+			startWithVideoMuted: !camera,
+			prejoinPageEnabled: false,
+			prejoinConfig: { enabled: false },
 			disableDeepLinking: true,
 			toolbarButtons: JITSI_TOOLBAR_BUTTONS,
 			toolbarConfig: { alwaysVisible: true },
@@ -227,15 +252,13 @@ onMounted(async () => {
 		api?.isAudioMuted().then((muted) => (audioMuted.value = muted))
 		api?.isVideoMuted().then((muted) => (videoMuted.value = muted))
 		qualityState.start()
-		// Started off and already clicked: mic and camera on now (#2165).
-		if (props.startOff) activation.joined()
 	})
 	api.addListener("videoQualityChanged", ({ videoQuality }) => qualityState.reported(videoQuality))
 	api.addListener("audioMuteStatusChanged", ({ muted }) => (audioMuted.value = muted))
 	api.addListener("videoMuteStatusChanged", ({ muted }) => (videoMuted.value = muted))
 	// Hanging up inside Jitsi just leaves; the chat stays.
 	api.addListener("readyToClose", () => dispose())
-})
+}
 
 function dispose() {
 	disposed = true
@@ -247,8 +270,6 @@ function dispose() {
 	api = null
 	ready.value = false
 }
-
-defineExpose({ activate })
 
 // Walking away or Esc unmounts the bubble: leave the call.
 onBeforeUnmount(() => {

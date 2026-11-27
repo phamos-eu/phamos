@@ -670,6 +670,7 @@
 			:status-open="statusOpen"
 			:bell="bell"
 			:bell-title="bellTitle"
+			:call-start="callStart"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -681,6 +682,7 @@
 			@open="openCockpit"
 			@status="toggleStatus()"
 			@bell="clickBell"
+			@call-start="stepCallStart"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -760,7 +762,11 @@ import {
 	callBox,
 	encounterCallWindowName,
 	jitsiCallUrl,
+	nextCallStart,
+	pageStorage,
+	readCallStart,
 	resizeCall,
+	saveCallStart,
 	splitCall,
 } from "../utils/ophiceCall.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
@@ -1620,7 +1626,7 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", callStart.value)
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1808,6 +1814,8 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 	})
 	bubbles[other.user] = bubble
 	try {
+		// Starting a chat myself means I'm back (#2168): only Available people meet.
+		if (!fromPeer) await backFromStatus()
 		// The server checks that we really stand together: my latest spot goes first.
 		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
@@ -1884,8 +1892,17 @@ function alertEncounter(other) {
 // first: some browsers (Safari) suspend the sound again while the tab is in the background.
 const unlockAudio = () => encounterAlert.unlock()
 
+// Mic and camera when a call starts (#2168): asked first, off or on; kept in this browser.
+const callStart = ref(readCallStart(pageStorage()))
+function stepCallStart() {
+	callStart.value = nextCallStart(callStart.value)
+	saveCallStart(pageStorage(), callStart.value)
+}
+
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
+	// Away or be right back (#2168): nothing opens, no call (the server refuses it too).
+	if (me.value?.status) return
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
@@ -2133,7 +2150,7 @@ function popOut() {
 	const area = meetingArea.value
 	if (!area) return
 	// Straight in, mic and camera on, my name filled in (#2108).
-	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "", callStart.value)
 	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
@@ -2845,7 +2862,7 @@ function toggleStatus(event) {
 // For "back in 20 minutes": a slow clock is enough.
 const clock = ref(Date.now())
 const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
-let statusClearing = false
+let statusClearing = null
 
 const statusChips = computed(() => {
 	if (!me.value) return []
@@ -2872,14 +2889,15 @@ async function saveStatus(values) {
 	}
 }
 
-/** Moving means I'm back: the status goes. */
+/** Moving means I'm back: the status goes. Resolves once the server knows. */
 function backFromStatus() {
-	if (!me.value?.status || statusClearing) return
-	statusClearing = true
+	if (statusClearing) return statusClearing
+	if (!me.value?.status) return Promise.resolve()
 	me.value.status = null
-	call(`${API}.set_status`, { kind: "" })
+	statusClearing = call(`${API}.set_status`, { kind: "" })
 		.catch(() => {})
-		.finally(() => (statusClearing = false))
+		.finally(() => (statusClearing = null))
+	return statusClearing
 }
 
 function onRemoteStatus(message) {

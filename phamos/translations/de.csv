@@ -2733,7 +2733,7 @@ Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
-"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
+Whoever stops inside the area joins this meeting.,"Wer im Bereich stehen bleibt, tritt dieser Besprechung bei."
 The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
 The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
@@ -3164,3 +3164,15 @@ Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: 
 {0} set: {1},{0} gesetzt: {1}
 Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
 (ERPNext picked {0}),(ERPNext hat {0} gewählt)
+Join the call with:,Dem Anruf beitreten mit:
+Microphone on,Mikrofon an
+Microphone off,Mikrofon aus
+Camera on,Kamera an
+Camera off,Kamera aus
+Not available right now.,Gerade nicht erreichbar.
+Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
+Calls: ask for mic and camera,Anrufe: nach Mikrofon und Kamera fragen
+Calls: mic and camera off,Anrufe: Mikrofon und Kamera aus
+Calls: mic and camera on,Anrufe: Mikrofon und Kamera an
+Click to change.,Zum Ändern klicken.
+Join,Beitreten
