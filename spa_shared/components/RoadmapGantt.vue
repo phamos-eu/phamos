@@ -124,6 +124,7 @@ import {
 	ROW_PADDING,
 	rowHeights,
 	stackEvents,
+	stackSelection,
 	toDay,
 	ZOOM_DAY_WIDTH,
 } from "@spa/utils/roadmapLayout.js"
@@ -146,18 +147,23 @@ const props = defineProps({
 	rows: { type: Array, default: () => [] },
 	/** [{ from, to, conflict }]: bar names; red when `conflict` */
 	dependencies: { type: Array, default: () => [] },
-	/** [{ name, type: "milestone" | "release", title, date }] */
+	/** [{ name, type: "milestone" | "release", title, date, url?, late? }]: see MarkerLayer */
 	markers: { type: Array, default: () => [] },
 	/** { start, end }: the visible date range; three months from this month when empty */
 	range: { type: Object, default: null },
 	zoom: { type: String, default: "month", validator: (v) => ["week", "month", "quarter"].includes(v) },
 	showBaseline: { type: Boolean, default: false },
-	/** { type: "bar" | "event", name } or null */
+	/** { type: "bar" | "event", name } or null; a stack is selected when it holds `name` */
 	selected: { type: Object, default: null },
 	/** width in px of the row-label column */
 	labelWidth: { type: Number, default: 168 },
 })
 
+/**
+ * select: { type: "bar", name }, { type: "event", name } for one feature, or
+ * { type: "event", name, names } for a stack of several features (names in date order);
+ * null on Esc.
+ */
 const emit = defineEmits(["select"])
 
 // Strip at the top of the body that holds the marker diamonds.
@@ -312,7 +318,7 @@ function neighbour(item, key) {
 }
 
 function selectItem(item) {
-	emit("select", { type: item.type, name: item.name })
+	emit("select", item.type === "event" ? stackSelection(item.stack) : { type: item.type, name: item.name })
 }
 
 function onKeydown(event) {
@@ -357,6 +363,31 @@ function scrollToToday() {
 	const tl = timeline.value
 	if (day && tl.rangeStart && day >= tl.rangeStart && day < tl.rangeEnd) scrollToDate(day)
 }
+
+/**
+ * Brings the selected bar or dot into view when it lies outside, for example after a side
+ * panel narrowed the chart or a link in the panel selected a bar further away (#2035).
+ */
+function scrollSelectedIntoView() {
+	const sel = props.selected
+	const item = sel && navOrder.value.find((i) => (i.type === "bar" ? sel.type === "bar" && i.name === sel.name : sel.type === "event" && i.stack.events.some((e) => e.name === sel.name)))
+	const el = item && scroller.value?.querySelector(`[data-nav-key="${CSS.escape(item.key)}"]`)
+	if (!el) return
+	const box = scroller.value.getBoundingClientRect()
+	const rect = el.getBoundingClientRect()
+	const viewLeft = box.left + props.labelWidth
+	const viewWidth = box.right - viewLeft
+	if (rect.left >= viewLeft && rect.right <= box.right) return
+	// a bar wider than the view shows its start; anything else goes to the middle
+	const delta = rect.width > viewWidth ? rect.left - viewLeft - 16 : rect.left + rect.width / 2 - (viewLeft + viewWidth / 2)
+	scroller.value.scrollLeft += delta
+}
+
+// After the parent has drawn its side panel, so the measured width is the new one.
+watch(
+	() => props.selected,
+	(sel) => sel && nextTick(() => requestAnimationFrame(scrollSelectedIntoView))
+)
 
 let resizeObserver = null
 
@@ -444,6 +475,8 @@ watch(
 .roadmap-gantt__body {
 	position: relative;
 	overflow: hidden;
+	/* its own stacking context: bars, dots and slack labels stay under the sticky header and labels */
+	isolation: isolate;
 }
 
 .roadmap-gantt__row-line {
