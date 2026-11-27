@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest"
+import { picks_html, question_text } from "./rating.js"
+
+const __ = (text, args = []) => text.replace(/\{(\d)\}/g, (_, i) => args[i])
+
+describe("rating a fix (#2014)", () => {
+	it("asks bugs whether they are fixed and improvements how they are liked, now and later", () => {
+		expect(question_text(__, { kind: "Thumbs", round: "First impression", title: "Totals" })).toBe("“Totals” is live. Did it fix it?")
+		expect(question_text(__, { kind: "Thumbs", round: "Battle tested", title: "Totals" })).toContain("Still fixed?")
+		expect(question_text(__, { kind: "Stars", round: "First impression", title: "Search" })).toContain("How do you like it?")
+		expect(question_text(__, { kind: "Stars", round: "Battle tested", title: "Search" })).toContain("How do you like it now?")
+	})
+	it("escapes the report's title", () => {
+		expect(question_text(__, { kind: "Thumbs", title: "<img src=x onerror=alert(1)>" })).not.toContain("<img")
+	})
+	it("links the title to the report when the host knows where reports live", () => {
+		const url = (name) => `/app/issue/${encodeURIComponent(name)}`
+		const text = question_text(__, { kind: "Stars", round: "First impression", title: "Search", subject: "ISS-1" }, url)
+		expect(text).toContain('<a href="/app/issue/ISS-1" target="_blank" rel="noopener">“Search”</a>')
+		expect(question_text(__, { kind: "Stars", title: "Search", subject: "ISS-1" })).not.toContain("<a")
+		expect(question_text(__, { kind: "Stars", title: "Search" }, url)).not.toContain("<a")
+	})
+	it("escapes the report link", () => {
+		const text = question_text(__, { kind: "Stars", title: "Search", subject: "ISS-1" }, () => '/x?a=1&b="2"')
+		expect(text).toContain('href="/x?a=1&amp;b=&quot;2&quot;"')
+	})
+	it("offers thumbs for bugs and five stars for improvements", () => {
+		expect((picks_html(__, "Thumbs").match(/class="pick"/g) || []).length).toBe(2)
+		expect(picks_html(__, "Thumbs")).toContain('data-r="-1"')
+		expect((picks_html(__, "Stars").match(/class="pick"/g) || []).length).toBe(5)
+	})
+})

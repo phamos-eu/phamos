@@ -72,8 +72,9 @@
 #   replaces plan-drafted with mr-opened. When the plan states that no code
 #   change is required, it comments that finding and uses no-change instead.
 #   A reply the job cannot apply uses implement-failed. It does not merge.
-#   Adding plan-drafted again retries a failed attempt. GITLAB_API_TOKEN must
-#   be allowed to push a branch and to open a merge request.
+#   Adding plan-drafted again retries a failed attempt. GITLAB_API_TOKEN reads
+#   the issue and posts the comment. GITLAB_AI_DEVELOPER pushes the branch and
+#   opens the merge request.
 #   Set AI_ISSUE_IMPLEMENT_ENABLED=false to turn the job off.
 
 workflow:
@@ -224,6 +225,9 @@ unit_tests_1:
       phamos.phamos.page.extract_pdf.test_extract_pdf
       phamos.gitlab_integration.test_issue_analysis
       phamos.tests.test_set_timesheet_record_billable_hours
+      phamos.tests.test_party_account
+      phamos.tests.test_party_account_settings
+      phamos.tests.test_gitlab_issue_dashboard
 
 unit_tests_2:
   extends: .unit_tests
@@ -246,6 +250,7 @@ unit_tests_2:
       phamos.tests.test_personal_ideas
       phamos.tests.test_idea_import
       phamos.tests.test_idea_votes
+      phamos.tests.test_ophice
 
 tests_required:
   stage: test

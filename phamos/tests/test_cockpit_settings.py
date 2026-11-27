@@ -156,7 +156,10 @@ class TestCockpitSettingsValidation(FrappeTestCase):
 	def test_each_tab_starts_with_an_open_cockpit_button(self):
 		# the routes behind the buttons live in cockpit_settings.js (COCKPIT_ROUTES)
 		fields = frappe.get_meta(NEW).fields
-		tabs = [i for i, field in enumerate(fields) if field.fieldtype == "Tab Break"]
+		# The Ophice tab (#2077) holds Ophice's start-page switch; Ophice is not a cockpit.
+		tabs = [
+			i for i, field in enumerate(fields) if field.fieldtype == "Tab Break" and field.fieldname != "ophice_tab"
+		]
 		self.assertEqual(len(tabs), len(COCKPITS))
 		with open(frappe.get_app_path("phamos", "cockpits", "doctype", "cockpit_settings", "cockpit_settings.js")) as js:
 			script = js.read()

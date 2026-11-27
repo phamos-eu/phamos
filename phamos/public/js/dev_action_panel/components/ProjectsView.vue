@@ -2,6 +2,8 @@
 import { computed, ref } from "vue";
 import ProjectCard from "./ProjectCard.vue";
 import FrappeFilter from "./FrappeFilter.vue";
+import QuickSearch from "./QuickSearch.vue";
+import { projectMatchesSearch } from "../quickSearch.js";
 
 const props = defineProps({
   // One list: assigned to me first, then the rest; last used first within each (get_dev_all_projects)
@@ -18,7 +20,9 @@ const PROJECT_ICON = "M3 7h18M3 12h18M3 17h18";
 
 // Names matching the Filter button, or null when no filter is set.
 const matchingNames = ref(null);
-const filtering = computed(() => matchingNames.value !== null);
+// Quick text search next to the Filter button (#2211).
+const search = ref("");
+const filtering = computed(() => matchingNames.value !== null || !!search.value.trim());
 
 const rawProjects = computed(() => props.allProjects || []);
 
@@ -27,7 +31,7 @@ const filteredProjects = computed(() => {
   const activeName = props.activeProjectSession?.project;
   const active = activeName ? rawProjects.value.find((p) => p.name === activeName) : null;
   const allowed = matchingNames.value && new Set(matchingNames.value);
-  const rest = rawProjects.value.filter((p) => p.name !== activeName && (!allowed || allowed.has(p.name)));
+  const rest = rawProjects.value.filter((p) => p.name !== activeName && (!allowed || allowed.has(p.name)) && projectMatchesSearch(p, search.value));
   return active ? [active, ...rest] : rest;
 });
 </script>
@@ -47,6 +51,7 @@ const filteredProjects = computed(() => {
 
     <!-- Frappe list-view filter -->
     <div class="pv__toolbar">
+      <QuickSearch v-model="search" placeholder="Search projects by name, ID, customer or status…" />
       <FrappeFilter doctype="Project" @change="matchingNames = $event" />
       <span class="pv__count">
         {{ filteredProjects.length }} of {{ rawProjects.length }}
@@ -71,7 +76,7 @@ const filteredProjects = computed(() => {
         <p class="pv__empty-title">
           {{ filtering ? 'No projects match your filters' : 'No open projects found' }}
         </p>
-        <p v-if="filtering" class="pv__empty-sub">Change or clear the filters above.</p>
+        <p v-if="filtering" class="pv__empty-sub">Change or clear the search and filters above.</p>
       </div>
       <ProjectCard
         v-for="project in filteredProjects"

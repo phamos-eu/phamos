@@ -5,6 +5,7 @@
 events, STATUS, URL, METHOD, the owner as organizer, `pull_event_slots` all-day flag and timeout,
 and the slot cache. SOGo is replaced by patched `requests` calls."""
 
+import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -84,6 +85,27 @@ DTSTAMP:20261001T000000Z
 DTSTART:20261104T090000Z
 DTEND:20261104T100000Z
 SUMMARY:Standup
+END:VEVENT
+END:VCALENDAR
+</C:calendar-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+</D:multistatus>"""
+
+
+# A weekly event as SOGo keeps it: start Thu 3 Dec, then Mondays and Wednesdays (#1991). No RDATE,
+# as in invites sent before #1991 and from other clients.
+WEEKLY_FROM_THURSDAY = """<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<D:response><D:href>/SOGo/dav/x/Calendar/personal/weekly-1.ics</D:href><D:propstat><D:prop>
+<C:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//test//EN
+BEGIN:VEVENT
+UID:weekly-1
+DTSTAMP:20261001T000000Z
+DTSTART:20261203T090000Z
+DTEND:20261203T100000Z
+RRULE:FREQ=WEEKLY;BYDAY=MO,WE
+SUMMARY:Weekly
 END:VEVENT
 END:VCALENDAR
 </C:calendar-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
@@ -228,6 +250,48 @@ class TestMailcowEventSync(FrappeTestCase):
 			}
 		)
 		self.assertEqual(sync_event._event_recurrence_rule(doc), "FREQ=WEEKLY;BYDAY=WE")
+
+	# --- #1991: the chosen start is always the first appointment ---------------------------
+	# 2026-12-03 is a Thursday. Weekly on Monday + Wednesday: Thu 3, then Mon 7, Wed 9, …
+
+	def _weekly_event(self, **values):
+		return self._event(
+			**{
+				"starts_on": "2026-12-03 10:00:00",
+				"ends_on": "2026-12-03 11:00:00",
+				"repeat_this_event": 1,
+				"repeat_on": "Weekly",
+				"monday": 1,
+				"wednesday": 1,
+				**values,
+			}
+		)
+
+	def test_a_start_outside_the_weekdays_stays_and_is_an_occurrence(self):
+		doc = self._weekly_event()
+		self.assertEqual(str(frappe.db.get_value("Event", doc.name, "starts_on")), "2026-12-03 10:00:00")
+		body = self._body()
+		self.assertIn("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", body)
+		self.assertRegex(body, r"(?m)^DTSTART;TZID=([^:]+):20261203T100000\r$")
+		tz = re.search(r"(?m)^DTSTART;TZID=([^:]+):", body).group(1)
+		self.assertIn(f"RDATE;TZID={tz}:20261203T100000\r\n", body)
+
+	def test_an_all_day_start_outside_the_weekdays_gets_a_date_rdate(self):
+		self._weekly_event(all_day=1, starts_on="2026-12-03 00:00:00", ends_on="2026-12-03 00:00:00")
+		self.assertIn("RDATE;VALUE=DATE:20261203\r\n", self._body())
+
+	def test_a_start_inside_the_weekdays_needs_no_rdate(self):
+		for values in ({"thursday": 1}, {"monday": 0, "wednesday": 0}, {"repeat_on": "Daily"}):
+			self.put.reset_mock()
+			self._weekly_event(**values)
+			self.assertNotIn("RDATE", self._body(), values)
+
+	def test_the_calendar_read_back_keeps_a_start_outside_the_weekdays(self):
+		frappe.set_user(OWNER)
+		with patch("requests.request", self._report(content=WEEKLY_FROM_THURSDAY)):
+			slots = sync_event.pull_event_slots("2026-12-01T00:00:00", "2026-12-11T00:00:00")
+		days = [s["start"][:10] for s in slots if s["uid"] == "weekly-1"]
+		self.assertEqual(days, ["2026-12-03", "2026-12-07", "2026-12-09"])
 
 	# --- milestone 68, Phase 0: all-day, status, url, method, organizer ---------------------
 

@@ -21,6 +21,7 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
 from frappe.utils.html_utils import sanitize_html
 
+from phamos.phamos.doctype.implementation_chapter.critical_path import critical_path, dependency_conflict
 from phamos.setup.implementation_cockpit import IMPLEMENTATION_ROLE
 
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
@@ -713,3 +714,623 @@ def resolve_status(route=None, ref_doctype=None, ref_docname=None, issue=None):
 		settings = frappe.get_cached_doc("Phriend Settings")
 		implementation = report_implementation(settings, route, ref_doctype, ref_docname)
 	return implementation if implementation in _allowed_implementations() else None
+
+
+# Features (#1972): list, Kanban and WBS of the implementation's features. Customers see them
+# read-only; staff who may write Implementation Feature move cards on the Kanban.
+
+FEATURE_STATUSES = ("Idea", "Agreed", "Planned", "In Progress", "In Testing", "Live", "Dropped")
+FEATURE_LIST_FIELDS = (
+	"name",
+	"title",
+	"status",
+	"priority",
+	"module",
+	"owner_user",
+	"target_level",
+	"current_level",
+	"estimated_hours",
+	"planned_start",
+	"target_date",
+	"gitlab_milestone",
+	"dod_agreed_on",
+)
+GITLAB_ISSUE_FIELDS = (
+	"name",
+	"issue_id",
+	"title",
+	"state",
+	"issue_url",
+	"gitlab_milestone",
+	"implementation_feature",
+	"created_at",
+	"closed_at",
+	"aging_days",
+	"total_touch_time",
+	"time_estimate_hours",
+	"time_spent_hours",
+)
+
+
+def _can_move_features():
+	"""Staff who may change features in Desk move cards; customers only look."""
+	return is_internal_user() and bool(frappe.has_permission("Implementation Feature", "write"))
+
+
+def _feature_rows(implementation):
+	return frappe.get_all(
+		"Implementation Feature",
+		filters={"implementation": implementation},
+		fields=list(FEATURE_LIST_FIELDS),
+		order_by="planned_start asc, creation asc",
+	)
+
+
+def _issues_by_feature(features):
+	issues = {}
+	for issue in frappe.get_all(
+		"GitLab Issue",
+		filters={"implementation_feature": ["in", features or [""]]},
+		fields=list(GITLAB_ISSUE_FIELDS),
+		order_by="created_at asc",
+	):
+		issues.setdefault(issue.implementation_feature, []).append(issue)
+	return issues
+
+
+def _parents_by_feature(child_doctype, parent_doctype, features, label_field):
+	"""{feature: [{name, label}]} for chapters or releases that list the feature."""
+	rows = frappe.get_all(
+		child_doctype,
+		filters={"feature": ["in", features or [""]], "parenttype": parent_doctype},
+		fields=["feature", "parent"],
+	)
+	labels = dict(
+		frappe.get_all(
+			parent_doctype,
+			filters={"name": ["in", list({r.parent for r in rows}) or [""]]},
+			fields=["name", label_field],
+			as_list=True,
+		)
+	)
+	out = {}
+	for row in rows:
+		out.setdefault(row.feature, []).append({"name": row.parent, "label": labels.get(row.parent) or row.parent})
+	return out
+
+
+def _percent(value):
+	"""Half-up, as people read percentages (Python's round() would make 62.5 into 62)."""
+	return int(value + 0.5)
+
+
+def feature_progress(feature, issues):
+	"""Progress of one feature in percent: Live is done; otherwise the closed share of its GitLab
+	issues; otherwise how far its level has come towards the target. Dropped counts nowhere."""
+	if feature.status == "Live":
+		return 100
+	if issues:
+		return _percent(100 * sum(1 for i in issues if i.state == "closed") / len(issues))
+	if cint(feature.target_level):
+		return min(100, _percent(100 * cint(feature.current_level) / cint(feature.target_level)))
+	return 0
+
+
+def feature_weight(feature, issues):
+	"""Hours a feature weighs in the WBS roll-up: its estimate, or its issues' estimates if larger."""
+	return max(flt(feature.estimated_hours), sum(flt(i.time_estimate_hours) for i in issues))
+
+
+def roll_up(items):
+	"""Weighted progress of (progress, weight) pairs; plain average when no item has hours."""
+	items = list(items)
+	if not items:
+		return 0
+	total = sum(weight for _progress, weight in items)
+	if total:
+		return _percent(sum(progress * weight for progress, weight in items) / total)
+	return _percent(sum(progress for progress, _weight in items) / len(items))
+
+
+def _wip(implementation, features):
+	limit = cint(frappe.db.get_value("Implementation", implementation, "max_parallel_features"))
+	running = sum(1 for f in features if f.status == "In Progress")
+	return {"running": running, "limit": limit, "over": bool(limit and running > limit)}
+
+
+@frappe.whitelist()
+def get_features(implementation):
+	"""The implementation's features with effort, progress, chapters, releases and issue figures."""
+	_require_implementation(implementation)
+	from phamos.phamos.doctype.implementation_release.implementation_release import feature_efforts
+
+	features = _feature_rows(implementation)
+	names = [f.name for f in features]
+	issues = _issues_by_feature(names)
+	efforts = feature_efforts(features) if features else {}
+	chapters = _parents_by_feature("Implementation Chapter Feature", "Implementation Chapter", names, "chapter_title")
+	releases = _parents_by_feature("Implementation Release Feature", "Implementation Release", names, "title")
+	owners = {u: frappe.utils.get_fullname(u) for u in {f.owner_user for f in features if f.owner_user}}
+	today_date = getdate(today())
+	rows = []
+	for feature in features:
+		linked = issues.get(feature.name, [])
+		open_issues = [i for i in linked if i.state != "closed"]
+		rows.append(
+			{
+				# the responsible's name only: a staff e-mail address is not needed in the cockpit
+				**{key: value for key, value in feature.items() if key != "owner_user"},
+				"owner_name": owners.get(feature.owner_user),
+				"effort_hours": round(flt(efforts.get(feature.name)), 1),
+				"progress": feature_progress(feature, linked),
+				"chapters": chapters.get(feature.name, []),
+				"releases": releases.get(feature.name, []),
+				"issues_open": len(open_issues),
+				"issues_total": len(linked),
+				# the oldest open issue, in days: what has been waiting longest on this card
+				"oldest_open_days": max(
+					((today_date - getdate(i.created_at)).days for i in open_issues if i.created_at), default=None
+				),
+				"touch_hours": round(sum(flt(i.total_touch_time) for i in linked) / 3600, 1),
+			}
+		)
+	return {
+		"features": rows,
+		"statuses": FEATURE_STATUSES,
+		"wip": _wip(implementation, features),
+		"can_move": _can_move_features(),
+	}
+
+
+@frappe.whitelist()
+def get_feature(implementation, name):
+	"""One feature in full: definition of done, history, doctypes and its GitLab issues."""
+	_require_implementation(implementation)
+	if frappe.db.get_value("Implementation Feature", name, "implementation") != implementation:
+		frappe.throw(_("This feature does not belong to the implementation."), frappe.PermissionError)
+	doc = frappe.get_doc("Implementation Feature", name)
+	issues = _issues_by_feature([name]).get(name, [])
+	library = dict(
+		frappe.get_all(
+			"Implementation Doctype",
+			filters={"name": ["in", [d.implementation_doctype for d in doc.doctypes] or [""]]},
+			fields=["name", "kind"],
+			as_list=True,
+		)
+	)
+	contact = doc.dod_agreed_by and frappe.db.get_value("Contact", doc.dod_agreed_by, "full_name")
+	return {
+		**{field: doc.get(field) for field in FEATURE_LIST_FIELDS if field != "owner_user"},
+		"description": sanitize_html(doc.description or "", always_sanitize=True),
+		"definition_of_done": doc.definition_of_done,
+		"dod_agreed_by_name": contact or doc.dod_agreed_by,
+		"owner_name": doc.owner_user and frappe.utils.get_fullname(doc.owner_user),
+		"progress": feature_progress(doc, issues),
+		"chapters": _parents_by_feature("Implementation Chapter Feature", "Implementation Chapter", [name], "chapter_title").get(name, []),
+		"releases": _parents_by_feature("Implementation Release Feature", "Implementation Release", [name], "title").get(name, []),
+		"history": [
+			{"date": row.date, "status": row.status, "level": row.level, "note": row.note, "by": frappe.utils.get_fullname(row.by) if row.by else None}
+			for row in reversed(doc.progress)
+		],
+		"doctypes": [
+			{"name": row.implementation_doctype, "kind": library.get(row.implementation_doctype), "work_done": row.work_done}
+			for row in doc.doctypes
+		],
+		"touch_hours": round(sum(flt(i.total_touch_time) for i in issues) / 3600, 1),
+		# what the cockpit shows of each issue; GitLab-internal figures stay on the server
+		"issues": [
+			{field: i.get(field) for field in ("name", "issue_id", "title", "state", "issue_url", "time_estimate_hours")}
+			for i in issues
+		],
+		"can_move": _can_move_features(),
+		"statuses": FEATURE_STATUSES,
+	}
+
+
+@frappe.whitelist()
+def set_feature_status(implementation, name, status):
+	"""Move a card on the Kanban. Status is daily work (#1971); a move to Dropped after the
+	baseline is recorded as a scope change for the customer by the feature's own hooks."""
+	_require_implementation(implementation)
+	if not _can_move_features():
+		frappe.throw(_("Only phamos staff can move features."), frappe.PermissionError)
+	if status not in FEATURE_STATUSES:
+		frappe.throw(_("Unknown status {0}.").format(status))
+	if frappe.db.get_value("Implementation Feature", name, "implementation") != implementation:
+		frappe.throw(_("This feature does not belong to the implementation."), frappe.PermissionError)
+	doc = frappe.get_doc("Implementation Feature", name)
+	doc.check_permission("write")
+	doc.status = status
+	doc.save()
+	return {"status": doc.status, "wip": _wip(implementation, _feature_rows(implementation))}
+
+
+@frappe.whitelist()
+def get_wbs(implementation):
+	"""Implementation → Modules → Features → GitLab issues, with progress rolled up by hours."""
+	_require_implementation(implementation)
+	features = [f for f in _feature_rows(implementation) if f.status != "Dropped"]
+	issues = _issues_by_feature([f.name for f in features])
+	milestones = dict(
+		frappe.get_all(
+			"GitLab Milestones",
+			filters={"name": ["in", list({i.gitlab_milestone for rows in issues.values() for i in rows if i.gitlab_milestone}) or [""]]},
+			fields=["name", "title"],
+			as_list=True,
+		)
+	)
+	modules = {}
+	for feature in features:
+		linked = issues.get(feature.name, [])
+		node = {
+			"name": feature.name,
+			"title": feature.title,
+			"status": feature.status,
+			"progress": feature_progress(feature, linked),
+			"weight_hours": round(feature_weight(feature, linked), 1),
+			"issues": [
+				{
+					"name": i.name,
+					"issue_id": i.issue_id,
+					"title": i.title,
+					"state": i.state,
+					"url": i.issue_url,
+					"milestone": milestones.get(i.gitlab_milestone) or i.gitlab_milestone,
+				}
+				for i in linked
+			],
+		}
+		modules.setdefault(feature.module or "", []).append(node)
+	tree = []
+	for module, nodes in sorted(modules.items(), key=lambda item: (item[0] == "", item[0])):
+		tree.append(
+			{
+				"module": module,
+				"progress": roll_up((n["progress"], n["weight_hours"]) for n in nodes),
+				"weight_hours": round(sum(n["weight_hours"] for n in nodes), 1),
+				"features": nodes,
+			}
+		)
+	all_nodes = [n for m in tree for n in m["features"]]
+	return {
+		"progress": roll_up((n["progress"], n["weight_hours"]) for n in all_nodes),
+		"weight_hours": round(sum(n["weight_hours"] for n in all_nodes), 1),
+		"weighted": any(n["weight_hours"] for n in all_nodes),
+		"modules": tree,
+	}
+
+
+# Roadmap (#1694, data #2033): modules in their depth levels over time.
+CHAPTER_STATUSES_HIDDEN_FROM_CUSTOMERS = ("Draft", "Cancelled")
+# Draft chapters are not agreed yet and Cancelled ones won't happen: neither decides the end date.
+CHAPTER_STATUSES_ON_CRITICAL_PATH = ("Planned", "In Progress", "Blocked")
+ROADMAP_CHAPTER_FIELDS = (
+	"name",
+	"chapter_title",
+	"status",
+	"module",
+	"planned_start",
+	"target_date",
+	"current_level",
+	"target_level",
+)
+
+
+def _can_propose_dates():
+	"""Whether the Roadmap shows "Propose a date change". Off for everyone for now (#2219).
+
+	The button opened the Implementation Change form in Desk, where the new dates can't be
+	entered: the values are read-only there, so a saved change had none. #2219 brings a way to
+	propose a chapter's dates; then staff who may create an Implementation Change get the button
+	again (is_internal_user() and create permission).
+	"""
+	return False
+
+
+def _baseline_rows(implementation):
+	"""The current baseline and its chapter dates and levels by chapter, and the features it holds.
+
+	Read here rather than through `get_baseline_variance`: that one checks Desk read permission on
+	Implementation, which customers (website users) don't have, and reads every chapter again.
+	"""
+	baseline = frappe.db.get_value(
+		"Implementation Baseline",
+		{"implementation": implementation, "is_current": 1},
+		["name", "baseline_date"],
+		as_dict=True,
+	)
+	if not baseline:
+		return None, {}, set()
+	chapters = {
+		row.chapter: row
+		for row in frappe.get_all(
+			"Implementation Baseline Chapter",
+			filters={"parent": baseline.name, "parenttype": "Implementation Baseline"},
+			fields=["chapter", "planned_start", "target_date", "current_level"],
+		)
+	}
+	features = set(
+		frappe.get_all(
+			"Implementation Baseline Feature",
+			filters={"parent": baseline.name, "parenttype": "Implementation Baseline"},
+			pluck="feature",
+		)
+	)
+	return baseline, chapters, features
+
+
+def _target_reached(row):
+	"""A chapter (or module row) is done when it has reached its target level.
+
+	Chapters have no Done status; their level says how far they are (#2033 decision 7). Done
+	work has no slack and doesn't decide the end date any more.
+	"""
+	target = cint(row.target_level)
+	return bool(target) and cint(row.current_level) >= target
+
+
+def _days_between(then, now):
+	if not then or not now:
+		return None
+	return (getdate(now) - getdate(then)).days
+
+
+def _finished_dates(features):
+	"""{feature: date of its latest progress row with status Live}."""
+	finished = {}
+	for row in frappe.get_all(
+		"Implementation Feature Progress",
+		filters={"parent": ["in", features or [""]], "parenttype": "Implementation Feature", "status": "Live"},
+		fields=["parent", "date"],
+	):
+		if row.date and (row.parent not in finished or getdate(row.date) > getdate(finished[row.parent])):
+			finished[row.parent] = row.date
+	return finished
+
+
+def _roadmap_markers(implementation, features_by_name, visible_chapters):
+	"""GitLab milestones with a due date and the releases still planned, as dated markers.
+
+	A release tied to a chapter the viewer doesn't see (a Draft one, for customers) stays hidden
+	with it.
+	"""
+	projects = frappe.get_all("GitLab Project", filters={"implementation": implementation}, pluck="name")
+	milestones = (
+		frappe.get_all(
+			"GitLab Milestones",
+			filters={"gitlab_project": ["in", projects], "due_date": ["is", "set"]},
+			fields=["name", "title", "due_date", "state", "web_url"],
+			order_by="due_date asc",
+		)
+		if projects
+		else []
+	)
+	releases = frappe.get_all(
+		"Implementation Release",
+		filters={"implementation": implementation, "status": ["!=", "Cancelled"], "target_date": ["is", "set"]},
+		fields=["name", "title", "target_date", "chapter"],
+		order_by="target_date asc",
+	)
+	releases = [r for r in releases if not r.chapter or r.chapter in visible_chapters]
+	release_features = {}
+	for row in frappe.get_all(
+		"Implementation Release Feature",
+		filters={"parent": ["in", [r.name for r in releases] or [""]], "parenttype": "Implementation Release"},
+		fields=["parent", "feature"],
+	):
+		release_features.setdefault(row.parent, []).append(row.feature)
+
+	markers = [
+		{
+			"type": "milestone",
+			"name": m.name,
+			"title": m.title,
+			"date": m.due_date,
+			"state": m.state,
+			"web_url": m.web_url,
+		}
+		for m in milestones
+	]
+	for release in releases:
+		late = [
+			{"name": f.name, "title": f.title}
+			for f in (features_by_name.get(name) for name in release_features.get(release.name, []))
+			# a Live feature is done, however late: only open work can still miss the release
+			if f and f.status != "Live" and f.target_date and getdate(f.target_date) > getdate(release.target_date)
+		]
+		markers.append(
+			{
+				"type": "release",
+				"name": release.name,
+				"title": release.title,
+				"date": release.target_date,
+				"late_features": late,
+			}
+		)
+	return markers
+
+
+def _roadmap_dates(rows, markers):
+	"""Every date the Roadmap draws (bars, baseline bars, events, markers), for its initial range."""
+	dates = []
+	for row in rows:
+		for bar in row["bars"]:
+			dates += [bar["planned_start"], bar["target_date"]]
+			if bar["baseline"]:
+				dates += [bar["baseline"]["planned_start"], bar["baseline"]["target_date"]]
+		dates += [event["date"] for event in row["events"]]
+	dates += [marker["date"] for marker in markers]
+	return [getdate(value) for value in dates if value]
+
+
+@frappe.whitelist()
+def get_roadmap(implementation):
+	"""Everything the Roadmap draws: one row per module with its chapters as level-step bars,
+	features as events, chapter dependencies, the critical path, markers and the baseline.
+
+	Customers get the same picture without Draft and Cancelled chapters (#1694 decision 12).
+	The critical path runs through the agreed chapters only, for staff and customers alike, so
+	both see the same slack.
+	"""
+	_require_implementation(implementation)
+
+	internal = is_internal_user()
+	chapters = frappe.get_all(
+		"Implementation Chapter",
+		filters={"implementation": implementation},
+		fields=list(ROADMAP_CHAPTER_FIELDS),
+		order_by="planned_start asc, creation asc",
+	)
+	if not internal:
+		chapters = [c for c in chapters if c.status not in CHAPTER_STATUSES_HIDDEN_FROM_CUSTOMERS]
+	chapter_names = {c.name for c in chapters}
+	depends_on = {}
+	for row in frappe.get_all(
+		"Implementation Chapter Dependency",
+		filters={"parent": ["in", list(chapter_names) or [""]], "parenttype": "Implementation Chapter"},
+		fields=["parent", "chapter"],
+	):
+		if row.chapter not in depends_on.setdefault(row.parent, []):
+			depends_on[row.parent].append(row.chapter)
+
+	path = critical_path(
+		[
+			{
+				"name": c.name,
+				"planned_start": c.planned_start,
+				"target_date": c.target_date,
+				"depends_on": depends_on.get(c.name, []),
+			}
+			for c in chapters
+			if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH and not _target_reached(c)
+		]
+	)["items"]
+
+	baseline, baseline_chapters, baseline_features = _baseline_rows(implementation)
+
+	def chapter_bar(chapter):
+		then = baseline_chapters.get(chapter.name)
+		on_path = path.get(chapter.name, {})
+		done = _target_reached(chapter)
+		return {
+			"name": chapter.name,
+			"chapter": chapter.name,
+			"title": chapter.chapter_title or chapter.name,
+			"status": chapter.status,
+			"planned_start": chapter.planned_start,
+			"target_date": chapter.target_date,
+			# the level when the plan was agreed: where the level step starts (None without baseline)
+			"start_level": (cint(then.current_level) or None) if then else None,
+			"current_level": cint(chapter.current_level) or None,
+			"target_level": cint(chapter.target_level) or None,
+			"done": done,
+			"critical": False if done else on_path.get("critical"),
+			"slack_days": None if done else on_path.get("slack_days"),
+			"cycle": bool(on_path.get("cycle")),
+			"baseline": {
+				"planned_start": then.planned_start,
+				"target_date": then.target_date,
+				"shift_days": _days_between(then.target_date, chapter.target_date),
+			}
+			if then
+			else None,
+			"is_new": bool(baseline) and not then,
+		}
+
+	features = [f for f in _feature_rows(implementation) if f.status != "Dropped"]
+	features_by_name = {f.name: f for f in features}
+	finished = _finished_dates([f.name for f in features if f.status == "Live"])
+
+	def feature_events(feature):
+		common = {
+			"name": feature.name,
+			"title": feature.title,
+			"status": feature.status,
+			"is_new": bool(baseline) and feature.name not in baseline_features,
+		}
+		events = []
+		if feature.planned_start:
+			events.append({**common, "kind": "planned", "date": feature.planned_start})
+		if feature.status == "Live" and finished.get(feature.name):
+			events.append({**common, "kind": "finished", "date": finished[feature.name]})
+		return events
+
+	# Rows in the order of the Implementation's Modules table (Implementation Item). Saving a
+	# chapter adds a row for it there, often without a module; a chapter's module is its own
+	# `module`, else the module set on its row. Chapters of a module missing from the table get a
+	# row after the others; chapters and features without any module go to "No module".
+	items = frappe.get_all(
+		"Implementation Item",
+		filters={"parent": implementation, "parenttype": "Implementation", "parentfield": "modules"},
+		fields=["name", "module", "implementation_chapter", "planned_start", "target_date", "current_level", "target_level"],
+		order_by="idx asc",
+	)
+	# two rows pointing at the same chapter with different modules: the later row wins
+	module_of_chapter = {i.implementation_chapter: i.module for i in items if i.implementation_chapter and i.module}
+	rows = {}
+	for item in items:
+		# a row whose chapter the viewer doesn't see (Draft, for customers) would show up empty
+		# and give the chapter away
+		if item.module and (not item.implementation_chapter or item.implementation_chapter in chapter_names):
+			rows.setdefault(item.module, {"module": item.module, "label": item.module, "bars": [], "events": []})
+	no_module = {"bars": [], "events": []}
+	for chapter in chapters:
+		module = chapter.module or module_of_chapter.get(chapter.name)
+		if not module:
+			no_module["bars"].append(chapter_bar(chapter))
+			continue
+		rows.setdefault(module, {"module": module, "label": module, "bars": [], "events": []})
+		rows[module]["bars"].append(chapter_bar(chapter))
+	for item in items:
+		if item.module and not item.implementation_chapter:
+			# A module row without a chapter is planned on the Modules table only: a bar from its
+			# own dates and levels, outside the critical path. (A row with a chapter never shows its
+			# own dates: the chapter is the plan, and a hidden Draft chapter must stay hidden.)
+			rows[item.module]["bars"].append(
+				{
+					"name": f"item:{item.name}",
+					"chapter": None,
+					"title": item.module,
+					"status": None,
+					"planned_start": item.planned_start,
+					"target_date": item.target_date,
+					"start_level": None,
+					"current_level": cint(item.current_level) or None,
+					"target_level": cint(item.target_level) or None,
+					"done": _target_reached(item),
+					"critical": None,
+					"slack_days": None,
+					"cycle": False,
+					"baseline": None,
+					"is_new": False,
+				}
+			)
+	for feature in features:
+		if feature.module:
+			target = rows.setdefault(feature.module, {"module": feature.module, "label": feature.module, "bars": [], "events": []})
+		else:
+			target = no_module
+		target["events"].extend(feature_events(feature))
+	modules = list(rows.values())
+
+	# All links between the chapters shown, Draft ones included for staff; critical_path() only
+	# saw the agreed chapters, so its own list is not enough here.
+	by_name = {c.name: c for c in chapters}
+	dependencies = [
+		{"from": predecessor, "to": successor, "conflict": dependency_conflict(by_name[predecessor], by_name[successor])}
+		for successor, predecessors in depends_on.items()
+		for predecessor in predecessors
+		if predecessor in by_name and successor in by_name
+	]
+
+	markers = _roadmap_markers(implementation, features_by_name, chapter_names)
+	dates = _roadmap_dates([*modules, no_module], markers)
+	return {
+		"modules": modules,
+		"no_module": no_module,
+		"dependencies": dependencies,
+		"markers": markers,
+		"baseline": {"name": baseline.name, "baseline_date": baseline.baseline_date} if baseline else None,
+		"range": {"start": min(dates), "end": max(dates)} if dates else None,
+		"can_propose": _can_propose_dates(),
+	}

@@ -1,0 +1,38 @@
+{#- /de/dokumentation, /en/documentation. Context: index.py. Frappe's Jinja does not autoescape: database values go through `| e`. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs with context %}
+{% from "phamos/templates/web_profile/docs_macros.html" import book_tile, search_box with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-docs">
+	<header class="wp-page-head">
+		<div class="wp-page-head-top">{{ breadcrumbs(crumbs) }}</div>
+		<div class="wp-page-head-main">
+			<div>
+				<h1>{{ _("Documentation") }}</h1>
+				<p class="wp-intro">{{ intro | e }}</p>
+				{%- if content_in_other_language %}<p class="wp-note wp-docs-language">{{ _("This documentation is in German.") }}</p>{% endif %}
+			</div>
+		</div>
+	</header>
+	<div class="wp-toolbar">{{ search_box(search_action, lang) }}</div>
+
+	{%- for group in groups %}
+	<section class="wp-related" {% if group.shelf %}aria-labelledby="wp-docs-shelf-{{ loop.index }}"{% else %}aria-label="{{ _('Documentation') }}"{% endif %}>
+		{%- if group.shelf and groups | length > 1 %}
+		<div class="wp-related-head"><h2 id="wp-docs-shelf-{{ loop.index }}">{{ group.shelf | e }}</h2></div>
+		{%- endif %}
+		<ul class="wp-grid">
+			{%- for book in group.books %}{{ book_tile(book) }}{% endfor %}
+		</ul>
+	</section>
+	{%- else %}
+	<p class="wp-note">{{ _("No documentation is published yet.") }}</p>
+	{%- endfor %}
+</main>
+{% endblock %}
+
+{% block script %}{{ super() }}{{ include_script("web_docs.bundle.js") }}{% endblock %}

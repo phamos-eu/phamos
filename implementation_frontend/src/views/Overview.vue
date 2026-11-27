@@ -1,35 +1,25 @@
 <template>
 	<!-- First draft of the Overview (#1675 builds it out): status basics only. -->
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-5">
+	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 p-4">
+		<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
 			<div v-if="current.error" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4 text-sm text-ink-red-4">
 				{{ current.error }}
 			</div>
 			<template v-else-if="data">
-				<div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-					<StatCard
-						:label="__('Phase')"
-						:value="data.phase_number ? `${data.phase_number} / 6` : '—'"
-						:hint="data.phase || ''"
-					/>
-					<StatCard :label="__('Status')" :value="data.status || '—'" :hint="data.trend ? __('Trend: {0}', [data.trend]) : ''" />
-					<StatCard
-						:label="__('Next review')"
-						:value="data.next_review_due ? formatDate(data.next_review_due) : '—'"
-						:hint="data.review_cadence || ''"
-					/>
-					<StatCard
-						:label="__('Since')"
-						:value="data.start_date ? formatDate(data.start_date) : '—'"
-						:hint="data.customer_name || ''"
-					/>
-				</div>
+				<KpiStrip
+					:items="[
+						{ label: __('Phase'), value: data.phase_number ? `${data.phase_number} / 6` : '—', hint: data.phase || '' },
+						{ label: __('Status'), value: data.status || '—', hint: data.trend ? __('Trend: {0}', [data.trend]) : '' },
+						{ label: __('Next review'), value: data.next_review_due ? formatDate(data.next_review_due) : '—', hint: data.review_cadence || '' },
+						{ label: __('Since'), value: data.start_date ? formatDate(data.start_date) : '—', hint: data.customer_name || '' },
+					]"
+				/>
 
 				<!-- Open reports through Phriend, one click to where they stand (internal, #1671) -->
 				<router-link
 					v-if="issueCounts"
 					:to="{ name: 'Issues', params: { implementation }, query: { scope: issueCounts.mine ? 'mine' : 'implementation' } }"
-					class="flex items-center gap-4 rounded-lg border border-outline-gray-2 bg-surface-white p-4 hover:border-outline-gray-3"
+					class="flex items-center gap-3 rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 hover:border-outline-gray-3"
 				>
 					<FeatherIcon name="inbox" class="h-5 w-5 text-ink-gray-6" />
 					<div class="min-w-0 flex-1">
@@ -41,7 +31,7 @@
 					<span class="text-sm font-medium text-ink-gray-7">{{ __("See where they stand") }} →</span>
 				</router-link>
 
-				<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+				<section class="rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2.5">
 					<h2 class="text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Latest status") }}</h2>
 					<p v-if="data.status_statement" class="mt-2 whitespace-pre-line text-sm text-ink-gray-8">{{ data.status_statement }}</p>
 					<p v-else class="mt-2 text-sm text-ink-gray-5">{{ __("No status update yet.") }}</p>
@@ -56,7 +46,7 @@
 import { computed, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import dayjs from "dayjs"
-import StatCard from "@spa/components/dashboard/StatCard.vue"
+import KpiStrip from "../components/KpiStrip.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { current } from "../implementationStore.js"
 import { scope } from "../scopeStore.js"

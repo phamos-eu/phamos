@@ -31,6 +31,18 @@ const TYPES = [
 	["Question", "Question", "I'm not sure how"],
 	["Other", "Something else", "None of these"],
 ];
+// "Test result": proof of a test, posted as a comment on a GitLab issue (not an ERPNext Issue).
+// For everyone with Phriend in Desk and the cockpits, never on the portal; the chip shows once
+// the server says so.
+const TEST = "Test";
+const TEST_TYPE = [TEST, "Test result", "Post to a GitLab issue"];
+const TEST_RESULTS = [
+	["Passed", "Passed"],
+	["Failed", "Failed"],
+	["Note", "Just a note"],
+];
+// The team's status labels, one per issue (api.STATUS_LABELS; the server checks them)
+const STATUS_LABELS = ["Working", "Ready for Dev", "PM Review", "Testing", "Ready for Production", "Testing on Production"];
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 // the ball again, small, for the header; its own gradient id, because the big ball (hidden
 // while the flow is open) can't lend its gradient to another drawing
@@ -48,7 +60,16 @@ class Flow {
 		this.on_close = on_close;
 		this.step = 0;
 		const { canvas, from_failed, has_screenshot, ...text } = draft || {};
-		this.values = { title: "", comment: "", report_type: "Bug", priority: "Medium", ...text };
+		this.values = {
+			title: "",
+			comment: "",
+			report_type: "Bug",
+			priority: "Medium",
+			gitlab_issue: "",
+			test_result: "Passed",
+			test_status: "", // "" = leave the issue's status label as it is
+			...text,
+		};
 		this.include_screenshot = has_screenshot !== false;
 		this.touched = new Set(); // steps the user changed something in
 		if (draft && (draft.title || draft.comment)) this.touched.add(STEP.text);
@@ -66,6 +87,11 @@ class Flow {
 		if (canvas) this.use_screenshot(canvas);
 		else this.start_capture();
 		this.load_reported();
+		this.load_test_target();
+	}
+
+	is_test() {
+		return this.values.report_type === TEST;
 	}
 
 	add_styles() {
@@ -82,12 +108,15 @@ class Flow {
 	render() {
 		const __ = this.__;
 		const where = this.ctx.where || this.ctx.page_title || "";
-		const types = TYPES.map(
-			([value, label, hint]) =>
-				`<button type="button" class="chip" data-type="${value}"><span>${escape_html(__(label))}</span><small>${escape_html(__(hint))}</small></button>`
-		).join("");
+		const chip = ([value, label, hint], hidden = false) =>
+			`<button type="button" class="chip" data-type="${value}"${hidden ? " hidden" : ""}><span>${escape_html(__(label))}</span><small>${escape_html(__(hint))}</small></button>`;
+		const types = TYPES.map((type) => chip(type)).join("") + chip(TEST_TYPE, true);
 		const priorities = PRIORITIES.map(
 			(value) => `<button type="button" class="chip slim" data-priority="${value}">${escape_html(__(value))}</button>`
+		).join("");
+		const results = TEST_RESULTS.map(
+			([value, label]) =>
+				`<button type="button" class="chip slim" data-test-result="${value}">${escape_html(__(label))}</button>`
 		).join("");
 
 		this.layer = document.createElement("div");
@@ -116,8 +145,24 @@ class Flow {
 						<p class="field" id="ph-type-label">${escape_html(__("Type"))}</p>
 						<div class="chips" role="radiogroup" aria-labelledby="ph-type-label" data-group="report_type">${types}</div>
 						<div class="gap"></div>
-						<p class="field" id="ph-priority-label">${escape_html(__("How urgent is it?"))}</p>
-						<div class="chips" role="radiogroup" aria-labelledby="ph-priority-label" data-group="priority">${priorities}</div>
+						<div data-priority-box>
+							<p class="field" id="ph-priority-label">${escape_html(__("How urgent is it?"))}</p>
+							<div class="chips" role="radiogroup" aria-labelledby="ph-priority-label" data-group="priority">${priorities}</div>
+						</div>
+						<div data-test-box hidden>
+							<label class="field" for="ph-in-gitlab">${escape_html(__("GitLab issue you tested"))}</label>
+							<input class="input" id="ph-in-gitlab" maxlength="300" autocomplete="off" placeholder="${escape_html(__("e.g. #1862, phamos/phamos#1862 or the issue's link"))}">
+							<p class="reported-empty" data-test-from></p>
+							<div class="gap"></div>
+							<p class="field" id="ph-result-label">${escape_html(__("Result"))}</p>
+							<div class="chips" role="radiogroup" aria-labelledby="ph-result-label" data-group="test_result">${results}</div>
+							<div class="gap"></div>
+							<label class="field" for="ph-in-status">${escape_html(__("Set status on the issue"))}</label>
+							<select class="input" id="ph-in-status">
+								<option value="">${escape_html(__("Don't change"))}</option>
+								${STATUS_LABELS.map((s) => `<option value="${escape_html(s)}">${escape_html(s)}</option>`).join("")}
+							</select>
+						</div>
 						<section class="reported" data-reported aria-live="polite">
 							<p class="reported-empty">${escape_html(__("Looking for earlier reports…"))}</p>
 						</section>
@@ -130,11 +175,11 @@ class Flow {
 						</div>
 					</section>
 					<section class="pane" data-pane="2" hidden>
-						<label class="field" for="ph-in-title">${escape_html(__("In a few words"))}</label>
-						<input class="input" id="ph-in-title" maxlength="120" autocomplete="off" placeholder="${escape_html(__("e.g. Save does nothing on a new lead"))}">
+						<label class="field" for="ph-in-title" data-title-label></label>
+						<input class="input" id="ph-in-title" maxlength="120" autocomplete="off">
 						<div class="gap"></div>
-						<label class="field" for="ph-in-comment">${escape_html(__("What did you do, and what did you expect?"))}</label>
-						<textarea class="input" id="ph-in-comment" rows="6" placeholder="${escape_html(__("e.g. I filled in the company name and clicked Save. Nothing happened."))}"></textarea>
+						<label class="field" for="ph-in-comment" data-comment-label></label>
+						<textarea class="input" id="ph-in-comment" rows="6"></textarea>
 					</section>
 					<section class="pane" data-pane="3" hidden></section>
 				</main>
@@ -158,6 +203,15 @@ class Flow {
 			toggle_shot: $("[data-toggle-shot]"),
 			in_title: $("#ph-in-title"),
 			in_comment: $("#ph-in-comment"),
+			title_label: $("[data-title-label]"),
+			comment_label: $("[data-comment-label]"),
+			in_gitlab: $("#ph-in-gitlab"),
+			in_status: $("#ph-in-status"),
+			test_box: $("[data-test-box]"),
+			test_from: $("[data-test-from]"),
+			priority_box: $("[data-priority-box]"),
+			reported: $("[data-reported]"),
+			test_chip: $(`[data-type="${TEST}"]`),
 			summary: $('[data-pane="3"]'),
 			footer: $("footer"),
 			back: $("[data-back]"),
@@ -169,9 +223,60 @@ class Flow {
 		};
 		this.el.in_title.value = this.values.title;
 		this.el.in_comment.value = this.values.comment;
+		this.el.in_gitlab.value = this.values.gitlab_issue;
+		this.el.in_status.value = STATUS_LABELS.includes(this.values.test_status) ? this.values.test_status : "";
+		// a draft of a test result (sent, failed, reopened): its chip shows at once
+		if (this.is_test() && this.el.test_chip) this.el.test_chip.hidden = false;
 		this.footer_html = this.el.footer.innerHTML;
 		this.bind();
 		this.sync_choices();
+		this.sync_mode();
+	}
+
+	// A test result asks for the GitLab issue and the result instead of urgency, and its text
+	// step speaks of the test.
+	sync_mode() {
+		const __ = this.__;
+		const test = this.is_test();
+		this.el.priority_box.hidden = test;
+		this.el.test_box.hidden = !test;
+		if (test) this.el.reported.hidden = true;
+		else if (!this.reported_unavailable) this.el.reported.hidden = false;
+		this.el.title_label.textContent = test ? __("What did you test?") : __("In a few words");
+		this.el.in_title.placeholder = test
+			? __("e.g. DAP: Stop asks for the GitLab issue")
+			: __("e.g. Save does nothing on a new lead");
+		this.el.comment_label.textContent = test
+			? __("Steps and what you saw")
+			: __("What did you do, and what did you expect?");
+		this.el.in_comment.placeholder = test
+			? __("e.g. Started a timer on #1862, clicked Stop, the dialog showed the issue. As expected.")
+			: __("e.g. I filled in the company name and clicked Save. Nothing happened.");
+	}
+
+	// Whether this user may post test results, and the GitLab issue to suggest (the running
+	// DAP timer's, else the last one). Quiet on failure: the chip simply doesn't show.
+	async load_test_target() {
+		if (!this.el.test_chip) return;
+		let result;
+		try {
+			result = await call("phamos.phriend.api.get_test_target", {}, this.phriend.host.csrf_token());
+		} catch (e) {
+			return;
+		}
+		if (!this.layer.isConnected || !result || !result.allowed) return;
+		this.el.test_chip.hidden = false;
+		const target = result.target;
+		if (target && !this.values.gitlab_issue) {
+			const __ = this.__;
+			this.values.gitlab_issue = target.reference;
+			this.el.in_gitlab.value = target.reference;
+			this.el.test_from.classList.remove("warn");
+			this.el.test_from.textContent =
+				target.from === "timer"
+					? __("From your running timer: {0}", [target.label])
+					: __("The issue of your last test result");
+		}
 	}
 
 	bind() {
@@ -193,6 +298,7 @@ class Flow {
 			else if (t.hasAttribute("data-toggle-shot")) this.toggle_screenshot();
 			else if (t.dataset.type) this.choose("report_type", t.dataset.type, STEP.kind);
 			else if (t.dataset.priority) this.choose("priority", t.dataset.priority, STEP.kind);
+			else if (t.dataset.testResult) this.choose("test_result", t.dataset.testResult, STEP.kind);
 			else if (t.hasAttribute("data-discard")) this.close(true);
 			else if (t.hasAttribute("data-keep")) this.restore_footer();
 			else if (t.hasAttribute("data-shortcut")) this.edit_shortcut();
@@ -207,6 +313,16 @@ class Flow {
 		};
 		this.el.in_title.addEventListener("input", typing("title", STEP.text));
 		this.el.in_comment.addEventListener("input", typing("comment", STEP.text));
+		this.el.in_gitlab.addEventListener("input", (e) => {
+			typing("gitlab_issue", STEP.kind)(e);
+			this.el.test_from.classList.remove("warn");
+			this.el.test_from.textContent = "";
+		});
+		this.el.in_status.addEventListener("change", (e) => {
+			this.values.test_status = e.target.value;
+			this.touched.add(STEP.kind);
+			this.update_footer();
+		});
 		this.el.in_title.addEventListener("keydown", (e) => {
 			if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.isComposing) {
 				e.preventDefault();
@@ -374,13 +490,15 @@ class Flow {
 		this.el.skip.hidden = !(on_shot && this.include_screenshot && !this.capture_failed);
 		// always "Next": every step is optional anyway, and a label that changes while typing
 		// moves the button (UX review of !1162)
-		this.el.next.textContent = this.step === LAST_STEP ? __("Send to Phriend") : __("Next");
+		const send_label = this.is_test() ? __("Post to GitLab") : __("Send to Phriend");
+		this.el.next.textContent = this.step === LAST_STEP ? send_label : __("Next");
 	}
 
 	choose(key, value, step) {
 		this.values[key] = value;
 		this.touched.add(step);
 		this.sync_choices();
+		if (key === "report_type") this.sync_mode();
 		this.update_footer();
 	}
 
@@ -396,6 +514,7 @@ class Flow {
 			});
 		mark("[data-type]", "type", this.values.report_type);
 		mark("[data-priority]", "priority", this.values.priority);
+		mark("[data-test-result]", "testResult", this.values.test_result);
 	}
 
 	// the title the server uses when it's left empty (shown greyed out): where it happened
@@ -417,7 +536,10 @@ class Flow {
 			errors ? (errors === 1 ? __("1 error") : __("{0} errors", [errors])) : "",
 			failed ? (failed === 1 ? __("1 failed call") : __("{0} failed calls", [failed])) : "",
 		].filter(Boolean).join(", ");
+		const test = this.is_test();
 		const facts = [
+			...(test ? [[__("GitLab issue"), v.gitlab_issue.trim() || __("not set yet")]] : []),
+			...(test ? [[__("Status"), v.test_status ? `→ ${v.test_status}` : __("unchanged")]] : []),
 			[__("Page"), ctx.where || ctx.page_title || ctx.route],
 			[__("Address"), ctx.page_url],
 			[__("Browser"), c.browser],
@@ -436,7 +558,7 @@ class Flow {
 						<p class="meta">${escape_html(
 							[
 								__(type_label(v.report_type)),
-								__(v.priority),
+								test ? __(result_label(v.test_result)) : __(v.priority),
 								shot ? __("with screenshot") : waiting ? __("screenshot still being taken…") : __("no screenshot"),
 							].join(" · ")
 						)}</p>
@@ -530,6 +652,19 @@ class Flow {
 	args_without_screenshot() {
 		const v = this.values;
 		const ctx = this.ctx;
+		if (this.is_test()) {
+			return {
+				gitlab_issue: v.gitlab_issue.trim(),
+				result: v.test_result,
+				status: v.test_status || "",
+				title: v.title.trim(),
+				comment: v.comment.trim(),
+				route: ctx.route || "",
+				page_url: ctx.page_url,
+				page_title: ctx.where || ctx.page_title || "",
+				context: ctx.context,
+			};
+		}
 		return {
 			title: v.title.trim(),
 			comment: v.comment.trim(),
@@ -545,6 +680,14 @@ class Flow {
 	}
 
 	send() {
+		if (this.is_test() && !this.values.gitlab_issue.trim()) {
+			// nowhere to post it: back to the field, with a word why
+			this.show(STEP.kind);
+			this.el.test_from.classList.add("warn");
+			this.el.test_from.textContent = this.__("Enter the GitLab issue first.");
+			setTimeout(() => this.el.in_gitlab.focus(), 0);
+			return;
+		}
 		const args = this.args_without_screenshot();
 		// Only a screenshot the user has seen goes out: on the screenshot step or as the thumbnail
 		// on the summary. One still being taken, or not looked at, stays here (GDPR review of
@@ -557,8 +700,12 @@ class Flow {
 				comment: this.values.comment,
 				report_type: this.values.report_type,
 				priority: this.values.priority,
+				gitlab_issue: this.values.gitlab_issue,
+				test_result: this.values.test_result,
+				test_status: this.values.test_status,
 				has_screenshot: include,
 			},
+			test: this.is_test(),
 			canvas: null, // the screenshot with the drawing, kept for "Edit" after a failure
 			// encodes the screenshot after the flow closed, so closing feels instant
 			async args() {
@@ -630,6 +777,7 @@ class Flow {
 				this.phriend.host.csrf_token()
 			);
 		} catch (e) {
+			this.reported_unavailable = true;
 			box.hidden = true; // not worth a message: reporting still works
 			return;
 		}
@@ -766,8 +914,13 @@ class Flow {
 }
 
 function type_label(value) {
-	const type = TYPES.find(([v]) => v === value);
+	const type = [...TYPES, TEST_TYPE].find(([v]) => v === value);
 	return type ? type[1] : value;
+}
+
+function result_label(value) {
+	const result = TEST_RESULTS.find(([v]) => v === value);
+	return result ? result[1] : value;
 }
 
 function version_of(versions) {
