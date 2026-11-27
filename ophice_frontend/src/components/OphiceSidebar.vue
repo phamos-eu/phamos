@@ -90,7 +90,7 @@
 				@dragstart="onFlagDragStart"
 				@dragend="$emit('flag-drag', false)"
 			>
-				<span class="h-5 w-5 flex-shrink-0"><FlagIcon :color="flagColor" /></span>
+				<span class="h-5 w-5 flex-shrink-0"><FlagIcon :color="flagLook.color" :pattern="flagLook.pattern" /></span>
 				<span v-if="!collapsed" class="truncate">{{ placingFlag ? __("Click on the map") : __("Plant your flag") }}</span>
 			</button>
 			<div
@@ -267,9 +267,9 @@ const props = defineProps({
 	/** the encounter alert (#2135): "ask", "on", "blocked" or "muted", and its tooltip */
 	bell: { type: String, default: "ask" },
 	bellTitle: { type: String, default: "" },
-	/** my planted flag (#2130), or null; the colour it gets when I plant it; placing it right now */
+	/** my planted flag (#2130), or null; how it looks while it waits here; placing it right now */
 	flag: { type: Object, default: null },
-	flagColor: { type: String, default: "red" },
+	flagLook: { type: Object, default: () => ({ color: "red", pattern: "plain" }) },
 	placingFlag: { type: Boolean, default: false },
 })
 const emit = defineEmits([

@@ -697,7 +697,7 @@
 			:bell="bell"
 			:bell-title="bellTitle"
 			:flag="myFlag"
-			:flag-color="flagColor"
+			:flag-look="flagLook"
 			:placing-flag="placingFlag"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
@@ -1101,6 +1101,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,
@@ -2835,7 +2836,8 @@ function pinStyle(pin) {
 
 const viewportEl = ref(null)
 const flags = ref([])
-const flagColor = ref("red")
+// How my flag looks while it waits in the sidebar; it keeps its look when taken down.
+const flagLook = ref({ color: "red", pattern: "plain" })
 const placingFlag = ref(false)
 const draggingFlag = ref(false)
 const flagAim = ref(null)
@@ -2845,8 +2847,8 @@ const flagGhost = computed(() => {
 	if (!flagAim.value || !me.value) return null
 	return {
 		...flagAim.value,
-		color: myFlag.value?.color || flagColor.value,
-		pattern: myFlag.value?.pattern || "plain",
+		color: myFlag.value?.color || flagLook.value.color,
+		pattern: myFlag.value?.pattern || flagLook.value.pattern,
 		blocked: Boolean(flagBlocked(flagAim.value, { areas: areas.value, flags: flags.value, user: me.value.user })),
 	}
 })
@@ -2905,7 +2907,7 @@ async function saveFlag(args, { thump = false } = {}) {
 		if (thump) encounterAlert.thump()
 	} catch (e) {
 		flags.value = before
-		toast.error(errorText(e) || __("Your flag could not be planted."))
+		toast({ title: errorText(e) || __("Your flag could not be planted."), icon: "alert-circle" })
 	}
 }
 
@@ -2913,11 +2915,11 @@ function plantFlag(cell) {
 	if (!cell || !me.value) return
 	const why = flagBlocked(cell, { areas: areas.value, flags: flags.value, user: me.value.user })
 	if (why) {
-		toast.error(why === "area" ? __("A flag can't stand inside an area.") : __("There is already a flag on this spot."))
+		toast({ title: why === "area" ? __("A flag can't stand inside an area.") : __("There is already a flag on this spot."), icon: "alert-circle" })
 		return
 	}
 	// Planted where it lands right away; the server's answer (or its refusal) follows.
-	upsertFlag({ ...(myFlag.value || { color: flagColor.value, pattern: "plain" }), user: me.value.user, full_name: me.value.full_name, ...cell })
+	upsertFlag({ ...(myFlag.value || flagLook.value), user: me.value.user, full_name: me.value.full_name, ...cell })
 	saveFlag({ x: cell.x, y: cell.y }, { thump: true })
 }
 
@@ -2936,12 +2938,13 @@ function setFlagLook(look) {
 async function takeDownFlag() {
 	flagMenuOpen.value = false
 	const before = flags.value
+	if (myFlag.value) flagLook.value = { color: myFlag.value.color, pattern: myFlag.value.pattern }
 	flags.value = flags.value.filter((f) => f.user !== me.value?.user)
 	try {
 		await call(`${API}.take_down_my_flag`)
 	} catch (e) {
 		flags.value = before
-		toast.error(errorText(e) || __("Your flag could not be taken down."))
+		toast({ title: errorText(e) || __("Your flag could not be taken down."), icon: "alert-circle" })
 	}
 }
 
@@ -3610,7 +3613,7 @@ onMounted(async () => {
 		for (const notice of data.notices || []) upsertNotice(notice)
 		pins.value = data.pins || []
 		flags.value = data.flags || []
-		flagColor.value = data.flag_color || "red"
+		flagLook.value = data.flag_look || flagLook.value
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("Ophice could not be loaded.")

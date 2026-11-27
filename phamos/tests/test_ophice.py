@@ -1853,6 +1853,11 @@ class OphiceFlagTestCase(FrappeTestCase):
 		self.assertEqual([(f["x"], f["y"], f["color"], f["pattern"]) for f in mine], [(4, 5, "teal", "waves")])
 		ophice.take_down_my_flag()
 		self.assertEqual([f for f in ophice._flags() if f["user"] == "Administrator"], [])
+		# Taken down, it keeps its look; planted again, it comes back in it.
+		self.assertEqual(ophice.get_space()["flag_look"], {"color": "teal", "pattern": "waves"})
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(color="red")
+		self.assertEqual(ophice.set_my_flag(1, 1)["color"], "teal")
 
 	def test_not_inside_an_area(self):
 		self._area(1, 1, 3, 2)

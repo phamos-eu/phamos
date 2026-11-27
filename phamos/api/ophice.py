@@ -490,9 +490,9 @@ def get_space():
 		"background_layout": _background_layout(_background()),
 		"background_ratio": _background_ratio(_background()),
 		"areas": _areas(),
-		# Everyone's flags (#2130), and the colour a flag of mine gets before I choose one.
+		# Everyone's flags (#2130), and how mine looks while it waits in the sidebar.
 		"flags": _flags(),
-		"flag_color": _default_flag_color(user),
+		"flag_look": _my_flag_look(user),
 		# The map tools and the Debug menu are only shown to map editors (#2071).
 		"can_edit_map": can_edit_map(user),
 		# Cockpit spaces open their cockpit when I stop inside (#2076), unless I switched it off.
@@ -739,8 +739,25 @@ def _flag_blocked(x, y, user):
 	return ""
 
 
+def _my_flag_raw(user):
+	return frappe.db.get_value("DefaultValue", {"parent": user, "defkey": FLAG_KEY}, "defvalue")
+
+
 def _my_flag(user):
-	return _parse_flag(frappe.db.get_value("DefaultValue", {"parent": user, "defkey": FLAG_KEY}, "defvalue"))
+	return _parse_flag(_my_flag_raw(user))
+
+
+def _my_flag_look(user):
+	"""My flag's colour and pattern, also while it is taken down (it keeps its look)."""
+	try:
+		data = json.loads(_my_flag_raw(user) or "{}")
+	except (TypeError, ValueError):
+		data = {}
+	data = data if isinstance(data, dict) else {}
+	return {
+		"color": data.get("color") if data.get("color") in FLAG_COLORS else _default_flag_color(user),
+		"pattern": data.get("pattern") if data.get("pattern") in FLAG_PATTERNS else FLAG_PATTERNS[0],
+	}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -762,15 +779,15 @@ def set_my_flag(x=None, y=None, color=None, pattern=None):
 		reason = _flag_blocked(x, y, user)
 		if reason:
 			frappe.throw(reason)
-		flag = {**(flag or {}), "x": x, "y": y}
+		flag = {**(flag or _my_flag_look(user)), "x": x, "y": y}
 	elif not flag:
 		frappe.throw(_("Plant your flag on the map first."))
 	if color is not None and color not in FLAG_COLORS:
 		frappe.throw(_("Unknown colour."))
 	if pattern is not None and pattern not in FLAG_PATTERNS:
 		frappe.throw(_("Unknown pattern."))
-	flag["color"] = color or flag.get("color") or _default_flag_color(user)
-	flag["pattern"] = pattern or flag.get("pattern") or FLAG_PATTERNS[0]
+	flag["color"] = color or flag["color"]
+	flag["pattern"] = pattern or flag["pattern"]
 	frappe.defaults.set_user_default(FLAG_KEY, json.dumps(flag, separators=(",", ":")), user)
 	flag = {**flag, "user": user, "full_name": frappe.db.get_value("User", user, "full_name") or user}
 	_publish(EVENT_FLAG, flag)
@@ -779,10 +796,10 @@ def set_my_flag(x=None, y=None, color=None, pattern=None):
 
 @frappe.whitelist(methods=["POST"])
 def take_down_my_flag():
-	"""Take my flag off the map; it waits in the sidebar again."""
+	"""Take my flag off the map; it waits in the sidebar again, in the same colour and pattern."""
 	_require_user()
 	user = frappe.session.user
-	frappe.defaults.clear_user_default(FLAG_KEY, user)
+	frappe.defaults.set_user_default(FLAG_KEY, json.dumps(_my_flag_look(user), separators=(",", ":")), user)
 	_publish(EVENT_FLAG_REMOVED, {"user": user})
 
 

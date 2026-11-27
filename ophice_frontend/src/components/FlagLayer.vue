@@ -209,12 +209,16 @@ onBeforeUnmount(() => {
 .ophice-flag--lifted {
 	opacity: 0.35;
 }
+/* Above the areas, so a blocked spot inside one shows too. */
 .ophice-flag--ghost {
-	z-index: 5;
-	opacity: 0.7;
+	z-index: 30;
+	opacity: 0.75;
 	pointer-events: none;
 }
 .ophice-flag--blocked {
+	opacity: 1;
+}
+.ophice-flag--blocked .ophice-flag-icon {
 	opacity: 0.45;
 	filter: grayscale(1);
 }
