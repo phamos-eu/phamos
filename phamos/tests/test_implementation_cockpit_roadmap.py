@@ -87,7 +87,8 @@ class TestCockpitRoadmap(FrappeTestCase):
 		staff = get_roadmap(self.implementation)
 		self.assertEqual(set(bars(staff)), {agreed, draft, cancelled})
 		self.assertEqual(staff["dependencies"], [{"from": agreed, "to": draft, "conflict": False}])
-		self.assertTrue(staff["can_propose"])
+		# hidden until a date change can be proposed with its dates (#2219): the Desk form couldn't
+		self.assertFalse(staff["can_propose"])
 
 		frappe.get_doc(
 			{
