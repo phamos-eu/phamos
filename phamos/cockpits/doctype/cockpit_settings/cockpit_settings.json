@@ -34,6 +34,7 @@
   "personal_glow_breathing",
   "personal_cockpit_section",
   "personal_ideas_show_author",
+  "personal_ideas_ai_suggestions",
   "project_management_spa_tab",
   "project_management_open_cockpit",
   "project_management_window_section",
@@ -324,6 +325,13 @@
    "fieldname": "personal_ideas_show_author",
    "fieldtype": "Check",
    "label": "Show Author of Ideas Handed in for Vote"
+  },
+  {
+   "default": "0",
+   "description": "Idea Catcher (/idea) suggests the user's own ideas that are close in meaning to a newly caught one. The idea texts are sent to Mistral (phamos Settings > Data Extract); turn on only once the AVV lists Mistral as sub-processor.",
+   "fieldname": "personal_ideas_ai_suggestions",
+   "fieldtype": "Check",
+   "label": "Suggest Related Ideas with AI"
   },
   {
    "fieldname": "project_management_spa_tab",
@@ -937,7 +945,7 @@
   },
   {
    "default": "0",
-   "description": "Everyone lands in Ophice after login (#2077). Sets the standard System Settings \u2192 Default App to phamos, whose first app is Ophice; people who chose their own default app keep it. Only switch on in production after the privacy owner's OK (#2069).",
+   "description": "Everyone lands in Ophice after login (#2077). Sets the standard System Settings → Default App to phamos, whose first app is Ophice; people who chose their own default app keep it. Only switch on in production after the privacy owner's OK (#2069).",
    "fieldname": "ophice_start_page",
    "fieldtype": "Check",
    "label": "Ophice is the start page after login"
@@ -945,7 +953,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-22 20:00:00.000000",
+ "modified": "2026-11-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",
