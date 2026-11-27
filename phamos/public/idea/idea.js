@@ -28,6 +28,28 @@
 	var choose = $("choose")
 	var queueBadge = $("queue")
 
+	// --- keyboard (#2216) ---------------------------------------------------------------------
+	// iOS Safari leaves the layout viewport (what position: fixed and 100dvh measure) behind the
+	// on-screen keyboard. The visual viewport is what the user sees, so the page follows it: the
+	// app takes its height and offset, the sheet and toast sit --kb above the layout bottom.
+	// Android with interactive-widget=resizes-content shrinks both, so --kb stays 0 there.
+	var root = document.documentElement
+	function fitToKeyboard() {
+		var vv = window.visualViewport
+		if (!vv) return
+		var kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+		root.style.setProperty("--vvh", vv.height + "px")
+		root.style.setProperty("--vv-top", vv.offsetTop + "px")
+		root.style.setProperty("--kb", kb + "px")
+		// Keyboard up: iOS reports it as --kb, Android as a much shorter visible area.
+		root.classList.toggle("kb-open", kb > 80 || vv.height < window.screen.height * 0.6)
+	}
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener("resize", fitToKeyboard)
+		window.visualViewport.addEventListener("scroll", fitToKeyboard)
+	}
+	fitToKeyboard()
+
 	document.querySelectorAll("[data-t]").forEach(function (el) {
 		el.textContent = __(el.getAttribute("data-t"))
 	})
