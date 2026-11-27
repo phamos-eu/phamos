@@ -1,24 +1,67 @@
 // A Jitsi call in its own browser window: encounter calls and meeting areas (#2108, #2078).
 
+// --- Mic and camera when a call starts (#2168), chosen per browser: "ask" (the default: nothing
+// turns on before I say so), "off" or "on" (straight in, as #2108 had it for everyone).
+export const CALL_START_KEY = "phamos-ophice-call-start"
+export const CALL_START_MODES = ["ask", "off", "on"]
+export const DEFAULT_CALL_START = "ask"
+
+/** The stored choice, or the default (also without storage: private window, blocked). */
+export function readCallStart(storage) {
+	try {
+		const mode = storage?.getItem(CALL_START_KEY)
+		return CALL_START_MODES.includes(mode) ? mode : DEFAULT_CALL_START
+	} catch {
+		return DEFAULT_CALL_START
+	}
+}
+
+/** Stores a choice; it holds until the reload when the storage refuses. */
+export function saveCallStart(storage, mode) {
+	try {
+		storage?.setItem(CALL_START_KEY, mode)
+	} catch {
+		// private window or blocked storage
+	}
+}
+
+/** The next choice on the sidebar's button: ask → off → on → ask. */
+export function nextCallStart(mode) {
+	const i = CALL_START_MODES.indexOf(mode)
+	return CALL_START_MODES[(i + 1) % CALL_START_MODES.length]
+}
+
+/** This page's localStorage, or null where touching it throws. */
+export function pageStorage() {
+	try {
+		return window.localStorage
+	} catch {
+		return null
+	}
+}
+
 /**
  * Address of the call page: the room on its Jitsi host, with my name filled in.
  * @param {{ domain: string, room: string }} video  the call: an encounter's (open_encounter) or an area's
  * @param {string} displayName  my name in the call
+ * @param {"ask" | "off" | "on"} start  mic and camera at the start (#2168)
  * @returns {string} the URL, or "" without a call
  */
-export function jitsiCallUrl(video, displayName = "") {
+export function jitsiCallUrl(video, displayName = "", start = "on") {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""
 	// Jitsi reads settings from the fragment as JSON values; the fragment never reaches a server.
-	// Whoever opens the call wants to talk: mic and camera on, straight in without the pre-join
-	// screen (#2108). The browser still asks once for the permission to use them.
+	// "on": straight in with mic and camera (#2108); "off": straight in, both off; "ask": both off
+	// on Jitsi's pre-join screen, where I switch on what I want and join.
+	const muted = start !== "on"
+	const prejoin = start === "ask"
 	const settings = [
-		"config.startWithAudioMuted=false",
-		"config.startWithVideoMuted=false",
-		"config.prejoinConfig.enabled=false",
+		`config.startWithAudioMuted=${muted}`,
+		`config.startWithVideoMuted=${muted}`,
+		`config.prejoinConfig.enabled=${prejoin}`,
 		// The legacy name of the same switch, for older self-hosted Jitsi: keep both.
-		"config.prejoinPageEnabled=false",
+		`config.prejoinPageEnabled=${prejoin}`,
 	]
 	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`

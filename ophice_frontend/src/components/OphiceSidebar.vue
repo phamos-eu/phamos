@@ -89,6 +89,19 @@
 				<FeatherIcon :name="bell === 'muted' ? 'bell-off' : 'bell'" class="h-4 w-4 flex-shrink-0" />
 				<span v-if="!collapsed" class="truncate">{{ bellLabel }}</span>
 			</button>
+			<!-- Mic and camera when a call starts (#2168): a click steps ask → off → on. -->
+			<button
+				type="button"
+				class="ophice-side__row"
+				:class="{ 'ophice-side__row--icon': collapsed }"
+				:title="callStartTitle"
+				:aria-label="collapsed ? callStartTitle : undefined"
+				data-testid="call-start"
+				@click="$emit('call-start')"
+			>
+				<FeatherIcon :name="callStart === 'on' ? 'video' : callStart === 'off' ? 'video-off' : 'help-circle'" class="h-4 w-4 flex-shrink-0" />
+				<span v-if="!collapsed" class="truncate">{{ callStartLabel }}</span>
+			</button>
 		</div>
 
 		<!-- Settings we use while testing, a section of their own -->
@@ -235,6 +248,8 @@ const props = defineProps({
 	/** the encounter alert (#2135): "ask", "on", "blocked" or "muted", and its tooltip */
 	bell: { type: String, default: "ask" },
 	bellTitle: { type: String, default: "" },
+	/** mic and camera when a call starts (#2168): "ask", "off" or "on" */
+	callStart: { type: String, default: "ask" },
 })
 defineEmits([
 	"update:collapsed",
@@ -247,7 +262,17 @@ defineEmits([
 	"adjust",
 	"remove-background",
 	"bell",
+	"call-start",
 ])
+const callStartLabel = computed(
+	() =>
+		({
+			ask: __("Calls: ask for mic and camera"),
+			off: __("Calls: mic and camera off"),
+			on: __("Calls: mic and camera on"),
+		})[props.callStart]
+)
+const callStartTitle = computed(() => `${callStartLabel.value}. ${__("Click to change.")}`)
 
 const statusIcon = computed(() => (props.status?.kind === "away" ? "moon" : props.status ? "coffee" : "check-circle"))
 const statusLabel = computed(() =>
