@@ -999,7 +999,9 @@ const imageBox = computed(() =>
 /** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
 function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
-	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	// A second finger may land on a chip: it still joins the pinch (#2213).
+	const joinsPinch = event.pointerType === "touch" && camera().isPressed()
+	if (!joinsPinch && event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
 	camera().onPointerDown(event)
 }
 
