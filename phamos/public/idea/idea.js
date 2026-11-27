@@ -223,7 +223,7 @@
 		title.className = "item-title"
 		title.textContent = idea.title
 		li.appendChild(title)
-		if (idea.summary) {
+		if (idea.summary && idea.summary !== idea.title) {
 			var summary = document.createElement("div")
 			summary.className = "item-sub"
 			summary.textContent = idea.summary
