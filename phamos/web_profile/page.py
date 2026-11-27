@@ -62,5 +62,20 @@ def breadcrumb_schema(crumbs):
 	}
 
 
+def faq_schema(faqs):
+	"""FAQPage JSON-LD for the questions shown on the page, or None without questions (phamos/phamos#1823).
+	Answers keep their Text Editor HTML: schema.org allows simple markup (links, lists) in ``text``."""
+	if not faqs:
+		return None
+	return {
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		"mainEntity": [
+			{"@type": "Question", "name": f["question"].strip(), "acceptedAnswer": {"@type": "Answer", "text": f["answer"]}}
+			for f in faqs
+		],
+	}
+
+
 def home_crumb():
 	return {"label": _("Home"), "url": "/"}

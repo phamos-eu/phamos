@@ -13,7 +13,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_url, strip_html
 
-from phamos.web_profile.page import breadcrumb_schema, home_crumb, init_page, set_seo
+from phamos.web_profile.page import breadcrumb_schema, faq_schema, home_crumb, init_page, set_seo
 from phamos.web_profile.sections import build_profile, find_item, item_url, section_url
 
 
@@ -53,7 +53,7 @@ def get_context(context):
 		path=item.url,
 		image=get_url(item.image) if item.image else None,
 		alternates={lng: item_url(section, item.slug, lng) for lng in ("de", "en")},
-		schema=[breadcrumb_schema(context.crumbs), schema],
+		schema=[breadcrumb_schema(context.crumbs), schema, faq_schema(profile["faqs"])],
 	)
 	if item.masked and section == "people":
 		# Anonymous people are not indexed (re-identification risk, no search value). Anonymous
