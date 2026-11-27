@@ -129,3 +129,32 @@ describe("Ophice map pinch with more fingers and chips (#2213 review)", () => {
 		expect(cam.isPressed()).toBe(false)
 	})
 })
+
+describe("Ophice map: a touch on a chip (#2213, review of !1372)", () => {
+	it("never pans from a chip on a primary touch, even after a touch that never ended", () => {
+		const cam = camera()
+		cam.setZoom(1.5)
+		// An earlier touch on a chip lost its pointerup (the chip opened a menu).
+		cam.onChipPointerDown({ ...touch(1, 150, 200), isPrimary: true })
+		const pan = { ...cam.pan }
+		cam.onChipPointerDown({ ...touch(2, 150, 200), isPrimary: true })
+		cam.onPointerMove(touch(2, 100, 150))
+		expect(cam.pan).toEqual(pan)
+		expect(cam.dragging.value).toBe(false)
+	})
+
+	it("joins a pinch as the second finger", () => {
+		const cam = camera()
+		cam.setZoom(1.5)
+		cam.onPointerDown({ ...touch(1, 150, 200), isPrimary: true })
+		cam.onChipPointerDown({ ...touch(2, 250, 200), isPrimary: false })
+		cam.onPointerMove(touch(2, 300, 200))
+		expect(cam.zoom.value).toBe(2.25)
+	})
+
+	it("ignores a mouse press on a chip", () => {
+		const cam = camera()
+		cam.onChipPointerDown({ pointerId: 1, pointerType: "mouse", button: 0, clientX: 0, clientY: 0, currentTarget: box })
+		expect(cam.isPressed()).toBe(false)
+	})
+})
