@@ -1,70 +1,46 @@
 // A Jitsi call in its own browser window: encounter calls and meeting areas (#2108, #2078).
 
-// --- Mic and camera when a call starts (#2168), chosen per browser: "ask" (the default: nothing
-// turns on before I say so), "off" or "on" (straight in, as #2108 had it for everyone).
-export const CALL_START_KEY = "phamos-ophice-call-start"
-export const CALL_START_MODES = ["ask", "off", "on"]
-export const DEFAULT_CALL_START = "ask"
-
-/** The stored choice, or the default (also without storage: private window, blocked). */
-export function readCallStart(storage) {
-	try {
-		const mode = storage?.getItem(CALL_START_KEY)
-		return CALL_START_MODES.includes(mode) ? mode : DEFAULT_CALL_START
-	} catch {
-		return DEFAULT_CALL_START
-	}
-}
-
-/** Stores a choice; it holds until the reload when the storage refuses. */
-export function saveCallStart(storage, mode) {
-	try {
-		storage?.setItem(CALL_START_KEY, mode)
-	} catch {
-		// private window or blocked storage
-	}
-}
-
-/** The next choice on the sidebar's button: ask → off → on → ask. */
-export function nextCallStart(mode) {
-	const i = CALL_START_MODES.indexOf(mode)
-	return CALL_START_MODES[(i + 1) % CALL_START_MODES.length]
-}
-
-/** This page's localStorage, or null where touching it throws. */
-export function pageStorage() {
-	try {
-		return window.localStorage
-	} catch {
-		return null
-	}
-}
-
 /**
  * Address of the call page: the room on its Jitsi host, with my name filled in.
  * @param {{ domain: string, room: string }} video  the call: an encounter's (open_encounter) or an area's
  * @param {string} displayName  my name in the call
- * @param {"ask" | "off" | "on"} start  mic and camera at the start (#2168)
+ * @param {{ startOff?: boolean }} options  startOff: I was approached (#2165), see jitsiStartConfig
  * @returns {string} the URL, or "" without a call
  */
-export function jitsiCallUrl(video, displayName = "", start = "on") {
+export function jitsiCallUrl(video, displayName = "", { startOff = false } = {}) {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""
 	// Jitsi reads settings from the fragment as JSON values; the fragment never reaches a server.
-	// "on": straight in with mic and camera (#2108); "off": straight in, both off; "ask": both off
-	// on Jitsi's pre-join screen, where I switch on what I want and join.
-	const muted = start !== "on"
-	const prejoin = start === "ask"
+	// The same start as the embedded call (jitsiStartConfig).
 	const settings = [
-		`config.startWithAudioMuted=${muted}`,
-		`config.startWithVideoMuted=${muted}`,
-		`config.prejoinConfig.enabled=${prejoin}`,
+		`config.startWithAudioMuted=${startOff}`,
+		`config.startWithVideoMuted=${startOff}`,
+		"config.prejoinConfig.enabled=false",
 		// The legacy name of the same switch, for older self-hosted Jitsi: keep both.
-		`config.prejoinPageEnabled=${prejoin}`,
+		"config.prejoinPageEnabled=false",
 	]
+	if (startOff) settings.push("config.disableInitialGUM=true")
 	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
+}
+
+/**
+ * Start settings of the embedded call. Whoever walks up starts with mic and camera on, straight in
+ * without the pre-join screen (#2108); the browser still asks once for the permission. The person
+ * being approached (#2165) joins at once too and hears the other, but with both off, and Jitsi
+ * touches no device yet (disableInitialGUM: no camera light, no mic indicator). They turn them on
+ * themselves, with the call's buttons (PM, 2026-11-27).
+ * @param {{ startOff?: boolean }} options
+ */
+export function jitsiStartConfig({ startOff = false } = {}) {
+	return {
+		startWithAudioMuted: startOff,
+		startWithVideoMuted: startOff,
+		...(startOff ? { disableInitialGUM: true } : {}),
+		prejoinPageEnabled: false,
+		prejoinConfig: { enabled: false },
+	}
 }
 
 // Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is

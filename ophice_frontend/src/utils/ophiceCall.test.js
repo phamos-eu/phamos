@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
-	CALL_START_KEY,
-	CALL_START_MODES,
-	DEFAULT_CALL_START,
-	nextCallStart,
-	readCallStart,
-	saveCallStart,
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
 	CALL_HEADER,
@@ -13,6 +7,7 @@ import {
 	JITSI_TOOLBAR_BUTTONS,
 	callBox,
 	callMaxHeight,
+	jitsiStartConfig,
 	splitCall,
 	encounterCallWindowName,
 	jitsiCallUrl,
@@ -32,6 +27,25 @@ describe("JITSI_TOOLBAR_BUTTONS", () => {
 	})
 })
 
+describe("jitsiStartConfig", () => {
+	it("starts with mic and camera on, without the pre-join screen, for whoever walks up", () => {
+		expect(jitsiStartConfig()).toEqual({
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
+			prejoinPageEnabled: false,
+			prejoinConfig: { enabled: false },
+		})
+	})
+
+	it("starts the approached person with both off, and no device touched (#2165)", () => {
+		const config = jitsiStartConfig({ startOff: true })
+		expect(config.startWithAudioMuted).toBe(true)
+		expect(config.startWithVideoMuted).toBe(true)
+		expect(config.disableInitialGUM).toBe(true)
+		expect(config.prejoinConfig).toEqual({ enabled: false })
+	})
+})
+
 describe("jitsiCallUrl", () => {
 	const ON = "config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false"
 
@@ -48,15 +62,13 @@ describe("jitsiCallUrl", () => {
 		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
-	it("starts with both off, on Jitsi's pre-join screen only when asking (#2168)", () => {
-		const get = (start) => new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", start).split("#")[1])
-		for (const [start, prejoin] of [["off", "false"], ["ask", "true"]]) {
-			const settings = get(start)
-			expect(settings.get("config.startWithAudioMuted")).toBe("true")
-			expect(settings.get("config.startWithVideoMuted")).toBe("true")
-			expect(settings.get("config.prejoinConfig.enabled")).toBe(prejoin)
-			expect(settings.get("config.prejoinPageEnabled")).toBe(prejoin)
-		}
+	it("starts the approached person with both off and no device touched, also in its own window (#2165)", () => {
+		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", { startOff: true }).split("#")[1])
+		expect(settings.get("config.startWithAudioMuted")).toBe("true")
+		expect(settings.get("config.startWithVideoMuted")).toBe("true")
+		expect(settings.get("config.disableInitialGUM")).toBe("true")
+		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
+		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
 	it("works without a name and tidies the host", () => {
@@ -73,29 +85,6 @@ describe("jitsiCallUrl", () => {
 		for (const domain of ["evil.com/x", "a@evil.com", "evil.com?x", ""]) {
 			expect(jitsiCallUrl({ domain, room: "r" })).toBe("")
 		}
-	})
-})
-
-describe("call start choice (#2168)", () => {
-	const store = (initial = {}) => {
-		const data = { ...initial }
-		return { getItem: (k) => data[k] ?? null, setItem: (k, v) => (data[k] = v), data }
-	}
-
-	it("asks by default, and when the stored value is unknown or the storage throws", () => {
-		expect(DEFAULT_CALL_START).toBe("ask")
-		expect(readCallStart(store())).toBe("ask")
-		expect(readCallStart(store({ [CALL_START_KEY]: "loud" }))).toBe("ask")
-		expect(readCallStart(null)).toBe("ask")
-		expect(readCallStart({ getItem: () => { throw new Error("blocked") } })).toBe("ask")
-	})
-
-	it("keeps the choice and steps ask → off → on → ask", () => {
-		const s = store()
-		saveCallStart(s, "off")
-		expect(readCallStart(s)).toBe("off")
-		expect(() => saveCallStart({ setItem: () => { throw new Error("full") } }, "on")).not.toThrow()
-		expect(CALL_START_MODES.map(nextCallStart)).toEqual(["off", "on", "ask"])
 	})
 })
 
