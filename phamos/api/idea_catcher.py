@@ -36,6 +36,7 @@ SEARCH_LIMIT = 20
 SUGGEST_CANDIDATES = 60  # my most recently changed open ideas that are compared
 SUGGEST_LIMIT = 5
 EMBED_TEXT_LENGTH = 2000
+EMBED_BATCH = 16  # texts per request: 16 × ~500 tokens stays below Mistral's per-request limit
 EMBED_CACHE_TTL = 30 * 24 * 3600
 # Cosine similarity of mistral-embed vectors: unrelated texts still score around 0.6.
 BANDS = ((0.86, "very close"), (0.78, "related"))
@@ -132,9 +133,14 @@ def _embeddings(rows):
 	keys = [f"phamos:idea_embedding:{row.name}:{row.modified}" for row in rows]
 	vectors = [cache.get_value(key, expires=True) for key in keys]
 	missing = [i for i, vector in enumerate(vectors) if not vector]
-	if missing:
-		fresh = llm.embed([_embed_text(rows[i]) for i in missing])
-		for i, vector in zip(missing, fresh):
+	# In batches, so one request stays below Mistral's token limit per call, and what was
+	# fetched is cached even if a later batch fails.
+	for start in range(0, len(missing), EMBED_BATCH):
+		batch = missing[start : start + EMBED_BATCH]
+		fresh = llm.embed([_embed_text(rows[i]) for i in batch])
+		if len(fresh) != len(batch):
+			raise ValueError(f"Mistral returned {len(fresh)} embeddings for {len(batch)} texts")
+		for i, vector in zip(batch, fresh):
 			vectors[i] = vector
 			cache.set_value(keys[i], vector, expires_in_sec=EMBED_CACHE_TTL)
 	return vectors
@@ -234,7 +240,11 @@ def link_idea(name, target, mode):
 
 	# Only a fresh catch is merged away: an idea someone wrote on or handed in for a vote keeps
 	# its history, sessions and votes, so it can only be linked.
-	if doc.vote_status or frappe.db.exists("Idea Writing Session", {"idea": doc.name}):
+	if (
+		doc.stage != "Seed"
+		or doc.vote_status
+		or frappe.db.exists("Idea Writing Session", {"idea": doc.name})
+	):
 		frappe.throw(_("This idea has its own history. Link it instead of adding it."))
 	stamp = format_datetime(now_datetime())  # the user's own date and time format
 	added = f"<p><em>{_('Added {0}').format(stamp)}</em></p>{doc.content or ''}"

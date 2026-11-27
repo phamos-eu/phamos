@@ -151,3 +151,22 @@ class TestIdeaCatcher(FrappeTestCase):
 		catcher.link_idea(child, caught, "spawned")
 		catcher.link_idea(caught, target, "append")
 		self.assertEqual(frappe.db.get_value("Idea", child, "spawned_from"), target)
+
+	def test_embeddings_go_in_batches(self):
+		for i in range(20):
+			self._mine(f"Idea {i}")
+		new = catcher.save_idea("Something new")["name"]
+		calls = []
+
+		def fake_embed(texts):
+			calls.append(len(texts))
+			return [[1, 0] for _ in texts]
+
+		with (
+			patch.object(catcher, "ai_suggestions_enabled", return_value=True),
+			patch.object(catcher.llm, "get_mistral_settings", return_value={"api_key": "x"}),
+			patch.object(catcher.llm, "embed", side_effect=fake_embed),
+		):
+			catcher.suggest_ideas(new)
+		self.assertTrue(all(size <= catcher.EMBED_BATCH for size in calls))
+		self.assertEqual(sum(calls), 21)

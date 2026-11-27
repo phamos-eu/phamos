@@ -129,19 +129,24 @@
 				} catch (error) {
 					// No connection or server down: keep it and try later. A refusal (4xx) will not get
 					// better by retrying, so the text goes back into the box instead of looping.
-					// Signed out (session expired): keep everything and offer the login on the badge.
-					if (error.status === 401 || error.status === 403) {
+					// Signed out or a stale CSRF token (400/401/403): keep everything; the badge offers
+					// the login, which also loads a fresh token.
+					if (error.status === 400 || error.status === 401 || error.status === 403) {
 						needsLogin = true
 						renderQueue(queue)
 						break
 					}
-					if (error.status && error.status >= 400 && error.status < 500) {
+					// Refused for good (417: validation, e.g. too long): out of the queue, but the text
+					// goes back into the box, after anything already typed there, so it is never lost.
+					if (error.status === 417) {
 						queue.shift()
 						writeQueue(queue)
-						if (!text.value.trim()) text.value = item.text
+						text.value = text.value.trim() ? text.value + "\n\n" + item.text : item.text
+						updateSave()
 						toast(error.message)
 						continue
 					}
+					// Offline, timeout, rate limit, server error: try again later.
 					break
 				}
 				queue = readQueue().filter(function (q) {
