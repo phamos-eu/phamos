@@ -1,17 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
-	CALL_START_KEY,
-	CALL_START_MODES,
-	DEFAULT_CALL_START,
-	nextCallStart,
-	readCallStart,
-	saveCallStart,
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
 	CALL_HEADER,
 	CALL_MIN_W,
 	JITSI_TOOLBAR_BUTTONS,
-	callActivation,
 	callBox,
 	callMaxHeight,
 	jitsiStartConfig,
@@ -53,52 +46,6 @@ describe("jitsiStartConfig", () => {
 	})
 })
 
-describe("callActivation", () => {
-	function jitsi({ audio = true, video = true } = {}) {
-		const run = vi.fn()
-		const activation = callActivation({
-			isAudioMuted: async () => audio,
-			isVideoMuted: async () => video,
-			run,
-		})
-		return { activation, run }
-	}
-
-	it("turns mic and camera on at the first click after the join", async () => {
-		const { activation, run } = jitsi()
-		await activation.joined()
-		expect(run).not.toHaveBeenCalled()
-		expect(activation.click()).toBe(true)
-		await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(2))
-		expect(run.mock.calls).toEqual([["toggleAudio"], ["toggleVideo"]])
-	})
-
-	it("keeps a click before the join until Jitsi joined", async () => {
-		const { activation, run } = jitsi()
-		activation.click()
-		await Promise.resolve()
-		expect(run).not.toHaveBeenCalled()
-		await activation.joined()
-		expect(run.mock.calls).toEqual([["toggleAudio"], ["toggleVideo"]])
-	})
-
-	it("only switches on what is off", async () => {
-		const { activation, run } = jitsi({ audio: false, video: true })
-		activation.click()
-		await activation.joined()
-		expect(run.mock.calls).toEqual([["toggleVideo"]])
-	})
-
-	it("acts once: later clicks change nothing", async () => {
-		const { activation, run } = jitsi()
-		activation.click()
-		await activation.joined()
-		expect(activation.click()).toBe(false)
-		await activation.joined()
-		expect(run).toHaveBeenCalledTimes(2)
-	})
-})
-
 describe("jitsiCallUrl", () => {
 	const ON = "config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false"
 
@@ -115,15 +62,13 @@ describe("jitsiCallUrl", () => {
 		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
-	it("starts with both off, on Jitsi's pre-join screen only when asking (#2168)", () => {
-		const get = (start) => new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", start).split("#")[1])
-		for (const [start, prejoin] of [["off", "false"], ["ask", "true"]]) {
-			const settings = get(start)
-			expect(settings.get("config.startWithAudioMuted")).toBe("true")
-			expect(settings.get("config.startWithVideoMuted")).toBe("true")
-			expect(settings.get("config.prejoinConfig.enabled")).toBe(prejoin)
-			expect(settings.get("config.prejoinPageEnabled")).toBe(prejoin)
-		}
+	it("starts the approached person with both off and no device touched, also in its own window (#2165)", () => {
+		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", { startOff: true }).split("#")[1])
+		expect(settings.get("config.startWithAudioMuted")).toBe("true")
+		expect(settings.get("config.startWithVideoMuted")).toBe("true")
+		expect(settings.get("config.disableInitialGUM")).toBe("true")
+		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
+		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
 
 	it("works without a name and tidies the host", () => {
@@ -140,29 +85,6 @@ describe("jitsiCallUrl", () => {
 		for (const domain of ["evil.com/x", "a@evil.com", "evil.com?x", ""]) {
 			expect(jitsiCallUrl({ domain, room: "r" })).toBe("")
 		}
-	})
-})
-
-describe("call start choice (#2168)", () => {
-	const store = (initial = {}) => {
-		const data = { ...initial }
-		return { getItem: (k) => data[k] ?? null, setItem: (k, v) => (data[k] = v), data }
-	}
-
-	it("asks by default, and when the stored value is unknown or the storage throws", () => {
-		expect(DEFAULT_CALL_START).toBe("ask")
-		expect(readCallStart(store())).toBe("ask")
-		expect(readCallStart(store({ [CALL_START_KEY]: "loud" }))).toBe("ask")
-		expect(readCallStart(null)).toBe("ask")
-		expect(readCallStart({ getItem: () => { throw new Error("blocked") } })).toBe("ask")
-	})
-
-	it("keeps the choice and steps ask → off → on → ask", () => {
-		const s = store()
-		saveCallStart(s, "off")
-		expect(readCallStart(s)).toBe("off")
-		expect(() => saveCallStart({ setItem: () => { throw new Error("full") } }, "on")).not.toThrow()
-		expect(CALL_START_MODES.map(nextCallStart)).toEqual(["off", "on", "ask"])
 	})
 })
 

@@ -10,7 +10,6 @@
 		@keydown.stop
 		@keydown.escape.prevent="emit('close')"
 		@pointerdown="onBubbleDown"
-		@click="onBubbleClick"
 	>
 		<!-- The top bar, with and without the call (#2135; the call's right bar of #2108 is gone): who,
 		     own window, and "Esc to close" as a button that teaches the key. -->
@@ -119,9 +118,8 @@
 				class="flex-shrink-0 p-2"
 				:style="videoWidth ? { width: `${videoWidth + 16}px` } : { width: '48rem' }"
 			>
-				<!-- Approached (#2165): mic and camera wait for a click anywhere on the bubble. -->
+				<!-- Approached (#2165): joined at once, mic and camera off until I turn them on. -->
 				<VideoCall
-					ref="videoCall"
 					class="h-full rounded-lg"
 					fill
 					:class="{ 'pointer-events-none': dragging }"
@@ -129,7 +127,6 @@
 					:room="video.room"
 					:display-name="displayName"
 					:start-off="callStartsOff"
-					@activated="emit('call-activated')"
 					@joined="keepChatFocus"
 					@stolen="keepChatFocus"
 					@toggled="input?.focus()"
@@ -191,10 +188,10 @@ const props = defineProps({
 	dragging: { type: Boolean, default: false },
 	/** The video's width in px (with the call; the parent keeps 16:9 to 1:1). */
 	videoWidth: { type: Number, default: 0 },
-	/** I was approached and haven't clicked the call yet: it joins with mic and camera off (#2165). */
+	/** I was approached: the call joins with mic and camera off (#2165). */
 	callStartsOff: { type: Boolean, default: false },
 })
-const emit = defineEmits(["send", "close", "call", "move-start", "resize-start", "split-by", "call-activated"])
+const emit = defineEmits(["send", "close", "call", "move-start", "resize-start", "split-by"])
 // One arrow key press on the line between chat and video, in px.
 const SPLIT_STEP = 24
 
@@ -215,18 +212,12 @@ function onBubbleDown(event) {
 	if (!props.movable || event.target.closest("button, a, input, textarea, select, [data-no-drag]")) return
 	emit("move-start", event)
 }
-// The first click on the bubble turns the call's mic and camera on when I was approached
-// (#2165); not the one that closes it.
-function onBubbleClick(event) {
-	if (!event.target.closest("[data-testid='close-bubble']")) videoCall.value?.activate()
-}
 // The huddle's tint: the other person's colour.
 const huddleArea = computed(() => ({ title: props.peer.full_name, color_hue: ringHue(props.peer.user) }))
 
 const draft = ref("")
 const list = ref(null)
 const input = ref(null)
-const videoCall = ref(null)
 // The call shows here unless it moved into its own window.
 const inCall = computed(() => !!props.video && !props.inWindow)
 const firstName = computed(() => (props.peer.full_name || "").split(" ")[0] || props.peer.full_name)
