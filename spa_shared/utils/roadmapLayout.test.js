@@ -13,6 +13,7 @@ import {
 	ROW_PADDING,
 	rowHeights,
 	stackEvents,
+	stackSelection,
 } from "./roadmapLayout.js"
 
 // Month zoom: 6 px per day, starting 1 Nov 2026.
@@ -99,6 +100,30 @@ describe("stackEvents", () => {
 
 	it("leaves out dots without a date or outside the range", () => {
 		expect(stackEvents([ev("A", null), ev("B", "2025-01-01")], timeline, 10)).toEqual([])
+	})
+})
+
+describe("stackSelection", () => {
+	const ev = (name, date, status = "planned") => ({ name, date, status })
+
+	it("selects one feature by name", () => {
+		const [stack] = stackEvents([ev("F-1", "2026-11-01")], timeline, 14)
+		expect(stackSelection(stack)).toEqual({ type: "event", name: "F-1" })
+	})
+
+	it("lists every feature of a stack once, in date order", () => {
+		const [stack] = stackEvents(
+			[ev("F-3", "2026-11-03", "finished"), ev("F-1", "2026-11-01"), ev("F-2", "2026-11-02"), ev("F-1", "2026-11-03", "finished")],
+			timeline,
+			18
+		)
+		expect(stackSelection(stack)).toEqual({ type: "event", name: "F-1", names: ["F-1", "F-2", "F-3"] })
+	})
+
+	it("treats a feature's planned and finished dots as one feature", () => {
+		const [stack] = stackEvents([ev("F-1", "2026-11-01"), ev("F-1", "2026-11-02", "finished")], timeline, 14)
+		expect(stack.count).toBe(2)
+		expect(stackSelection(stack)).toEqual({ type: "event", name: "F-1" })
 	})
 })
 
