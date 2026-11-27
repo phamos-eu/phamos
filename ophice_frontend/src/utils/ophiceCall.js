@@ -4,24 +4,55 @@
  * Address of the call page: the room on its Jitsi host, with my name filled in.
  * @param {{ domain: string, room: string }} video  the call: an encounter's (open_encounter) or an area's
  * @param {string} displayName  my name in the call
+ * @param {{ startOff?: boolean }} options  startOff: I was approached (#2165), see jitsiStartConfig
  * @returns {string} the URL, or "" without a call
  */
-export function jitsiCallUrl(video, displayName = "") {
+export function jitsiCallUrl(video, displayName = "", { startOff = false } = {}) {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""
 	// Jitsi reads settings from the fragment as JSON values; the fragment never reaches a server.
-	// Whoever opens the call wants to talk: mic and camera on, straight in without the pre-join
-	// screen (#2108). The browser still asks once for the permission to use them.
+	// The same start as the embedded call (jitsiStartConfig).
 	const settings = [
-		"config.startWithAudioMuted=false",
-		"config.startWithVideoMuted=false",
+		`config.startWithAudioMuted=${startOff}`,
+		`config.startWithVideoMuted=${startOff}`,
 		"config.prejoinConfig.enabled=false",
 		// The legacy name of the same switch, for older self-hosted Jitsi: keep both.
 		"config.prejoinPageEnabled=false",
 	]
+	if (startOff) settings.push("config.disableInitialGUM=true")
 	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
+}
+
+/**
+ * Start settings of the embedded call. Whoever walks up starts with mic and camera on, straight in
+ * without the pre-join screen (#2108); the browser still asks once for the permission. The person
+ * being approached (#2165) joins at once too and hears the other, but with both off, and Jitsi
+ * touches no device yet (disableInitialGUM: no camera light, no mic indicator). They turn them on
+ * themselves, with the call's buttons (PM, 2026-11-27).
+ * @param {{ startOff?: boolean }} options
+ */
+export function jitsiStartConfig({ startOff = false } = {}) {
+	return {
+		startWithAudioMuted: startOff,
+		startWithVideoMuted: startOff,
+		...(startOff ? { disableInitialGUM: true } : {}),
+		prejoinPageEnabled: false,
+		prejoinConfig: { enabled: false },
+	}
+}
+
+/**
+ * How a chat with someone opens (#2165, #2168).
+ * - fromPeer: the other person walked up and started it; my page only follows.
+ * - answer: I answer someone who came over (a walk-up ping), by my own action.
+ * @returns {{ callOff: boolean, backToAvailable: boolean }} callOff: my call starts with mic and
+ *   camera off (I was approached); backToAvailable: my Away / Be right back status goes first,
+ *   because I start or answer it myself (the server only lets Available people meet).
+ */
+export function encounterOpening({ fromPeer = false, answer = false } = {}) {
+	return { callOff: fromPeer || answer, backToAvailable: !fromPeer }
 }
 
 // Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is

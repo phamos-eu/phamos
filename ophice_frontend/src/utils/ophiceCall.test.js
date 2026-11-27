@@ -7,8 +7,10 @@ import {
 	JITSI_TOOLBAR_BUTTONS,
 	callBox,
 	callMaxHeight,
+	jitsiStartConfig,
 	splitCall,
 	encounterCallWindowName,
+	encounterOpening,
 	jitsiCallUrl,
 	nextQualityLevel,
 	qualityLevel,
@@ -26,6 +28,39 @@ describe("JITSI_TOOLBAR_BUTTONS", () => {
 	})
 })
 
+describe("jitsiStartConfig", () => {
+	it("starts with mic and camera on, without the pre-join screen, for whoever walks up", () => {
+		expect(jitsiStartConfig()).toEqual({
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
+			prejoinPageEnabled: false,
+			prejoinConfig: { enabled: false },
+		})
+	})
+
+	it("starts the approached person with both off, and no device touched (#2165)", () => {
+		const config = jitsiStartConfig({ startOff: true })
+		expect(config.startWithAudioMuted).toBe(true)
+		expect(config.startWithVideoMuted).toBe(true)
+		expect(config.disableInitialGUM).toBe(true)
+		expect(config.prejoinConfig).toEqual({ enabled: false })
+	})
+})
+
+describe("encounterOpening (#2165, #2168)", () => {
+	it("I start it: mic and camera on, my status goes", () => {
+		expect(encounterOpening()).toEqual({ callOff: false, backToAvailable: true })
+	})
+
+	it("the other person walked up: mic and camera off, my status stays", () => {
+		expect(encounterOpening({ fromPeer: true })).toEqual({ callOff: true, backToAvailable: false })
+	})
+
+	it("I answer a walk-up ping: mic and camera off, but my status goes (else the server refuses)", () => {
+		expect(encounterOpening({ answer: true })).toEqual({ callOff: true, backToAvailable: true })
+	})
+})
+
 describe("jitsiCallUrl", () => {
 	const ON = "config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false"
 
@@ -38,6 +73,15 @@ describe("jitsiCallUrl", () => {
 		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }).split("#")[1])
 		expect(settings.get("config.startWithAudioMuted")).toBe("false")
 		expect(settings.get("config.startWithVideoMuted")).toBe("false")
+		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
+		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
+	})
+
+	it("starts the approached person with both off and no device touched, also in its own window (#2165)", () => {
+		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", { startOff: true }).split("#")[1])
+		expect(settings.get("config.startWithAudioMuted")).toBe("true")
+		expect(settings.get("config.startWithVideoMuted")).toBe("true")
+		expect(settings.get("config.disableInitialGUM")).toBe("true")
 		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
 		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})

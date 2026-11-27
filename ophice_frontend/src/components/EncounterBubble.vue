@@ -118,6 +118,7 @@
 				class="flex-shrink-0 p-2"
 				:style="videoWidth ? { width: `${videoWidth + 16}px` } : { width: '48rem' }"
 			>
+				<!-- Approached (#2165): joined at once, mic and camera off until I turn them on. -->
 				<VideoCall
 					class="h-full rounded-lg"
 					fill
@@ -125,6 +126,7 @@
 					:domain="video.domain"
 					:room="video.room"
 					:display-name="displayName"
+					:start-off="callStartsOff"
 					@joined="keepChatFocus"
 					@stolen="keepChatFocus"
 					@toggled="input?.focus()"
@@ -186,6 +188,8 @@ const props = defineProps({
 	dragging: { type: Boolean, default: false },
 	/** The video's width in px (with the call; the parent keeps 16:9 to 1:1). */
 	videoWidth: { type: Number, default: 0 },
+	/** I was approached: the call joins with mic and camera off (#2165). */
+	callStartsOff: { type: Boolean, default: false },
 })
 const emit = defineEmits(["send", "close", "call", "move-start", "resize-start", "split-by"])
 // One arrow key press on the line between chat and video, in px.
