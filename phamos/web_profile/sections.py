@@ -8,12 +8,13 @@ Privacy is applied here, once, before anything reaches a template: anonymous alu
 unapproved customers never carry a name, photo or named URL in their item.
 """
 
+import html
 import re
 from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import getdate, strip_html
 
 from phamos.web_profile.events import load_events, month_span
 from phamos.web_profile.i18n import localized
@@ -549,6 +550,7 @@ def load_teams(lang):
 def load_modules(lang):
 	industries = _profile_map("Industry Web Profile", "industry", "industry")
 	industry_titles = _industry_titles(lang)
+	module_books = _children("Web Profile Book", "Module Web Profile", "book")
 	module_industries = {}
 	for industry, modules in _children("Web Profile Module", "Industry Web Profile", "module").items():
 		for module in modules:
@@ -570,7 +572,8 @@ def load_modules(lang):
 		item["search"] = item["title"].lower()
 		item["summary"] = localized(r, "summary", lang)
 		item["body"] = localized(r, "content", lang)
-		item["data"] = {"complexity": r.complexity, "duration": _duration(r.typical_duration), "key_person": r.key_person}
+		item["data"] = {"complexity": r.complexity, "duration": _duration(r.typical_duration), "key_person": r.key_person,
+			"books": module_books.get(r.name, [])}  # Bookstack Book names, shown when published (#2006)
 		items.append(item)
 	return items
 
@@ -589,20 +592,29 @@ def load_implementations(lang):
 			fields=["parent", "person", "role", "key_person"], order_by="idx asc"):
 		project_people.setdefault(row.parent, []).append(row)
 	items = []
-	for r in _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
-			"start_date", "industry", "customer_approved", "region"]):
+	records = _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
+		"start_date", "industry", "customer_approved", "region"])
+	# The customer link holds the internal ID ("Knd-00314"); named cases show the customer's name (#1825).
+	# Names are read only for approved cases: anonymous ones must never carry them.
+	approved = [r.customer for r in records if r.customer and r.customer_approved]
+	customer_names = dict(frappe.get_all("Customer", filters={"name": ["in", approved]},
+		fields=["name", "customer_name"], as_list=True)) if approved else {}
+	for r in records:
 		if r.implementation_status == "Cancelled":
 			continue
 		industry_label = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
 		year = getdate(r.start_date).year if r.start_date else None
-		masked = not r.customer_approved
+		customer_name = customer_names.get(r.customer)
+		# No name to show (approved but empty customer_name): stay anonymous rather than fall back to the ID.
+		masked = not r.customer_approved or not customer_name
 		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), _region(r.region)]))
-		title = localized(r, "title", lang) or (descriptor if masked else r.customer)
+		title = localized(r, "title", lang) or (descriptor if masked else customer_name)
 		if masked:
 			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == descriptor else descriptor,
 				masked=True)
 		else:
-			item = _item("implementations", r, lang, title, r.route, subtitle=r.customer, image=r.image)
+			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == customer_name else customer_name,
+				image=r.image)
 		if r.industry in industries:
 			_facet(item, "industry", industries[r.industry][0], industry_label)
 		for module in implementation_modules.get(r.name, []):
@@ -631,7 +643,7 @@ def load_implementations(lang):
 			"year": year,
 			"team": teams.get(r.team),
 			"industry": (industries[r.industry][0], industry_label) if r.industry in industries else None,
-			"customer": None if masked else r.customer,
+			"customer": None if masked else customer_name,
 			# Server-side only (never rendered): lets the customer page find its projects.
 			"_customer": r.customer,
 			# Named cases link to a named customer page, anonymous cases only to an anonymous one.
@@ -988,7 +1000,14 @@ def build_profile(item, lang):
 		if item.data.get("duration"):
 			facts.append({"label": _("Typical duration"), "value": item.data["duration"]})
 		overview = [_("{0} is an ERPNext module that phamos introduces step by step, together with the people who will use it.").format(item.title)]
-		# Content first (projects, industries), the people afterwards; the sidebar keeps the key person.
+		# Content first (guides, projects, industries), the people afterwards; the sidebar keeps the key person.
+		book_tiles = documentation_tiles(item.data.get("books"), lang)
+		if book_tiles:
+			intro = _("Guides for {0} from our documentation.").format(item.title)
+			if lang != "de":
+				intro += " " + _("The documentation is in German.")
+			sections.append({"title": _("Documentation"), "intro": intro, "tiles": book_tiles,
+				"count": len(book_tiles), "see_all": None})
 		add_related(_("Implementations"), _("Projects in which {0} was introduced.").format(item.title),
 			"implementations", facet="module", values=[item.slug])
 		add_related(_("Industries"), _("Industries where {0} plays a central role.").format(item.title),
@@ -1083,13 +1102,53 @@ def build_profile(item, lang):
 
 	facts = [f for f in facts if f.get("value") or f.get("links")]
 	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
-		"schema": schema, "key_people": key_people(item, lang),
+		"schema": schema, "key_people": key_people(item, lang), "faqs": faqs(item, lang),
 		# Events only (phamos.web_profile.events.build); empty for every other section.
 		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None,
 		"anonymous_note": anonymous.note if anonymous else None}
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)
+
+
+def documentation_tiles(book_names, lang):
+	"""Tiles for the BookStack books a profile links, in table order; unpublished books are left out
+	(phamos/phamos#2006). The books are German, so English pages say so on every tile."""
+	from phamos.web_profile.docs import published_books
+	from phamos.web_profile.icons import module_icon
+
+	if not book_names:
+		return []
+	books = {b.name: b for b in published_books(lang)}
+	return [
+		frappe._dict(section="docs", name=n, url=books[n].url, title=books[n].title, subtitle=books[n].summary,
+			icon=module_icon("file"), initials=books[n].title[:1], chips=[] if lang == "de" else [_("in German")])
+		for n in book_names if n in books
+	]
+
+
+def modules_for_book(book_name, lang):
+	"""Published module profiles that link a book, for the book's own page."""
+	return [m for m in get_items("modules", lang) if book_name in (m.data.get("books") or [])]
+
+
+def faqs(item, lang):
+	"""The page's FAQ rows in ``lang`` ({question, answer}), in table order (phamos/phamos#1823).
+
+	No fallback to another language: a German answer on an English page (and in its English
+	FAQPage schema) would mix languages for search engines. Anonymous pages show their FAQ too;
+	the field description tells editors to name no one there."""
+	doctype = SECTIONS[item.section]["doctype"]
+	if not frappe.get_meta(doctype).has_field("faqs"):  # events (Marketing Content) have no FAQ
+		return []
+	rows = frappe.get_all("Web Profile FAQ", filters={"parenttype": doctype, "parentfield": "faqs",
+		"parent": item.name, "language": lang}, fields=["question", "answer"], order_by="idx asc")
+	return [r for r in rows if (r.question or "").strip() and _has_text(r.answer)]
+
+
+def _has_text(html_value):
+	"""True when the HTML shows any text: an editor's "<p>&nbsp;</p>" or "<p><br></p>" counts as empty."""
+	return bool(html.unescape(strip_html(html_value or "")).replace("\u00a0", " ").strip())
 
 
 def _dedupe(item, profile):

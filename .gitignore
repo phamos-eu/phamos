@@ -8,7 +8,7 @@ phamos/docs/current
 node_modules/*
 !node_modules/.gitkeep
 **/node_modules/
-phamos/public/dist/js
+phamos/public/dist/
 phamos/public/node_modules
 
 # SPA Vite build output (built via yarn build / postinstall)
@@ -20,6 +20,7 @@ phamos/public/software_development
 phamos/public/general_management
 phamos/public/team
 phamos/public/personal
+phamos/public/ophice
 phamos/public/scan
 phamos/public/implementation
 phamos/www/human_resources_spa.html
@@ -30,5 +31,6 @@ phamos/www/software_development_spa.html
 phamos/www/general_management_spa.html
 phamos/www/team_cockpit.html
 phamos/www/personal_cockpit.html
+phamos/www/ophice.html
 phamos/www/scan.html
 phamos/www/implementation_cockpit.html

@@ -21,21 +21,30 @@ PHASES = ("Extract", "Identify", "Classify", "Enrich", "Decide", "Act")
 RUN_DOCTYPE = "AI Agent Run"
 
 
-def get_agent(doctype):
-	"""The enabled agent responsible for a document type, or None."""
-	name = frappe.db.get_value("AI Agent", {"applies_to_doctype": doctype, "enabled": 1}, "name")
+def get_agent(doctype, include_disabled=False):
+	"""The agent responsible for a document type, or None. Only an enabled one, unless
+	include_disabled: a manual override may start a disabled agent too (an enabled one first).
+	"""
+	filters = {"applies_to_doctype": doctype}
+	if not include_disabled:
+		filters["enabled"] = 1
+	name = frappe.db.get_value("AI Agent", filters, "name", order_by="enabled desc, creation asc")
 	return frappe.get_doc("AI Agent", name) if name else None
 
 
-def enqueue_run(doctype, name, trigger="Manual", mode="Fill Empty"):
-	"""Queue a run. Returns {"queued", "run", "reason"}; one run per document at a time."""
-	agent = get_agent(doctype)
+def enqueue_run(doctype, name, trigger="Manual", mode="Fill Empty", override_reasons=None):
+	"""Queue a run. Returns {"queued", "run", "reason"}; one run per document at a time.
+
+	override_reasons (a list) is given for a run started by hand: it may use a disabled agent, and
+	a non-empty list marks a manual override past the checks named there, kept on the run.
+	"""
+	agent = get_agent(doctype, include_disabled=override_reasons is not None)
 	if not agent:
 		return {"queued": False, "reason": "no_agent"}
 	if not locks.acquire(doctype, name):
 		return {"queued": False, "reason": "already_running", "run": latest_run(doctype, name)}
 	try:
-		run = _new_run(agent, doctype, name, trigger, mode)
+		run = _new_run(agent, doctype, name, trigger, mode, override_reasons)
 		frappe.enqueue(
 			execute,
 			queue="long",
@@ -50,14 +59,14 @@ def enqueue_run(doctype, name, trigger="Manual", mode="Fill Empty"):
 	return {"queued": True, "run": run.name}
 
 
-def run_now(doctype, name, trigger="Manual", mode="Fill Empty"):
+def run_now(doctype, name, trigger="Manual", mode="Fill Empty", override_reasons=None):
 	"""Run synchronously (tests, debugging). Returns the finished run document."""
-	agent = get_agent(doctype)
+	agent = get_agent(doctype, include_disabled=override_reasons is not None)
 	if not agent:
 		frappe.throw(_("No enabled AI Agent works on {0}.").format(doctype))
 	if not locks.acquire(doctype, name):
 		frappe.throw(_("An AI run for {0} is already in progress.").format(name))
-	run = _new_run(agent, doctype, name, trigger, mode)
+	run = _new_run(agent, doctype, name, trigger, mode, override_reasons)
 	execute(run.name, commit=False)
 	return frappe.get_doc(RUN_DOCTYPE, run.name)
 
@@ -68,7 +77,7 @@ def latest_run(doctype, name):
 	)
 
 
-def _new_run(agent, doctype, name, trigger, mode):
+def _new_run(agent, doctype, name, trigger, mode, override_reasons=None):
 	run = frappe.get_doc(
 		{
 			"doctype": RUN_DOCTYPE,
@@ -79,6 +88,8 @@ def _new_run(agent, doctype, name, trigger, mode):
 			"mode": mode,
 			"status": "Queued",
 			"triggered_by": frappe.session.user,
+			"manual_override": 1 if override_reasons else 0,
+			"override_reasons": "\n".join(override_reasons or []),
 		}
 	)
 	run.insert(ignore_permissions=True)
@@ -120,6 +131,10 @@ def execute(run_name, commit=True):
 				"duration": round(time.monotonic() - started, 2),
 			}
 		)
+		# a warning on the Phriend of whoever started the run (#2012)
+		from phamos.phriend import events as phriend_events
+
+		phriend_events.ai_run_failed(run)
 	finally:
 		frappe.set_user(previous_user)
 		locks.release(run.reference_doctype, run.reference_name)

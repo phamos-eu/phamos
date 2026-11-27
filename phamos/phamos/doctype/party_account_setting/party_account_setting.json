@@ -1,0 +1,132 @@
+{
+ "actions": [],
+ "creation": "2026-11-17 20:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "section_break_debtor",
+  "debtor_parent_account",
+  "auto_create_debtor_account",
+  "column_break_debtor",
+  "debtor_number_start",
+  "debtor_number_end",
+  "section_break_creditor",
+  "creditor_parent_account",
+  "auto_create_creditor_account",
+  "column_break_creditor",
+  "creditor_number_start",
+  "creditor_number_end"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_debtor",
+   "fieldtype": "Section Break",
+   "label": "Debtor Accounts (Customers)"
+  },
+  {
+   "description": "Group account under which a receivable account is created for each customer, e.g. \"Debitoren\". Leave empty if this company does not need these accounts.",
+   "fieldname": "debtor_parent_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Debtor Parent Account",
+   "options": "Account"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.debtor_parent_account",
+   "description": "Every save of a customer creates its account for this company if it is missing. A customer cannot be saved without one.",
+   "fieldname": "auto_create_debtor_account",
+   "fieldtype": "Check",
+   "label": "Create Automatically and Require"
+  },
+  {
+   "fieldname": "column_break_debtor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10000",
+   "depends_on": "eval:doc.debtor_parent_account",
+   "fieldname": "debtor_number_start",
+   "fieldtype": "Int",
+   "label": "First Debtor Number",
+   "mandatory_depends_on": "eval:doc.debtor_parent_account",
+   "non_negative": 1
+  },
+  {
+   "default": "69999",
+   "depends_on": "eval:doc.debtor_parent_account",
+   "fieldname": "debtor_number_end",
+   "fieldtype": "Int",
+   "label": "Last Debtor Number",
+   "mandatory_depends_on": "eval:doc.debtor_parent_account",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "section_break_creditor",
+   "fieldtype": "Section Break",
+   "label": "Creditor Accounts (Suppliers)"
+  },
+  {
+   "description": "Group account under which a payable account is created for each supplier, e.g. \"Kreditoren\". Leave empty if this company does not need these accounts.",
+   "fieldname": "creditor_parent_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Creditor Parent Account",
+   "options": "Account"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.creditor_parent_account",
+   "description": "Every save of a supplier creates its account for this company if it is missing. A supplier cannot be saved without one.",
+   "fieldname": "auto_create_creditor_account",
+   "fieldtype": "Check",
+   "label": "Create Automatically and Require"
+  },
+  {
+   "fieldname": "column_break_creditor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "70000",
+   "depends_on": "eval:doc.creditor_parent_account",
+   "fieldname": "creditor_number_start",
+   "fieldtype": "Int",
+   "label": "First Creditor Number",
+   "mandatory_depends_on": "eval:doc.creditor_parent_account",
+   "non_negative": 1
+  },
+  {
+   "default": "99999",
+   "depends_on": "eval:doc.creditor_parent_account",
+   "fieldname": "creditor_number_end",
+   "fieldtype": "Int",
+   "label": "Last Creditor Number",
+   "mandatory_depends_on": "eval:doc.creditor_parent_account",
+   "non_negative": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-17 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Party Account Setting",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

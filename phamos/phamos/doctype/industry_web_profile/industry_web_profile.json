@@ -20,7 +20,8 @@
   "industry_website_col",
   "image",
   "content_section",
-  "translations"
+  "translations",
+  "faqs"
  ],
  "fields": [
   {
@@ -101,6 +102,13 @@
    "fieldtype": "Table",
    "label": "Texts per Language",
    "options": "Web Profile Content"
+  },
+  {
+   "description": "Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.",
+   "fieldname": "faqs",
+   "fieldtype": "Table",
+   "label": "FAQ",
+   "options": "Web Profile FAQ"
   }
  ],
  "index_web_pages_for_search": 0,

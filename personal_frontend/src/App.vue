@@ -39,6 +39,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { clockTime } from "@spa/utils/datetime.js"
 import { __ } from "@spa/utils/i18n.js"
+import { IDEA_ICON } from "@spa/utils/icons.js"
 import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasContracts, loadMyContracts } from "./contractStore.js"
@@ -156,7 +157,7 @@ const BASE_ITEMS = [
 	{
 		name: "Ideas",
 		label: "Ideas",
-		icon: "feather",
+		icon: IDEA_ICON,
 		match: ["Ideas", "IdeaDetail", "IdeaWrite"],
 		// Hand in for vote (#1842): everyone's ideas up for vote.
 		children: [{ name: "IdeasVote", label: "For vote", icon: "thumbs-up", match: ["IdeasVote", "IdeaVoteDetail"] }],

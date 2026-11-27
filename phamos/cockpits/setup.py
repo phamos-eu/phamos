@@ -134,16 +134,26 @@ TASK_FIELDS = [
 	},
 ]
 
-# On Issue the "Implementation Specific" section belongs to Phriend (phamos/phriend/setup.py) and
-# only shows on Phriend and GitLab issues. A team must be settable on every Issue, so the field
-# sits next to Department (custom_department, phamos/setup/ops_inbox.py) instead.
+# On Issue the section shows on every Issue and starts with the team (#1955). Phriend's fields
+# follow the team inside it and carry their own conditions (phamos/phriend/setup.py), so they
+# stay hidden on Issues that are no Phriend report and have no GitLab issue. Issue starts with
+# the Section Break `subject_section`, so the section swallows no standard field.
 ISSUE_FIELDS = [
+	{
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
+		"fieldtype": "Section Break",
+		"insert_after": "",
+		"collapsible": 0,
+		# the section used to show only on Phriend and GitLab issues; clear that condition
+		"depends_on": "",
+	},
 	{
 		"fieldname": "custom_team",
 		"label": "Team",
 		"fieldtype": "Link",
 		"options": "Team",
-		"insert_after": "custom_department",
+		"insert_after": IMPLEMENTATION_SECTION,
 		"description": "The team this issue belongs to. It shows in that team's Team Cockpit.",
 	},
 ]
@@ -178,6 +188,33 @@ def ensure_task_fields():
 def ensure_issue_fields():
 	ensure_module()
 	create_custom_fields({"Issue": [{**field, "module": MODULE} for field in ISSUE_FIELDS]}, update=True)
+	expand_issue_sections()
+
+
+def expand_issue_sections():
+	"""Every section on the Issue form open, never collapsible (#2157).
+
+	A Property Setter for each standard Section Break that ERPNext makes collapsible, read from
+	the DocFields, so a section ERPNext makes collapsible later is covered on the next migrate.
+	Our own sections are not collapsible at their source (custom fields). With collapsible off,
+	Frappe ignores `collapsible_depends_on` (ERPNext opens "Details" only on closed issues).
+	"""
+	sections = frappe.get_all(
+		"DocField",
+		filters={"parent": "Issue", "parenttype": "DocType", "fieldtype": "Section Break", "collapsible": 1},
+		pluck="fieldname",
+	)
+	for fieldname in sections:
+		existing = frappe.db.get_value(
+			"Property Setter",
+			{"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"},
+			["name", "value"],
+			as_dict=True,
+		)
+		if existing and existing.value == "0":
+			continue
+		setter = make_property_setter("Issue", fieldname, "collapsible", "0", "Check")
+		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
 
 
 def after_migrate():

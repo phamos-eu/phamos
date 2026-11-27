@@ -1,0 +1,50 @@
+// Ophice (#2069, #2070): the app people "go to work" in. Its own SPA, not a cockpit: no cockpit
+// shell, the map fills the window.
+import "./main.css"
+
+import { syncThemeFromMediaPreference } from "@spa/theme.js"
+import { createApp } from "vue"
+import { Button, Dialog, FeatherIcon, FormControl, frappeRequest, FrappeUI, setConfig, toast } from "frappe-ui"
+import App from "./App.vue"
+import { socketioOptions } from "@spa/utils/socketio.js"
+import router from "./router"
+import { session } from "@spa/session.js"
+import { i18n } from "@spa/utils/i18n.js"
+
+setConfig("resourceFetcher", frappeRequest)
+syncThemeFromMediaPreference()
+
+const app = createApp(App)
+// FrappeUI also opens the realtime socket ($socket) that Ophice listens on.
+app.use(FrappeUI, { socketio: socketioOptions(window.frappe?.boot) })
+app.use(router)
+app.use(i18n)
+
+app.component("Button", Button)
+app.component("Dialog", Dialog)
+app.component("FeatherIcon", FeatherIcon)
+app.component("FormControl", FormControl)
+
+app.provide("$session", session)
+app.config.globalProperties.$toast = toast
+
+async function mountApp() {
+	try {
+		if (import.meta.env.DEV) {
+			const values = await frappeRequest({ url: "/api/method/phamos.www.ophice.get_context_for_dev" })
+			if (!window.frappe) window.frappe = {}
+			window.frappe.boot = values
+			if (!window.csrf_token && values?.csrf_token) window.csrf_token = values.csrf_token
+		}
+		app.mount("#app")
+	} catch (e) {
+		console.error("Failed to boot Ophice", e)
+		const el = document.getElementById("app")
+		if (el) {
+			el.innerHTML =
+				'<p style="padding:1.5rem;font-family:sans-serif;color:#b91c1c">Failed to load Ophice. Check the console for details.</p>'
+		}
+	}
+}
+
+mountApp()

@@ -101,9 +101,55 @@ class TestDevActionPanelBilling(_DapTestCase):
 			{self.billable: "75", self.internal: "75", self.no_implementation: "0"},
 		)
 
-	def test_new_project_and_timesheet_record_default_to_zero_percent_billable(self):
-		self.assertEqual(frappe.new_doc("Project").percent_billable, "0")
+	def test_new_project_leaves_percent_billable_to_the_rule(self):
+		# Empty on a new project, so the customer / internal rule decides (#1896).
+		self.assertFalse(frappe.new_doc("Project").percent_billable)
 		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
+
+	def _customer(self):
+		name = "DAP Billing Customer"
+		if not frappe.db.exists("Customer", name):
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": name,
+					"customer_type": "Company",
+					"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}) or "All Customer Groups",
+					"territory": frappe.db.get_value("Territory", {"is_group": 0}) or "All Territories",
+				}
+			).insert(ignore_permissions=True)
+		return name
+
+	def test_customer_project_without_percent_billable_presets_100_internal_0(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		customer_project = self._project("DAP Customer", percent_billable="", customer=customer)
+		internal = self._project("DAP Own", percent_billable="", customer=customer, custom_is_internal_project=1)
+		no_customer = self._project("DAP Own", percent_billable="")
+		self.assertEqual(billing_context(customer_project), {"percent_billable": "100"})
+		self.assertEqual(billing_context(internal), {"percent_billable": "0"})
+		self.assertEqual(billing_context(no_customer), {"percent_billable": "0"})
+		for project in (customer_project, internal, no_customer):
+			self._assign(project)
+		rows = {p["name"]: p["percent_billable"] for p in self._as_user(dap.get_dev_all_projects)}
+		self.assertEqual(
+			(rows[customer_project], rows[internal], rows[no_customer]), ("100", "0", "0")
+		)
+
+	def test_project_value_wins_over_the_customer_rule(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		zero = self._project("DAP Customer", percent_billable="0", customer=customer)
+		half = self._project("DAP Own", percent_billable="50", custom_is_internal_project=1)
+		self.assertEqual(billing_context(zero), {"percent_billable": "0"})
+		self.assertEqual(billing_context(half), {"percent_billable": "50"})
+
+	def test_customer_project_timer_starts_at_100(self):
+		project = self._project("DAP Customer", percent_billable="", customer=self._customer())
+		started = self._as_user(dap.start_project_timer, project, 3600, "Customer work")
+		self.assertEqual(frappe.db.get_value("Timesheet Record", started["name"], "percent_billable"), "100")
 
 	def test_project_without_percent_billable_presets_zero_everywhere(self):
 		from phamos.api import personal_timer
@@ -301,6 +347,70 @@ class TestDevActionPanelIssueList(_DapTestCase):
 			dap.get_matching_names, "GitLab Issue", [["GitLab Issue", "title", "=", "DAP Scope issue"]]
 		)
 		self.assertEqual(names, [opened])
+
+	def _family(self):
+		parent = self._issue("DAP Family parent")
+		children = [self._issue("DAP Family child", parent=parent) for _ in range(2)]
+		standalone = self._issue("DAP Family standalone")
+		return parent, children, standalone
+
+	def _matching(self, *rows):
+		# Narrowed to this test's issues; the site may hold other open issues.
+		return set(
+			self._as_user(
+				dap.get_matching_names,
+				"GitLab Issue",
+				[["GitLab Issue", "title", "like", "DAP Family%"], *[["GitLab Issue", *r] for r in rows]],
+			)
+		)
+
+	def test_gitlab_parent_issue_filter_lists_the_parent_and_its_children(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", parent]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", standalone]), {standalone})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "in", f"{parent},{standalone}"]), {parent, *children, standalone}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "!=", parent]), {standalone})
+
+	def test_gitlab_child_issue_filter_lists_child_issues_only(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "set"]), set(children))
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "not set"]), {parent, standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", children[0]]), {children[0]})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", parent]), set())
+		# Both together: the children of one parent.
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "=", parent], ["gitlab_child_issue", "is", "set"]), set(children)
+		)
+
+	def test_gitlab_family_filters_match_like_as_sql_does(self):
+		# % and _ anywhere, case-insensitive, like the column filters (MariaDB LIKE).
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", f"%{parent}%"]), {parent, *children})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "like", f"{parent[:2]}%{parent[-2:]}"]), {parent, *children}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "_"]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent.upper()]), {parent, *children})
+		# A run of % is one wildcard; \% and \_ are literal.
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", "%" * 40 + parent[-3:]]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent + "\\%"]), set())
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "\\_"]), set())
+		self.assertEqual(self._matching(["gitlab_parent_issue", "not like", f"%{parent}%"]), {standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "like", f"%{children[0]}%"]), {children[0]})
+		self.assertEqual(
+			self._matching(["gitlab_child_issue", "not like", f"%{children[0]}%"]), {parent, standalone, children[1]}
+		)
+
+	def test_gitlab_family_filters_refuse_conditions_they_cannot_answer(self):
+		self.assertRaises(
+			frappe.ValidationError,
+			self._as_user,
+			dap.get_matching_names,
+			"GitLab Issue",
+			[["GitLab Issue", "gitlab_parent_issue", ">", "x"]],
+		)
 
 	def test_running_issue_assigned_to_someone_else_is_marked_running(self):
 		running = self._issue("Running, not assigned to me")

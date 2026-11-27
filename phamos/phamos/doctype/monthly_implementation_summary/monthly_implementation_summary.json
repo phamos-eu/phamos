@@ -10,10 +10,8 @@
     "implementation",
     "status",
     "sales_order_status_information",
-    "mis_delivery_notes_section",
-    "mis_delivery_notes",
-    "mis_sales_invoices_section",
-    "mis_sales_invoices",
+    "deliveries_section",
+    "deliveries_html",
     "section_break_1_section",
     "delivery_note_details",
     "delivery_note_item",
@@ -40,11 +38,11 @@
   ],
   "fields": [
     {
-    "fieldname": "naming_series",
-    "fieldtype": "Select",
-    "hidden": 1,
-    "label": "Naming Series"
-  },
+      "fieldname": "naming_series",
+      "fieldtype": "Select",
+      "hidden": 1,
+      "label": "Naming Series"
+    },
     {
       "fieldname": "implementation",
       "fieldtype": "Link",
@@ -72,27 +70,14 @@
       "options": "Sales Order Status"
     },
     {
-      "fieldname": "mis_delivery_notes_section",
+      "fieldname": "deliveries_section",
       "fieldtype": "Section Break",
-      "label": "Delivery Notes"
+      "label": "Deliveries & Invoices"
     },
     {
-      "fieldname": "mis_delivery_notes",
-      "fieldtype": "Table",
-      "label": "Delivery Notes",
-      "options": "MIS Delivery Note"
-    },
-    {
-      "fieldname": "mis_sales_invoices_section",
-      "fieldtype": "Section Break",
-      "label": "Sales Invoices"
-    },
-    {
-      "fieldname": "mis_sales_invoices",
-      "fieldtype": "Table",
-      "label": "Sales Invoices",
-      "options": "MIS Sales Invoice",
-      "ignore_user_permissions": 1
+      "fieldname": "deliveries_html",
+      "fieldtype": "HTML",
+      "label": "Deliveries & Invoices"
     },
     {
       "fieldname": "section_break_1_section",

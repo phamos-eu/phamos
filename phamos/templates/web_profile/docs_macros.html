@@ -1,0 +1,92 @@
+{#- Building blocks of the documentation pages (phamos/phamos#2005, #2045). Every database value is
+    escaped with `| e`; only page content (Bookstack Page.html, sanitised by the sync) is printed raw. -#}
+
+{% macro book_tile(book, heading="h3") -%}
+<li class="wp-tile-item">
+	<div class="wp-tile wp-docs-tile">
+		<{{ heading }} class="wp-tile-title"><a class="wp-stretched-link" href="{{ book.url | e }}">{{ book.title | e }}</a></{{ heading }}>
+		{%- if book.summary %}<span class="wp-tile-subtitle">{{ book.summary | truncate(180) | e }}</span>{% endif %}
+		<span class="wp-chips"><span class="wp-chip">{{ page_count(book.page_count) }}</span></span>
+	</div>
+</li>
+{%- endmacro %}
+
+{% macro page_count(n) -%}
+{{ _("1 page") if n == 1 else _("{0} pages").format(n) }}
+{%- endmacro %}
+
+{#- Book contents beside a page: chapters fold, the one with the current page is open (#2045). -#}
+{% macro nav_contents(entries, current=None) -%}
+<ol class="wp-docs-toc">
+	{%- for entry in entries %}
+	{%- if entry.type == "chapter" %}
+	{%- set open = entry.pages | selectattr("slug", "equalto", current) | list %}
+	<li class="wp-docs-toc-chapter">
+		<details{% if open %} open{% endif %}>
+			<summary>{{ entry.title | e }}</summary>
+			<ol>{% for p in entry.pages %}{{ toc_link(p, current) }}{% endfor %}</ol>
+		</details>
+	</li>
+	{%- else %}{{ toc_link(entry, current) }}{% endif %}
+	{%- endfor %}
+</ol>
+{%- endmacro %}
+
+{% macro toc_link(p, current) -%}
+<li><a href="{{ p.url | e }}"{% if current == p.slug %} aria-current="page"{% endif %}>{{ p.title | e }}</a></li>
+{%- endmacro %}
+
+{#- A book's chapters, numbered in BookStack's order, each folding (#2045). The id is the chapter
+    slug: rewritten chapter links (/de/dokumentation/<book>#<chapter>) land on it. -#}
+{% macro book_chapters(entries) -%}
+{%- set ns = namespace(n=0) %}
+<ol class="wp-docs-chapters">
+	{%- for entry in entries %}
+	{%- if entry.type == "chapter" %}
+	{%- set ns.n = ns.n + 1 %}
+	<li class="wp-docs-chapter-item">
+		<details class="wp-docs-chapter" id="{{ entry.slug | e }}" data-wp-docs-chapter>
+			<summary>
+				<span class="wp-docs-chapter-num" aria-hidden="true">{{ ns.n }}</span>
+				<span class="wp-docs-chapter-title"><h2>{{ entry.title | e }}</h2>
+					{%- if entry.description %}<span class="wp-docs-chapter-desc">{{ entry.description | e }}</span>{% endif %}</span>
+				<span class="wp-docs-chapter-count">{{ page_count(entry.pages | length) }}</span>
+			</summary>
+			<ol class="wp-docs-chapter-pages">
+				{%- for p in entry.pages %}<li><a href="{{ p.url | e }}">{{ p.title | e }}</a></li>{% endfor %}
+			</ol>
+		</details>
+	</li>
+	{%- else %}
+	<li class="wp-docs-loose"><a href="{{ entry.url | e }}">{{ entry.title | e }}</a></li>
+	{%- endif %}
+	{%- endfor %}
+</ol>
+{%- endmacro %}
+
+{#- Floating buttons: back to the top, and to the next heading / chapter below the current scroll
+    position (web_docs.bundle.js). Hidden until the script runs. -#}
+{% macro jump_buttons(next_label, next_target) -%}
+<div class="wp-docs-jump" data-wp-docs-jump hidden>
+	<button type="button" class="wp-docs-jump-btn" data-wp-docs-top aria-label="{{ _('Back to top') }}" title="{{ _('Back to top') }}">
+		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+	<button type="button" class="wp-docs-jump-btn" data-wp-docs-next="{{ next_target }}" aria-label="{{ next_label }}" title="{{ next_label }}">
+		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></button>
+</div>
+{%- endmacro %}
+
+{#- Search field (#2046), the same element as on the Web Profile listings (/de/module): a plain GET
+    form that works without JavaScript; web_docs.bundle.js adds suggestions while typing. On book
+    and page views it searches that book unless unticked. -#}
+{% macro search_box(action, lang, book=None, query="") -%}
+<form class="wp-searchbar wp-docs-search" role="search" action="{{ action | e }}" method="get" data-wp-docs-search data-lang="{{ lang }}">
+	{%- set placeholder = _("Search in {0}").format(book.title) if book else _("Search the documentation") %}
+	<label class="wp-visually-hidden" for="wp-docs-q-{{ (book.slug if book else 'all') | e }}">{{ placeholder | e }}</label>
+	<input id="wp-docs-q-{{ (book.slug if book else 'all') | e }}" class="wp-search" type="search" name="q" value="{{ query | e }}"
+		minlength="2" maxlength="100" autocomplete="off" placeholder="{{ placeholder | e }}" data-wp-docs-search-input>
+	{%- if book %}
+	<label class="wp-docs-search-scope"><input type="checkbox" name="book" value="{{ book.slug | e }}" checked data-wp-docs-search-book> {{ _("Only this book") }}</label>
+	{%- endif %}
+	<ul class="wp-docs-suggest" role="listbox" hidden data-wp-docs-suggest></ul>
+</form>
+{%- endmacro %}

@@ -19,9 +19,3 @@ class BookstackConfiguration(Document):
 		# Cheap call: list a single user
 		client.get("users", params={"count": 1})
 		return _("Connection OK")
-
-	@frappe.whitelist()
-	def sync_all(self):
-		from phamos.bookstack_integration import sync
-
-		return sync.sync_instance(self.name)
