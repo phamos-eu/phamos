@@ -202,6 +202,12 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* A bit bigger than its cell (PM, 2026-11-27), grown from the foot of the pole so it still
+   stands in the cell it was planted on. */
+.ophice-flag > .ophice-flag-icon {
+	transform: scale(1.4);
+	transform-origin: 29% 90%;
+}
 .ophice-flag--mine {
 	cursor: grab;
 	touch-action: none;
