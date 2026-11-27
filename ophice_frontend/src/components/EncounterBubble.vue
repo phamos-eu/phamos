@@ -125,7 +125,6 @@
 					:domain="video.domain"
 					:room="video.room"
 					:display-name="displayName"
-					:start-muted="approached"
 					@joined="keepChatFocus"
 					@stolen="keepChatFocus"
 					@toggled="input?.focus()"
@@ -179,8 +178,6 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** The call runs in its own window (#2108): no embedded call here. */
 	inWindow: { type: Boolean, default: false },
-	/** Walked up to (#2168): the call joins with my mic and camera off and untouched. */
-	approached: { type: Boolean, default: false },
 	/** Moved by a press anywhere on it (with the call, #2108). */
 	movable: { type: Boolean, default: false },
 	/** My chip for the huddle: { user, full_name, user_image } */

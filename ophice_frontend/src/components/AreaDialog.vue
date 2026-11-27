@@ -53,7 +53,7 @@
 					placeholder="https://meet.systemli.org/FullTimeDefencesRejectOverly"
 				/>
 				<p class="text-xs text-ink-gray-5">
-					{{ __("Whoever stops inside the area joins this meeting, with microphone and camera on.") }}
+					{{ __("Whoever stops inside the area joins this meeting.") }}
 				</p>
 				<p v-if="kind === 'Guest' || kind === 'Customer meeting'" class="text-xs text-ink-gray-5">
 					{{ __("Chat: the guest chat, kept only for a short while (comes with the guest chat).") }}
