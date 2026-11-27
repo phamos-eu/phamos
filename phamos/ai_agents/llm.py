@@ -98,3 +98,21 @@ def chat_json(prompt, model=None, system=None, images=None):
 		raise Exception(f"Mistral chat failed ({response.status_code}): {response.text[:500]}")
 	content = (response.json().get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
 	return json.loads(content), model
+
+
+EMBED_MODEL = "mistral-embed"
+
+
+def embed(texts):
+	"""One embedding vector per text, in order (Idea Catcher's nearby ideas, #2206)."""
+	settings = _require_settings()
+	response = requests.post(
+		f"{_api_base(settings)}/embeddings",
+		json={"model": EMBED_MODEL, "input": list(texts)},
+		headers={"Authorization": f"Bearer {settings['api_key']}"},
+		timeout=60,
+	)
+	if not response.ok:
+		raise Exception(f"Mistral embeddings failed ({response.status_code}): {response.text[:500]}")
+	rows = sorted(response.json().get("data") or [], key=lambda row: row.get("index", 0))
+	return [row["embedding"] for row in rows]
