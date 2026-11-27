@@ -479,12 +479,26 @@ body {
 	--sheet-radius: 34px;
 }
 
+/* The glow is its own fixed layer over the whole screen, safe areas included (viewport-fit=cover),
+   so it shines behind the status bar and the Dynamic Island with no edge (#2218). A body
+   background with background-attachment: fixed does not do that on iOS. Content stays below
+   the island through .app's padding-top: env(safe-area-inset-top). */
 [data-platform="ios"] body {
+	background: transparent;
+}
+
+[data-platform="ios"]::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	top: calc(-1 * env(safe-area-inset-top));
+	bottom: calc(-1 * env(safe-area-inset-bottom));
+	z-index: -1;
+	pointer-events: none;
 	background:
 		radial-gradient(120% 60% at 0% 0%, rgba(255, 214, 10, 0.22), transparent 60%),
 		radial-gradient(100% 60% at 100% 100%, rgba(10, 132, 255, 0.18), transparent 60%),
 		var(--bg);
-	background-attachment: fixed;
 }
 
 [data-platform="ios"] .btn-primary {

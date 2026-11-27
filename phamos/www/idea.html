@@ -23,6 +23,13 @@
 				var ua = navigator.userAgent
 				var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
 				document.documentElement.setAttribute("data-platform", ios ? "ios" : "android")
+				// iOS: no flat theme-color, so Safari's status bar shows the page's glow instead of a
+				// hard-edged strip; the glow layer reaches behind the Dynamic Island (#2218).
+				if (ios) {
+					document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+						m.remove()
+					})
+				}
 			})()
 		</script>
 	</head>
