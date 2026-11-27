@@ -3200,3 +3200,44 @@ Slack is how many days a chapter can slip before it delays the end date. Late me
 "The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
 "Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
 Target level reached,Ziellevel erreicht
+Calls: ask for mic and camera,Anrufe: nach Mikrofon und Kamera fragen
+Calls: mic and camera off,Anrufe: Mikrofon und Kamera aus
+Calls: mic and camera on,Anrufe: Mikrofon und Kamera an
+Click to change.,Zum Ändern klicken.
+Join,Beitreten
+"Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
+Idea saved,Idee gespeichert
+Does it belong to an existing idea?,Gehört sie zu einer bestehenden Idee?
+Close in meaning,Inhaltlich nah
+Grew out of it,Daraus entstanden
+Add to it,Dort ergänzen
+What's the idea?,Was ist die Idee?
+Search my ideas,Meine Ideen durchsuchen
+1 idea waiting to send,1 Idee wartet auf Versand
+{0} ideas waiting to send,{0} Ideen warten auf Versand
+Kept on this phone. It is sent when you are online again.,"Auf diesem Telefon gespeichert. Sie wird gesendet, sobald Sie wieder online sind."
+Very close,Sehr nah
+Related,Verwandt
+Far,Fern
+No idea matches.,Keine Idee passt.
+No other ideas yet.,Noch keine anderen Ideen.
+Looking for close ideas …,Suche nach ähnlichen Ideen …
+Nothing close found.,Nichts Ähnliches gefunden.
+Linked: grew out of {0},Verknüpft: entstanden aus {0}
+Added to {0},Ergänzt in {0}
+No connection. The idea is saved; link it later in the Personal Cockpit.,Keine Verbindung. Die Idee ist gespeichert; verknüpfen Sie sie später im Personal Cockpit.
+Only colleagues can catch ideas.,Nur Kolleginnen und Kollegen können Ideen festhalten.
+Write or dictate your idea first.,Schreiben oder diktieren Sie zuerst Ihre Idee.
+Unknown link: {0},Unbekannte Verknüpfung: {0}
+Added {0},Ergänzt am {0}
+Idea suggestions failed,Ideen-Vorschläge fehlgeschlagen
+The AI could not be asked. Search instead.,Die KI konnte nicht gefragt werden. Bitte suchen Sie stattdessen.
+Suggest Related Ideas with AI,Verwandte Ideen per KI vorschlagen
+{0} already grew out of this idea.,{0} ist bereits aus dieser Idee entstanden.
+This idea has its own history. Link it instead of adding it.,"Diese Idee hat eine eigene Geschichte. Verknüpfen Sie sie, statt sie zu ergänzen."
+That is too long for a quick idea. Write it out in the Personal Cockpit.,Das ist zu lang für eine schnelle Idee. Schreiben Sie sie im Personal Cockpit aus.
+Sign in to send {0},"Anmelden, um {0} zu senden"
+"Stays its own idea, linked to this one.","Bleibt eine eigene Idee, verknüpft mit dieser."
+"Your text goes to the bottom of this idea, with date and time.","Ihr Text kommt unten an diese Idee, mit Datum und Uhrzeit."
+Grew out of this idea,Aus dieser Idee entstanden
+{0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."

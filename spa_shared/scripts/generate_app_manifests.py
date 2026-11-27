@@ -13,7 +13,9 @@ Usage (macOS; needs Pillow, which the bench environment has, QuickLook to render
 the Feather SVG symbols, and `yarn install` in human_resources_frontend, which
 provides the feather-icons package):
 
-	~/frappe-bench/env/bin/python spa_shared/scripts/generate_app_manifests.py
+	~/frappe-bench/env/bin/python spa_shared/scripts/generate_app_manifests.py [slug ...]
+
+With slugs, only those apps are written (e.g. `idea`).
 
 Writes to phamos/public/manifest/: <slug>.webmanifest, <slug>-icon-192.png,
 <slug>-icon-512.png, <slug>-maskable-512.png and <slug>-apple-touch-icon.png.
@@ -30,6 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = REPO_ROOT / "phamos" / "public" / "manifest"
 ASSET_URL = "/assets/phamos/manifest"
 FEATHER_ICONS = REPO_ROOT / "human_resources_frontend" / "node_modules" / "feather-icons" / "dist" / "icons"
+OWN_SYMBOLS = Path(__file__).resolve().parent / "symbols"  # symbols Feather lacks
 
 # Splash background of an installed cockpit: the cockpit background (frappe-ui surface-gray-1).
 LIGHT_BACKGROUND = "#f8f8f8"
@@ -113,6 +116,16 @@ APPS = [
 		"color": "#0e7490",
 		"symbol": "user",
 	},
+	{
+		# Idea Catcher (#2202): the phone page that catches an idea. Feather has no bulb, so the
+		# symbol is our own SVG in scripts/symbols/ (same 24px grid and stroke as Feather).
+		"slug": "idea",
+		"name": "Idea",
+		"description": "Catch an idea: type or dictate it, link it later",
+		"route": "/idea",
+		"color": "#ca8a04",
+		"symbol": "lightbulb",
+	},
 ]
 
 RENDER_SIZE = 1024  # symbols are rendered large and scaled down for smooth edges
@@ -124,7 +137,8 @@ def render_symbol_mask(symbol, workdir):
 
 	QuickLook renders the SVG black on white; inverting that gives the mask.
 	"""
-	svg = (FEATHER_ICONS / f"{symbol}.svg").read_text()
+	own = OWN_SYMBOLS / f"{symbol}.svg"
+	svg = (own if own.exists() else FEATHER_ICONS / f"{symbol}.svg").read_text()
 	svg = svg.replace('width="24" height="24"', f'width="{RENDER_SIZE}" height="{RENDER_SIZE}"')
 	svg = svg.replace('stroke="currentColor"', 'stroke="#000000"')
 	svg_path = Path(workdir) / f"{symbol}.svg"
@@ -189,10 +203,13 @@ def build_manifest(app):
 	}
 
 
-def main():
+def main(only=None):
+	"""Write manifests and icons for all apps, or only for the slugs in `only`."""
 	OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 	with tempfile.TemporaryDirectory() as workdir:
 		for app in APPS:
+			if only and app["slug"] not in only:
+				continue
 			mask = render_symbol_mask(app["symbol"], workdir)
 			slug, color = app["slug"], app["color"]
 
@@ -211,4 +228,6 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+	import sys
+
+	main(only=sys.argv[1:] or None)
