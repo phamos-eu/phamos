@@ -3,6 +3,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import Sidebar from "./components/Sidebar.vue";
 import StatsBar from "./components/StatsBar.vue";
 import FrappeFilter from "./components/FrappeFilter.vue";
+import QuickSearch from "./components/QuickSearch.vue";
+import { issueMatchesSearch, sortIssues, ISSUE_SORT_OPTIONS, DEFAULT_ISSUE_SORT } from "./quickSearch.js";
 import IssueList from "./components/IssueList.vue";
 import BreakModal from "./components/BreakModal.vue";
 import BreakConfirm from "./components/BreakConfirm.vue";
@@ -42,6 +44,9 @@ function onIssueFilter(names) {
   issueMatches.value = names;
   if (names) mineOnly.value = false;
 }
+// Quick text search and sort next to the Filter button (#2211).
+const issueSearch = ref("");
+const issueSort = ref(DEFAULT_ISSUE_SORT);
 // The Filter button is rebuilt empty when the Issues view opens again, so drop its result.
 watch(currentView, (view) => { if (view !== "issues") issueMatches.value = null; });
 
@@ -75,9 +80,9 @@ const filteredIssues = computed(() => {
     list = list.filter(i => allowed.has(i.name));
   }
 
-  // Due date first, issues without one last
-  const due = i => (i.due_date ? new Date(i.due_date).getTime() : Infinity);
-  list = [...list].sort((a, b) => due(a) - due(b));
+  if (issueSearch.value.trim()) list = list.filter(i => issueMatchesSearch(i, issueSearch.value));
+
+  list = sortIssues(list, issueSort.value);
 
   // Re-inject the active issue at the top, bypassing all filters
   if (activeIssue) list = [activeIssue, ...list];
@@ -405,7 +410,11 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
       <div class="dc-body">
         <template v-if="currentView === 'issues'">
           <div class="dc-filter-row">
+            <QuickSearch v-model="issueSearch" placeholder="Search issues by title, #number, project, assignee or label…" />
             <FrappeFilter doctype="GitLab Issue" @change="onIssueFilter" />
+            <select v-model="issueSort" class="dc-sort form-control" title="Sort issues">
+              <option v-for="o in ISSUE_SORT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
             <span class="dc-filter-count">{{ filteredIssues.length }} of {{ issues.length }}</span>
           </div>
           <div v-if="activeProjectRow" class="dc-running-project">
@@ -513,6 +522,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 .dc-body { flex: 1; min-width: 0; overflow-y: auto; }
 .dc-running-project { padding: 4px 16px 0; }
 .dc-filter-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: var(--card-bg); }
+.dc-sort { width: auto; flex-shrink: 0; font-size: 12px; height: 28px; padding: 2px 8px; }
 .dc-filter-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 .dc-loading {
