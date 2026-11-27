@@ -10,6 +10,7 @@ import {
 	jitsiStartConfig,
 	splitCall,
 	encounterCallWindowName,
+	encounterOpening,
 	jitsiCallUrl,
 	nextQualityLevel,
 	qualityLevel,
@@ -43,6 +44,20 @@ describe("jitsiStartConfig", () => {
 		expect(config.startWithVideoMuted).toBe(true)
 		expect(config.disableInitialGUM).toBe(true)
 		expect(config.prejoinConfig).toEqual({ enabled: false })
+	})
+})
+
+describe("encounterOpening (#2165, #2168)", () => {
+	it("I start it: mic and camera on, my status goes", () => {
+		expect(encounterOpening()).toEqual({ callOff: false, backToAvailable: true })
+	})
+
+	it("the other person walked up: mic and camera off, my status stays", () => {
+		expect(encounterOpening({ fromPeer: true })).toEqual({ callOff: true, backToAvailable: false })
+	})
+
+	it("I answer a walk-up ping: mic and camera off, but my status goes (else the server refuses)", () => {
+		expect(encounterOpening({ answer: true })).toEqual({ callOff: true, backToAvailable: true })
 	})
 })
 
