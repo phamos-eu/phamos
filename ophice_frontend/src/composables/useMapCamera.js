@@ -148,16 +148,87 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 		over.y = elastic ? rubber(raw.y - pan.y) : 0
 	}
 
-	// --- Drag to pan. A press that moves less than a few px stays a click (chips, spaces).
+	// --- Drag to pan with one finger (or the mouse); pinch with two to zoom (#2213). A press that
+	// moves less than a few px stays a click (chips, spaces).
+	// The fingers on the map, by pointer id: where each is now (client px).
+	const pointers = new Map()
 	let start = null
+	let pinch = null
 	let suppressClick = false
 
-	function onPointerDown(event) {
+	function capture(target, id) {
+		try {
+			target?.setPointerCapture?.(id)
+		} catch {
+			// the gesture still works while the pointers stay over the map
+		}
+	}
+
+	/** Start (or restart) a one-finger drag from where this pointer is now. */
+	function startDrag(id, target) {
+		const at = pointers.get(id)
+		start = { x: at.x, y: at.y, panX: pan.x + over.x, panY: pan.y + over.y, id, target }
+	}
+
+	/** Distance and middle (view px) of two fingers. */
+	function twoFingers(box, ids) {
+		const [a, b] = ids.map((id) => pointers.get(id))
+		return {
+			dist: Math.hypot(b.x - a.x, b.y - a.y),
+			mid: { x: (a.x + b.x) / 2 - box.left, y: (a.y + b.y) / 2 - box.top },
+		}
+	}
+
+	/**
+	 * @param {PointerEvent} event
+	 * @param {{pan?: boolean}} [options]  pan: false only notes the finger (it landed on a chip), so
+	 *   a second finger can pinch with it; alone it does not move the map and its tap stays a click.
+	 */
+	function onPointerDown(event, { pan: pans = true } = {}) {
 		if (event.button !== 0) return
-		start = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, id: event.pointerId, target: event.currentTarget }
+		// Only fingers pinch. A mouse released outside the map, or a touch that ended without a
+		// pointerup or pointercancel, left an entry behind: the first finger down starts fresh.
+		if (event.pointerType !== "touch" || event.isPrimary) {
+			pointers.clear()
+			pinch = null
+			start = null
+		}
+		pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+		if (pointers.size === 1) {
+			if (pans) startDrag(event.pointerId, event.currentTarget)
+			return
+		}
+		if (pointers.size !== 2 || pinch) return
+		// The second finger: a pinch. Zoom follows the distance between the two, pan their middle.
+		// A third finger is ignored.
+		const ids = [...pointers.keys()]
+		const target = start?.target || event.currentTarget
+		const box = target?.getBoundingClientRect?.() || { left: 0, top: 0 }
+		const { dist, mid } = twoFingers(box, ids)
+		if (!dist) return
+		pinch = { ids, dist, zoom: zoom.value, mid, box, target }
+		start = null
+		dragging.value = true
+		springing.value = false
+		followPaused.value = true
+		for (const id of pointers.keys()) capture(target, id)
 	}
 
 	function onPointerMove(event) {
+		const at = pointers.get(event.pointerId)
+		if (!at) return
+		at.x = event.clientX
+		at.y = event.clientY
+		if (pinch) {
+			if (!pinch.ids.includes(event.pointerId)) return
+			const { dist, mid } = twoFingers(pinch.box, pinch.ids)
+			// The map under the fingers moves with them, then zooms around their middle. The zoom
+			// counts from the start, not step by step: small steps would round away.
+			panBy(mid.x - pinch.mid.x, mid.y - pinch.mid.y)
+			setZoom(Math.round(pinch.zoom * (dist / pinch.dist) * 100) / 100, mid)
+			pinch.mid = mid
+			return
+		}
 		if (!start || event.pointerId !== start.id) return
 		const dx = event.clientX - start.x
 		const dy = event.clientY - start.y
@@ -166,11 +237,7 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 			dragging.value = true
 			springing.value = false
 			followPaused.value = true
-			try {
-				start.target?.setPointerCapture?.(event.pointerId)
-			} catch {
-				// the drag still works while the pointer stays over the map
-			}
+			capture(start.target, event.pointerId)
 		}
 		// Each move from the start: the resistance stays steady however fast the hand is.
 		over.x = 0
@@ -178,8 +245,26 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 		panBy(dx, dy, { x: start.panX, y: start.panY })
 	}
 
-	function onPointerUp() {
-		if (!start) return
+	function onPointerUp(event) {
+		const id = event?.pointerId
+		if (id !== undefined && !pointers.delete(id)) return
+		if (id === undefined) pointers.clear()
+		if (pinch) {
+			// A third finger lifting changes nothing.
+			if (!pinch.ids.includes(id) && id !== undefined) return
+			const target = pinch.target
+			const rest = pinch.ids.find((other) => other !== id && pointers.has(other))
+			pinch = null
+			suppressClick = true
+			// One pinch finger left: it goes on as a drag from where it is, without a jump.
+			if (rest !== undefined) {
+				startDrag(rest, target)
+				return
+			}
+		} else if (id !== undefined && start?.id !== id) {
+			// Not the finger that pans (a finger noted on a chip): nothing to end.
+			return
+		}
 		if (dragging.value) suppressClick = true
 		start = null
 		dragging.value = false
@@ -270,5 +355,7 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 		onClickCapture,
 		onWheel,
 		isPlaced: () => placed,
+		// A finger (or the mouse) is down on the map: a second finger may join for a pinch.
+		isPressed: () => pointers.size > 0,
 	}
 }
