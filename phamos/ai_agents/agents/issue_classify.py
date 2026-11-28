@@ -154,7 +154,11 @@ def screenshot_images(doc):
 	if not url:
 		return []
 	ctype = IMAGE_TYPES.get(url.rsplit(".", 1)[-1].lower())
-	name = frappe.db.get_value("File", {"file_url": url}, "name")
+	# only the file Phriend attached to this Issue: a URL alone could point at another record's
+	# private file (AI review on !1347)
+	name = frappe.db.get_value(
+		"File", {"file_url": url, "attached_to_doctype": "Issue", "attached_to_name": doc.name}, "name"
+	)
 	if not ctype or not name:
 		return []
 	try:
