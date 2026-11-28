@@ -26,10 +26,19 @@ body {
 	--hr-gantt-header-month-h: 26px;
 	--hr-gantt-header-week-h: 22px;
 	--hr-gantt-header-day-h: 26px;
+	/* Categorical chart colours for stacked series: blue, orange, aqua. Hues far apart, checked
+	   for colour-blind separation on the light and dark surface (dataviz validator). Assign them
+	   in this order, never cycled. */
+	--chart-series-1: #2a78d6;
+	--chart-series-2: #eb6834;
+	--chart-series-3: #1baf7a;
 }
 
 html[data-theme="dark"] {
 	color-scheme: dark;
+	--chart-series-1: #3987e5;
+	--chart-series-2: #d95926;
+	--chart-series-3: #199e70;
 }
 
 /* -------------------------------------------------------------------------- */
