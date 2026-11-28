@@ -36,6 +36,10 @@ def on_issue_insert(doc, method=None):
 		settings = frappe.get_cached_doc(SETTINGS)
 		if not settings.enabled or not in_scope(doc, settings):
 			return
+		# only Issues of an Implementation the assistant was switched on for; the others are left alone
+		# entirely: no run, no assignment, no brief (#2114)
+		if not implementation_switched_on(implementation_of(doc), settings.assistant_user):
+			return
 		from phamos.ai_agents import runner
 
 		runner.enqueue_run("Issue", doc.name, trigger="Insert")
@@ -50,6 +54,28 @@ def in_scope(doc, settings):
 		return False
 	types = {row.issue_type for row in settings.scope_issue_types}
 	return not types or doc.issue_type in types
+
+
+def implementation_of(doc):
+	"""The Issue's Implementation: its own, else the one Identify finds for sure in code (#2112), for
+	example from the e-mail of a stakeholder. None when there is none or it is unclear."""
+	if doc.get("custom_implementation"):
+		return doc.custom_implementation
+	from phamos.ai_agents.agents.issue_identify import STRONG, identify
+
+	found = identify(doc)["implementation"]
+	return found["value"] if found["confidence"] == STRONG else None
+
+
+def implementation_switched_on(implementation, user):
+	"""Whether the assistant works on Issues of this Implementation (#2114).
+
+	Switched on = an explicit User Permission of the assistant's user on that Implementation. Checked
+	as a record, not with frappe.has_permission: a user without any User Permission may read every
+	Implementation, and here no entry has to mean "off".
+	"""
+	return bool(implementation and user and frappe.db.exists(
+		"User Permission", {"user": user, "allow": "Implementation", "for_value": implementation}))
 
 
 def reporter_user(doc):
@@ -301,6 +327,13 @@ def manual_checks(doc):
 		checks.append(_check("issue_type_scope", auto, _("Issue Type in scope"), doc.issue_type in types,
 			doc.issue_type or _("empty"), _("Issue Type on the Issue: one of {0}").format(", ".join(types))))
 
+	implementation = implementation_of(doc)
+	checks.append(_check("implementation_on", auto, _("Implementation switched on for the assistant"),
+		implementation_switched_on(implementation, settings.assistant_user),
+		implementation or _("no Implementation found"),
+		_("User Permission of {0} on Implementation {1}").format(settings.assistant_user, implementation)
+		if implementation else _("An Implementation on the Issue that the assistant is switched on for")))
+
 	page = doc.get("phriend_ref_doctype")
 	excluded = [row.excluded_doctype for row in settings.excluded_doctypes]
 	checks.append(_check("sensitive_page", model, _("Not reported from a sensitive page"),
@@ -357,7 +390,7 @@ def get_run_result(run):
 	return row
 
 
-AUTO_KEYS = ("settings_enabled", "agent_enabled", "project_scope", "issue_type_scope")
+AUTO_KEYS = ("settings_enabled", "agent_enabled", "project_scope", "issue_type_scope", "implementation_on")
 
 
 @frappe.whitelist(methods=["POST"])
