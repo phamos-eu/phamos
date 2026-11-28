@@ -884,14 +884,21 @@ function _mis_render_so_hours(frm, total) {
 }
 
 function _mis_load_so_hours(frm) {
+	// frm is reused when the user moves to another MIS, so a late answer must not paint
+	// its banner over a newer document (or over a newer request for the same one).
+	const request = (frm._mis_so_hours_request = (frm._mis_so_hours_request || 0) + 1);
 	if (frm.is_new()) {
 		_mis_render_so_hours(frm, null);
 		return;
 	}
+	const docname = frm.doc.name;
 	frappe.call({
 		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_so_hours_alert",
-		args: { docname: frm.doc.name },
-	}).then(r => _mis_render_so_hours(frm, r.message && r.message.total));
+		args: { docname },
+	}).then(r => {
+		if (request !== frm._mis_so_hours_request || frm.doc.name !== docname) return;
+		_mis_render_so_hours(frm, r.message && r.message.total);
+	});
 }
 
 frappe.ui.form.on("Monthly Implementation Summary", {
