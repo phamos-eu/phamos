@@ -28,6 +28,41 @@
 	var choose = $("choose")
 	var queueBadge = $("queue")
 
+	// --- keyboard (#2216) ---------------------------------------------------------------------
+	// iOS Safari leaves the layout viewport (what position: fixed and 100dvh measure) behind the
+	// on-screen keyboard. The visual viewport is what the user sees, so the page follows it: the
+	// app takes its height and offset, the sheet and toast sit --kb above the layout bottom.
+	// Android with interactive-widget=resizes-content shrinks both, so --kb stays 0 there.
+	var root = document.documentElement
+	function fitToKeyboard() {
+		var vv = window.visualViewport
+		if (!vv) return
+		// Pinch-zoom shrinks the visual viewport too; that is no keyboard.
+		var zoomed = vv.scale > 1.01
+		var kb = zoomed ? 0 : Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+		root.style.setProperty("--vvh", vv.height + "px")
+		root.style.setProperty("--vv-top", vv.offsetTop + "px")
+		root.style.setProperty("--kb", kb + "px")
+		// Keyboard up: a text field has the cursor, and iOS reports the keyboard as --kb while
+		// Android shows a much shorter visible area. A short desktop window alone is not enough.
+		var active = document.activeElement
+		var typing = !!active && (/^(INPUT|TEXTAREA)$/.test(active.tagName) || active.isContentEditable)
+		root.classList.toggle(
+			"kb-open",
+			!zoomed && typing && (kb > 80 || vv.height < window.screen.height * 0.6)
+		)
+	}
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener("resize", fitToKeyboard)
+		window.visualViewport.addEventListener("scroll", fitToKeyboard)
+	}
+	// The class follows the cursor: in on focus, out when the field is left.
+	document.addEventListener("focusin", fitToKeyboard)
+	document.addEventListener("focusout", function () {
+		setTimeout(fitToKeyboard, 0)
+	})
+	fitToKeyboard()
+
 	document.querySelectorAll("[data-t]").forEach(function (el) {
 		el.textContent = __(el.getAttribute("data-t"))
 	})
@@ -202,7 +237,14 @@
 
 	function focusText() {
 		setTimeout(function () {
-			text.focus()
+			// Not while the link sheet is open or another field (the search) has the cursor.
+			if (!sheet.hidden) return
+			var active = document.activeElement
+			if (active && active !== text && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return
+			text.focus({ preventScroll: true })
+			// Put the cursor after any text already there (e.g. text put back from the queue).
+			var end = text.value.length
+			text.setSelectionRange(end, end)
 		}, 50)
 	}
 
@@ -237,10 +279,10 @@
 		setTimeout(function () {
 			sheet.hidden = true
 			scrim.hidden = true
+			focusText()
 		}, 250)
 		current = null
 		if (message) toast(message)
-		focusText()
 	}
 
 	function row(idea, band) {
@@ -338,12 +380,26 @@
 		if (!current || !chosen) return
 		var target = chosen
 		call("link_idea", { name: current.name, target: target.name, mode: mode }, true)
-			.then(function () {
-				closeSheet(
-					mode === "spawned"
-						? __("Linked: grew out of {0}", [target.title])
-						: __("Added to {0}", [target.title])
-				)
+			.then(function (result) {
+				if (mode === "spawned") {
+					closeSheet(__("Linked: grew out of {0}", [target.title]))
+					return
+				}
+				closeSheet()
+				// Undo for a few seconds (#2209): puts both ideas back and opens the sheet again.
+				toast(__("Added to {0}", [target.title]), {
+					label: __("Undo"),
+					duration: UNDO_MS,
+					run: function () {
+						call("undo_append", { token: result.undo }, true)
+							.then(function (idea) {
+								openSheet(idea)
+							})
+							.catch(function (error) {
+								toast(error.message)
+							})
+					},
+				})
 			})
 			.catch(function (error) {
 				toast(error.message || __("No connection. The idea is saved; link it later in the Personal Cockpit."))
@@ -366,20 +422,40 @@
 	// --- toast ---------------------------------------------------------------------------
 
 	var toastTimer = null
-	function toast(message) {
+	var UNDO_MS = 8000
+	// A short message; with `action` ({label, run, duration}) it carries one button, e.g. Undo.
+	function toast(message, action) {
 		var el = $("toast")
-		el.textContent = message
+		el.textContent = ""
+		var text = document.createElement("span")
+		text.textContent = message
+		el.appendChild(text)
+		if (action) {
+			var button = document.createElement("button")
+			button.className = "toast-action"
+			button.textContent = action.label
+			button.addEventListener("click", function () {
+				hideToast()
+				action.run()
+			})
+			el.appendChild(button)
+		}
+		el.classList.toggle("has-action", !!action)
 		el.hidden = false
 		requestAnimationFrame(function () {
 			el.classList.add("open")
 		})
 		clearTimeout(toastTimer)
-		toastTimer = setTimeout(function () {
-			el.classList.remove("open")
-			setTimeout(function () {
-				el.hidden = true
-			}, 250)
-		}, 3200)
+		toastTimer = setTimeout(hideToast, (action && action.duration) || 3200)
+	}
+
+	function hideToast() {
+		var el = $("toast")
+		clearTimeout(toastTimer)
+		el.classList.remove("open")
+		setTimeout(function () {
+			if (!el.classList.contains("open")) el.hidden = true
+		}, 250)
 	}
 
 	// Keyboard (hardware keyboards, desktop): Cmd/Ctrl+Enter or Cmd/Ctrl+S saves, as cockpit dialogs
@@ -394,6 +470,77 @@
 			closeSheet()
 		}
 	})
+
+	// --- install as an app (#2217) -------------------------------------------------------------
+	// Chrome and Edge (desktop and Android) fire beforeinstallprompt when the page is installable
+	// (manifest with icons, start_url, standalone). Keep the event and offer it on our own button.
+	// iOS Safari has no such event, so it gets a one-time note about the share menu instead.
+
+	var installBtn = $("install")
+	var iosHint = $("ios-hint")
+	var deferredInstall = null
+	var IOS_HINT_KEY = "phamos_idea_ios_hint_dismissed"
+
+	function runningAsApp() {
+		return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
+	}
+
+	window.addEventListener("beforeinstallprompt", function (event) {
+		event.preventDefault()
+		deferredInstall = event
+		installBtn.hidden = runningAsApp()
+	})
+
+	installBtn.addEventListener("click", async function () {
+		if (!deferredInstall) return
+		// An install event can open its dialog only once. After "not now" Chrome fires a fresh
+		// beforeinstallprompt, and the listener above shows the button again.
+		var prompt = deferredInstall
+		deferredInstall = null
+		installBtn.hidden = true
+		try {
+			prompt.prompt()
+			await prompt.userChoice
+		} catch (e) {
+			/* the browser refused or closed the dialog */
+		}
+		focusText()
+	})
+
+	window.addEventListener("appinstalled", function () {
+		deferredInstall = null
+		installBtn.hidden = true
+	})
+
+	function iosHintDismissed() {
+		try {
+			return localStorage.getItem(IOS_HINT_KEY) === "1"
+		} catch (e) {
+			return false
+		}
+	}
+
+	if (root.getAttribute("data-platform") === "ios" && !runningAsApp() && !iosHintDismissed()) {
+		iosHint.hidden = false
+	}
+	$("ios-hint-close").addEventListener("click", function () {
+		iosHint.hidden = true
+		try {
+			localStorage.setItem(IOS_HINT_KEY, "1")
+		} catch (e) {
+			/* private mode: it shows again next time */
+		}
+		focusText()
+	})
+
+	// --- focus (#2217) --------------------------------------------------------------------------
+	// The cursor waits in the box on open, on reload, and when the app comes back to the front.
+	// Phones raise the keyboard only on a tap; the cursor is placed either way.
+	window.addEventListener("pageshow", focusText)
+	document.addEventListener("visibilitychange", function () {
+		if (!document.hidden) focusText()
+	})
+	window.addEventListener("focus", focusText)
 
 	queueBadge.addEventListener("click", function () {
 		// The queue stays in localStorage, so leaving for the login page loses nothing.

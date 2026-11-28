@@ -35,6 +35,7 @@ html,
 body {
 	margin: 0;
 	height: 100%;
+	overflow: hidden; /* the page never scrolls; only the text box and the list do */
 	background: var(--bg);
 	color: var(--text);
 	font-family: var(--font);
@@ -46,9 +47,15 @@ body {
 }
 
 .app {
+	/* Follows the visible area (idea.js fitToKeyboard, #2216): iOS keeps the layout viewport
+	   behind the keyboard, so 100dvh alone would put the Save button under it. */
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: var(--vv-top, 0px);
+	height: var(--vvh, 100dvh);
 	display: flex;
 	flex-direction: column;
-	height: 100dvh;
 	padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
 }
 
@@ -76,6 +83,64 @@ body {
 	stroke-width: 1.6;
 	stroke-linecap: round;
 	stroke-linejoin: round;
+}
+
+.bar-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.install-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font: 600 13px var(--font);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.install-btn svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.ios-hint {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 6px;
+	padding: 10px 12px;
+	border-radius: 14px;
+	background: var(--tonal);
+	color: var(--on-tonal);
+	font-size: 14px;
+	line-height: 1.35;
+}
+
+.ios-hint span {
+	flex: 1;
+}
+
+.ios-hint-close {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 22px;
+	line-height: 1;
+	padding: 0 4px;
+	cursor: pointer;
 }
 
 .queue-badge {
@@ -182,8 +247,8 @@ body {
 	position: fixed;
 	left: 0;
 	right: 0;
-	bottom: 0;
-	max-height: 85dvh;
+	bottom: var(--kb, 0px); /* on top of the keyboard, not behind it (#2216) */
+	max-height: calc(var(--vvh, 100dvh) * 0.85);
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
@@ -366,13 +431,24 @@ body {
 	text-align: center;
 }
 
+/* Keyboard up: the sheet takes the whole visible area so the search results have room, and the
+   bottom safe-area padding is not needed (the keyboard covers that edge). */
+.kb-open .sheet {
+	max-height: calc(var(--vvh, 100dvh) - 8px);
+	padding-bottom: 12px;
+}
+
+.kb-open .app {
+	padding-bottom: 0;
+}
+
 /* --- toast ------------------------------------------------------------------------------- */
 
 .toast {
 	position: fixed;
 	left: 16px;
 	right: 16px;
-	bottom: calc(84px + env(safe-area-inset-bottom));
+	bottom: calc(84px + var(--kb, 0px) + env(safe-area-inset-bottom));
 	padding: 12px 16px;
 	border-radius: 14px;
 	background: rgba(30, 30, 32, 0.92);
@@ -390,6 +466,32 @@ body {
 	transform: none;
 }
 
+.toast.has-action {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	text-align: left;
+}
+
+.toast-action {
+	flex: none;
+	border: 0;
+	background: transparent;
+	color: #64b5ff;
+	font: 700 15px var(--font);
+	padding: 4px 6px;
+	cursor: pointer;
+}
+
+[data-platform="ios"] .toast-action {
+	color: var(--accent);
+}
+
+[data-platform="android"] .toast-action {
+	color: #d0bcff;
+}
+
 /* --- iOS: Liquid-Glass-style ---------------------------------------------------------------- */
 /* Translucent surfaces over a soft colour wash, blur + saturation, a light inner edge. The real
    lensing of Liquid Glass is native-only; this is the web approximation. */
@@ -403,12 +505,26 @@ body {
 	--sheet-radius: 34px;
 }
 
+/* The glow is its own fixed layer over the whole screen, safe areas included (viewport-fit=cover),
+   so it shines behind the status bar and the Dynamic Island with no edge (#2218). A body
+   background with background-attachment: fixed does not do that on iOS. Content stays below
+   the island through .app's padding-top: env(safe-area-inset-top). */
 [data-platform="ios"] body {
+	background: transparent;
+}
+
+[data-platform="ios"]::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	top: calc(-1 * env(safe-area-inset-top));
+	bottom: calc(-1 * env(safe-area-inset-bottom));
+	z-index: -1;
+	pointer-events: none;
 	background:
 		radial-gradient(120% 60% at 0% 0%, rgba(255, 214, 10, 0.22), transparent 60%),
 		radial-gradient(100% 60% at 100% 100%, rgba(10, 132, 255, 0.18), transparent 60%),
 		var(--bg);
-	background-attachment: fixed;
 }
 
 [data-platform="ios"] .btn-primary {
@@ -563,5 +679,8 @@ body {
 	[data-platform="android"] .toast {
 		background: #e6e0e9;
 		color: #322f35;
+	}
+	[data-platform="android"] .toast-action {
+		color: #6750a4; /* inverse primary on the light snackbar */
 	}
 }
