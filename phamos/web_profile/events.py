@@ -228,7 +228,7 @@ def _organizer(record, stakeholders):
 
 # Line breaks and block edges in text editor HTML; each becomes a space so words of two
 # paragraphs don't run together once the tags are gone.
-_BLOCK_BREAK = re.compile(r"<br\s*/?>|</?(?:p|div|li|ul|ol|h[1-6]|blockquote|tr|td|th)\b[^>]*>", re.IGNORECASE)
+_BLOCK_BREAK = re.compile(r"<br\b[^>]*>|</?(?:p|div|li|ul|ol|h[1-6]|blockquote|tr|td|th)\b[^>]*>", re.IGNORECASE)
 
 
 def _plain_text(value):

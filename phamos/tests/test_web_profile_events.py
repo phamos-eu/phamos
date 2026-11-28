@@ -412,6 +412,7 @@ class TestWebProfileEvents(FrappeTestCase):
 
 		self.assertEqual(_plain_text("<p>Line one</p><p>Line two</p>"), "Line one Line two")
 		self.assertEqual(_plain_text("Foo<br>Bar<BR/>Baz"), "Foo Bar Baz")
+		self.assertEqual(_plain_text('Foo<br class="x">Bar<br style="clear:both"/>Baz'), "Foo Bar Baz")
 		self.assertEqual(_plain_text("<ul><li>A</li><li>B</li></ul>"), "A B")
 		self.assertEqual(_plain_text("<p>Kaffee&nbsp;&amp;\n Kuchen</p>"), "Kaffee & Kuchen")
 		self.assertEqual(_plain_text("<b>Fett</b>gedruckt"), "Fettgedruckt")  # inline tags join, as written
