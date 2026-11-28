@@ -424,3 +424,128 @@ def remove_task_dependency(name, depends_on):
 def search_dependency_candidates(name, txt=""):
 	"""Tasks the given Task could depend on, for the side panel's search."""
 	return dc.search_dependency_candidates(CONFIG, name, txt)
+
+
+# --- Statistics and Implementations (#1975): hours only, no currency -------------------------
+
+MEMBER_HOURS_SETTING = "show_member_hours_to_team_leads"
+
+
+def _leads_team(team, employee):
+	lead, co_lead = frappe.db.get_value("Team", team, ["team_lead", "co_team_lead"]) or (None, None)
+	return bool(employee) and employee in (lead, co_lead)
+
+
+def _sees_member_rows(team, employee):
+	"""Per-person rows of others: lead or co-lead of the team (General Management and System Manager
+	too), and only while "Show member hours to team leads" is on in phamos Settings. The setting is
+	off until phamos' privacy owner has confirmed the legal side (decision 5 of #1975)."""
+	if not frappe.db.get_single_value("phamos Settings", MEMBER_HOURS_SETTING):
+		return False
+	return teams.sees_all_teams() or _leads_team(team, employee)
+
+
+def _sees_missing_hours(team, employee):
+	"""Who has no working hours set is a data-quality notice for lead, co-lead and HR."""
+	return teams.sees_all_teams() or "HR Manager" in frappe.get_roles() or _leads_team(team, employee)
+
+
+@frappe.whitelist()
+@_require_access
+def get_hours_statistics():
+	"""Logged against available hours of the active team: this month to date compared with the
+	previous month and last year, 12 months, year to date. Member rows: the user's own, or every
+	member's for those allowed (_sees_member_rows)."""
+	from phamos.cockpits import team_hours
+
+	team = teams.require_active_team()
+	employee = teams._employee(frappe.session.user)
+	data = team_hours.team_statistics(team)
+	sees_members = _sees_member_rows(team, employee)
+	for window in data.windows.values():
+		window.members = [r for r in window.members if sees_members or r.employee == employee]
+	if not _sees_missing_hours(team, employee):
+		data.missing_hours = []
+	data.team = team
+	data.sees_members = sees_members
+	return data
+
+
+IMPLEMENTATION_FIELDS = [
+	"name",
+	"customer",
+	"status",
+	"maturity_level",
+	"forecast",
+	"trend",
+	"enable_time_limit",
+	"limit_hours",
+	"hours_used_this_period",
+	"time_limit_percent_used",
+	"time_limit_from_date",
+	"time_limit_to_date",
+	"sales_order_total_hrs",
+	"delivered_total_hrs",
+	"remaining_hrs",
+	"total_time_last_3_months",
+	"predicted_time_next_3_months",
+]
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_implementations():
+	"""The active team's open Implementations, hours only: time limit, sold against delivered,
+	actual hours of the last 6 months against the prediction, maturity, forecast, trend, module
+	levels. Fields are listed explicitly so no currency field leaves the server."""
+	from frappe.utils import add_months, get_first_day, getdate, today
+
+	team = teams.require_active_team()
+	rows = frappe.get_all(
+		"Implementation",
+		filters={"team": team, "status": ["not in", ["Cancelled", "Completed"]]},
+		fields=IMPLEMENTATION_FIELDS,
+		order_by="name asc",
+		limit_page_length=0,
+	)
+	if not rows:
+		return {"team": team, "implementations": [], "can_open": False}
+
+	names = [r.name for r in rows]
+	modules = frappe.get_all(
+		"Implementation Item",
+		filters={"parenttype": "Implementation", "parent": ["in", names]},
+		fields=["parent", "module", "current_level", "target_level"],
+		order_by="idx asc",
+		limit_page_length=0,
+	)
+	start = get_first_day(add_months(today(), -5))
+	monthly = {}
+	if frappe.db.has_column("Project", "custom_implementation"):
+		for row in frappe.db.sql(
+			"""
+			select p.custom_implementation as implementation,
+				date_format(td.from_time, '%%Y-%%m') as month, sum(td.hours) as hours
+			from `tabTimesheet Detail` td
+			join `tabTimesheet` t on t.name = td.parent and t.docstatus < 2
+			join `tabProject` p on p.name = td.project
+			where p.custom_implementation in %(names)s and date(td.from_time) >= %(start)s
+			group by 1, 2
+			""",
+			{"names": names, "start": start},
+			as_dict=True,
+		):
+			monthly[(row.implementation, row.month)] = round(row.hours or 0, 1)
+
+	months = [getdate(add_months(start, i)) for i in range(6)]
+	for row in rows:
+		row.modules = [m for m in modules if m.parent == row.name]
+		for m in row.modules:
+			m.pop("parent")
+		# ISO month start; the page formats it in the user's language
+		row.months = [{"start": m, "hours": monthly.get((row.name, m.strftime("%Y-%m")), 0)} for m in months]
+		# predicted_time_next_3_months is a 3-month total: a monthly figure to compare with
+		row.predicted_per_month = round((row.predicted_time_next_3_months or 0) / 3, 1)
+	# Team members see their team's implementations here (#1975), but only those who may read
+	# Implementation get the link to its Desk form.
+	return {"team": team, "implementations": rows, "can_open": bool(frappe.has_permission("Implementation", "read"))}

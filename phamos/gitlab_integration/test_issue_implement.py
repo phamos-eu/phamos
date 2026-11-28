@@ -8,6 +8,7 @@ import email.message
 import importlib.util
 import io
 import os
+import subprocess
 import tempfile
 import urllib.error
 import urllib.parse
@@ -217,9 +218,20 @@ class TestIssueImplement(FrappeTestCase):
             seen["plan"] = args[2]
             return _change()
 
+        published = {}
+
+        def publish(gitlab, **kwargs):
+            published.update(kwargs)
+            return {
+                "iid": 15,
+                "web_url": f"{PROJECT}/-/merge_requests/15",
+                "title": kwargs["title"],
+            }
+
         with (
             tempfile.TemporaryDirectory() as root,
             patch.object(script, "call_implement", side_effect=implement),
+            patch.object(script, "run_git_publish", side_effect=publish),
             patch.dict(os.environ, {"AI_ISSUE_REPO": root, "CI_COMMIT_REF_NAME": "develop"}),
         ):
             script.analysis()._SOURCE_CACHE = None
@@ -227,19 +239,18 @@ class TestIssueImplement(FrappeTestCase):
 
         self.assertTrue(posted)
         self.assertIn("Implementation plan", seen["plan"])
-        commit = next(payload for path, payload in gl.posts if path == "/repository/commits")
-        self.assertEqual(commit["branch"], "phamos/phamos#7_develop")
-        self.assertEqual(commit["start_branch"], "develop")
+        self.assertEqual(published["branch"], "phamos/phamos#7_develop")
+        self.assertEqual(published["start"], "develop")
+        self.assertEqual(published["base"], "develop")
         self.assertEqual(
-            [item["file_path"] for item in commit["actions"]],
+            [item["file_path"] for item in published["files"]],
             [SOURCE, TEST],
         )
-        self.assertTrue(all(item["action"] == "create" for item in commit["actions"]))
-        mr = next(payload for path, payload in gl.posts if path == "/merge_requests")
-        self.assertEqual(mr["source_branch"], "phamos/phamos#7_develop")
-        self.assertEqual(mr["target_branch"], "develop")
-        self.assertIn("Issue #7", mr["description"])
-        self.assertIn("does not merge", mr["description"])
+        self.assertTrue(all(item["action"] == "create" for item in published["files"]))
+        self.assertIn("Issue #7", published["description"])
+        self.assertIn("does not merge", published["description"])
+        self.assertFalse(any(path == "/repository/commits" for path, _payload in gl.posts))
+        self.assertFalse(any(path == "/merge_requests" for path, _payload in gl.posts))
         note = next(payload["body"] for path, payload in gl.posts if path == "/issues/7/notes")
         self.assertIn("kind=mr", note)
         self.assertIn("mr=15", note)
@@ -341,11 +352,18 @@ class TestIssueImplement(FrappeTestCase):
         script = _ci_script()
         plan = _plan_script().comment_body(3, "plan", "6", PLAN)
         gl = RecordingGitLab([{"id": 8, "body": plan, "system": False}])
-        gl.commit_error = _http(403)
+
+        def publish(*_args, **_kwargs):
+            raise script.GitPublishError(
+                403,
+                "GitLab returned 403. GITLAB_AI_DEVELOPER needs permission "
+                "to push a branch and to open a merge request.",
+            )
 
         with (
             tempfile.TemporaryDirectory() as root,
             patch.object(script, "call_implement", return_value=_change()),
+            patch.object(script, "run_git_publish", side_effect=publish),
             patch.dict(os.environ, {"AI_ISSUE_REPO": root, "CI_COMMIT_REF_NAME": "develop"}),
         ):
             script.analysis()._SOURCE_CACHE = None
@@ -355,6 +373,7 @@ class TestIssueImplement(FrappeTestCase):
         note = next(payload["body"] for path, payload in gl.posts if path.endswith("/notes"))
         self.assertIn("kind=failed", note)
         self.assertIn("403", note)
+        self.assertIn("GITLAB_AI_DEVELOPER", note)
         self.assertFalse(any(path == "/merge_requests" for path, _payload in gl.posts))
         self.assertEqual(gl.puts[0]["add_labels"], "implement-failed")
 
@@ -404,18 +423,26 @@ class TestIssueImplement(FrappeTestCase):
                 return super().post(path, payload)
 
         gl = FakeGitLab([])
+        published = []
+
+        def publish(_gl, **kwargs):
+            published.append(kwargs["branch"])
+            return {
+                "iid": 15,
+                "web_url": f"{PROJECT}/-/merge_requests/15",
+                "title": kwargs["title"],
+            }
+
         with (
             tempfile.TemporaryDirectory() as root,
             patch.object(script, "call_implement", return_value=_change()),
+            patch.object(script, "run_git_publish", side_effect=publish),
             patch.dict(os.environ, {"AI_ISSUE_REPO": root, "AI_ISSUE_POLL_LIMIT": "1", "CI_COMMIT_REF_NAME": "develop"}),
         ):
             script.analysis()._SOURCE_CACHE = None
             script.poll(gl)
-        self.assertEqual(posts, [
-            "/repository/commits",
-            "/merge_requests",
-            "/issues/9/notes",
-        ])
+        self.assertEqual(posts, ["/issues/9/notes"])
+        self.assertEqual(published, ["phamos/phamos#9_develop"])
 
     def test_the_branch_is_the_issue_reference_plus_the_target(self):
         script = _ci_script()
@@ -444,3 +471,70 @@ class TestIssueImplement(FrappeTestCase):
         self.assertEqual(finding["body"], "The sidebar shows it.")
         self.assertIsNone(script.safe_path("/etc/passwd"))
         self.assertIsNone(script.safe_path("frappe/hooks.py"))
+
+    def test_the_developer_token_pushes_the_branch_and_opens_the_merge_request(self):
+        script = _ci_script()
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append((args, kwargs.get("env") or {}))
+            if "clone" in args:
+                os.makedirs(args[-1], exist_ok=True)
+            stderr = ""
+            if "push" in args:
+                stderr = f"remote:   {PROJECT}/-/merge_requests/15\n"
+            return subprocess.CompletedProcess(args, 0, "", stderr)
+
+        with (
+            patch.object(script.subprocess, "run", side_effect=fake_run),
+            patch.dict(os.environ, {
+                "CI_SERVER_URL": GITLAB,
+                "CI_PROJECT_PATH": "phamos/phamos",
+                "GITLAB_AI_DEVELOPER": "glpat-dev",
+            }),
+        ):
+            mr = script.run_git_publish(
+                None,
+                branch="phamos/phamos#7_develop",
+                start="develop",
+                base="develop",
+                title="Show the editor",
+                description="Issue #7\n\nWhy the form changes.",
+                commit_message="Show the editor\n\nIssue #7\n",
+                files=[{
+                    "action": "create",
+                    "file_path": SOURCE,
+                    "content": "frappe.ui.form.on('Timesheet Record', {});\n",
+                }],
+            )
+
+        self.assertEqual(mr["iid"], 15)
+        self.assertEqual(mr["web_url"], f"{PROJECT}/-/merge_requests/15")
+        clone = next(args for args, _env in calls if "clone" in args)
+        self.assertIn("credential.helper=", clone)
+        self.assertIn("https://oauth2@git.example.test/phamos/phamos.git", clone)
+        self.assertNotIn("glpat-dev", " ".join(clone))
+        checkout = next(args for args, _env in calls if "checkout" in args)
+        self.assertIn("phamos/phamos#7_develop", checkout)
+        push = next(args for args, _env in calls if "push" in args)
+        self.assertIn("merge_request.create", push)
+        self.assertIn("merge_request.target=develop", push)
+        self.assertIn("HEAD:refs/heads/phamos/phamos#7_develop", push)
+        description = next(arg for arg in push if arg.startswith("merge_request.description="))
+        self.assertNotIn("\n", description)
+        self.assertIn("Issue #7", description)
+        env = next(env for args, env in calls if "push" in args)
+        self.assertEqual(env["GITLAB_AI_DEVELOPER"], "glpat-dev")
+        self.assertTrue(env.get("GIT_ASKPASS"))
+        added = next(args for args, _env in calls if "add" in args)
+        self.assertIn(SOURCE, added)
+
+    def test_the_implement_prompt_uses_the_developer_and_tester_skills(self):
+        script = _ci_script()
+        text = script.system_prompt()
+        self.assertIn("# Senior Software Developer", text)
+        self.assertIn("# Senior Developer", text)
+        self.assertIn("# Senior Automation Tester", text)
+        self.assertIn("# Senior Software Tester", text)
+        self.assertIn("Return one JSON object", text)
+        self.assertNotIn("disable-model-invocation", text)

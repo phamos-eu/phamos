@@ -49,7 +49,7 @@
 						"
 						:title="collapsed ? item.label : undefined"
 					>
-						<FeatherIcon :name="item.icon" class="h-4 w-4 flex-shrink-0" />
+						<CockpitIcon :name="item.icon" class="h-4 w-4 flex-shrink-0" />
 						<span v-if="!collapsed" class="min-w-0 flex-1 truncate">{{ item.label }}</span>
 						<FeatherIcon
 							v-if="!collapsed && item.children?.length"
@@ -73,7 +73,7 @@
 									: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
 							"
 						>
-							<FeatherIcon :name="child.icon" class="h-3.5 w-3.5 flex-shrink-0" />
+							<CockpitIcon :name="child.icon" class="h-3.5 w-3.5 flex-shrink-0" />
 							<span class="truncate">{{ child.label }}</span>
 						</router-link>
 					</div>
@@ -120,6 +120,7 @@ import { openCockpit, openDesk } from "@spa/utils/appWindow.js"
 import { canOfferInstall, installApp, openInstallHint } from "@spa/installApp.js"
 import { otherCockpits } from "@spa/utils/cockpitSwitcher.js"
 import { __ } from "@spa/utils/i18n.js"
+import CockpitIcon from "./CockpitIcon.vue"
 
 const props = defineProps({
 	label: { type: String, required: true },

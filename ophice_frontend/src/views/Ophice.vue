@@ -420,6 +420,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:call-starts-off="bubble.callOff"
 						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
@@ -703,6 +704,7 @@
 			:meeting="Boolean(meetingArea)"
 			:float-target="pipBody"
 			@slots="(slots) => (dockRects = slots)"
+			@keys-back="giveKeysToCockpit"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -747,17 +749,21 @@ import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
 import { ringHue } from "../utils/ophiceColor.js"
-import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { areaUnder, isTyping, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
+import { stepBlocked } from "../utils/ophiceStep.js"
 import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
 import {
 	CALL_DEFAULT,
 	callBox,
 	encounterCallWindowName,
+	encounterOpening,
 	jitsiCallUrl,
 	resizeCall,
 	splitCall,
 } from "../utils/ophiceCall.js"
+import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -990,7 +996,11 @@ const imageBox = computed(() =>
 /** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
 function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
-	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) {
+		// A finger on a chip does not pan, but it can pinch with a second finger (#2213).
+		camera().onChipPointerDown(event)
+		return
+	}
 	camera().onPointerDown(event)
 }
 
@@ -1058,6 +1068,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,
@@ -1279,15 +1290,13 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
-function isTyping(target) {
-	if (!target) return false
-	const tag = target.tagName
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
-}
 
 function onKeydown(event) {
 	shift = event.shiftKey
-	if (props.cockpitOpen) return
+	// Over a cockpit only walking and jumping (#2155). The keys reach this page as long as nobody
+	// clicked into the cockpit: right after a cockpit space opened it, or with the pointer on the
+	// mini map. So a cockpit space never locks me in; walking out of it brings the map back.
+	if (props.cockpitOpen && !isWalkKey(event, DIRECTIONS)) return
 	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
 	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
 		event.preventDefault()
@@ -1317,6 +1326,8 @@ function onKeydown(event) {
 		return
 	}
 	if (!held.size && !event.repeat) {
+		// Started typing in the pause after a stop (#2171): that is a stop, open now.
+		if (event.key.length === 1 && event.code !== "Space" && !DIRECTIONS[event.key.toLowerCase()]) pendingStop.flush()
 		// Typed while the chat that just opened is still loading: keep it for the chat.
 		if (bufferWhileOpening(event)) return
 		// Esc said "walk on"; Enter brings the chat back while still next to the person.
@@ -1347,6 +1358,8 @@ function onKeydown(event) {
 	backFromStatus()
 	peopleSidebar.value?.fold()
 	held.add(key)
+	// Walking on: the stop before opens nothing (#2171).
+	pendingStop.cancel()
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
 	if (!frame) {
@@ -1385,13 +1398,30 @@ function nearestInRange() {
 	return best?.other || null
 }
 
-/** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
+/** The chat bubble with this person, unless it only shows why it could not be opened. */
+function liveBubble(user) {
+	const bubble = bubbles[user]
+	return bubble && (bubble.loading || bubble.encounter) ? bubble : null
+}
+
+// Passing by (#2171): a stop opens the chat, call or meeting only after a short pause (STOP_DELAY);
+// walking on, jumping or Go to within it opens nothing.
+const pendingStop = stopTimer(openOnStop, () => !held.size && !flying.value && !jump && !travel)
 function chatOnStop() {
+	pendingStop.stopped()
+}
+
+/** Stood still after a stop: next to someone, the chat opens (or gets the keyboard if already open). */
+function openOnStop() {
 	joinAreaIfInside()
+	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
+	// other person can still start one, which the mini map pings.
+	if (props.cockpitOpen) return
 	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
-	const bubble = bubbles[other.user]
+	const bubble = liveBubble(other.user)
+	// No chat yet, or the last try failed (#2161): try again.
 	if (!bubble) openBubble(other, { focus: true })
 	else if (!bubble.loading) focusBubble(other.user)
 	else bubble.focusOnOpen = true
@@ -1607,7 +1637,8 @@ const videoUser = computed(() => {
 // window stays open when the two walk apart: the call is the person's own from then on.
 const callWindows = {}
 function openEncounterCall(bubble) {
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "")
+	// Approached (#2165): in its own window, too, mic and camera off until I turn them on.
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.callOff })
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1777,7 +1808,8 @@ function checkEncounters() {
 	}
 }
 
-async function openBubble(other, { focus = false, fromPeer = false } = {}) {
+async function openBubble(other, { focus = false, fromPeer = false, answer = false } = {}) {
+	const opening = encounterOpening({ fromPeer, answer })
 	const bubble = reactive({
 		pendingText: "",
 		focusOnOpen: focus,
@@ -1788,9 +1820,13 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		loading: true,
 		error: "",
 		sending: false,
+		// The other person walked up (#2165): my call joins at once, with mic and camera off.
+		callOff: opening.callOff,
 	})
 	bubbles[other.user] = bubble
 	try {
+		// Starting a chat myself means I'm back (#2168): only Available people meet.
+		if (opening.backToAvailable) await backFromStatus()
 		// The server checks that we really stand together: my latest spot goes first.
 		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
@@ -1869,6 +1905,8 @@ const unlockAudio = () => encounterAlert.unlock()
 
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
+	// Away or be right back (#2168): nothing opens, no call (the server refuses it too).
+	if (me.value?.status) return
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
@@ -1877,7 +1915,8 @@ function onEncounterStarted(message) {
 		pingWalkUp(other)
 		return
 	}
-	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
+	// A bubble that failed to open (e.g. they were reloading) gives way to their chat (#2161).
+	if (!other || liveBubble(other.user) || dismissed.has(other.user)) return
 	if (distanceTo(other) > PART_DISTANCE || inCallArea(me.value) || inCallArea(other)) return
 	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
@@ -2013,13 +2052,11 @@ function openCockpitSpace() {
 }
 
 /**
- * Open a cockpit (shortcut bar or cockpit space). Where the browser has it, the mini map goes
- * straight into its floating window, so it can be pulled out of the browser without a second click
- * (PM, 2026-11-22). The browser only allows that right after a click or key press; walking is key
- * presses, so stopping in a cockpit space still counts. Otherwise it stays over the cockpit.
+ * Open a cockpit (shortcut bar or cockpit space). The mini map stays in the page, docked in the
+ * cockpit's sidebar (#2155); since the call is embedded (#2108) it needs no window of its own.
+ * Its "Float" button still puts it on top of other windows.
  */
 function openCockpit(cockpit) {
-	if (canFloat && !pipBody.value && navigator.userActivation?.isActive) floatAll()
 	emit("open-cockpit", cockpit)
 }
 
@@ -2234,6 +2271,33 @@ watch(
 		if (pipBody.value) closeMeetingPip()
 	}
 )
+
+// Over a cockpit, walking from the mini map out of the area I stood in when the cockpit opened
+// takes me back to the map (PM, 2026-11-25, #2155). The keys stay held, so the chip walks on there.
+// Opened outside any area: walking keeps the cockpit. Opened by a reload of /open/..., my chip
+// and the areas arrive after the cockpit: the start area is taken once both are there.
+let cockpitArea = null
+watch(
+	() => (props.cockpitOpen && me.value && areas.value.length ? areas.value : null),
+	(loaded) => {
+		cockpitArea = loaded ? areaUnder(loaded, me.value)?.name || null : null
+	},
+	{ immediate: true }
+)
+watch(
+	() => me.value && [me.value.x, me.value.y],
+	() => {
+		if (!props.cockpitOpen || !walkedOut(cockpitArea, areas.value, me.value)) return
+		cockpitArea = null
+		emit("back-to-map")
+	}
+)
+
+// --- The mini map (#2155) hands the keyboard back when the pointer leaves it.
+/** The pointer left the mini map: the keyboard goes back to the cockpit page. */
+function giveKeysToCockpit() {
+	document.querySelector("iframe[data-ophice-frame]")?.focus()
+}
 
 const pipBody = ref(null)
 /** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
@@ -2802,7 +2866,7 @@ function toggleStatus(event) {
 // For "back in 20 minutes": a slow clock is enough.
 const clock = ref(Date.now())
 const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
-let statusClearing = false
+let statusClearing = null
 
 const statusChips = computed(() => {
 	if (!me.value) return []
@@ -2829,14 +2893,15 @@ async function saveStatus(values) {
 	}
 }
 
-/** Moving means I'm back: the status goes. */
+/** Moving means I'm back: the status goes. Resolves once the server knows. */
 function backFromStatus() {
-	if (!me.value?.status || statusClearing) return
-	statusClearing = true
+	if (statusClearing) return statusClearing
+	if (!me.value?.status) return Promise.resolve()
 	me.value.status = null
-	call(`${API}.set_status`, { kind: "" })
+	statusClearing = call(`${API}.set_status`, { kind: "" })
 		.catch(() => {})
-		.finally(() => (statusClearing = false))
+		.finally(() => (statusClearing = null))
+	return statusClearing
 }
 
 function onRemoteStatus(message) {
@@ -3114,7 +3179,8 @@ async function sendFromPing(ping, text, done) {
 		} else {
 			const other = others.value.find((o) => o.user === ping.user)
 			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
-			if (!bubbles[other.user]?.encounter) await openBubble(other)
+			// Answering someone who came over (#2165): my call starts with mic and camera off.
+			if (!bubbles[other.user]?.encounter) await openBubble(other, { answer: ping.kind === "walkup" })
 			const bubble = bubbles[other.user]
 			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
 			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
@@ -3135,7 +3201,7 @@ function openFromPing(ping) {
 	if (!other) return
 	nextTick(() => {
 		if (bubbles[other.user]) focusBubble(other.user)
-		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true })
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, answer: ping.kind === "walkup" })
 	})
 }
 
@@ -3193,6 +3259,12 @@ function blocked(x, y) {
 	// In the air nothing blocks: that is the point of jumping.
 	if (jump || flying.value) return false
 	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
+}
+
+/** Walking from where my chip stands to x, y is blocked: only a step closer to someone, never away (#2160). */
+function stepBlockedTo(x, y) {
+	if (jump || flying.value) return false
+	return stepBlocked(others.value, me.value, { x, y }, MIN_DISTANCE)
 }
 
 // --- Jump (Space): a short hop forward that passes over other chips.
@@ -3301,8 +3373,9 @@ function tick(now) {
 		const y = rawY < 0 ? maxY : rawY > maxY ? 0 : rawY
 		const wrapped = x !== rawX || y !== rawY
 		// Each axis on its own, so a chip slides along another one instead of sticking to it.
-		if (!blocked(x, me.value.y)) me.value.x = x
-		if (!blocked(me.value.x, y)) me.value.y = y
+		// Too close to someone already (e.g. both stepped at once): any step away is allowed (#2160).
+		if (!stepBlockedTo(x, me.value.y)) me.value.x = x
+		if (!stepBlockedTo(me.value.x, y)) me.value.y = y
 		// The view follows my chip near its edge (#2089); after a wrap it jumps to the other side.
 		if (wrapped) camera().place(me.value.x, me.value.y)
 		else camera().followChip(me.value.x, me.value.y)
@@ -3424,6 +3497,7 @@ function pinPhriend() {
 }
 
 onBeforeUnmount(() => {
+	pendingStop.cancel()
 	clearInterval(phriendTimer)
 	phriend?.ball?.pin(null)
 	clearInterval(clockTimer)

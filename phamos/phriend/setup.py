@@ -24,6 +24,18 @@ TEAM_FIELD = "custom_team"
 
 _FIELDS = [
 	{
+		# The Implementation the Issue is about: set by Phriend (#1671) or by the Issue Assistant (#2112), shown
+		# in the Implementation Cockpit. On every Issue, right after the Team.
+		"fieldname": "custom_implementation",
+		"label": "Implementation",
+		"fieldtype": "Link",
+		"options": "Implementation",
+		"in_standard_filter": 1,
+		"depends_on": "",
+		# the section and the team come from phamos/cockpits/setup.py (#1955)
+		"insert_after": TEAM_FIELD,
+	},
+	{
 		"fieldname": "phriend_reported_by",
 		"label": "Reported By",
 		"fieldtype": "Link",
@@ -31,8 +43,7 @@ _FIELDS = [
 		"read_only": 1,
 		"in_standard_filter": 1,
 		"depends_on": PHRIEND_OR_GITLAB,
-		# the section and the team come from phamos/cockpits/setup.py (#1955)
-		"insert_after": TEAM_FIELD,
+		"insert_after": "custom_implementation",
 	},
 	{
 		"fieldname": "phriend_reported_by_name",
@@ -54,24 +65,13 @@ _FIELDS = [
 		"insert_after": "phriend_reported_by_name",
 	},
 	{
-		# The Implementation the report is about (#1671): set by Phriend, shown in the Implementation Cockpit.
-		"fieldname": "custom_implementation",
-		"label": "Implementation",
-		"fieldtype": "Link",
-		"options": "Implementation",
-		"in_standard_filter": 1,
-		# hidden on other Issues, as it was while the section carried the condition
-		"depends_on": PHRIEND_OR_GITLAB,
-		"insert_after": "phriend_source_system",
-	},
-	{
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
 		"options": "\nBug\nImprovement\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"depends_on": ONLY_PHRIEND,
-		"insert_after": "custom_implementation",
+		"insert_after": "phriend_source_system",
 	},
 	{
 		"fieldname": "phriend_comment",
@@ -118,12 +118,12 @@ _FIELDS = [
 		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_screenshot_preview",
 	},
-	# where it happened + raw context, collapsed
+	# where it happened + raw context, open like every Issue section (#2157)
 	{
 		"fieldname": "phriend_context_section",
 		"label": "Phriend: Where It Happened",
 		"fieldtype": "Section Break",
-		"collapsible": 1,
+		"collapsible": 0,
 		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_screenshot",
 	},
