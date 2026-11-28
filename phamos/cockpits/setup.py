@@ -153,6 +153,46 @@ def ensure_task_fields():
 	create_custom_fields({"Task": [{**field, "module": MODULE} for field in TASK_FIELDS]}, update=True)
 
 
+def expand_issue_sections():
+	"""Every section on the Issue form open, never collapsible (#2157).
+
+	A Property Setter for each standard Section Break that ERPNext makes collapsible, read from
+	the DocFields, so a section ERPNext makes collapsible later is covered on the next migrate.
+	Our own sections are not collapsible at their source (custom fields). With collapsible off,
+	Frappe ignores `collapsible_depends_on` (ERPNext opens "Details" only on closed issues).
+	"""
+	sections = frappe.get_all(
+		"DocField",
+		filters={"parent": "Issue", "parenttype": "DocType", "fieldtype": "Section Break", "collapsible": 1},
+		pluck="fieldname",
+	)
+	for fieldname in sections:
+		current = frappe.db.get_value(
+			"Property Setter", {"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"}, "value"
+		)
+		if current == "0":
+			continue
+		# A setter that makes the section collapsible again (set by hand in Customize Form) is
+		# replaced: make_property_setter inserts a new setter and deletes the old one, and returns it.
+		setter = make_property_setter("Issue", fieldname, "collapsible", "0", "Check")
+		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
+
+
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
+	ensure_module()
+	expand_issue_sections()
+
+
+def after_install():
+	"""Store the Cockpit Settings defaults on a new site (#1933).
+
+	Patches don't run on a fresh install, and a Single stores no defaults until it is saved: every
+	cockpit would start grey with no glow and "show author" off. Both patches only fill in fields
+	that have no stored value, so they are safe here.
+	"""
+	from phamos.patches.v1_0 import move_cockpit_settings, set_cockpit_window_defaults
+
+	move_cockpit_settings.execute()
+	set_cockpit_window_defaults.execute()

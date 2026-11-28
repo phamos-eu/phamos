@@ -1,5 +1,5 @@
 // Loaded on every desk page (app_include_js), so parent forms with an event_schedule table
-// (Team, Company) can call this from their own setup/refresh.
+// (Team, Department) can call this from their own setup/refresh.
 function setup_daily_schedule_email_account_query(frm) {
 	const grid = frm.fields_dict.event_schedule && frm.fields_dict.event_schedule.grid;
 	if (!grid) return;
@@ -169,6 +169,7 @@ function show_free_slots_dialog_for_row(frm, row, cdt, cdn) {
 				duration_minutes: values.duration,
 				time_from,
 				time_to,
+				email_account: row.email_account,
 			},
 			freeze: true,
 			freeze_message: __('Finding free slots...'),

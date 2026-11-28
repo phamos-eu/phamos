@@ -6,6 +6,7 @@
 import frappe
 
 from phamos.api import department_cockpit as dc
+from phamos.phamos.hr import sick_leave
 
 CONFIG = dc.CockpitConfig(
 	label="Human Resources",
@@ -14,6 +15,9 @@ CONFIG = dc.CockpitConfig(
 	roles=("System Manager", "HR Manager", "HR User"),
 	settings_method_name="get_human_resources_settings",
 )
+
+# Privacy mode (#1839): seconds data stays visible when the setting is empty.
+DEFAULT_PRIVACY_REVEAL_SECONDS = 120
 
 
 def check_app_permission():
@@ -33,6 +37,16 @@ def get_human_resources_settings():
 		human_resources_project_count (projects linked to the department).
 	"""
 	return dc.get_settings(CONFIG)
+
+
+@frappe.whitelist()
+def get_privacy_settings():
+	"""How long the HR Cockpit's privacy mode shows data after "Show data" (#1839).
+
+	No role check: a duration is not sensitive, and every cockpit user needs it to draw the top bar.
+	"""
+	seconds = frappe.db.get_single_value(sick_leave.SETTINGS, "human_resources_privacy_reveal_seconds")
+	return {"reveal_seconds": int(seconds) if seconds else DEFAULT_PRIVACY_REVEAL_SECONDS}
 
 
 @frappe.whitelist()
@@ -314,3 +328,15 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)

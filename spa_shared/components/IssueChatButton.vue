@@ -1,9 +1,10 @@
 <template>
 	<template v-if="state.enabled">
-		<!-- Below lg the chat is an overlay this button toggles; from lg on it is a column that is
-		     always there, so the button steps aside. -->
+		<!-- The chat is an overlay this button toggles. Where the page has a chat panel (the Issue
+		     view, #1911/#1915), the panel's icon in the rail is the one place to open it, so the
+		     button steps aside. -->
 		<Button
-			v-if="!docked"
+			v-if="!dockable"
 			ref="buttonRef"
 			:variant="state.is_member ? 'subtle' : 'outline'"
 			:loading="busy"
@@ -55,7 +56,7 @@
 </template>
 
 <script setup>
-// The chat of an Issue or a Task (#1615, #1779). Where the view offers a chat column (the Issue view
+// The chat of an Issue, a Task or an idea up for vote (#1615, #1779, #1842). Where the view offers a chat column (the Issue view
 // from lg on), the chat is always there: the chat itself, or "Start chat" / "Join chat". Elsewhere
 // (narrow screens, the Tasks Gantt) this button shows whether there is a chat and how many
 // messages are unread, and opens it as an overlay. The unread count follows Raven's
@@ -72,7 +73,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { totalUnread, unreadSummary, unreadTone } from "@spa/utils/chatUnread.js"
 
 const props = defineProps({
-	/** "Issue" or "Task": picks the cockpit endpoints (get_issue_chat, get_task_chat …) and texts */
+	/** "Issue", "Task" or "Idea": picks the cockpit endpoints (get_issue_chat, get_idea_chat …) and texts */
 	doctype: { type: String, default: "Issue" },
 	recordName: { type: String, required: true },
 	subject: { type: String, default: "" },
@@ -88,7 +89,17 @@ const method = computed(() => ({
 
 // Whole sentences per record type, so each translates on its own.
 const texts = computed(() =>
-	props.doctype === "Task"
+	props.doctype === "Idea"
+		? {
+				noChat: __("No chat about this idea yet."),
+				startHint: __("Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea."),
+				start: __("Start a Raven chat about this idea"),
+				join: __("Join the Raven chat about this idea"),
+				closed: __("Read the chat of this idea, which is no longer up for vote"),
+				open: __("Open the Raven chat about this idea"),
+				mentionNote: __("When you send, every colleague you mention joins the chat."),
+			}
+		: props.doctype === "Task"
 		? {
 				noChat: __("No chat for this Task yet."),
 				startHint: __("Start one with the people on this Task. Messages also show up in Raven, linked to the Task."),
@@ -109,7 +120,7 @@ const texts = computed(() =>
 			}
 )
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, mentions: 0, threads: [], skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, mentions: 0, message_count: 0, threads: [], skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
@@ -117,6 +128,11 @@ const buttonRef = ref(null)
 const panelRef = ref(null)
 const loading = ref(true)
 const docked = computed(() => Boolean(panelRef.value?.inColumn))
+// The view has a dock with this record's chat panel, expanded or not (panels/ChatDockHost.vue).
+const dockable = computed(() => {
+	const host = issueChatStore.dockHost
+	return Boolean(host?.record === props.recordName && host.available)
+})
 const unreadTotal = computed(() => totalUnread(state.value))
 
 const buttonLabel = computed(() => {
@@ -181,6 +197,11 @@ async function honourOpenRequest() {
 	await nextTick()
 	if (issueChatStore.openRequest !== props.recordName) return
 	const target = issueChatStore.openTarget
+	if (dockable.value && !docked.value) {
+		// Expand the collapsed chat panel first; the chat then lays itself into it.
+		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
+		await becomes(docked)
+	}
 	if (docked.value) {
 		// The column already shows the chat; go to the message the list pointed at.
 		issueChatStore.openRequest = null
@@ -199,6 +220,20 @@ async function honourOpenRequest() {
 	if (!drawerOpen.value) await onClick()
 	await nextTick()
 	panelRef.value?.focusTarget(target)
+}
+
+/** Resolves once `flag` is true, or after `ms` (the dock may not expand, e.g. it unmounted). */
+function becomes(flag, ms = 1500) {
+	if (flag.value) return Promise.resolve()
+	return new Promise((resolve) => {
+		const timer = setTimeout(done, ms)
+		const stop = watch(flag, (value) => value && done())
+		function done() {
+			clearTimeout(timer)
+			stop()
+			resolve()
+		}
+	})
 }
 
 /** Start or join the chat; true when the user is in it afterwards. */
@@ -235,6 +270,44 @@ async function onClick() {
 }
 
 watch(() => issueChatStore.openRequest, honourOpenRequest)
+
+// The chat shows in its panel: Raven marks the channel read. Also when another Issue opens while
+// the panel stays open (it is persistent, so `docked` doesn't change then): its count arrives
+// with its state and is cleared here too.
+watch([docked, () => state.value.unread], ([isDocked, unread]) => {
+	if (!isDocked || !unread) return
+	state.value = { ...state.value, unread: 0 }
+	chatChanged()
+})
+
+// What the chat panel's rail icon shows (#1915): "12 messages · 3 unread", and the unread count
+// as its badge.
+const rowSummary = computed(() => {
+	if (loading.value) return ""
+	if (!state.value.channel_id) return __("No chat yet")
+	if (!state.value.is_member) return __("You are not in this chat yet.")
+	const count = state.value.message_count || 0
+	const parts = [count === 1 ? __("1 message") : __("{0} messages", [count])]
+	if (unreadTotal.value) parts.push(__("{0} unread", [unreadTotal.value]))
+	return parts.join(" · ")
+})
+watch(
+	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value), loading],
+	([record, enabled, summary, unread, tone, isLoading], previous) => {
+		const before = previous?.[0]
+		if (before && before !== record) delete issueChatStore.chats[before]
+		// `enabled` is kept while the next record loads (see the recordName watch), so the panel
+		// and its Raven frame stay instead of blinking.
+		issueChatStore.chats[record] = {
+			// unknown (undefined) until the first answer, so the chat tile keeps its place meanwhile
+			enabled: isLoading && !enabled ? undefined : Boolean(enabled),
+			summary,
+			badge: unread ? (unread > 99 ? "99+" : String(unread)) : "",
+			tone,
+		}
+	},
+	{ immediate: true }
+)
 
 watch(
 	() => props.recordName,
@@ -274,5 +347,8 @@ useUserRealtime("raven:unread_thread_count_updated", () => {
 onDeactivated(() => {
 	drawerOpen.value = false
 })
-onBeforeUnmount(() => clearTimeout(refreshTimer))
+onBeforeUnmount(() => {
+	clearTimeout(refreshTimer)
+	delete issueChatStore.chats[props.recordName]
+})
 </script>

@@ -23,6 +23,8 @@ let loaded = false
 let owner = null
 let rafId = 0
 let lastRect = ""
+// While a splitter or a panel is dragged, the frame lets the pointer through (#1911, #1915).
+let passThrough = false
 
 function createFrame() {
 	frame = document.createElement("iframe")
@@ -81,7 +83,8 @@ function follow() {
 				width: `${rect.width}px`,
 				height: `${rect.height}px`,
 				visibility: "visible",
-				pointerEvents: "auto",
+				// a drag that resizes the chat moves the frame: keep letting the pointer through
+				pointerEvents: passThrough ? "none" : "auto",
 			})
 		}
 	}
@@ -130,6 +133,18 @@ export function releaseRavenFrame(slot) {
 	cancelAnimationFrame(rafId)
 	setHidden()
 	if (loaded) park()
+}
+
+/**
+ * While a splitter or a panel is dragged, the frame must not take the pointer: the drag would end
+ * as soon as the pointer crosses into Raven (#1911). Turning it off always works, also when the
+ * panel gave the frame back meanwhile, so the frame never stays deaf to clicks.
+ */
+export function setRavenFramePassThrough(on) {
+	passThrough = Boolean(on)
+	if (!frame) return
+	// a frame without a panel stays hidden and deaf (setHidden); only a shown one takes the pointer
+	frame.style.pointerEvents = passThrough || !owner ? "none" : "auto"
 }
 
 /** The running Raven's window, or null before the first panel loaded it. */

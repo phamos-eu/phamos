@@ -16,6 +16,11 @@ def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
     lock wait timeout (1205) while another request holds the row lock.
     Retrying the same write after a short backoff resolves the transient
     contention without changing what gets written or when.
+
+    No rollback before the retry: a lock wait timeout only undoes the failed
+    statement (a deadlock is already rolled back by the server), while a
+    rollback here would also drop the caller's earlier writes — on a Timesheet
+    Record submit, the submit itself (phamos/phamos#1636).
     """
     for attempt in range(max_retries + 1):
         try:
@@ -23,7 +28,6 @@ def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
             return
         except (frappe.QueryTimeoutError, frappe.QueryDeadlockError):
             if attempt < max_retries:
-                frappe.db.rollback()
                 time.sleep(1 + attempt)
                 continue
             raise
@@ -35,10 +39,23 @@ def sync_touch_time_on_timesheet_change(doc, method=None):
     always matches the SUM(actual_time) the dashboard's Touch Time KPI is built
     from (see _build_touch_time_kpis in gitlab_issue_dashboard.py). A Timesheet
     Record counts as long as its parent Timesheet is Draft or Submitted (not
-    Cancelled)."""
+    Cancelled).
+
+    Runs as a job after the submit or cancel is committed (phamos/phamos#1636):
+    written in the request, a webhook holding the issue row froze the user's
+    submit, and a lock timeout could roll the submit back."""
     if not doc.gitlab_issue:
         return
+    frappe.enqueue(
+        "phamos.gitlab_integration.gitlab_utils.sync_touch_time",
+        issue_name=doc.gitlab_issue,
+        enqueue_after_commit=True,
+    )
 
+
+def sync_touch_time(issue_name):
+    """Set the GitLab Issue's Total Touch Time to the SUM(actual_time) of its
+    counted Timesheet Records — see sync_touch_time_on_timesheet_change."""
     total = frappe.db.sql(
         """
         SELECT SUM(tr.actual_time)
@@ -46,10 +63,10 @@ def sync_touch_time_on_timesheet_change(doc, method=None):
         JOIN `tabTimesheet` t ON t.name = tr.timesheet
         WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue = %s
         """,
-        doc.gitlab_issue,
+        issue_name,
     )[0][0] or 0
 
-    _set_gitlab_issue_value_with_retry(doc.gitlab_issue, {"total_touch_time": total})
+    _set_gitlab_issue_value_with_retry(issue_name, {"total_touch_time": total})
 
 
 def sync_cycle_time_start(issue_name):
@@ -88,10 +105,15 @@ def sync_cycle_time_start(issue_name):
 
 def sync_cycle_time_start_on_timesheet_change(doc, method=None):
     """Re-resolve Cycle Time Started At whenever a Timesheet Record on this issue
-    is submitted or cancelled — see sync_cycle_time_start."""
+    is submitted or cancelled — see sync_cycle_time_start. Queued after commit
+    like sync_touch_time_on_timesheet_change."""
     if not doc.gitlab_issue:
         return
-    sync_cycle_time_start(doc.gitlab_issue)
+    frappe.enqueue(
+        "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start",
+        issue_name=doc.gitlab_issue,
+        enqueue_after_commit=True,
+    )
 
 
 def get_gitlab_headers():
@@ -330,6 +352,19 @@ def _get_issue_timestamp_fields(issue):
         # aging_days is an Int column (NOT NULL in DB), so use 0 for open issues
         "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else 0,
     }
+
+
+def _get_issue_time_fields(issue):
+	"""Time estimate and time spent in hours (#1985), from the REST issue (`time_stats`) or a
+	webhook payload (top-level seconds). Keys GitLab did not send are left out, so a payload
+	without time tracking never overwrites stored values with 0."""
+	stats = issue.get("time_stats") or issue
+	fields = {}
+	if stats.get("time_estimate") is not None:
+		fields["time_estimate_hours"] = round((stats.get("time_estimate") or 0) / 3600, 2)
+	if stats.get("total_time_spent") is not None:
+		fields["time_spent_hours"] = round((stats.get("total_time_spent") or 0) / 3600, 2)
+	return fields
 
 
 def _normalize_issue_text(value):
@@ -653,6 +688,7 @@ def sync_all_issues():
                         "labels": ", ".join(issue.get("labels", [])),
                     }
                     fields.update(_get_issue_timestamp_fields(issue))
+                    fields.update(_get_issue_time_fields(issue))
                     if milestone_name:
                         fields["gitlab_milestone"] = milestone_name
 
@@ -796,6 +832,7 @@ def sync_issues_for_project(project_name):
                     "labels": ", ".join(issue.get("labels", [])),
                 }
                 fields.update(_get_issue_timestamp_fields(issue))
+                fields.update(_get_issue_time_fields(issue))
 
                 if milestone_name:
                     fields["gitlab_milestone"] = milestone_name
@@ -1015,9 +1052,17 @@ def sync_gitlab_data():
     Full sync in order: projects → milestones → issues.
     This is what the Dev Action Panel sync button calls.
     """
-    sync_projects_only()
-    sync_gitlab_milestones()
-    sync_all_issues()
+    try:
+        sync_projects_only()
+        sync_gitlab_milestones()
+        sync_all_issues()
+        sync_gitlab_releases()
+    except Exception:
+        # a warning on the Phriend of the warning role (#2012); the job still fails as before
+        from phamos.phriend import events as phriend_events
+
+        phriend_events.gitlab_sync_failed()
+        raise
     return "Sync complete"
 
 
@@ -1156,6 +1201,7 @@ def _handle_issue_webhook(payload):
         "gitlab_milestone": milestone_name,
     }
     data.update(timestamp_data)
+    data.update(_get_issue_time_fields(issue_attrs))
 
     existing = frappe.db.get_value(
         "GitLab Issue",
@@ -1607,3 +1653,88 @@ def backfill_issue_comments_background(project_name=None):
         "status": "queued",
         "message": "Issue comment backfill queued as background job",
     }
+
+
+# Releases (#1985) -----------------------------------------------------------------------------
+
+
+def get_releases_for_project(project_id):
+	"""All releases of a GitLab project, newest first, with their milestones."""
+	settings = frappe.get_single("GitLab Settings")
+	base_url = settings.gitlab_url.rstrip("/")
+	headers = get_gitlab_headers()
+	releases, page = [], 1
+	while True:
+		response = requests.get(
+			f"{base_url}/api/v4/projects/{project_id}/releases",
+			headers=headers,
+			params={"per_page": 100, "page": page},
+			timeout=60,
+		)
+		if response.status_code != 200:
+			# 403/404/expired token: say so instead of returning a silently partial list
+			raise frappe.ValidationError(
+				f"GitLab answered {response.status_code} for the releases of project {project_id} (page {page})"
+			)
+		data = response.json()
+		if not data:
+			break
+		releases.extend(data)
+		page += 1
+	return releases
+
+
+def sync_gitlab_releases():
+	"""Releases of every GitLab Project that belongs to an Implementation, with their milestones.
+
+	Read-only: nothing is written back to GitLab. Planning happens in Implementation Release (#1986).
+	Not whitelisted on purpose: it runs inside sync_gitlab_data (scheduler or the sync button).
+	"""
+	projects = frappe.get_all(
+		"GitLab Project", filters={"implementation": ["is", "set"]}, fields=["name", "project_id"]
+	)
+	for project in projects:
+		# one unreachable project (timeout, 404, expired token) must not stop the others
+		try:
+			releases = get_releases_for_project(project.project_id)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"GitLab Release Sync Error - {project.name}")
+			continue
+		for release in releases:
+			# a savepoint per release: one broken release must not undo the others of this run
+			frappe.db.savepoint("gitlab_release_sync")
+			try:
+				upsert_release(project.name, release)
+			except Exception:
+				frappe.db.rollback(save_point="gitlab_release_sync")
+				frappe.log_error(frappe.get_traceback(), f"GitLab Release Sync Error - {project.name}")
+	frappe.db.commit()
+	return "Releases synced successfully"
+
+
+def upsert_release(gitlab_project, release):
+	"""Create or update one GitLab Release from the API payload; returns its name."""
+	name = f"{gitlab_project}-{release['tag_name']}"
+	doc = (
+		frappe.get_doc("GitLab Release", name)
+		if frappe.db.exists("GitLab Release", name)
+		else frappe.new_doc("GitLab Release")
+	)
+	if doc.is_new():
+		doc.gitlab_project = gitlab_project
+		doc.tag_name = release["tag_name"]
+	doc.title = release.get("name") or release["tag_name"]
+	doc.description = release.get("description") or ""
+	doc.released_at = _parse_gitlab_datetime(release.get("released_at"))
+	doc.upcoming = 1 if release.get("upcoming_release") else 0
+	doc.web_url = (release.get("_links") or {}).get("self") or ""
+	doc.last_synced = frappe.utils.now_datetime()
+	doc.set("milestones", [])
+	for milestone in release.get("milestones") or []:
+		milestone_name = frappe.db.get_value(
+			"GitLab Milestones", {"milestone_id": int(milestone["id"]), "gitlab_project": gitlab_project}, "name"
+		)
+		if milestone_name:
+			doc.append("milestones", {"gitlab_milestone": milestone_name})
+	doc.save(ignore_permissions=True)
+	return doc.name

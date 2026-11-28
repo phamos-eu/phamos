@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 22:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "feature",
+  "rank",
+  "effort_hours",
+  "fits",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "feature",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Feature",
+   "options": "Implementation Feature",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rank",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Rank",
+   "read_only": 1,
+   "description": "The order of the rows; 1 is the most important."
+  },
+  {
+   "fieldname": "effort_hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Open Effort (Hours)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fits",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Fits",
+   "read_only": 1,
+   "description": "Fits into the team capacity before the target date, counting the features ranked above it and earlier releases."
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Release Feature",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

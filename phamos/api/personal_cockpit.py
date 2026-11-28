@@ -333,6 +333,18 @@ def add_task_dependency(name, depends_on):
 	return dc.add_task_dependency(CONFIG, name, depends_on)
 
 
+@frappe.whitelist(methods=["POST"])
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
+
+
 # ToDos (phamos/phamos#1541) — logic in phamos.api.personal_todos.
 
 
@@ -798,3 +810,47 @@ def capture_side_idea(parent, text, name=None):
 def get_my_contracts():
 	"""My own submitted contracts: the one in force, upcoming changes and the history."""
 	return personal_contracts.get_my_contracts()
+
+
+# Hand in for vote (phamos/phamos#1842).
+
+
+@frappe.whitelist(methods=["POST"])
+def hand_in_idea_for_vote(name):
+	"""Open my idea for a vote by every cockpit user."""
+	return personal_ideas.hand_in_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_idea_from_vote(name):
+	"""Make my idea private again; its votes are removed."""
+	return personal_ideas.withdraw_idea_from_vote(name)
+
+
+@frappe.whitelist()
+def get_ideas_for_vote():
+	"""Every idea open for vote, most votes first."""
+	return personal_ideas.get_ideas_for_vote()
+
+
+@frappe.whitelist()
+def get_idea_for_vote(name):
+	return personal_ideas.get_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def vote_idea(name):
+	"""Toggle my upvote on an idea open for vote."""
+	return personal_ideas.vote_idea(name)
+
+
+@frappe.whitelist()
+def get_idea_chat(name):
+	"""Raven chat state of an idea up for vote (or my own idea)."""
+	return personal_ideas.get_idea_chat(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_idea_chat(name):
+	"""Start or join the Raven chat of an idea up for vote."""
+	return personal_ideas.ensure_idea_chat(name)

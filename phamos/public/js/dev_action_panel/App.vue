@@ -1,14 +1,18 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import Sidebar from "./components/Sidebar.vue";
 import StatsBar from "./components/StatsBar.vue";
-import FilterBar from "./components/FilterBar.vue";
+import FrappeFilter from "./components/FrappeFilter.vue";
+import QuickSearch from "./components/QuickSearch.vue";
+import { issueMatchesSearch, sortIssues, ISSUE_SORT_OPTIONS, DEFAULT_ISSUE_SORT } from "./quickSearch.js";
 import IssueList from "./components/IssueList.vue";
 import BreakModal from "./components/BreakModal.vue";
 import BreakConfirm from "./components/BreakConfirm.vue";
 import CalendarView from "./components/CalendarView.vue";
 import TimesheetList from "./components/TimesheetList.vue";
 import ProjectsView from "./components/ProjectsView.vue";
+import ProjectCard from "./components/ProjectCard.vue";
+import SessionStopModal from "./components/SessionStopModal.vue";
 
 const issues = ref([]);
 const stats = ref(null);
@@ -21,128 +25,93 @@ const activeSession = ref(null);
 const elapsedSeconds = ref(0);
 const sidebarOpen = ref(true);
 const selectedProject = ref(null);
-const currentView = ref("issues"); // 'issues' | 'timesheets' | 'team' | 'projects'
+const currentView = ref("projects"); // 'issues' | 'timesheets' | 'team' | 'projects'; opens on Projects
 const mineOnly = ref(true); // default: show only current user's issues
 
-// Projects section
-const myProjects = ref([]);
+// Projects section: one list (assigned to me first, then the rest; last used first within each)
 const allProjects = ref([]);
-const projectsFilter = ref("my"); // 'my' | 'all'
 const projectsLoading = ref(false);
 const activeProjectSession = ref(null);
 const projectElapsedSeconds = ref(0);
 let projectTimerInterval = null;
 
-// Filter state
-const searchQuery = ref("");
-const dueFilter = ref("all");
-const assigneeFilter = ref([]);
-const labelFilter = ref([]);
-const sortBy = ref("due_date");
-const sortDir = ref("asc");
-function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; }
+// Names matching the Frappe Filter button (GitLab Issue), or null when no filter is set
+const issueMatches = ref(null);
 
-// Dynamic filter options derived from the loaded issues
-const assigneeOptions = computed(() => {
-  const set = new Set();
-  issues.value.forEach(i => { if (i.assignee) set.add(i.assignee); });
-  return [...set].sort();
-});
-const labelOptions = computed(() => {
-  const set = new Set();
-  issues.value.forEach(i => {
-    if (i.labels) i.labels.split(",").map(l => l.trim()).filter(Boolean).forEach(l => set.add(l));
-  });
-  return [...set].sort();
-});
+// A filter (e.g. GitLab Project = X) shows every matching issue, not only mine:
+// the sidebar switches to All Issues, and My Issues narrows it again.
+function onIssueFilter(names) {
+  issueMatches.value = names;
+  if (names) mineOnly.value = false;
+}
+// Quick text search and sort next to the Filter button (#2211).
+const issueSearch = ref("");
+const issueSort = ref(DEFAULT_ISSUE_SORT);
+// The Filter button is rebuilt empty when the Issues view opens again, so drop its result.
+watch(currentView, (view) => { if (view !== "issues") issueMatches.value = null; });
 
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
 
+// Projects that have issues in the current scope, in the project list's order.
 const projects = computed(() => {
   const base = mineOnly.value ? issues.value.filter(i => i.is_mine) : issues.value;
-  const map = {};
+  const byProject = {};
   base.forEach(i => {
-    if (i.gitlab_project) {
-      if (!map[i.gitlab_project]) map[i.gitlab_project] = { name: i.gitlab_project, title: i.gitlab_project_title || i.gitlab_project, count: 0 };
-      map[i.gitlab_project].count++;
-    }
+    if (!i.project) return;
+    if (!byProject[i.project]) byProject[i.project] = { name: i.project, title: i.project_name || i.project, count: 0 };
+    byProject[i.project].count++;
   });
-  return Object.values(map).sort((a, b) => a.title.localeCompare(b.title));
+  const order = allProjects.value.map(p => p.name);
+  const rank = name => (order.includes(name) ? order.indexOf(name) : order.length);
+  return Object.values(byProject).sort((a, b) => rank(a.name) - rank(b.name));
 });
 
 const filteredIssues = computed(() => {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
   const activeIssueName = activeSession.value?.gitlab_issue;
   const activeIssue = issues.value.find(i => i.name === activeIssueName);
   let list = issues.value.filter(i => i.name !== activeIssueName);
 
   if (mineOnly.value) list = list.filter(i => i.is_mine);
-  if (selectedProject.value) list = list.filter(i => i.gitlab_project === selectedProject.value);
+  if (selectedProject.value) list = list.filter(i => i.project === selectedProject.value);
 
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) list = list.filter(i =>
-    i.title?.toLowerCase().includes(q) ||
-    String(i.issue_id).includes(q) ||
-    i.gitlab_project_title?.toLowerCase().includes(q) ||
-    i.assignee?.toLowerCase().includes(q) ||
-    i.labels?.toLowerCase().includes(q)
-  );
-
-  if (assigneeFilter.value.length) list = list.filter(i => assigneeFilter.value.includes(i.assignee));
-  if (labelFilter.value.length) list = list.filter(i =>
-    i.labels && labelFilter.value.some(l => i.labels.split(",").map(s => s.trim()).includes(l))
-  );
-
-  if (dueFilter.value !== "all") {
-    list = list.filter(i => {
-      if (dueFilter.value === "no_due") return !i.due_date;
-      if (!i.due_date) return false;
-      const d = new Date(i.due_date);
-      if (dueFilter.value === "overdue")   return d < today;
-      if (dueFilter.value === "today")     return d.getTime() === today.getTime();
-      if (dueFilter.value === "this_week") return d >= today && d <= weekEnd;
-      return true;
-    });
+  if (issueMatches.value) {
+    const allowed = new Set(issueMatches.value);
+    list = list.filter(i => allowed.has(i.name));
   }
 
-  list = [...list].sort((a, b) => {
-    let va, vb;
-    if (sortBy.value === "due_date") {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      va = new Date(a.due_date).getTime(); vb = new Date(b.due_date).getTime();
-    } else if (sortBy.value === "id") {
-      va = parseInt(a.issue_id) || 0; vb = parseInt(b.issue_id) || 0;
-    } else if (sortBy.value === "project") {
-      va = (a.gitlab_project_title || "").toLowerCase(); vb = (b.gitlab_project_title || "").toLowerCase();
-    } else if (sortBy.value === "title") {
-      va = (a.title || "").toLowerCase(); vb = (b.title || "").toLowerCase();
-    } else if (sortBy.value === "priority") {
-        const getPriority = (labels) => {
-          if (!labels) return 999;
+  if (issueSearch.value.trim()) list = list.filter(i => issueMatchesSearch(i, issueSearch.value));
 
-          if (labels.includes("P:1")) return 1;
-          if (labels.includes("P:2")) return 2;
-          if (labels.includes("P:3")) return 3;
-
-          return 999;
-        };
-
-        va = getPriority(a.labels);
-        vb = getPriority(b.labels);
-      }
-    if (va < vb) return sortDir.value === "asc" ? -1 : 1;
-    if (va > vb) return sortDir.value === "asc" ? 1 : -1;
-    return 0;
-  });
+  list = sortIssues(list, issueSort.value);
 
   // Re-inject the active issue at the top, bypassing all filters
   if (activeIssue) list = [activeIssue, ...list];
   return list;
 });
+
+// A running project timer is also shown on top of the Issues view.
+const activeProjectRow = computed(() => {
+  const s = activeProjectSession.value;
+  if (!s) return null;
+  return allProjects.value.find(p => p.name === s.project)
+    || { name: s.project, project_name: s.project, percent_billable: s.project_percent_billable, assignees: [] };
+});
+
+function openRunningSession() {
+  if (activeProjectSession.value) currentView.value = "projects";
+  else if (activeSession.value) currentView.value = "issues";
+}
+
+// Sidebar session widget: pause / resume / stop the running timesheet from any view.
+// The project session wins when both exist, same as the widget shows.
+const showSessionStop = ref(false);
+function onSidebarPause() { return activeProjectSession.value ? onPauseProjectTimer() : onPause(); }
+function onSidebarResume() { return activeProjectSession.value ? onResumeProjectTimer() : onResume(); }
+async function onSidebarStopConfirm(payload) {
+  showSessionStop.value = false;
+  if (activeProjectSession.value) await onStopProjectTimer(payload);
+  else if (activeSession.value) await onStop(payload);
+}
 
 // Timer
 let timerInterval = null;
@@ -174,10 +143,6 @@ async function loadSession() {
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
 
 // Projects
-async function loadMyProjects() {
-  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_my_projects" });
-  myProjects.value = r.message || [];
-}
 async function loadAllProjects() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" });
   allProjects.value = r.message || [];
@@ -208,6 +173,7 @@ async function onStartProjectTimer({ project, expectedTime, goal }) {
     activeProjectSession.value = { ...r.message };
     projectElapsedSeconds.value = Math.max(0, r.message.elapsed_seconds || 0);
     startProjectTick();
+    await loadAllProjects(); // the new record makes it the last used project
   }
 }
 
@@ -244,7 +210,7 @@ async function onStopProjectTimer({ result, percentBillable, activityType }) {
     stopProjectTick();
     activeProjectSession.value = null;
     projectElapsedSeconds.value = 0;
-    await Promise.all([loadMyProjects(), loadStats()]);
+    await Promise.all([loadAllProjects(), loadStats()]);
     frappe.show_alert({ message: __("Project session submitted."), indicator: "green" });
   }
 }
@@ -255,7 +221,7 @@ async function assignProject(project) {
     args: { project_name: project.name },
   });
   frappe.show_alert({ message: __("Project assigned to you."), indicator: "green" });
-  await Promise.all([loadMyProjects(), loadAllProjects()]);
+  await loadAllProjects();
 }
 
 // Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })
@@ -373,7 +339,7 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadMyProjects(), loadAllProjects(), loadActiveProjectSession()]); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadAllProjects(), loadActiveProjectSession()]); });
 onUnmounted(() => { stopTick(); stopProjectTick(); });
 </script>
 
@@ -388,9 +354,17 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
   <BreakModal
     v-if="showBreakModal && breakFrom"
     :break-from="breakFrom"
+    :projects="allProjects"
     @confirm="onBreakSubmit"
     @skip="onBreakSkip"
     @close="onBreakModalClose"
+  />
+  <SessionStopModal
+    v-if="showSessionStop && (activeProjectSession || activeSession)"
+    :session="activeProjectSession || activeSession"
+    :is-project="!!activeProjectSession"
+    @confirm="onSidebarStopConfirm"
+    @cancel="showSessionStop = false"
   />
 
   <div class="dc-root">
@@ -418,8 +392,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           :my-issues-count="myIssuesCount"
           :mine-only="mineOnly"
           :syncing="syncing"
-          :projects-filter="projectsFilter"
-          :my-projects-count="myProjects.length"
           :all-projects-count="allProjects.length"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
@@ -427,25 +399,36 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @change-view="currentView = $event"
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
-          @navigate-projects="(tab) => { currentView = 'projects'; projectsFilter = tab; }"
+          @navigate-projects="currentView = 'projects'"
+          @open-session="openRunningSession"
+          @pause-session="onSidebarPause"
+          @resume-session="onSidebarResume"
+          @stop-session="showSessionStop = true"
         />
       </aside>
 
       <div class="dc-body">
         <template v-if="currentView === 'issues'">
-          <FilterBar
-            v-model:search="searchQuery"
-            v-model:dueFilter="dueFilter"
-            v-model:assigneeFilter="assigneeFilter"
-            v-model:labelFilter="labelFilter"
-            v-model:sortBy="sortBy"
-            v-model:sortDir="sortDir"
-            :assignee-options="assigneeOptions"
-            :label-options="labelOptions"
-            :result-count="filteredIssues.length"
-            :total-count="issues.length"
-            @clear-all="clearAllFilters"
-          />
+          <div class="dc-filter-row">
+            <QuickSearch v-model="issueSearch" placeholder="Search issues by title, #number, project, assignee or label…" />
+            <FrappeFilter doctype="GitLab Issue" @change="onIssueFilter" />
+            <select v-model="issueSort" class="dc-sort form-control" title="Sort issues">
+              <option v-for="o in ISSUE_SORT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+            <span class="dc-filter-count">{{ filteredIssues.length }} of {{ issues.length }}</span>
+          </div>
+          <div v-if="activeProjectRow" class="dc-running-project">
+            <ProjectCard
+              :project="activeProjectRow"
+              :active-project-session="activeProjectSession"
+              :project-elapsed-seconds="projectElapsedSeconds"
+              :active-issue-session="activeSession"
+              @pause="onPauseProjectTimer"
+              @resume="onResumeProjectTimer"
+              @stop="onStopProjectTimer"
+              @assign="assignProject"
+            />
+          </div>
           <div v-if="loading" class="dc-loading">
             <div class="dc-loading__spinner"></div>
             <span>Loading your issues…</span>
@@ -470,14 +453,11 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <TimesheetList v-else-if="currentView === 'timesheets'" />
         <ProjectsView
           v-else-if="currentView === 'projects'"
-          :filter="projectsFilter"
-          :my-projects="myProjects"
           :all-projects="allProjects"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
           :active-issue-session="activeSession"
-          @change-filter="projectsFilter = $event"
           @start="onStartProjectTimer"
           @pause="onPauseProjectTimer"
           @resume="onResumeProjectTimer"
@@ -540,6 +520,10 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 
 /* Body */
 .dc-body { flex: 1; min-width: 0; overflow-y: auto; }
+.dc-running-project { padding: 4px 16px 0; }
+.dc-filter-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: var(--card-bg); }
+.dc-sort { width: auto; flex-shrink: 0; font-size: 12px; height: 28px; padding: 2px 8px; }
+.dc-filter-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 .dc-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

@@ -23,6 +23,7 @@ from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
 from phamos.cockpits.workdays import _employee
+from phamos.phamos.hr import sick_leave
 
 DOCTYPE = "Leave Application"
 COVER_FIELD = "custom_cover_employee"
@@ -62,21 +63,35 @@ def _employee_names(names) -> dict:
 	return {r.name: r.employee_name for r in rows}
 
 
+SYNC_ERROR_FIELD = "custom_mailcow_sync_error"
+
+
+def _has_sync_error_field() -> bool:
+	return frappe.get_meta("Event").has_field(SYNC_ERROR_FIELD)
+
+
 def _calendar_states(leave_names: list[str]) -> dict:
 	"""Calendar state per Leave Application, from the Events Phase 2 keeps for them."""
 	if not leave_names:
 		return {}
+	fields = ["name", "reference_docname", "custom_mailcow_synched"]
+	# The error field comes with the Event sync of #1558. A site without it (version-15 got the
+	# leave page in 15.125.0 but not #1558) failed here with "Unknown column"; there no push
+	# records an error, so the state is synced or pending.
+	if _has_sync_error_field():
+		fields.append(SYNC_ERROR_FIELD)
 	rows = frappe.get_all(
 		"Event",
 		filters={"reference_doctype": DOCTYPE, "reference_docname": ["in", leave_names]},
-		fields=["name", "reference_docname", "custom_mailcow_synched", "custom_mailcow_sync_error"],
+		fields=fields,
 		order_by="creation asc",
 	)
 	states = {}
 	for row in rows:
 		if row.reference_docname in states:
 			continue
-		if row.custom_mailcow_sync_error:
+		error = row.get(SYNC_ERROR_FIELD) or ""
+		if error:
 			state = "error"
 		elif row.custom_mailcow_synched:
 			state = "synced"
@@ -85,7 +100,7 @@ def _calendar_states(leave_names: list[str]) -> dict:
 		states[row.reference_docname] = {
 			"event": row.name,
 			"state": state,
-			"error": row.custom_mailcow_sync_error or "",
+			"error": error,
 		}
 	return states
 
@@ -168,10 +183,15 @@ def _leave_details(employee: str, date) -> dict:
 
 
 def get_my_leave_balance(date: str | None = None) -> dict:
-	"""Remaining days per allocated leave type on `date` (default today), from HRMS."""
+	"""Remaining days per allocated leave type on `date` (default today), from HRMS.
+
+	Also my own sick days in that calendar year (#1834): None while Phamos Settings lists no
+	sick leave types, so the view can leave the tile out. And that year's holidays from my
+	holiday list, for the leave heatmap (#1836).
+	"""
 	employee = _my_employee()
 	if not employee:
-		return {"has_employee": False, "balance": [], "without_pay": []}
+		return {"has_employee": False, "balance": [], "without_pay": [], "sick_days": None, "holidays": []}
 	details = _leave_details(employee, date)
 	balance = [
 		{
@@ -184,7 +204,25 @@ def get_my_leave_balance(date: str | None = None) -> dict:
 		}
 		for leave_type, values in sorted((details.get("leave_allocation") or {}).items())
 	]
-	return {"has_employee": True, "balance": balance, "without_pay": details.get("lwps") or []}
+	sick_days = sick_leave.get_sick_days([employee], *sick_leave.year_bounds(date))
+	return {
+		"has_employee": True,
+		"balance": balance,
+		"without_pay": details.get("lwps") or [],
+		"sick_days": sick_days[employee] if sick_days is not None else None,
+		"holidays": _holidays(employee, date),
+	}
+
+
+def _holidays(employee: str, date) -> list[dict]:
+	"""Holidays and weekly offs of the calendar year of `date` from my holiday list."""
+	from hrms.hr.utils import get_holidays_for_employee
+
+	year_start, year_end = sick_leave.year_bounds(date)
+	return [
+		{"date": h.holiday_date, "description": h.description, "weekly_off": bool(h.weekly_off)}
+		for h in get_holidays_for_employee(employee, year_start, year_end, raise_exception=False)
+	]
 
 
 def get_leave_form_options(from_date: str | None = None) -> dict:

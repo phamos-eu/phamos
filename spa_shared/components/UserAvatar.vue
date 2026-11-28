@@ -35,7 +35,7 @@ const props = defineProps({
 	size: {
 		type: String,
 		default: "sm",
-		validator: (v) => ["xs", "sm", "md"].includes(v),
+		validator: (v) => ["xs", "sm", "md", "lg"].includes(v),
 	},
 })
 
@@ -47,6 +47,7 @@ const sizeClass = computed(() => {
 		xs: "h-4 w-4",
 		sm: "h-7 w-7",
 		md: "h-8 w-8",
+		lg: "h-10 w-10",
 	}
 	return map[props.size]
 })
@@ -56,6 +57,7 @@ const abbrSizeClass = computed(() => {
 		xs: "text-[9px]",
 		sm: "text-xs",
 		md: "text-sm",
+		lg: "text-base",
 	}
 	return map[props.size]
 })

@@ -26,6 +26,18 @@ function clearFalseUnsavedState(frm) {
 	}
 }
 
+function addOpenInGitLabButton(frm) {
+	if (frm.is_new() || !frm.doc.issue_url) {
+		return;
+	}
+	const label = frm.doc.issue_id
+		? __("Open {0} in GitLab", ["#" + frm.doc.issue_id])
+		: __("Open in GitLab");
+	frm.add_custom_button(label, () => {
+		window.open(frm.doc.issue_url, "_blank", "noopener");
+	});
+}
+
 frappe.ui.form.on("GitLab Issue", {
 	onload_post_render(frm) {
 		// Some records can appear as dirty right after render due to widget
@@ -38,6 +50,7 @@ frappe.ui.form.on("GitLab Issue", {
 		clearFalseUnsavedState(frm);
 	},
 	refresh(frm) {
+		addOpenInGitLabButton(frm);
 		clearFalseUnsavedState(frm);
 	},
 	after_save(frm) {

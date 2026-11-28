@@ -3,7 +3,10 @@
 		class="flex h-full flex-none flex-col border-r border-outline-gray-2 bg-surface-white transition-[width] dark:bg-surface-gray-1"
 		:class="collapsed ? 'w-14' : 'w-52'"
 	>
+		<!-- A cockpit can replace the label row (#1672: customer and implementation picker). -->
+		<slot v-if="$slots.header" name="header" :collapsed="collapsed" :toggle="toggle" />
 		<div
+			v-else
 			class="flex h-12 flex-shrink-0 items-center border-b border-outline-gray-2 px-3"
 			:class="collapsed ? 'justify-center' : 'justify-between'"
 		>
@@ -33,7 +36,7 @@
 						"
 						:title="collapsed ? item.label : undefined"
 					>
-						<FeatherIcon :name="item.icon" class="h-4 w-4 flex-shrink-0" />
+						<CockpitIcon :name="item.icon" class="h-4 w-4 flex-shrink-0" />
 						<span v-if="!collapsed" class="min-w-0 flex-1 truncate">{{ item.label }}</span>
 						<FeatherIcon
 							v-if="!collapsed && item.children?.length"
@@ -57,16 +60,31 @@
 									: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
 							"
 						>
-							<FeatherIcon :name="child.icon" class="h-3.5 w-3.5 flex-shrink-0" />
+							<CockpitIcon :name="child.icon" class="h-3.5 w-3.5 flex-shrink-0" />
 							<span class="truncate">{{ child.label }}</span>
 						</router-link>
 					</div>
 				</div>
 			</template>
 			<slot :collapsed="collapsed" :expand="expand" />
+			<!-- Every cockpit is its own desktop app (#1458); this explains how to install it (#1998).
+			     Here rather than in a menu, because cockpits may replace the header and the footer. -->
+			<button
+				v-if="offerInstall"
+				type="button"
+				class="mt-auto flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				:class="collapsed ? 'justify-center' : ''"
+				:title="collapsed ? __('Install as app') : undefined"
+				@click="openInstallHint"
+			>
+				<FeatherIcon name="download" class="h-4 w-4 flex-shrink-0" />
+				<span v-if="!collapsed" class="truncate">{{ __("Install as app") }}</span>
+			</button>
 		</nav>
 
-		<div class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
+		<!-- Website users have no Desk; their cockpit puts its own footer here (#1671). -->
+		<slot v-if="$slots.footer" name="footer" :collapsed="collapsed" />
+		<div v-else class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
 			<button
 				type="button"
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
@@ -82,10 +100,12 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { openDesk } from "@spa/utils/appWindow.js"
+import { canOfferInstall, installApp, openInstallHint } from "@spa/installApp.js"
 import { __ } from "@spa/utils/i18n.js"
+import CockpitIcon from "./CockpitIcon.vue"
 
 const props = defineProps({
 	label: { type: String, required: true },
@@ -96,6 +116,8 @@ const props = defineProps({
 const route = useRoute()
 const collapsed = ref(false)
 const openGroups = ref({})
+// installApp.installed is reactive, so the entry disappears once the app is installed.
+const offerInstall = computed(() => !installApp.installed && canOfferInstall())
 
 function isActive(item) {
 	return (item.match || [item.name]).includes(route.name)

@@ -8,12 +8,13 @@ Privacy is applied here, once, before anything reaches a template: anonymous alu
 unapproved customers never carry a name, photo or named URL in their item.
 """
 
+import html
 import re
 from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import getdate, strip_html
 
 from phamos.web_profile.events import load_events, month_span
 from phamos.web_profile.i18n import localized
@@ -589,20 +590,29 @@ def load_implementations(lang):
 			fields=["parent", "person", "role", "key_person"], order_by="idx asc"):
 		project_people.setdefault(row.parent, []).append(row)
 	items = []
-	for r in _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
-			"start_date", "industry", "customer_approved", "region"]):
+	records = _published("Implementation Web Profile", ["implementation", "customer", "implementation_status", "team",
+		"start_date", "industry", "customer_approved", "region"])
+	# The customer link holds the internal ID ("Knd-00314"); named cases show the customer's name (#1825).
+	# Names are read only for approved cases: anonymous ones must never carry them.
+	approved = [r.customer for r in records if r.customer and r.customer_approved]
+	customer_names = dict(frappe.get_all("Customer", filters={"name": ["in", approved]},
+		fields=["name", "customer_name"], as_list=True)) if approved else {}
+	for r in records:
 		if r.implementation_status == "Cancelled":
 			continue
 		industry_label = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
 		year = getdate(r.start_date).year if r.start_date else None
-		masked = not r.customer_approved
+		customer_name = customer_names.get(r.customer)
+		# No name to show (approved but empty customer_name): stay anonymous rather than fall back to the ID.
+		masked = not r.customer_approved or not customer_name
 		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), _region(r.region)]))
-		title = localized(r, "title", lang) or (descriptor if masked else r.customer)
+		title = localized(r, "title", lang) or (descriptor if masked else customer_name)
 		if masked:
 			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == descriptor else descriptor,
 				masked=True)
 		else:
-			item = _item("implementations", r, lang, title, r.route, subtitle=r.customer, image=r.image)
+			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == customer_name else customer_name,
+				image=r.image)
 		if r.industry in industries:
 			_facet(item, "industry", industries[r.industry][0], industry_label)
 		for module in implementation_modules.get(r.name, []):
@@ -631,7 +641,7 @@ def load_implementations(lang):
 			"year": year,
 			"team": teams.get(r.team),
 			"industry": (industries[r.industry][0], industry_label) if r.industry in industries else None,
-			"customer": None if masked else r.customer,
+			"customer": None if masked else customer_name,
 			# Server-side only (never rendered): lets the customer page find its projects.
 			"_customer": r.customer,
 			# Named cases link to a named customer page, anonymous cases only to an anonymous one.
@@ -1083,13 +1093,32 @@ def build_profile(item, lang):
 
 	facts = [f for f in facts if f.get("value") or f.get("links")]
 	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
-		"schema": schema, "key_people": key_people(item, lang),
+		"schema": schema, "key_people": key_people(item, lang), "faqs": faqs(item, lang),
 		"anonymous_note": anonymous.note if anonymous else None,
 		# Events only (phamos.web_profile.events.build); empty for every other section.
 		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None}
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)
+
+
+def faqs(item, lang):
+	"""The page's FAQ rows in ``lang`` ({question, answer}), in table order (phamos/phamos#1823).
+
+	No fallback to another language: a German answer on an English page (and in its English
+	FAQPage schema) would mix languages for search engines. Anonymous pages show their FAQ too;
+	the field description tells editors to name no one there."""
+	doctype = SECTIONS[item.section]["doctype"]
+	if not frappe.get_meta(doctype).has_field("faqs"):  # events (Marketing Content) have no FAQ
+		return []
+	rows = frappe.get_all("Web Profile FAQ", filters={"parenttype": doctype, "parentfield": "faqs",
+		"parent": item.name, "language": lang}, fields=["question", "answer"], order_by="idx asc")
+	return [r for r in rows if (r.question or "").strip() and _has_text(r.answer)]
+
+
+def _has_text(html_value):
+	"""True when the HTML shows any text: an editor's "<p>&nbsp;</p>" or "<p><br></p>" counts as empty."""
+	return bool(html.unescape(strip_html(html_value or "")).replace("\u00a0", " ").strip())
 
 
 def _dedupe(item, profile):

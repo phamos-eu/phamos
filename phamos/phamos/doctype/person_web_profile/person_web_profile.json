@@ -46,6 +46,7 @@
   "languages",
   "content_section",
   "translations",
+  "faqs",
   "links_section",
   "profile_links",
   "legacy_section",
@@ -197,14 +198,14 @@
    "label": "Profile Image"
   },
   {
-   "description": "Every consent is stored with its date. Without publication consent an external person cannot be published.",
+   "description": "Every consent is stored with its date. Without publication consent an external person cannot be published, nor an employee unless by HR.",
    "fieldname": "consent_section",
    "fieldtype": "Section Break",
    "label": "Consent"
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.party_type && doc.party_type!='Employee'",
+   "depends_on": "party_type",
    "fieldname": "publication_consent",
    "fieldtype": "Check",
    "label": "Consents to Public Profile"
@@ -297,6 +298,13 @@
    "options": "Web Profile Content"
   },
   {
+   "description": "Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.",
+   "fieldname": "faqs",
+   "fieldtype": "Table",
+   "label": "FAQ",
+   "options": "Web Profile FAQ"
+  },
+  {
    "collapsible": 0,
    "fieldname": "links_section",
    "fieldtype": "Section Break",
@@ -340,7 +348,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-11-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Person Web Profile",

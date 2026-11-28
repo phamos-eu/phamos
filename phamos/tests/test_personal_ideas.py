@@ -16,6 +16,7 @@ from phamos.cockpits import permissions
 
 USER = "idea-a@example.com"
 OTHER = "idea-b@example.com"
+COLLEAGUE = "idea-c@example.com"
 
 
 def _ensure_user(email, roles=("Employee",)):
@@ -26,6 +27,16 @@ def _ensure_user(email, roles=("Employee",)):
 	missing = set(roles) - set(frappe.get_roles(email))
 	if missing:
 		frappe.get_doc("User", email).add_roles(*missing)
+
+
+def _give_employee_role(email):
+	"""HRMS removes the Employee role from a user with no Employee record (validate_employee_role);
+	on a real site every Employee-role user has one. Add the row directly."""
+	if "Employee" not in frappe.get_roles(email):
+		frappe.get_doc(
+			{"doctype": "Has Role", "parent": email, "parenttype": "User", "parentfield": "roles", "role": "Employee"}
+		).db_insert()
+		frappe.clear_cache(user=email)
 
 
 def _versions(name):
@@ -197,7 +208,10 @@ class TestPersonalIdeas(FrappeTestCase):
 		child = pc.capture_side_idea(idea["name"], "Also mine")
 
 		frappe.set_user(OTHER)
-		self.assertEqual(frappe.get_list("Idea", pluck="name"), [])
+		# Ideas handed in for a vote (#1842) are readable by everyone; these were not handed in.
+		visible = frappe.get_list("Idea", pluck="name")
+		self.assertNotIn(idea["name"], visible)
+		self.assertNotIn(child["name"], visible)
 		self.assertEqual(frappe.get_list("Idea Writing Session", pluck="name"), [])
 		self.assertEqual(
 			frappe.get_list("Version", filters={"ref_doctype": "Idea", "docname": idea["name"]}, pluck="name"), []
@@ -221,3 +235,79 @@ class TestPersonalIdeas(FrappeTestCase):
 		note.save(ignore_version=False)
 		frappe.set_user(OTHER)
 		self.assertTrue(frappe.get_list("Version", filters={"ref_doctype": "ToDo", "docname": note.name}))
+
+
+class TestIdeasInDesk(FrappeTestCase):
+	"""Employees work on their own ideas in Desk, /app/idea (#1951)."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		for email in (USER, COLLEAGUE):
+			_ensure_user(email)
+			_give_employee_role(email)
+		frappe.set_user(USER)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		for email in (USER, COLLEAGUE):
+			frappe.clear_cache(user=email)
+
+	def test_employee_works_on_own_ideas_in_desk(self):
+		mine = pc.create_idea("From the cockpit")
+		self.assertTrue(frappe.has_permission("Idea", "read"))
+		self.assertIn(mine["name"], frappe.get_list("Idea", pluck="name"))
+
+		doc = frappe.get_doc("Idea", mine["name"])
+		doc.title = "Edited in Desk"
+		doc.save()
+		self.assertEqual(frappe.db.get_value("Idea", mine["name"], "title"), "Edited in Desk")
+
+		new = frappe.get_doc({"doctype": "Idea", "title": "Made in Desk"}).insert()
+		self.assertEqual(new.user, USER)
+		self.assertIn(new.name, [row["name"] for row in pc.get_ideas()])
+
+		frappe.delete_doc("Idea", new.name)
+		self.assertFalse(frappe.db.exists("Idea", new.name))
+
+	def test_employee_cannot_touch_a_colleagues_idea(self):
+		frappe.set_user(COLLEAGUE)
+		private = pc.create_idea("Colleague's")
+		handed_in = pc.hand_in_idea_for_vote(pc.create_idea("Colleague's, for vote")["name"])
+		frappe.set_user(USER)
+
+		visible = frappe.get_list("Idea", pluck="name")
+		self.assertNotIn(private["name"], visible)
+		self.assertNotIn(handed_in["name"], visible)
+		for name in (private["name"], handed_in["name"]):
+			self.assertFalse(frappe.has_permission("Idea", "read", doc=name))
+			self.assertFalse(frappe.has_permission("Idea", "write", doc=name))
+			with self.assertRaises(frappe.PermissionError):
+				frappe.get_doc("Idea", name).save()
+			with self.assertRaises(frappe.PermissionError):
+				frappe.delete_doc("Idea", name)
+		# The cockpit's vote view still shows the colleague's handed-in idea.
+		self.assertIn(handed_in["name"], [row["name"] for row in pc.get_ideas_for_vote()])
+
+	def test_employee_cannot_file_an_idea_under_someone_else(self):
+		with self.assertRaises(frappe.PermissionError):
+			frappe.get_doc({"doctype": "Idea", "title": "Not mine", "user": COLLEAGUE}).insert()
+		mine = frappe.get_doc({"doctype": "Idea", "title": "Mine"}).insert()
+		mine.user = COLLEAGUE
+		with self.assertRaises(frappe.PermissionError):
+			mine.save()
+
+	def test_employee_cannot_set_votes_or_import_key(self):
+		mine = pc.hand_in_idea_for_vote(pc.create_idea("Mine, for vote")["name"])
+
+		doc = frappe.get_doc("Idea", mine["name"])
+		doc.update({"vote_count": 99, "handed_in_on": "2020-01-01 00:00:00", "imported_from": "fake"})
+		doc.save()
+		saved = frappe.db.get_value("Idea", mine["name"], ["vote_count", "handed_in_on", "imported_from"], as_dict=True)
+		self.assertEqual(saved.vote_count, 0)
+		self.assertEqual(str(saved.handed_in_on), str(mine["handed_in_on"]))
+		self.assertFalse(saved.imported_from)
+
+		new = frappe.get_doc({"doctype": "Idea", "title": "New", "vote_count": 5, "imported_from": "fake"}).insert()
+		self.assertEqual(new.vote_count, 0)
+		self.assertFalse(new.imported_from)
