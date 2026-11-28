@@ -96,3 +96,8 @@ export function follow(pan, target, view, margin) {
 	if (target > view - margin) return pan - (target - (view - margin))
 	return pan
 }
+
+/** True when a label's text is cut off (truncated with an ellipsis), so its full text is worth showing (#2096). */
+export function isCutOff(element) {
+	return Boolean(element) && element.scrollWidth > element.clientWidth + 1
+}
