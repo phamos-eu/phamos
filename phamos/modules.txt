@@ -6,3 +6,5 @@ Bookstack Integration
 Cockpits
 Marketing
 Phriend
+Ophice
+AI Agents

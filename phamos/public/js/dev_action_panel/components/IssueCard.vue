@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import DateTimePicker from "./DateTimePicker.vue";
+import { PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 function labelNames(labels) {
   if (!labels) return [];
@@ -36,7 +37,7 @@ const startTimeModified = ref(false);
 
 // Stop form
 const stopResult = ref("");
-const stopBillable = ref(100);
+const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopActivityType = ref("");
 const stopEndTimeDate = ref(new Date());
 const stopEndTimeModified = ref(false);
@@ -150,6 +151,8 @@ function openStart() {
 }
 function openStop() {
   panel.value = panel.value === "stop" ? null : "stop";
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  stopBillable.value = percentBillablePreset(props.activeSession?.project_percent_billable);
   const now = new Date();
   const fromDate = parseSystemDatetimeToUserDate(props.activeSession?.from_time);
 

@@ -120,6 +120,20 @@ function load_flow() {
 	});
 }
 
+// The Implementation Cockpit finds the implementation of the page or record itself (#1671).
+function status_url(ctx) {
+	const query = new URLSearchParams();
+	if (ctx.issue) {
+		query.set("issue", ctx.issue);
+	} else if (ctx.ref_doctype && ctx.ref_docname) {
+		query.set("ref_doctype", ctx.ref_doctype);
+		query.set("ref_docname", ctx.ref_docname);
+	} else if (ctx.route) {
+		query.set("route", ctx.route);
+	}
+	return `/implementation-cockpit/status?${query}`;
+}
+
 const desk = {
 	__: (text, args) => __(text, args),
 	csrf_token: () => frappe.csrf_token,
@@ -139,6 +153,11 @@ const desk = {
 			.join("&");
 		window.open(`/app/issue?${query}`, "_blank", "noopener");
 	},
+	// the Implementation Cockpit for users who may open it (phamos/phriend/boot.py)
+	open_status:
+		frappe.boot.phriend && frappe.boot.phriend.implementation_cockpit
+			? (ctx) => window.open(status_url(ctx), "_blank", "noopener")
+			: null,
 	on_route_change: (callback) => {
 		if (frappe.router && typeof frappe.router.on === "function") frappe.router.on("change", callback);
 		else $(window).on("hashchange popstate", callback);
@@ -147,6 +166,24 @@ const desk = {
 	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
 	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
 	user: frappe.session.user,
+	// Phriend Settings → Features (#2009)
+	features: (frappe.boot.phriend && frappe.boot.phriend.features) || {},
+	// leave me in peace (#2010)
+	quiet: (frappe.boot.phriend && frappe.boot.phriend.quiet) || null,
+	can_configure: !!(frappe.boot.phriend && frappe.boot.phriend.can_configure),
+	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
+	// one voice (#2011)
+	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
+	// events (#2012): the user's own realtime room. Phriend mounts before Desk creates its
+	// socket, and frappe.realtime.on() does nothing without one: wait for it (found in #2014).
+	on_event: (cb) => {
+		let tries = 0;
+		const attach = () => {
+			if (frappe.realtime && frappe.realtime.socket) frappe.realtime.on("phriend_event", cb);
+			else if (++tries < 120) setTimeout(attach, 500);
+		};
+		attach();
+	},
 };
 
 frappe.provide("phriend");

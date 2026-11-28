@@ -10,6 +10,18 @@ app_license = "MIT"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits open inside it. Frappe's
+	# "Default App" opens an app's first tile it shows. So Ophice is listed twice, and exactly one
+	# of the two shows: here, first, while the start-page switch (#2077, Cockpit Settings) is on;
+	# otherwise further down, so a site whose default app is already "phamos" keeps landing in the
+	# Personal Cockpit after this release (review of the release).
+	{
+		"name": "ophice",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_start_tile_permission",
+	},
 	{
 		"name": "personal_cockpit",
 		"logo": "/assets/phamos/manifest/personal-icon-192.png",
@@ -66,6 +78,30 @@ add_to_apps_screen = [
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
 	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
+	# Ophice while it is not the start page (see the first tile).
+	{
+		"name": "ophice_tile",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_tile_permission",
+	},
+	# Not a cockpit: opens the Desk workspace (#2028). "Open in Cockpit" (api.issue_cockpits) only
+	# takes tiles whose phamos.api.<name> module has a CockpitConfig, so it skips this one.
+	{
+		"name": "bookstack",
+		"logo": "/assets/phamos/manifest/bookstack-icon-192.png",
+		"title": "Bookstack",
+		"route": "/app/bookstack",
+		"has_permission": "phamos.bookstack_integration.api.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -99,7 +135,12 @@ app_include_js = [
 # Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
 # `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
 web_include_css = ["web_profile.bundle.css"]
-web_include_js = ["web_profile.bundle.js"]
+web_include_js = [
+	"web_profile.bundle.js",
+	# Phriend for Desk users on the website pages (#2104): a small loader; the ball loads only
+	# when the server says Phriend is for the user
+	"phriend_web.bundle.js",
+]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
@@ -146,6 +187,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/ophice", "to_route": "ophice"},
+    {"from_route": "/ophice/<path:app_path>", "to_route": "ophice"},
     {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
     {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
@@ -160,6 +203,8 @@ website_route_rules = [
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -258,11 +303,13 @@ after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
+	"phamos.setup.issue_assistant.after_migrate",  # Issue Assistant role, user, bot, agent, Customer switch (#2111)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
 # Uninstallation
@@ -383,7 +430,11 @@ doc_events = {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Issue": {
+		"on_update": "phamos.api.issue_chat.on_record_update",
+		# the Issue Assistant's first look at a new Issue, in the background (#2111)
+		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
+	},
 	"Task": {
 		"after_insert": "phamos.api.issue_chat.on_task_insert",
 		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
@@ -408,7 +459,10 @@ doc_events = {
     "Delivery Note": {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": [
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.clear_timesheet_stamps_on_delivery_note_cancel",
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        ],
     },
     # Event tickets: Attendee links and payment status (phamos.marketing.billing). Only on_change: it runs
     # once after every save, submit and cancel, and payments reach an invoice through db_set, which runs
@@ -449,7 +503,24 @@ doc_events = {
             "phamos.web_profile.mirror.push_to_profiles",
         ]
     },
-    "Implementation": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    # a published GitLab Release sets the planned Implementation Release to Released (#1986)
+    "GitLab Release": {
+        "on_update": "phamos.phamos.doctype.implementation_release.implementation_release.link_published_release",
+    },
+    "Implementation": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # direct edits of agreed plan values wait for the customer's confirmation (#1971)
+            "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        ],
+    },
+    "Implementation Release": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+    },
+    "Implementation Feature": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",
+    },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
     "Employee": {
         "on_update": [
@@ -503,6 +574,15 @@ doc_events = {
 # your_app/hooks.py
 
 fixtures = [
+    {"dt": "Role", "filters": [
+        [
+            "name", "in", [
+                "Bookstack User",
+                "Bookstack Manager",
+                "Ophice Map Editor",
+            ]
+        ]
+    ]},
     {"dt": "Scheduled Job Type", "filters": [
         [
             "name", "in", [
@@ -530,6 +610,10 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
+        # Phriend: rating questions for reports that went live (#2014)
+        "phamos.phriend.feedback.create_due_requests",
+        # Implementation Release: capacity shrinks every day, leave changes (#1986)
+        "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
@@ -565,6 +649,10 @@ scheduler_events = {
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
         ],
+        # Ophice: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
+        "* * * * *": [
+            "phamos.api.ophice.burn_due_encounters",
+        ],
         # Personal Cockpit: fix today's day plans that were never started (#1559).
         "0 10 * * *": [
             "phamos.api.personal_day_plan.freeze_day_plans",
@@ -597,6 +685,8 @@ override_doctype_dashboards = {
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
+    "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
+    "Lead": "phamos.custom_scripts.custom_python.lead_dashboard.get_lead_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
@@ -657,6 +747,8 @@ user_data_fields = [
 	},
 	{"doctype": "Idea Writing Session", "filter_by": "user"},
 	{"doctype": "Idea Vote", "filter_by": "user"},
+	# Phriend's rating questions and answers (#2014)
+	{"doctype": "Phriend Feedback", "filter_by": "user", "redact_fields": ["comment"]},
 ]
 
 # Authentication and authorization

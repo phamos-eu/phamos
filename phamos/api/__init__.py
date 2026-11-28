@@ -132,6 +132,22 @@ def update_customer_comment(ts_name, comment=None, custom_rating=None):
     }
 
 
+def _set_gitlab_urls_from_comment(ts, comment):
+    """Fill the Timesheet's GitLab child/parent URL columns from links in the comment.
+
+    Only empty columns are filled. Links are classified via the synced GitLab Issue.
+    """
+    from phamos.phamos.page.project_action_panel.project_action_panel import _find_gitlab_issues_in_text
+
+    child_issue, parent_issue = _find_gitlab_issues_in_text(comment)
+
+    if child_issue and not ts.custom_gitlab_child_issue_url:
+        ts.db_set("custom_gitlab_child_issue_url", frappe.db.get_value("GitLab Issue", child_issue, "issue_url"))
+    if parent_issue and not ts.custom_gitlab_parent_issue_url:
+        ts.db_set("custom_gitlab_parent_issue_url", frappe.db.get_value("GitLab Issue", parent_issue, "issue_url"))
+
+
+
 def get_customer_for_user(user):
     # Server-side lookup: session may be unset during on_login hooks.
     contacts = frappe.get_all(
@@ -369,7 +385,7 @@ def get_customer_sales_order_status():
 
     implementation_names = [impl.name for impl in implementations]
 
-    # Get all OPEN sales orders for these implementations (matching Implementation doctype logic)
+    # Get all submitted sales orders for these implementations except cancelled.
     sales_orders = frappe.db.sql("""
         SELECT
             so.name,
@@ -386,7 +402,7 @@ def get_customer_sales_order_status():
         WHERE
             so.custom_implementation IN %(implementations)s
             AND so.docstatus = 1
-            AND so.status IN ('To Deliver and Bill', 'To Deliver', 'To Bill')
+            AND so.status != 'Cancelled'
         ORDER BY so.transaction_date DESC
     """, {"implementations": implementation_names}, as_dict=True)
 
@@ -412,8 +428,9 @@ def get_customer_sales_order_status():
         total_so_hrs += so.total_hrs or 0
         total_delivered_hrs += so.delivered_hrs or 0
 
-        # Count open sales orders (all fetched orders are open based on our query)
-        open_so_count += 1
+        # Count open sales orders only (exclude completed/closed from open bucket)
+        if so.status not in ("Completed", "Closed"):
+            open_so_count += 1
 
     # Calculate billable timesheet hours (not on delivery note) - matching Implementation doctype logic
     # Get projects for these implementations using SQL
