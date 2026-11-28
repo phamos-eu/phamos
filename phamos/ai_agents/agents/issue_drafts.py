@@ -4,21 +4,21 @@
 """Issue Assistant, e-mail drafts to the reporter (#2229).
 
 On request in the Issue chat (#2116) the assistant writes an e-mail draft to the reporter. A person
-reviews it on the Issue and presses Send; nothing goes out by itself (#1953 decision 4).
+reviews it on the Issue and sends it; nothing goes out by itself (#1953 decision 4).
 
 The draft is a Communication marked `custom_draft`. It is **not linked to the Issue while it is a
 draft** (`custom_draft_issue` holds the Issue): a Communication linked to an Issue counts as a sent
 reply as soon as it is saved (Frappe's first response time, ERPNext's SLA), and it would show in the
-Issue's timeline as an e-mail. Send links it, makes it an e-mail and sends this same record through
-the Issue's Email Account, so the customer's answer comes back to the Issue.
+Issue's timeline as an e-mail.
 
-Staff can't open a Communication in Desk (write: System Manager only), so drafts are read and
-edited through the endpoints below, which check the Issue's permissions, and shown in a dialog on
-the Issue form.
+The chat's link opens the Issue with Frappe's usual e-mail dialog, filled from the draft (PM's local
+test 2026-11-28). It sends a new e-mail the standard way; the draft is deleted afterwards. Staff can't
+open a Communication in Desk (write: System Manager only), so drafts are read and discarded through
+the endpoints below, which check the Issue's permissions.
 
-Before Send a check in code blocks drafts that name another customer, contain another customer's
-e-mail domain, address or phone number, or go to a recipient outside this Issue's customer (#1953
-confidentiality).
+A check in code warns, without blocking, when the e-mail names another customer, contains another
+customer's e-mail domain, address or phone number, or goes to a recipient outside this Issue's
+customer (#1953 confidentiality; warn only, PM 2026-11-28).
 """
 
 import re
@@ -87,7 +87,7 @@ def draft_url(issue_name, draft):
 	return get_url(f"/app/issue/{issue_name}?draft={draft}")
 
 
-# --- reading and editing (Issue form) ------------------------------------------------------------
+# --- reading and discarding (Issue form) --------------------------------------------------------
 
 
 def _draft(name, ptype):
@@ -115,33 +115,13 @@ def get_drafts(issue):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_draft(name, subject=None, content=None, recipients=None, cc=None):
-	comm, issue = _draft(name, "write")
-	_apply_edits(comm, subject, content, recipients, cc)
-	comm.flags.skip_add_signature = True
-	comm.save(ignore_permissions=True)
-	return _as_dict(comm)
-
-
-@frappe.whitelist(methods=["POST"])
 def discard_draft(name):
 	comm, issue = _draft(name, "write")
 	frappe.delete_doc("Communication", comm.name, ignore_permissions=True)
 	return {"name": name, "discarded": 1}
 
 
-def _apply_edits(comm, subject, content, recipients, cc):
-	if subject is not None:
-		comm.subject = cstr(subject).strip()[:140]
-	if content is not None:
-		comm.content = content
-	if recipients is not None:
-		comm.recipients = cstr(recipients).strip()
-	if cc is not None:
-		comm.cc = cstr(cc).strip() or None
-
-
-# --- the check and Send --------------------------------------------------------------------------
+# --- the check --------------------------------------------------------------------------
 
 
 def _emails(text):
@@ -153,7 +133,7 @@ def _digits(text):
 
 
 def confidentiality_problems(comm, issue):
-	"""What stops this draft from going to this Issue's customer: [message], empty when it may go."""
+	"""What speaks against this e-mail going to this Issue's customer: [message], empty when nothing."""
 	from phamos.ai_agents.agents.issue import customer_of
 
 	customer = customer_of(issue)
@@ -222,34 +202,8 @@ def _other_customer_phones(customer):
 
 
 @frappe.whitelist(methods=["POST"])
-def send_draft(name, subject=None, content=None, recipients=None, cc=None):
-	"""Send the draft after the check: it becomes an e-mail on the Issue, sent by the session user."""
-	comm, issue = _draft(name, "write")
-	_apply_edits(comm, subject, content, recipients, cc)
-	problems = confidentiality_problems(comm, issue)
-	if problems:
-		frappe.throw("<br>".join(escape_html(p) for p in problems), title=_("Not sent"))
-
-	from frappe.utils import get_fullname
-	from frappe.utils.data import get_string_between
-	from frappe.email.email_body import get_message_id
-
-	user = frappe.session.user
-	in_reply_to = frappe.db.get_value("Communication", {"reference_doctype": "Issue", "reference_name": issue.name,
-		"sent_or_received": "Received", "communication_medium": "Email"}, "name", order_by="creation desc")
-	comm.update({
-		DRAFT_FIELD: 0,
-		"communication_medium": "Email",
-		"reference_doctype": "Issue",
-		"reference_name": issue.name,
-		"sender": frappe.db.get_value("User", user, "email") or user,
-		"sender_full_name": get_fullname(user),
-		"user": user,
-		"message_id": get_string_between("<", get_message_id(), ">"),
-		"in_reply_to": in_reply_to,
-	})
-	comm.save(ignore_permissions=True)  # adds the sender's signature; the Issue sees a sent reply now
-	if not comm.get_outgoing_email_account():
-		frappe.throw(_("No outgoing Email Account for this Issue. Set one up first."), exc=frappe.OutgoingEmailError)
-	comm.send_email()
-	return {"name": comm.name, "sent": 1}
+def check_email(issue, subject=None, content=None, recipients=None, cc=None):
+	"""Warnings for an e-mail on this Issue as written in the e-mail dialog: [message], empty when fine."""
+	doc = frappe.get_doc("Issue", issue)
+	doc.check_permission("read")
+	return confidentiality_problems(frappe._dict(subject=subject, content=content, recipients=recipients, cc=cc), doc)

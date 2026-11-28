@@ -1016,37 +1016,24 @@ class TestDrafts(ChatTestCase):
 			"reference_name": doc.name, "sent_or_received": "Sent"}))
 		self.assertFalse(frappe.db.get_value("Issue", doc.name, "first_responded_on"))
 
-	def test_send_links_and_sends_the_same_record(self):
+	def test_check_warns_about_another_customer_or_a_foreign_recipient(self):
 		doc, draft, _reply = self.draft_via_chat()
 		self.addCleanup(frappe.set_user, "Administrator")
 		frappe.set_user(self.CHAT_USER)
-		with patch("frappe.core.doctype.communication.communication.Communication.send_email") as send, \
-				patch("frappe.core.doctype.communication.communication.Communication.get_outgoing_email_account",
-					return_value=frappe._dict(name="x")):
-			self.drafts.send_draft(draft)
-		send.assert_called_once()
-		comm = frappe.get_doc("Communication", draft)
-		self.assertEqual((comm.custom_draft, comm.reference_doctype, comm.reference_name, comm.communication_medium),
-			(0, "Issue", doc.name, "Email"))
+		reporter = self.drafts.reporter_email(doc)
+		self.assertEqual(self.drafts.check_email(doc.name, "Ihre Anfrage", "<p>Hallo</p>", reporter), [])
+		problems = self.drafts.check_email(doc.name, "Ihre Anfrage",
+			f"<p>Wie bei {self.OTHER} ist das bekannt.</p>", reporter)
+		self.assertTrue(any(self.OTHER in p for p in problems), problems)
+		problems = self.drafts.check_email(doc.name, "Ihre Anfrage", "<p>Hallo</p>", "someone@elsewhere.example")
+		self.assertTrue(any("someone@elsewhere.example" in p for p in problems), problems)
 
-	def test_send_needs_write_on_the_issue(self):
+	def test_check_needs_read_on_the_issue(self):
 		doc, draft, _reply = self.draft_via_chat()
 		self.addCleanup(frappe.set_user, "Administrator")
 		frappe.set_user(WEBSITE_USER)
 		with self.assertRaises(frappe.PermissionError):
-			self.drafts.send_draft(draft)
-
-	def test_another_customer_or_foreign_recipient_blocks_sending(self):
-		doc, draft, _reply = self.draft_via_chat(body=f"Wie bei {self.OTHER} ist das ein bekanntes Problem.")
-		self.addCleanup(frappe.set_user, "Administrator")
-		frappe.set_user(self.CHAT_USER)
-		with patch("frappe.core.doctype.communication.communication.Communication.send_email") as send:
-			with self.assertRaises(frappe.ValidationError):
-				self.drafts.send_draft(draft)
-			with self.assertRaises(frappe.ValidationError):
-				self.drafts.send_draft(draft, content="<p>Hallo</p>", recipients="someone@elsewhere.example")
-		send.assert_not_called()
-		self.assertEqual(frappe.db.get_value("Communication", draft, "custom_draft"), 1)
+			self.drafts.check_email(doc.name, "x", "<p>x</p>", "a@b.example")
 
 	def test_discard_deletes_the_draft(self):
 		doc, draft, _reply = self.draft_via_chat()
