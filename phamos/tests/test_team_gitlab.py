@@ -148,7 +148,7 @@ class TestSla(TeamGitlabTestCase):
 	def test_figures_of_the_teams_issues(self):
 		frappe.db.set_single_value("Support Settings", "track_service_level_agreement", 1)
 
-		def issue(team, responded, response_by, status=None):
+		def issue(team, responded, response_by, status=None, resolved=None, resolution_by=None):
 			name = frappe.get_doc({"doctype": "Issue", "subject": "SLA test", "custom_team": team}).insert(ignore_permissions=True).name
 			frappe.db.set_value(
 				"Issue",
@@ -159,15 +159,20 @@ class TestSla(TeamGitlabTestCase):
 					"first_response_time": 7200,
 					"opening_date": "2026-03-02",
 					"agreement_status": status,
+					"sla_resolution_date": resolved,
+					"sla_resolution_by": resolution_by,
 				},
 				update_modified=False,
 			)
 
-		issue(TEAM_A, "2026-03-02 10:00:00", "2026-03-02 12:00:00", "Fulfilled")
-		issue(TEAM_A, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed")
-		issue(None, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed")
+		issue(TEAM_A, "2026-03-02 10:00:00", "2026-03-02 12:00:00", "Fulfilled", "2026-03-04 10:00:00", "2026-03-05 10:00:00")
+		issue(TEAM_A, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed", "2026-03-06 10:00:00", "2026-03-05 10:00:00")
+		issue(None, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed", "2026-03-06 10:00:00", "2026-03-05 10:00:00")
+		# SLA without resolution tracking: ERPNext marks it Fulfilled at the first response while
+		# the Issue is still open, so it is a response but not a resolution
+		issue(TEAM_A, "2026-03-04 10:00:00", "2026-03-04 12:00:00", "Fulfilled")
 		sla = self.stats().sla["current"]
-		self.assertEqual((sla.responses, sla.first_response_hours, sla.responses_in_time), (2, 2.0, 50.0))
+		self.assertEqual((sla.responses, sla.first_response_hours, sla.responses_in_time), (3, 2.0, 66.7))
 		self.assertEqual((sla.resolutions, sla.resolutions_in_time), (2, 50.0))
 
 
