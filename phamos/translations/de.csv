@@ -3678,3 +3678,22 @@ Only the side that proposed it can withdraw it.,"Nur die Seite, die ihn vorgesch
 The customer,Der Kunde
 Choose a planned chapter of this implementation.,Wählen Sie ein geplantes Kapitel dieser Implementierung.
 Target Date must be after Planned Start.,Das Zieldatum muss nach dem geplanten Start liegen.
+No activity for {0} days,Seit {0} Tagen keine Aktivität
+First response missed,Erste Antwort verpasst
+First response due,Erste Antwort bald fällig
+Resolution missed,Lösung verpasst
+Resolution due,Lösung bald fällig
+and {0} more in the Team Cockpit,und {0} weitere im Team-Cockpit
+Needs attention since the last summary,Braucht Aufmerksamkeit seit der letzten Übersicht
+Needs attention,Braucht Aufmerksamkeit
+What lies around or misses its SLA,Was liegen bleibt oder sein SLA verpasst
+"Issues whose SLA is missed or due soon, and open Issues and Tasks of the team without activity for {0} days.","Issues, deren SLA verpasst oder bald fällig ist, und offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen."
+Open Issues and Tasks of the team without activity for {0} days.,Offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen.
+Nothing needs attention. Every open record of the team moved recently.,Nichts braucht Aufmerksamkeit. Jeder offene Datensatz des Teams hat sich zuletzt bewegt.
+Could not load what needs attention.,"Konnte nicht laden, was Aufmerksamkeit braucht."
+Not assigned,Nicht zugewiesen
+Needs attention: idle days,Braucht Aufmerksamkeit: Tage ohne Aktivität
+Needs attention: SLA due within hours,Braucht Aufmerksamkeit: SLA fällig innerhalb von Stunden
+Only the first {0} are shown.,Nur die ersten {0} werden gezeigt.
+Needs attention: morning summary in the team chat,Braucht Aufmerksamkeit: Morgenübersicht im Team-Chat
+Team Attention Notice,Team-Aufmerksamkeitshinweis
