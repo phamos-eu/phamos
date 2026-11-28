@@ -6,6 +6,7 @@ import { syncThemeFromMediaPreference } from "@spa/theme.js"
 import { createApp } from "vue"
 import { Button, Dialog, FeatherIcon, FormControl, frappeRequest, FrappeUI, setConfig, toast } from "frappe-ui"
 import App from "./App.vue"
+import { socketioOptions } from "@spa/utils/socketio.js"
 import router from "./router"
 import { session } from "@spa/session.js"
 import { i18n } from "@spa/utils/i18n.js"
@@ -15,7 +16,7 @@ syncThemeFromMediaPreference()
 
 const app = createApp(App)
 // FrappeUI also opens the realtime socket ($socket) that Ophice listens on.
-app.use(FrappeUI)
+app.use(FrappeUI, { socketio: socketioOptions(window.frappe?.boot) })
 app.use(router)
 app.use(i18n)
 

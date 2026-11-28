@@ -143,7 +143,7 @@ import { useRoute, useRouter } from "vue-router"
 import dayjs from "dayjs"
 import { TabButtons } from "frappe-ui"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
-import KpiStrip from "../components/KpiStrip.vue"
+import KpiStrip from "@spa/components/dashboard/KpiStrip.vue"
 import { __ } from "@spa/utils/i18n.js"
 import FeedbackDialog from "../components/FeedbackDialog.vue"
 import {

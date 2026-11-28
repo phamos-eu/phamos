@@ -11,12 +11,13 @@ import Issues from "./views/Issues.vue"
 import Links from "./views/Links.vue"
 import Features from "./views/Features.vue"
 import NoImplementation from "./views/NoImplementation.vue"
+import Roadmap from "./views/Roadmap.vue"
+import { planningRedirect } from "./utils/roadmapView.js"
 
 // Every page belongs to one implementation, so it is part of the URL: links into the cockpit
 // (report emails, GitLab) always open the right one (#1672).
 const sections = [
 	{ path: "milestones", name: "Milestones", issue: "#1679" },
-	{ path: "planning", name: "Planning", issue: "#1693, #1694" },
 	{ path: "team", name: "Team", label: "Contact & Team", issue: "#1684" },
 ]
 
@@ -40,6 +41,9 @@ const router = createRouter({
 		{ path: "/:implementation/features", name: "Features", component: Features, props: true },
 		// a feature opens in the side panel of the Features page, so the list or board stays in view
 		{ path: "/:implementation/features/:feature", name: "FeatureDetail", component: Features, props: true },
+		// Roadmap (#2035): modules, chapters and features over time; it replaced the Planning placeholder
+		{ path: "/:implementation/roadmap", name: "Roadmap", component: Roadmap, props: true },
+		{ path: "/:implementation/planning", redirect: planningRedirect },
 		...sections.map((s) => ({
 			path: `/:implementation/${s.path}`,
 			name: s.name,

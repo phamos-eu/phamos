@@ -2347,9 +2347,9 @@ Feature {0} is listed twice.,Feature {0} ist doppelt aufgeführt.
 Feature {0} is already planned in release {1}. Move it from there.,Feature {0} ist bereits in Release {1} geplant. Verschieben Sie es von dort.
 These milestones of its features are not in the release: {0},Diese Meilensteine seiner Features fehlen im Release: {0}
 Implementation Change,Planänderung
-Implementation Baseline,Planungsbasis
-Implementation Baseline Chapter,Planungsbasis Kapitel
-Implementation Baseline Feature,Planungsbasis Feature
+Implementation Baseline,Baseline
+Implementation Baseline Chapter,Baseline-Kapitel
+Implementation Baseline Feature,Baseline-Feature
 Change Type,Änderungsart
 Target Type,Zieltyp
 Old Values,Alte Werte
@@ -2361,7 +2361,7 @@ Agreed by Customer,Zugestimmt vom Kunden
 Decided On,Entschieden am
 Applied On,Angewendet am
 Dispute Reason,Grund des Widerspruchs
-Baseline Date,Datum der Planungsbasis
+Baseline Date,Baseline-Datum
 Snapshot,Momentaufnahme
 Proposed,Vorgeschlagen
 Applied – awaiting customer,Angewendet – wartet auf Kunden
@@ -2401,7 +2401,7 @@ Customer disputed,Kunde hat widersprochen
 Customer contact,Kundenkontakt
 Record the customer's confirmation,Bestätigung des Kunden erfassen
 Record the customer's dispute,Widerspruch des Kunden erfassen
-Implementation Baseline Release,Planungsbasis Release
+Implementation Baseline Release,Baseline-Release
 Ranking,Rangfolge
 The release's features in their agreed order.,Die Features des Releases in ihrer vereinbarten Reihenfolge.
 "A new ranking lists the same features as the release, in the new order.","Eine neue Rangfolge enthält dieselben Features wie das Release, in der neuen Reihenfolge."
@@ -2468,7 +2468,7 @@ The WIP limit (work in progress) is agreed with you. Fewer things at the same ti
 A feature is done when its agreed definition of done is met. Until then its progress comes from its closed GitLab issues or its level.,"Ein Feature ist fertig, wenn seine vereinbarte Definition of Done erfüllt ist. Bis dahin ergibt sich sein Fortschritt aus den geschlossenen GitLab-Issues oder seiner Stufe."
 Could not load the features,Die Features konnten nicht geladen werden
 Could not load the work breakdown,Der Projektstrukturplan konnte nicht geladen werden
-Drop {0}? After the baseline the customer confirms this as a scope change.,{0} streichen? Nach der Planungsbasis bestätigt der Kunde das als Umfangsänderung.
+Drop {0}? After the baseline the customer confirms this as a scope change.,{0} streichen? Nach der Baseline bestätigt der Kunde das als Umfangsänderung.
 Could not move the feature,Das Feature konnte nicht verschoben werden
 Without milestone,Ohne Meilenstein
 Level (current / target),Stufe (aktuell / Ziel)
@@ -2600,9 +2600,9 @@ A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
 Nothing planned yet,Noch nichts geplant
 On the critical path,Auf dem kritischen Pfad
-Baseline: {0} – {1},Planungsbasis: {0} – {1}
+Baseline: {0} – {1},Baseline: {0} – {1}
 GitLab milestone,GitLab-Meilenstein
-Against the baseline,Gegenüber der Planungsbasis
+Against the baseline,Gegenüber der Baseline
 +{0} d,+{0} T
 {0} d,{0} T
 {0} d late,{0} T zu spät
@@ -2675,6 +2675,36 @@ Stars,Sterne
 Times Put Off,Mal verschoben
 Live Since,Live seit
 Phriend Feedback,Phriend-Rückmeldung
+No module,Kein Modul
+Roadmap,Roadmap
+Weeks,Wochen
+Quarters,Quartale
+Compare with baseline,Mit Baseline vergleichen
+A baseline is set when the Planning meeting is submitted.,"Eine Baseline entsteht, wenn das Planungsmeeting gebucht wird."
+Propose a date change,Terminänderung vorschlagen
+{0} features,{0} Features
+"Nothing planned yet. Chapters and modules are planned in Desk, on the Implementation.","Noch nichts geplant. Kapitel und Module werden im Desk geplant, an der Implementation."
+1 chapter,1 Kapitel
+{0} chapters,{0} Kapitel
+Planned start,Geplanter Start
+Target date,Zieldatum
+Levels,Level
+Slack to the end date,Puffer bis zum Endtermin
+In a dependency loop,In einer Abhängigkeitsschleife
+On plan,Im Plan
+Added after the baseline,Nach der Baseline hinzugekommen
+Needed by,Gebraucht von
+This module is planned without a chapter. A chapter makes it plannable with dependencies and the critical path.,Dieses Modul ist ohne Kapitel geplant. Mit einem Kapitel wird es mit Abhängigkeiten und kritischem Pfad planbar.
+Late: {0},Verspätet: {0}
+Could not load the roadmap,Die Roadmap konnte nicht geladen werden
+L{0} → L{1},L{0} → L{1}
+"The roadmap shows when each module reaches which depth level, and which chapters decide the end date.","Die Roadmap zeigt, wann jedes Modul welches Tiefenlevel erreicht und welche Kapitel über den Endtermin entscheiden."
+"Each row is a module. A bar is a chapter: the work that takes the module from one level to the next. Levels 1 to 6 say how deep the module is in use, from first steps to fully running.","Jede Zeile ist ein Modul. Ein Balken ist ein Kapitel: die Arbeit, die das Modul von einem Level zum nächsten bringt. Die Level 1 bis 6 sagen, wie tief das Modul genutzt wird, von den ersten Schritten bis zum vollen Betrieb."
+"The critical path is the chain of chapters that decides the end date. Its bars have a red border: if one of them is late, the end date moves.","Der kritische Pfad ist die Kette von Kapiteln, die über den Endtermin entscheidet. Ihre Balken haben einen roten Rand: Verspätet sich eines davon, verschiebt sich der Endtermin."
+Slack is how many days a chapter can slip before it delays the end date. Late means it already does.,"Der Puffer sagt, um wie viele Tage sich ein Kapitel verschieben kann, bevor es den Endtermin verzögert. „Zu spät“ heißt, es tut das schon."
+"The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
+"Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
+Target level reached,Ziellevel erreicht
 Results for “{0}”,Ergebnisse für „{0}“
 Search only for “{0}”,Nur nach „{0}“ suchen
 The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
@@ -2695,6 +2725,7 @@ This chat has ended.,Dieser Chat ist beendet.
 {0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
 Nobody to chat with here.,Hier ist niemand zum Chatten.
 Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
+"This space has its own meeting: use its call and chat.","Dieser Bereich hat sein eigenes Meeting: Nutzen Sie dessen Anruf und Chat."
 Write something first.,Schreiben Sie zuerst etwas.
 A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
 Esc to close,Esc zum Schließen
@@ -2731,13 +2762,13 @@ Meeting areas,Besprechungsbereiche
 "Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
 Standup,Standup
 Jitsi meeting URL,Jitsi-Besprechungs-URL
-"Whoever stops inside the area joins this meeting, with microphone and camera off.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit ausgeschaltetem Mikrofon und ausgeschalteter Kamera."
+"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
 The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
 The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
 Meeting {0},Besprechung {0}
 Leave the meeting,Besprechung verlassen
 Leave (Esc),Verlassen (Esc)
-"The meeting URL must start with https://, for example https://meet.jit.si/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.jit.si/OurStandup."
+"The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.systemli.org/OurStandup."
 Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} verwendet werden.
 "The meeting URL needs a room name after the server, for example /OurStandup.","Die Besprechungs-URL braucht nach dem Server einen Raumnamen, zum Beispiel /OurStandup."
 Give the area a name.,Geben Sie dem Bereich einen Namen.
@@ -3036,3 +3067,248 @@ End {0}'s visit?,Besuch von {0} beenden?
 Send out,Hinausschicken
 Send out of Ophice,Aus dem Ophice schicken
 {0} has left Ophice.,{0} hat das Ophice verlassen.
+"Fly there. Hold {0} for: Fly or Beam",Hinfliegen. {0} gedrückt halten für: Fliegen oder Beamen
+Fly,Fliegen
+with wings,mit Flügeln
+Beam,Beamen
+at once,sofort
+Meeting point,Treffpunkt
+Set a meeting point for the two of you,Einen Treffpunkt für Sie beide setzen
+Meeting point of {0}: click to fly there,Treffpunkt von {0}: zum Hinfliegen klicken
+Your meeting point,Ihr Treffpunkt
+Meeting point · {0},Treffpunkt · {0}
+"Remove the meeting point, for everyone","Treffpunkt entfernen, für alle"
+Click on the map where you want to meet · Esc to cancel,"Klicken Sie auf die Karte, wo Sie sich treffen möchten · Esc zum Abbrechen"
+Set a meeting point for you and the people selected,Einen Treffpunkt für Sie und die ausgewählten Personen setzen
+Clear the selection (Esc),Auswahl aufheben (Esc)
+Not on the map right now.,Gerade nicht auf der Karte.
+The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
+{0} set a meeting point,{0} hat einen Treffpunkt gesetzt
+Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
+Call window,Anruffenster
+Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
+AI processing allowed,KI-Verarbeitung erlaubt
+Issue Assistant Settings,Einstellungen Anfrage-Assistent
+Assistant User,Assistent-Benutzer
+Excluded Pages,Ausgeschlossene Seiten
+First look at {0},Erster Blick auf {0}
+Sender: {0},Absender: {0}
+Phriend report forwarded from {0},"Phriend-Meldung, weitergeleitet von {0}"
+Created in ERPNext,In ERPNext angelegt
+AI model not used: reported from a sensitive page ({0}).,KI-Modell nicht genutzt: gemeldet von einer sensiblen Seite ({0}).
+AI model not used: AI processing is not allowed for customer {0}.,KI-Modell nicht genutzt: KI-Verarbeitung ist für Kunde {0} nicht erlaubt.
+AI model not used: the sender is not known as a customer or a phamos user.,KI-Modell nicht genutzt: Der Absender ist weder als Kunde noch als phamos-Benutzer bekannt.
+AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt werden: Kunde {0} erlaubt KI-Verarbeitung.
+AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
+The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
+AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
+Test settings,Testeinstellungen
+Remove background,Hintergrund entfernen
+Unfold the sidebar: names and descriptions,Seitenleiste aufklappen: Namen und Beschreibungen
+Fold the sidebar to icons,Seitenleiste auf Symbole zuklappen
+"Be right back, or away until a time. Shown above your chip.","Gleich zurück, oder abwesend bis zu einer Uhrzeit. Wird über Ihrem Chip angezeigt."
+Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröße von Ophice und den Cockpits darin. Die Karte hat ihren eigenen Zoom.
+"Drag on the map to draw an area, click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Upload an image as the background of Ophice, for everyone.","Ein Bild als Hintergrund von Ophice hochladen, für alle."
+"Size and position of the background image, the grid's size and everyone's starting zoom.","Größe und Position des Hintergrundbilds, die Größe des Rasters und der Start-Zoom für alle."
+"Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
+"Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
+Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
+{0} wants to chat,{0} möchte mit Ihnen chatten
+Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
+Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
+Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
+to close,zum Schließen
+Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
+"Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
+Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Allow chat notifications,Chat-Benachrichtigungen erlauben
+Chat notifications on,Chat-Benachrichtigungen an
+Chat sound on,Chat-Ton an
+Chat notifications muted,Chat-Benachrichtigungen stumm
+Dock in the corner,In der Ecke andocken
+Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
+AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
+Started by hand by {0} (manual override).,Von Hand gestartet von {0} (manueller Override).
+Started by hand by {0}.,Von Hand gestartet von {0}.
+Automatic start,Automatischer Start
+AI model,KI-Modell
+Issue Assistant switched on,Issue-Assistent eingeschaltet
+Issue Assistant Settings: tick Enabled,Issue Assistant Settings: Aktiviert ankreuzen
+AI Agent for Issues enabled,KI-Agent für Anfragen aktiviert
+AI Agent {0}: tick Enabled,KI-Agent {0}: Aktiviert ankreuzen
+Run bench migrate to create the AI Agent,"bench migrate ausführen, um den KI-Agenten anzulegen"
+Project in scope,Projekt im Geltungsbereich
+Project on the Issue: one of {0},Projekt der Anfrage: eines von {0}
+Issue Type in scope,Anfragetyp im Geltungsbereich
+Issue Type on the Issue: one of {0},Anfragetyp der Anfrage: einer von {0}
+Not reported from a sensitive page,Nicht von einer sensiblen Seite gemeldet
+no page,keine Seite
+A report from a page other than {0},Eine Meldung von einer anderen Seite als {0}
+Customer allows AI processing,Kunde erlaubt KI-Verarbeitung
+Customer {0}: tick {1} (signed AVV),Kunde {0}: {1} ankreuzen (unterschriebener AVV)
+Internal Issue or known customer,Interne Anfrage oder bekannter Kunde
+"no Customer, created by {0}","kein Kunde, erstellt von {0}"
+"A Customer on the Issue (directly, via Implementation or Project) with AI processing allowed, or the Issue created by a phamos Desk user while logged in","Ein Kunde an der Anfrage (direkt, über Implementation oder Projekt) mit erlaubter KI-Verarbeitung, oder die Anfrage von einem angemeldeten phamos-Desk-Benutzer erstellt"
+Run Issue Assistant,Issue-Assistent starten
+Start anyway,Trotzdem starten
+The Issue Assistant is already working on this Issue.,Der Issue-Assistent arbeitet bereits an dieser Anfrage.
+The Issue Assistant could not start ({0}).,Der Issue-Assistent konnte nicht starten ({0}).
+Issue Assistant started (manual override),Issue-Assistent gestartet (manueller Override)
+Issue Assistant started,Issue-Assistent gestartet
+Would start automatically for a new Issue,Würde bei einer neuen Anfrage automatisch starten
+May use the AI model,Darf das KI-Modell nutzen
+The automatic start runs only when an Issue is created. Starting here always works; past a red check it is recorded as a manual override.,"Der automatische Start läuft nur, wenn eine Anfrage angelegt wird. Hier starten geht immer; an einer roten Prüfung vorbei wird es als manueller Override festgehalten."
+Needed to pass,Nötig zum Bestehen
+Last run,Letzter Lauf
+Manual Override,Manueller Override
+Override Reasons,Override-Gründe
+Started by hand although the automatic start or the AI gate would not have run it.,"Von Hand gestartet, obwohl der automatische Start oder die KI-Prüfung ihn nicht ausgeführt hätte."
+The checks the manual start went past.,"Die Prüfungen, an denen der manuelle Start vorbeiging."
+AI Agent Run {0} not found.,KI-Agenten-Lauf {0} nicht gefunden.
+The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}).
+Issue Assistant finished,Issue-Assistent fertig
+Issue Assistant failed,Issue-Assistent fehlgeschlagen
+"Issue Assistant: {0}",Issue-Assistent: {0}
+AI model not used: the gate did not allow it.,KI-Modell nicht genutzt: Die Prüfung hat es nicht erlaubt.
+AI model {0} read the Issue.,KI-Modell {0} hat die Anfrage gelesen.
+account manager of {0},Account Manager von {0}
+user with permission on {0},Benutzer mit Berechtigung auf {0}
+internal stakeholder of {0},interner Stakeholder von {0}
+member of project {0},Mitglied im Projekt {0}
+worked on recent Issues of {0},hat an letzten Anfragen von {0} gearbeitet
+AI model not available: {0},KI-Modell nicht verfügbar: {0}
+Missing: {0},Fehlt: {0}
+{0} set to {1}: {2},{0} auf {1} gesetzt: {2}
+{0}: suggests {1} instead of {2}: {3},{0}: schlägt {1} statt {2} vor: {3}
+Assigned {0}: {1},{0} zugewiesen: {1}
+Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
+The screenshot was read too.,Der Screenshot wurde mitgelesen.
+"the model call failed ({0})",der Aufruf des Modells ist fehlgeschlagen ({0})
+Identified: {0},Erkannt: {0}
+nothing set,nichts gesetzt
+Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: Mitarbeiter {0} (nur nach E-Mail-Adresse)
+{0} set: {1},{0} gesetzt: {1}
+Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
+(ERPNext picked {0}),(ERPNext hat {0} gewählt)
+No Implementation,Keine Implementierung
+Set the Implementation on this Issue first. The GitLab project is taken from it.,Setzen Sie zuerst die Implementierung an dieser Anfrage. Das GitLab-Projekt wird daraus übernommen.
+No GitLab Project,Kein GitLab-Projekt
+GitLab Project,GitLab-Projekt
+No GitLab Project is linked to Implementation {0}. Link one in {1} first.,Mit der Implementierung {0} ist kein GitLab-Projekt verknüpft. Verknüpfen Sie zuerst eines unter {1}.
+GitLab Project {0} does not belong to Implementation {1},GitLab-Projekt {0} gehört nicht zur Implementierung {1}
+Implementation {0} has several GitLab Projects. Choose one.,Die Implementierung {0} hat mehrere GitLab-Projekte. Wählen Sie eines aus.
+Save the Issue first.,Speichern Sie zuerst die Anfrage.
+Not available right now.,Gerade nicht erreichbar.
+Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
+"Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
+Idea saved,Idee gespeichert
+Does it belong to an existing idea?,Gehört sie zu einer bestehenden Idee?
+Close in meaning,Inhaltlich nah
+Grew out of it,Daraus entstanden
+Add to it,Dort ergänzen
+What's the idea?,Was ist die Idee?
+Search my ideas,Meine Ideen durchsuchen
+1 idea waiting to send,1 Idee wartet auf Versand
+{0} ideas waiting to send,{0} Ideen warten auf Versand
+Kept on this phone. It is sent when you are online again.,"Auf diesem Telefon gespeichert. Sie wird gesendet, sobald Sie wieder online sind."
+Very close,Sehr nah
+Related,Verwandt
+Far,Fern
+No idea matches.,Keine Idee passt.
+No other ideas yet.,Noch keine anderen Ideen.
+Looking for close ideas …,Suche nach ähnlichen Ideen …
+Nothing close found.,Nichts Ähnliches gefunden.
+Linked: grew out of {0},Verknüpft: entstanden aus {0}
+Added to {0},Ergänzt in {0}
+No connection. The idea is saved; link it later in the Personal Cockpit.,Keine Verbindung. Die Idee ist gespeichert; verknüpfen Sie sie später im Personal Cockpit.
+Only colleagues can catch ideas.,Nur Kolleginnen und Kollegen können Ideen festhalten.
+Write or dictate your idea first.,Schreiben oder diktieren Sie zuerst Ihre Idee.
+Unknown link: {0},Unbekannte Verknüpfung: {0}
+Added {0},Ergänzt am {0}
+Idea suggestions failed,Ideen-Vorschläge fehlgeschlagen
+The AI could not be asked. Search instead.,Die KI konnte nicht gefragt werden. Bitte suchen Sie stattdessen.
+Suggest Related Ideas with AI,Verwandte Ideen per KI vorschlagen
+{0} already grew out of this idea.,{0} ist bereits aus dieser Idee entstanden.
+This idea has its own history. Link it instead of adding it.,"Diese Idee hat eine eigene Geschichte. Verknüpfen Sie sie, statt sie zu ergänzen."
+That is too long for a quick idea. Write it out in the Personal Cockpit.,Das ist zu lang für eine schnelle Idee. Schreiben Sie sie im Personal Cockpit aus.
+Sign in to send {0},"Anmelden, um {0} zu senden"
+"Stays its own idea, linked to this one.","Bleibt eine eigene Idee, verknüpft mit dieser."
+"Your text goes to the bottom of this idea, with date and time.","Ihr Text kommt unten an diese Idee, mit Datum und Uhrzeit."
+Grew out of this idea,Aus dieser Idee entstanden
+{0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."
+Install app,App installieren
+"Add to your Home Screen: tap Share, then 'Add to Home Screen'.","Zum Home-Bildschirm hinzufügen: auf Teilen tippen, dann „Zum Home-Bildschirm“."
+Too late to undo. Change the idea in the Personal Cockpit instead.,Zu spät zum Rückgängigmachen. Ändern Sie die Idee stattdessen im Personal Cockpit.
+"{0} was changed in the meantime, so this cannot be undone.","{0} wurde inzwischen geändert, daher lässt sich das nicht rückgängig machen."
+Team Assignment,Teamzuordnung
+Co-Lead,Co-Lead
+Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
+Change membership through Team Assignment.,Die Mitgliedschaft wird über die Teamzuordnung geändert.
+"Change membership through Team Assignment. Weekly capacity comes from Weekly Working Hours, or the Employment Contract.","Die Mitgliedschaft wird über die Teamzuordnung geändert. Die Wochenkapazität kommt aus den Wochenarbeitszeiten oder dem Arbeitsvertrag."
+"Who is in which team, and when. The Team's lead, co-lead and member table follow the assignments open today.","Wer wann in welchem Team ist. Teamleitung, Co-Leitung und Mitgliedertabelle des Teams folgen den heute offenen Zuordnungen."
+The end date of a team assignment cannot be before its start date.,Das Enddatum einer Teamzuordnung darf nicht vor ihrem Startdatum liegen.
+{0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.,"{0} ist in diesem Zeitraum bereits Team {1} zugeordnet ({2}). Immer nur ein Team: Beenden Sie zuerst diese Zuordnung."
+Team {0} already has a {1} in this period ({2}).,Team {0} hat in diesem Zeitraum bereits eine Rolle {1} ({2}).
+"The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.","Die Zuordnung ist gespeichert, aber Team {0} konnte nicht aktualisiert werden. Der tägliche Job versucht es erneut; siehe Fehlerprotokoll."
+Implementation switched on for the assistant,Implementierung für den Assistenten eingeschaltet
+no Implementation found,keine Implementierung gefunden
+User Permission of {0} on Implementation {1},Benutzerberechtigung von {0} auf Implementierung {1}
+An Implementation on the Issue that the assistant is switched on for,"Eine Implementierung an der Anfrage, für die der Assistent eingeschaltet ist"
+Switched on for,Eingeschaltet für
+Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführen, damit der Benutzer des Assistenten angelegt wird."
+None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
+"The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
+Switch Implementations on or off,Implementierungen ein- oder ausschalten
+Switch an Implementation on,Implementierung einschalten
+applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.
+Actual hours per month; the line is the predicted hours per month,Ist-Stunden pro Monat; die Linie zeigt die geplanten Stunden pro Monat
+Billable rate,Abrechenbare Quote
+Billable · non-billable,Abrechenbar · nicht abrechenbar
+"Billable, non-billable customer work and internal hours; the line below each month is the booked rate.",Abrechenbare und nicht abrechenbare Kundenarbeit sowie interne Stunden; unter jedem Monat steht die Buchungsquote.
+Booked rate,Buchungsquote
+Could not load the implementations.,Die Implementierungen konnten nicht geladen werden.
+Could not load the statistics.,Die Statistik konnte nicht geladen werden.
+Health,Zustand
+Hours on this project count as internal in the Team Cockpit's statistics.,Stunden auf diesem Projekt zählen in der Statistik des Team-Cockpits als intern.
+Hours per FTE,Stunden pro VZÄ
+Hours this month,Stunden in diesem Monat
+Is Internal Project,Internes Projekt
+Last 6 months,Letzte 6 Monate
+Level {0},Stufe {0}
+Loading implementations…,Implementierungen werden geladen…
+Loading statistics…,Statistik wird geladen…
+Logged / available,Gebucht / verfügbar
+Logged against available hours,Gebuchte gegenüber verfügbaren Stunden
+Logged hours — 12 months,Gebuchte Stunden – 12 Monate
+"Maturity level, forecast and trend","Reifegrad, Prognose und Trend"
+Members this month,Mitglieder in diesem Monat
+No hours to show.,Keine Stunden vorhanden.
+No limit,Kein Limit
+No open implementation belongs to this team.,Zu diesem Team gehört keine offene Implementierung.
+Non-billable customer work,Nicht abrechenbare Kundenarbeit
+Open implementations,Offene Implementierungen
+Over their time limit,Über dem Zeitlimit
+Predicted per month,Geplant pro Monat
+Predicted: {0} h per month,Geplant: {0} h pro Monat
+Show member hours to team leads,Stunden der Mitglieder für Teamleitungen anzeigen
+Sold · delivered · left,Verkauft · geliefert · offen
+Sold · delivered · remaining hours,Verkaufte · gelieferte · verbleibende Stunden
+Sorted by name. Rates against each person's available hours after leave and holidays.,Nach Name sortiert. Quoten bezogen auf die verfügbaren Stunden jeder Person nach Urlaub und Feiertagen.
+Team leads and co-leads see logged and available hours of each member on the Team Cockpit's Statistics page. Members always see their own. Switch on only after the privacy owner has confirmed it (#1975).,"Teamleitung und Co-Leitung sehen auf der Statistikseite des Team-Cockpits die gebuchten und verfügbaren Stunden jedes Mitglieds. Mitglieder sehen immer ihre eigenen. Erst einschalten, wenn die Datenschutzverantwortliche Person es bestätigt hat (#1975)."
+"The team's implementations, in hours","Die Implementierungen des Teams, in Stunden"
+"Year to date: {0} h logged, booked rate {1}","Seit Jahresbeginn: {0} h gebucht, Buchungsquote {1}"
+Your hours this month,Ihre Stunden in diesem Monat
+from the 3-month prediction,aus der 3-Monats-Planung
+of logged hours,der gebuchten Stunden
+of {0} with a limit,von {0} mit Limit
+so far,bisher
+"so far, all implementations","bisher, alle Implementierungen"
+vs last year,ggü. Vorjahr
+vs {0},ggü. {0}
+{0} of {1} at target,{0} von {1} am Ziel
+{0} of {1} h,{0} von {1} h
+"{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
+"{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"

@@ -14,6 +14,7 @@ import {
 	toast,
 } from "frappe-ui"
 import App from "./App.vue"
+import { socketioOptions } from "@spa/utils/socketio.js"
 import router from "./router"
 import { session } from "@spa/session.js"
 
@@ -21,7 +22,7 @@ setConfig("resourceFetcher", frappeRequest)
 syncThemeFromMediaPreference()
 
 const app = createApp(App)
-app.use(FrappeUI)
+app.use(FrappeUI, { socketio: socketioOptions(window.frappe?.boot) })
 app.use(router)
 
 app.component("Button", Button)
