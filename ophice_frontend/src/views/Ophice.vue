@@ -998,7 +998,7 @@ function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
 	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) {
 		// A finger on a chip does not pan, but it can pinch with a second finger (#2213).
-		if (event.pointerType === "touch") camera().onPointerDown(event, { pan: camera().isPressed() })
+		camera().onChipPointerDown(event)
 		return
 	}
 	camera().onPointerDown(event)
@@ -1068,6 +1068,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,

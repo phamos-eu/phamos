@@ -3193,6 +3193,14 @@ Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: 
 {0} set: {1},{0} gesetzt: {1}
 Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
 (ERPNext picked {0}),(ERPNext hat {0} gewählt)
+No Implementation,Keine Implementierung
+Set the Implementation on this Issue first. The GitLab project is taken from it.,Setzen Sie zuerst die Implementierung an dieser Anfrage. Das GitLab-Projekt wird daraus übernommen.
+No GitLab Project,Kein GitLab-Projekt
+GitLab Project,GitLab-Projekt
+No GitLab Project is linked to Implementation {0}. Link one in {1} first.,Mit der Implementierung {0} ist kein GitLab-Projekt verknüpft. Verknüpfen Sie zuerst eines unter {1}.
+GitLab Project {0} does not belong to Implementation {1},GitLab-Projekt {0} gehört nicht zur Implementierung {1}
+Implementation {0} has several GitLab Projects. Choose one.,Die Implementierung {0} hat mehrere GitLab-Projekte. Wählen Sie eines aus.
+Save the Issue first.,Speichern Sie zuerst die Anfrage.
 Not available right now.,Gerade nicht erreichbar.
 Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
 "Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
@@ -3255,3 +3263,13 @@ Take back my vote,Meine Stimme zurücknehmen
 This idea was changed elsewhere. Reload it to see the latest version.,"Diese Idee wurde anderswo geändert. Laden Sie sie neu, um die aktuelle Fassung zu sehen."
 Title is required,Titel ist erforderlich
 Up for vote,Zur Abstimmung
+Team Assignment,Teamzuordnung
+Co-Lead,Co-Lead
+Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
+Change membership through Team Assignment.,Die Mitgliedschaft wird über die Teamzuordnung geändert.
+"Change membership through Team Assignment. Weekly capacity comes from Weekly Working Hours, or the Employment Contract.","Die Mitgliedschaft wird über die Teamzuordnung geändert. Die Wochenkapazität kommt aus den Wochenarbeitszeiten oder dem Arbeitsvertrag."
+"Who is in which team, and when. The Team's lead, co-lead and member table follow the assignments open today.","Wer wann in welchem Team ist. Teamleitung, Co-Leitung und Mitgliedertabelle des Teams folgen den heute offenen Zuordnungen."
+The end date of a team assignment cannot be before its start date.,Das Enddatum einer Teamzuordnung darf nicht vor ihrem Startdatum liegen.
+{0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.,"{0} ist in diesem Zeitraum bereits Team {1} zugeordnet ({2}). Immer nur ein Team: Beenden Sie zuerst diese Zuordnung."
+Team {0} already has a {1} in this period ({2}).,Team {0} hat in diesem Zeitraum bereits eine Rolle {1} ({2}).
+"The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.","Die Zuordnung ist gespeichert, aber Team {0} konnte nicht aktualisiert werden. Der tägliche Job versucht es erneut; siehe Fehlerprotokoll."
