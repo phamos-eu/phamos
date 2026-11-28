@@ -27,6 +27,8 @@ const team = ref("")
 const teams = ref([])
 
 const navItems = [
+	// a short tile per page, the start page (#2236)
+	{ name: "TeamOverview", label: "Overview", icon: "home", match: ["TeamOverview"] },
 	// who is there and on what they work, live, with the team chat (#1978)
 	{ name: "TeamMates", label: "Team mates", icon: "users", match: ["TeamMates"] },
 	// appointments with leave and public holidays (#1979)
@@ -133,6 +135,7 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamIdeas") return "Ideas"
 	if (route.name === "TeamSuccesses") return "Successes"
 	if (route.name === "TeamAttention") return "Needs attention"
+	if (route.name === "TeamOverview") return "Overview"
 	return "Issues"
 })
 
@@ -160,6 +163,7 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamIdeas") return "Ideas shared with the team"
 	if (route.name === "TeamSuccesses") return "What the team achieved"
 	if (route.name === "TeamAttention") return "What lies around or misses its SLA"
+	if (route.name === "TeamOverview") return "The team today and this month"
 	return "Team issues overview"
 })
 </script>

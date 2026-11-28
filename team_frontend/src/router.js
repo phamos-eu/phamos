@@ -6,13 +6,21 @@ import TeamIdeas from "./views/TeamIdeas.vue"
 import TeamMates from "./views/TeamMates.vue"
 import TeamSuccesses from "./views/TeamSuccesses.vue"
 import TeamAttention from "./views/TeamAttention.vue"
+import TeamOverview from "./views/TeamOverview.vue"
 import TeamImplementations from "./views/TeamImplementations.vue"
 import TeamStatistics from "./views/TeamStatistics.vue"
 import spaConfig from "./config"
 
 export default createSpaRouter({
 	config: spaConfig,
+	// the cockpit opens on its Overview (#2236)
+	rootRedirect: "/overview",
 	routes: [
+		{
+			path: "/overview",
+			name: "TeamOverview",
+			component: TeamOverview,
+		},
 		{
 			path: "/checklists/home",
 			name: "ChecklistsHome",

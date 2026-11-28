@@ -899,3 +899,113 @@ def get_team_attention():
 			for i in items
 		],
 	}
+
+
+# --- Overview (#2236) --------------------------------------------------------------------------
+
+OVERVIEW_LIST_LENGTH = 3
+# the appointment fields the Overview needs to find the next occurrence (spa_shared appointments.js)
+OVERVIEW_APPOINTMENT_FIELDS = ("name", "subject", "location", "start", "end", "repeat_this_event", "repeat_on", "repeat_till")
+
+
+# the hours and GitLab figures are team totals, the same for everyone in the team, and costly: the
+# start page reuses them for a few minutes
+OVERVIEW_CACHE_SECONDS = 10 * 60
+
+
+def _overview_part(name, fn):
+	"""One tile's data. A tile that fails (no GitLab sync, ...) shows as missing and leaves an Error
+	Log; the other tiles still load."""
+	try:
+		return fn()
+	except Exception:
+		frappe.clear_messages()
+		frappe.log_error(title=f"Team Cockpit overview: {name} not loaded")
+		return None
+
+
+def _cached_team_figures(kind, team, fn):
+	key = f"team_overview:{kind}:{team}"
+	# expires=True: a key with an expiry must not be read through the request's local cache, which
+	# would remember a miss for the rest of the request
+	value = frappe.cache.get_value(key, expires=True)
+	if value is None:
+		value = fn()
+		frappe.cache.set_value(key, value, expires_in_sec=OVERVIEW_CACHE_SECONDS)
+	return value
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_overview():
+	"""The Team Cockpit's start page (#2236): a short summary of each page, each from the page's own
+	endpoint, so the same access rules apply. Team totals only; nothing per person beyond the team
+	mates' presence."""
+	from phamos.cockpits import appointments as appointment_logic
+
+	team = teams.require_active_team()
+	today = frappe.utils.today()
+
+	def mates():
+		rows = get_team_mates()["members"]
+		# presence only: what a team mate works on stays on the Team mates page
+		return [
+			{key: row.get(key) for key in ("employee", "employee_name", "image", "presence", "since", "focus")}
+			for row in rows
+		]
+
+	def appointments():
+		from phamos.cockpits.appointments import WEEKDAYS
+
+		rows = appointment_logic.list_appointments(_active_team_doc())
+		return [{key: row.get(key) for key in (*OVERVIEW_APPOINTMENT_FIELDS, *WEEKDAYS)} for row in rows]
+
+	def hours():
+		def compute():
+			totals = get_hours_statistics().windows["current"].totals
+			return {key: totals.get(key) for key in ("logged", "available", "booked_rate", "billable_rate")}
+
+		return _cached_team_figures("hours", team, compute)
+
+	def gitlab():
+		def compute():
+			data = get_gitlab_statistics()
+			current = data.windows["current"]
+			return {
+				"closed": current.closed_total,
+				"opened": current.opened_total,
+				"merged": data.merge_requests["current"].merged_total,
+			}
+
+		return _cached_team_figures("gitlab", team, compute)
+
+	def successes():
+		from phamos.cockpits import team_successes
+
+		rows = team_successes.list_successes(team, limit=OVERVIEW_LIST_LENGTH)
+		return [{key: row.get(key) for key in ("name", "success_type", "title", "date")} for row in rows]
+
+	def attention():
+		if not frappe.has_permission("Issue", "read"):
+			return None  # the page needs Issue rights; without them the tile is missing, not an error
+		data = get_team_attention()
+		# records only: who they are assigned to stays on the Needs attention page
+		return {
+			"count": len(data["items"]),
+			"truncated": data["truncated"],
+			"items": [
+				{key: item[key] for key in ("doctype", "name", "title", "kind", "detail")}
+				for item in data["items"][:OVERVIEW_LIST_LENGTH]
+			],
+		}
+
+	return {
+		"team": team,
+		"mates": _overview_part("team mates", mates),
+		"appointments": _overview_part("appointments", appointments),
+		"absences": _overview_part("absences", lambda: get_team_absences(today, today)),
+		"hours": _overview_part("hours", hours),
+		"gitlab": _overview_part("GitLab", gitlab),
+		"successes": _overview_part("successes", successes),
+		"attention": _overview_part("needs attention", attention),
+	}
