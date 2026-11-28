@@ -49,3 +49,37 @@ export function restyleDependencyArrows(gantt) {
 		arrow.path = path
 	}
 }
+
+const SVG_NS = "http://www.w3.org/2000/svg"
+
+/**
+ * Make each dependency arrow clickable (#2001): wrap it in a `g.dep-link` with a wide,
+ * invisible `path.dep-hit` on top, carrying `data-from` / `data-to` (Task names).
+ * Run after restyleDependencyArrows; frappe-gantt's render() drops both again.
+ */
+export function addArrowHitAreas(gantt) {
+	if (!gantt?.arrows?.length) return
+	for (const arrow of gantt.arrows) {
+		const el = arrow.element
+		const from = arrow.from_task?.task?.id
+		const to = arrow.to_task?.task?.id
+		if (!el?.parentNode || !from || !to) continue
+
+		let group = el.parentNode
+		if (!group.classList?.contains("dep-link")) {
+			group = document.createElementNS(SVG_NS, "g")
+			group.setAttribute("class", "dep-link")
+			el.parentNode.insertBefore(group, el)
+			group.appendChild(el)
+		}
+		let hit = group.querySelector("path.dep-hit")
+		if (!hit) {
+			hit = document.createElementNS(SVG_NS, "path")
+			hit.setAttribute("class", "dep-hit")
+			group.appendChild(hit)
+		}
+		hit.setAttribute("d", el.getAttribute("d") || "")
+		group.dataset.from = from
+		group.dataset.to = to
+	}
+}

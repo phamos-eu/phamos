@@ -1,0 +1,31 @@
+{
+	"id": "/team-cockpit",
+	"name": "Team Cockpit",
+	"short_name": "Team Cockpit",
+	"description": "Your team's issues, tasks and checklists",
+	"start_url": "/team-cockpit",
+	"scope": "/team-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#1d4ed8",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/team-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/team-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/team-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

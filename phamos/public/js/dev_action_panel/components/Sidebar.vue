@@ -16,7 +16,7 @@ const props = defineProps({
   projectElapsedSeconds: Number,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects", "open-session"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects", "open-session", "pause-session", "resume-session", "stop-session"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -88,6 +88,21 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
         <span class="sb__session-timer">{{ fmtElapsed(displayElapsed) }}</span>
       </div>
       <div class="sb__session-goal">{{ displaySession.goal }}</div>
+      <!-- Pause / Resume / Stop right here, without opening the card (.stop keeps the widget click off) -->
+      <div class="sb__session-actions" @click.stop @keydown.enter.stop>
+        <button v-if="isRunning" class="sb__sess-btn sb__sess-btn--pause" title="Pause" @click="emit('pause-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          Pause
+        </button>
+        <button v-else class="sb__sess-btn sb__sess-btn--resume" title="Resume" @click="emit('resume-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Resume
+        </button>
+        <button class="sb__sess-btn sb__sess-btn--stop" title="Stop and submit this timesheet" @click="emit('stop-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+          Stop
+        </button>
+      </div>
     </div>
 
     <!-- Issues filter: Mine / All -->
@@ -95,7 +110,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     <nav class="sb__nav">
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && mineOnly }"
         @click="selectIssueView(true)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -106,7 +121,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       </button>
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': !mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && !mineOnly }"
         @click="selectIssueView(false)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -233,6 +248,16 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 .sb__session-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: var(--blue-50, #eff6ff); color: var(--primary); border-radius: 3px; padding: 1px 5px; flex-shrink: 0; }
 .sb__session-timer { font-family: var(--font-monospace, monospace); font-size: 12.5px; font-weight: 700; color: var(--text-color); }
 .sb__session-goal { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb__session-actions { display: flex; gap: 6px; margin-top: 8px; cursor: default; }
+.sb__sess-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 4px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color);
+}
+.sb__sess-btn--pause  { color: var(--yellow-700, #a16207); border-color: var(--yellow-300, #fde047); }
+.sb__sess-btn--resume { color: var(--green-700, #15803d); border-color: var(--green-300, #86efac); }
+.sb__sess-btn--stop   { color: var(--red-600, #dc2626); border-color: var(--red-300, #fca5a5); }
+.sb__sess-btn:hover   { background: var(--control-bg); }
 
 /* Section label */
 .sb__section-label { padding: 14px 14px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); flex-shrink: 0; }

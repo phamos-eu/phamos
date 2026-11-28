@@ -371,3 +371,49 @@ class TestIssueAnalysis(FrappeTestCase):
 
         self.assertIn("phamos/timesheet_record.py", seen["code"])
         self.assertIn("create_timesheet_record_from_action_panel", seen["code"])
+
+    def test_standard_apps_keep_the_custom_app_major_version(self):
+        script = _ci_script()
+
+        def write(path, text):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(text)
+
+        with tempfile.TemporaryDirectory() as root:
+            custom = os.path.join(root, "custom")
+            apps = os.path.join(root, "apps")
+            write(os.path.join(custom, "phamos", "__init__.py"), "__version__ = '15.32.0'\n")
+            write(os.path.join(custom, "phamos", "hooks.py"), 'required_apps = ["erpnext", "hrms"]\n')
+            write(os.path.join(apps, "frappe", "frappe", "__init__.py"), "__version__ = '15.47.0'\n")
+            write(
+                os.path.join(apps, "frappe", "frappe", "timesheet.py"),
+                "def last_changed_by(timesheet):\n    return timesheet.modified_by\n",
+            )
+            write(os.path.join(apps, "erpnext", "erpnext", "__init__.py"), "__version__ = '16.0.0'\n")
+            write(
+                os.path.join(apps, "erpnext", "erpnext", "timesheet.py"),
+                "def last_changed_by_v16(timesheet):\n    return 'version 16'\n",
+            )
+            write(os.path.join(apps, "hrms", "hrms", "__init__.py"), "__version__ = '15.1.0'\n")
+            script._SOURCE_CACHE = None
+            with patch.dict(os.environ, {"AI_ISSUE_STD_APPS": apps, "AI_ISSUE_REPO": custom}):
+                matched = [name for name, _version, _path in script.matching_standard_apps(custom)]
+                code, kept = script.relevant_standard_code(
+                    "Timesheet last changed",
+                    "Who last changed the timesheet?",
+                    "",
+                    custom,
+                )
+        self.assertEqual(matched, ["frappe", "hrms"])
+        self.assertIn("frappe/timesheet.py", code)
+        self.assertIn("last_changed_by", code)
+        self.assertNotIn("last_changed_by_v16", code)
+        self.assertGreaterEqual(kept, 1)
+
+    def test_the_analysis_prompt_uses_the_functional_consultant(self):
+        script = _ci_script()
+        text = script.system_prompt("bug")
+        self.assertIn("# Senior Functional Consultant", text)
+        self.assertIn("This is a bug report", text)
+        self.assertNotIn("disable-model-invocation", text)

@@ -7,6 +7,7 @@ import { RequestError, call } from "./request";
 import { DRAFT_KEY, escape_html, storage_set } from "./util";
 
 const METHOD = "phamos.phriend.api.create_report";
+const TEST_METHOD = "phamos.phriend.api.add_test_evidence"; // a test result: a comment on a GitLab issue
 
 export class Sender {
 	constructor(phriend) {
@@ -28,21 +29,42 @@ export class Sender {
 		this.sending = report;
 		ball.set_pending(true);
 		ball.set_busy(true);
-		ball.say(escape_html(__("Sending…")), 0);
+		ball.say(escape_html(report.test ? __("Posting to GitLab…") : __("Sending…")), 0, "fingers_crossed");
 		try {
 			const args = report.args_value || (report.args_value = await report.args());
-			const result = await call(METHOD, args, host.csrf_token());
-			if (!result || !result.name) throw new RequestError("server", __("unexpected answer from the server"));
+			const result = await call(report.test ? TEST_METHOD : METHOD, args, host.csrf_token());
+			const ok = result && (report.test ? result.web_url : result.name);
+			if (!ok) throw new RequestError("server", __("unexpected answer from the server"));
 			this.sending = null;
 			storage_set(DRAFT_KEY, null, "session");
 			ball.set_pending(false);
 			ball.hop();
-			// a system with a target system sends the report there and gets that Issue's address back
-			const url = result.url || host.issue_url(result.name);
-			ball.say(
-				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>`,
-				8000
-			);
+			if (report.test) {
+				const status = result.status
+					? ` · ${escape_html(__("status now {0}", [result.status]))}`
+					: result.status_error
+						? `<br>${escape_html(__("The status was not changed: {0}", [result.status_error]))}`
+						: "";
+				ball.say(
+					`${escape_html(__("Posted to"))} <a href="${escape_html(result.web_url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.reference || result.web_url)}</a>${status}`,
+					result.status_error ? 0 : 10000,
+					result.status_error ? "point_up" : "thumbs_up"
+				);
+			} else {
+				// a system with a target system sends the report there and gets that Issue's address back
+				const url = result.url || host.issue_url(result.name);
+				// follow it where its status is shown, for users who may open the Implementation Cockpit (#1671)
+				const follow =
+					host.open_status && !result.url
+						? ` · <button type="button" class="link" data-follow>${escape_html(__("Follow its status"))}</button>`
+						: "";
+				ball.say(
+					`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>${follow}`,
+					follow ? 12000 : 8000,
+					"thumbs_up"
+				);
+				if (follow) this.phriend.bind_bubble_link("[data-follow]", () => host.open_status({ issue: result.name }));
+			}
 			this.phriend.refresh_badge();
 		} catch (error) {
 			const e = error instanceof RequestError ? error : new RequestError("server", error && error.message);
@@ -96,7 +118,7 @@ export class Sender {
 			forbidden: `${escape_html(__("You're not allowed to send Phriend reports."))} ${escape_html(error.message || "")} ${link("data-discard-report", __("Discard"))}`,
 			server: `${escape_html(__("Sending didn't work:"))} ${escape_html(String(error.message || __("unknown error")).replace(/[.\s]+$/, ""))}. ${kept} ${again} · ${edit}`,
 		}[error.kind];
-		const bubble = ball.say(text, 0);
+		const bubble = ball.say(text, 0, "point_up");
 		const on = (selector, callback) => {
 			const el = bubble.querySelector(selector);
 			if (el) el.addEventListener("click", callback);

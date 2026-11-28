@@ -3,15 +3,22 @@
  * calendar show the same days as the attendees' calendars. Mirrors _row_recurrence_rule in
  * phamos/events/team_daily_schedule.py:
  * - Daily, Weekly, Monthly, Yearly, until the end of `repeat_till` (inclusive)
- * - Weekly on the ticked weekdays, or the weekday of the start when none is ticked
+ * - Weekly on the ticked weekdays, or the weekday of the start when none is ticked. The start is
+ *   always the first appointment, also on a weekday that isn't ticked (Wolfram, 2026-11-19):
+ *   start Thursday, Monday and Wednesday ticked → Thu, Mon, Wed, Mon, …
+ *   The RRULE alone has no such occurrence; the invite adds the start as an RDATE
+ *   (_start_outside_rule in phamos/mailcow_integration/caldav/ics.py, #1991), so the attendees'
+ *   calendars show it too. Change both sides together.
  * - Monthly / Yearly on the start's day; months without that day are skipped (RFC 5545)
  * Kept free of Vue and the DOM so it can be unit-tested.
  */
 
 export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Yearly"]
-// Safety cap for the expansion loops (a daily repeat over 10 years is ~3650 steps).
+// Safety cap for the expansion loops. They start at the window, not at the first occurrence
+// (AI review of !1203), so this only limits how far one window reaches.
 const MAX_STEPS = 5000
+const DAY_MS = 86400000
 
 /** "2026-12-01 10:00:00" (site time, as Frappe sends it) -> local Date. */
 export function parseDateTime(value) {
@@ -42,6 +49,14 @@ export function weeklyDays(appointment) {
 	return start ? [weekdayIndex(start)] : []
 }
 
+/** A weekly repeat whose start is on a weekday that isn't ticked: the start is an extra first
+ * appointment before the ticked days (the dialog says so). */
+export function startOutsideWeeklyDays(appointment) {
+	if (repeatFrequency(appointment) !== "Weekly") return false
+	const start = parseDateTime(appointment.start)
+	return Boolean(start) && !weeklyDays(appointment).includes(weekdayIndex(start))
+}
+
 function repeatEnd(appointment) {
 	const until = parseDateTime(appointment.repeat_till)
 	if (!until) return null
@@ -62,8 +77,11 @@ function shiftMonths(start, months) {
 	return d.getDate() === start.getDate() ? d : null
 }
 
-/** Every occurrence start, in order, from the first one; stops after `limitDate` or `repeat_till`. */
-function* occurrenceStarts(appointment, limitDate) {
+/**
+ * Occurrence starts in order, from the first one that can end at or after `fromDate` (the loops
+ * jump there, one step early for daylight saving), up to `limitDate` or `repeat_till`.
+ */
+function* occurrenceStarts(appointment, fromDate, limitDate) {
 	const start = parseDateTime(appointment.start)
 	if (!start) return
 	const freq = repeatFrequency(appointment)
@@ -75,16 +93,25 @@ function* occurrenceStarts(appointment, limitDate) {
 	const stop = until && until < limitDate ? until : limitDate
 	const within = (d) => d <= stop
 
+	const behind = fromDate ? fromDate - start : 0
 	if (freq === "Daily") {
-		for (let i = 0; i < MAX_STEPS; i++) {
+		const first = Math.max(0, Math.floor(behind / DAY_MS) - 1)
+		for (let i = first; i < first + MAX_STEPS; i++) {
 			const d = addDays(start, i)
 			if (!within(d)) return
 			yield d
 		}
 	} else if (freq === "Weekly") {
 		const days = weeklyDays(appointment)
+		// The start comes first and is earlier than every ticked day after it (those before it
+		// are skipped below), so the order stays right.
+		if (!days.includes(weekdayIndex(start))) {
+			if (!within(start)) return
+			yield start
+		}
 		const weekStart = addDays(start, -weekdayIndex(start))
-		for (let w = 0; w < MAX_STEPS; w++) {
+		const first = Math.max(0, Math.floor((fromDate ? fromDate - weekStart : 0) / (7 * DAY_MS)) - 1)
+		for (let w = first; w < first + MAX_STEPS; w++) {
 			for (const day of days) {
 				const d = addDays(weekStart, w * 7 + day)
 				if (d < start) continue
@@ -94,7 +121,11 @@ function* occurrenceStarts(appointment, limitDate) {
 		}
 	} else {
 		const step = freq === "Monthly" ? 1 : 12
-		for (let i = 0; i < MAX_STEPS; i++) {
+		const monthsBehind = fromDate
+			? (fromDate.getFullYear() - start.getFullYear()) * 12 + fromDate.getMonth() - start.getMonth()
+			: 0
+		const first = Math.max(0, Math.floor(monthsBehind / step) - 1)
+		for (let i = first; i < first + MAX_STEPS; i++) {
 			const d = shiftMonths(start, i * step)
 			if (!d) continue
 			if (!within(d)) return
@@ -113,7 +144,8 @@ function duration(appointment) {
 export function occurrencesBetween(appointment, from, to) {
 	const length = duration(appointment)
 	const result = []
-	for (const start of occurrenceStarts(appointment, to)) {
+	// An occurrence that started before `from` can still overlap it by its length.
+	for (const start of occurrenceStarts(appointment, new Date(from.getTime() - length), to)) {
 		const end = new Date(start.getTime() + length)
 		if (end >= from && start <= to) result.push({ start, end })
 	}
@@ -123,7 +155,7 @@ export function occurrencesBetween(appointment, from, to) {
 /** The first occurrence that hasn't ended at `now`, or null when all are past. */
 export function nextOccurrence(appointment, now, horizonDays = 3660) {
 	const length = duration(appointment)
-	for (const start of occurrenceStarts(appointment, addDays(now, horizonDays))) {
+	for (const start of occurrenceStarts(appointment, new Date(now.getTime() - length), addDays(now, horizonDays))) {
 		const end = new Date(start.getTime() + length)
 		if (end >= now) return { start, end }
 	}

@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, weeklyDays } from "./appointments.js"
+import { listAppointments, nextOccurrence, occurrencesBetween, parseDateTime, startOutsideWeeklyDays, weeklyDays } from "./appointments.js"
 
 const day = (iso) => parseDateTime(iso)
 const starts = (list) =>
@@ -65,6 +65,41 @@ describe("appointment occurrences", () => {
 	})
 })
 
+describe("weekly repeat whose start is not on a ticked weekday", () => {
+	// the start, 2026-12-01, is a Tuesday
+	const weekly = (extra = {}) => appt({ repeat_this_event: 1, repeat_on: "Weekly", ...extra })
+
+	it("starts on the chosen day, then continues on the ticked weekdays", () => {
+		const a = weekly({ monday: 1, thursday: 1, repeat_till: "2026-12-10" })
+		expect(starts(occurrencesBetween(a, day("2026-11-01"), day("2026-12-31")))).toEqual([
+			"2026-12-01",
+			"2026-12-03",
+			"2026-12-07",
+			"2026-12-10",
+		])
+		expect(startOutsideWeeklyDays(a)).toBe(true)
+	})
+
+	it("is the next appointment until it has passed", () => {
+		const a = weekly({ monday: 1 })
+		expect(starts([nextOccurrence(a, day("2026-11-30 12:00:00"))])).toEqual(["2026-12-01"])
+		expect(starts([nextOccurrence(a, day("2026-12-01 12:00:00"))])).toEqual(["2026-12-07"])
+	})
+
+	it("adds nothing when the start's weekday is ticked, none is ticked, or the repeat is not weekly", () => {
+		expect(startOutsideWeeklyDays(weekly({ tuesday: 1, thursday: 1 }))).toBe(false)
+		expect(startOutsideWeeklyDays(weekly())).toBe(false)
+		expect(startOutsideWeeklyDays(appt({ repeat_this_event: 1, repeat_on: "Daily", monday: 1 }))).toBe(false)
+		expect(startOutsideWeeklyDays(appt({ repeat_on: "Weekly", monday: 1 }))).toBe(false)
+		const ticked = weekly({ tuesday: 1, thursday: 1, repeat_till: "2026-12-08" })
+		expect(starts(occurrencesBetween(ticked, day("2026-11-01"), day("2026-12-31")))).toEqual([
+			"2026-12-01",
+			"2026-12-03",
+			"2026-12-08",
+		])
+	})
+})
+
 describe("appointment list", () => {
 	const now = day("2026-12-05 12:00:00")
 
@@ -85,5 +120,26 @@ describe("appointment list", () => {
 			"O",
 			"OO",
 		])
+	})
+})
+
+describe("long-running repeats (AI review of !1203)", () => {
+	it("a daily repeat without an end still occurs after more than 13 years", () => {
+		const a = appt({ repeat_this_event: 1, repeat_on: "Daily" })
+		const from = day("2041-06-01")
+		expect(starts(occurrencesBetween(a, from, day("2041-06-02 23:59:59")))).toEqual(["2041-06-01", "2041-06-02"])
+		expect(nextOccurrence(a, from, 3)).not.toBeNull()
+	})
+
+	it("weekly and monthly repeats start right at the window, years later", () => {
+		const weekly = appt({ repeat_this_event: 1, repeat_on: "Weekly", tuesday: 1 })
+		expect(starts(occurrencesBetween(weekly, day("2040-01-01"), day("2040-01-14")))).toEqual(["2040-01-03", "2040-01-10"])
+		const monthly = appt({ repeat_this_event: 1, repeat_on: "Monthly" })
+		expect(starts(occurrencesBetween(monthly, day("2045-03-01"), day("2045-04-30")))).toEqual(["2045-03-01", "2045-04-01"])
+	})
+
+	it("an occurrence that started before the window but still runs is included", () => {
+		const long = appt({ start: "2026-12-01 22:00:00", end: "2026-12-02 02:00:00", repeat_this_event: 1, repeat_on: "Daily" })
+		expect(starts(occurrencesBetween(long, day("2026-12-05 01:00:00"), day("2026-12-05 01:30:00")))).toEqual(["2026-12-04"])
 	})
 })

@@ -9,6 +9,7 @@ import {
 	peopleIndex,
 	personFor,
 	removeAttendee,
+	toggleDepartment,
 } from "./attendeePicker.js"
 
 const SALES = {
@@ -69,5 +70,13 @@ describe("attendee picker", () => {
 		expect(personFor(index, "ann@phamos.eu").name).toBe("Ann")
 		expect(personFor(index, "guest@partner.de")).toEqual({ email: "guest@partner.de", name: "guest@partner.de", image: null })
 		expect(isPicked({ required: ["guest@partner.de"], optional: [] }, "Guest@partner.de")).toBe(true)
+	})
+
+	it("a department click adds the rest, and removes everyone once all are picked", () => {
+		let a = addAttendees(EMPTY, ["ann@phamos.eu", "guest@partner.de"])
+		a = toggleDepartment(a, SALES)
+		expect(a.required).toEqual(["ann@phamos.eu", "guest@partner.de", "ben@phamos.eu"])
+		a = toggleDepartment(moveAttendee(a, "ben@phamos.eu", "optional"), SALES)
+		expect(a).toEqual({ required: ["guest@partner.de"], optional: [] })
 	})
 })

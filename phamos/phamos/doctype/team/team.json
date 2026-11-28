@@ -42,7 +42,9 @@
    "fieldname": "team_lead",
    "fieldtype": "Link",
    "label": "Team Lead",
-   "options": "Employee"
+   "options": "Employee",
+   "read_only": 1,
+   "description": "Change membership through Team Assignment."
   },
   {
    "fieldname": "column_break_ediq",
@@ -52,7 +54,9 @@
    "fieldname": "co_team_lead",
    "fieldtype": "Link",
    "label": "Co Team Lead",
-   "options": "Employee"
+   "options": "Employee",
+   "read_only": 1,
+   "description": "Change membership through Team Assignment."
   },
   {
    "fieldname": "section_break_ixiz",
@@ -62,7 +66,9 @@
    "fieldname": "team_members",
    "fieldtype": "Table",
    "label": "Team Members",
-   "options": "Team Members"
+   "options": "Team Members",
+   "read_only": 1,
+   "description": "Change membership through Team Assignment. Weekly capacity comes from Weekly Working Hours, or the Employment Contract."
   },
   {
    "fieldname": "total_team_capacity",
@@ -129,8 +135,14 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-07-13 13:59:14.342947",
+ "links": [
+  {
+   "group": "Membership",
+   "link_doctype": "Team Assignment",
+   "link_fieldname": "team"
+  }
+ ],
+ "modified": "2026-11-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team",

@@ -20,6 +20,14 @@ frappe.ui.form.on("Issue", {
 			}
 		}
 
+		// Where this report stands, in the Implementation Cockpit (#1671): only with an implementation
+		// and for users who may open the cockpit (frappe.boot.phriend.implementation_cockpit).
+		if (frm.doc.custom_implementation && frappe.boot.phriend && frappe.boot.phriend.implementation_cockpit) {
+			frm.add_custom_button(__("Status in the Implementation Cockpit"), () =>
+				window.open(`/implementation-cockpit/status?issue=${encodeURIComponent(frm.doc.name)}`, "_blank", "noopener")
+			);
+		}
+
 		const button = frm.add_custom_button(__("Create GitLab Issue"), () => phriend_create_gitlab_issue(frm));
 		if (!frm.doc.gitlab_issue_url) button.addClass("btn-primary");
 		phriend_render_gitlab_issues(frm);
@@ -87,7 +95,34 @@ function phriend_render_preview(frm) {
 }
 
 function phriend_create_gitlab_issue(frm) {
-	frappe.call("phamos.phriend.api.get_gitlab_defaults").then(({ message: defaults }) => {
+	if (frm.is_dirty()) {
+		// the GitLab project comes from the saved Implementation (#2167)
+		frappe.msgprint(__("Save the Issue first."));
+		return;
+	}
+	const esc = frappe.utils.escape_html;
+	frappe.call("phamos.phriend.api.get_gitlab_defaults", { issue: frm.doc.name }).then(({ message: defaults }) => {
+		// no Implementation, or no GitLab Project for it: no GitLab issue (#2167)
+		if (!defaults.implementation) {
+			frappe.msgprint({
+				title: __("No Implementation"),
+				indicator: "orange",
+				message: __("Set the Implementation on this Issue first. The GitLab project is taken from it."),
+			});
+			return;
+		}
+		const projects = defaults.gitlab_projects || [];
+		if (!projects.length) {
+			frappe.msgprint({
+				title: __("No GitLab Project"),
+				indicator: "orange",
+				message: __("No GitLab Project is linked to Implementation {0}. Link one in {1} first.", [
+					esc(defaults.implementation),
+					`<a href="/app/gitlab-project">${__("GitLab Project")}</a>`,
+				]),
+			});
+			return;
+		}
 		if (!defaults.has_token) {
 			frappe.msgprint({
 				title: __("GitLab not set up"),
@@ -110,13 +145,23 @@ function phriend_create_gitlab_issue(frm) {
 					reqd: 1,
 					default: frm.doc.subject,
 				},
-				{
-					fieldtype: "HTML",
-					fieldname: "where",
-					options: `<p class="text-muted small">${__("Will be created in {0}", [
-						`<b>${frappe.utils.escape_html(defaults.gitlab_project)}</b>`,
-					])}</p>`,
-				},
+				projects.length > 1
+					? {
+							fieldtype: "Select",
+							fieldname: "gitlab_project",
+							label: __("GitLab Project"),
+							reqd: 1,
+							options: [{ label: "", value: "" }].concat(
+								projects.map((p) => ({ label: p.label, value: p.name }))
+							),
+					  }
+					: {
+							fieldtype: "HTML",
+							fieldname: "where",
+							options: `<p class="text-muted small">${__("Will be created in {0}", [
+								`<b>${esc(projects[0].label)}</b>`,
+							])}</p>`,
+					  },
 				{
 					fieldtype: "Data",
 					fieldname: "labels",
@@ -130,7 +175,12 @@ function phriend_create_gitlab_issue(frm) {
 				dialog.disable_primary_action();
 				frappe.call({
 					method: "phamos.phriend.api.create_gitlab_issue",
-					args: { issue: frm.doc.name, title: values.title, labels: values.labels },
+					args: {
+						issue: frm.doc.name,
+						title: values.title,
+						labels: values.labels,
+						gitlab_project: values.gitlab_project || projects[0].name,
+					},
 					freeze: true,
 					freeze_message: __("Sending to GitLab..."),
 					callback(r) {

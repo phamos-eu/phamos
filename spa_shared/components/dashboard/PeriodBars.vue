@@ -1,15 +1,16 @@
 <template>
-	<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
-		<div class="mb-4 flex flex-wrap items-start gap-3">
-			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-semibold text-ink-gray-9">{{ title }}</h2>
+	<section class="rounded-lg border border-outline-gray-2 bg-surface-white" :class="compact ? 'p-3' : 'p-5'">
+		<div class="flex flex-wrap items-start gap-3" :class="compact ? 'mb-2' : 'mb-4'">
+			<div class="min-w-0 flex-1" :class="compact ? 'flex items-baseline gap-2' : ''">
+				<h2 class="font-semibold text-ink-gray-9" :class="compact ? 'text-sm' : 'text-base'">{{ title }}</h2>
 				<p v-if="subtitle" class="text-sm text-ink-gray-5">{{ subtitle }}</p>
 			</div>
 			<!-- Controls for the chart, e.g. a view switch. -->
 			<slot name="actions" />
 		</div>
 		<div
-			class="grid h-48 items-end gap-2 border-b border-outline-gray-2 px-2"
+			class="grid items-end gap-2 border-b border-outline-gray-2 px-2"
+			:class="compact ? 'h-24' : 'h-48'"
 			:style="{ gridTemplateColumns: `repeat(${Math.max(periods.length, 1)}, minmax(0, 1fr))` }"
 		>
 			<div
@@ -90,6 +91,8 @@ const props = defineProps({
 	note: { type: String, default: "" },
 	// Optional (value, seriesIndex) => string for the bar tooltips.
 	format: { type: Function, default: null },
+	// A lower chart and less padding, for pages that keep a table in view below it.
+	compact: { type: Boolean, default: false },
 	// Periods become keyboard-focusable buttons that emit `select` with (period, index) (drill-down).
 	selectable: { type: Boolean, default: false },
 	// Optional colour per series (CSS values); defaults to the shared palette.

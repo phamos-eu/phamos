@@ -115,6 +115,13 @@
 		);
 	}
 
+	// Module Web Profile > Documentation: only books published on the website (phamos/phamos#2006).
+	frappe.ui.form.on("Module Web Profile", {
+		setup(frm) {
+			frm.set_query("book", "documentation", () => ({ filters: { publish_on_website: 1 } }));
+		},
+	});
+
 	frappe.ui.form.on("Web Page", {
 		refresh(frm) {
 			if (frm.is_new()) return;

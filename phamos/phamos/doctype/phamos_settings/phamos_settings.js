@@ -2,6 +2,21 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('phamos Settings', {
+    setup(frm) {
+        // Party Accounts (#1529): a parent must be a group of the row's company with the right root type.
+        const parent_account_query = (root_type) => (doc, cdt, cdn) => {
+            const row = locals[cdt][cdn];
+            return {
+                filters: {
+                    company: row.company,
+                    is_group: 1,
+                    root_type: root_type,
+                },
+            };
+        };
+        frm.set_query("debtor_parent_account", "party_account_settings", parent_account_query("Asset"));
+        frm.set_query("creditor_parent_account", "party_account_settings", parent_account_query("Liability"));
+    },
     validate: function(frm) {
         // Filter out the enabled channels
         let enabled_channels = (frm.doc.mattermost_channel || []).filter(

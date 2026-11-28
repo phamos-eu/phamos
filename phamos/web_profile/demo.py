@@ -318,6 +318,11 @@ def _team(team_name, lead, members):
 		"team_members": [{"employee": e, "designation": frappe.db.get_value("Employee", e, "designation")} for e in members],
 	})
 	doc.insert(ignore_permissions=True)
+	# Membership lives in Team Assignment (#1974)
+	from phamos.phamos.doctype.team_assignment.team_assignment import assignments_from_team, sync_team
+
+	assignments_from_team(doc.name)
+	sync_team(doc.name)
 	return doc.name
 
 

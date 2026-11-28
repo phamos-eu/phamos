@@ -1,0 +1,31 @@
+{
+	"id": "/idea",
+	"name": "Idea",
+	"short_name": "Idea",
+	"description": "Catch an idea: type or dictate it, link it later",
+	"start_url": "/idea",
+	"scope": "/idea",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#ca8a04",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/idea-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/idea-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/idea-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

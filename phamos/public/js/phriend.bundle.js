@@ -8,7 +8,7 @@
 // carry html2canvas.
 
 import { create_phriend } from "./phriend/index";
-import { text_of } from "./phriend/request";
+import { call, text_of } from "./phriend/request";
 
 const REPORT_DOCTYPE = "Issue";
 const CLOSED_STATUSES = ["Resolved", "Closed"];
@@ -76,6 +76,16 @@ function badge_filters() {
 	return filters;
 }
 
+// The same scope as badge_filters, as the server's arguments (route, ref_doctype, ref_docname).
+function badge_args() {
+	const filters = badge_filters();
+	return {
+		route: filters.phriend_route || null,
+		ref_doctype: filters.phriend_ref_doctype || null,
+		ref_docname: filters.phriend_ref_docname || null,
+	};
+}
+
 function server_message(xhr) {
 	try {
 		const body = JSON.parse(xhr.responseText || "{}");
@@ -120,6 +130,20 @@ function load_flow() {
 	});
 }
 
+// The Implementation Cockpit finds the implementation of the page or record itself (#1671).
+function status_url(ctx) {
+	const query = new URLSearchParams();
+	if (ctx.issue) {
+		query.set("issue", ctx.issue);
+	} else if (ctx.ref_doctype && ctx.ref_docname) {
+		query.set("ref_doctype", ctx.ref_doctype);
+		query.set("ref_docname", ctx.ref_docname);
+	} else if (ctx.route) {
+		query.set("route", ctx.route);
+	}
+	return `/implementation-cockpit/status?${query}`;
+}
+
 const desk = {
 	__: (text, args) => __(text, args),
 	csrf_token: () => frappe.csrf_token,
@@ -131,6 +155,9 @@ const desk = {
 		frappe.model.can_read(REPORT_DOCTYPE) && !(frappe.boot.phriend && frappe.boot.phriend.has_target)
 			? frappe.db.count(REPORT_DOCTYPE, { filters: badge_filters() })
 			: Promise.resolve(0),
+	// quiet on failure (no message box), like the cockpits
+	testing_tickets: () =>
+		call("phamos.phriend.api.get_testing_on_production", badge_args(), frappe.csrf_token),
 	// in a new tab, like the cockpits, so a report in progress isn't lost
 	open_reports: () => {
 		const filters = badge_filters();
@@ -139,6 +166,11 @@ const desk = {
 			.join("&");
 		window.open(`/app/issue?${query}`, "_blank", "noopener");
 	},
+	// the Implementation Cockpit for users who may open it (phamos/phriend/boot.py)
+	open_status:
+		frappe.boot.phriend && frappe.boot.phriend.implementation_cockpit
+			? (ctx) => window.open(status_url(ctx), "_blank", "noopener")
+			: null,
 	on_route_change: (callback) => {
 		if (frappe.router && typeof frappe.router.on === "function") frappe.router.on("change", callback);
 		else $(window).on("hashchange popstate", callback);
@@ -147,6 +179,24 @@ const desk = {
 	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
 	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
 	user: frappe.session.user,
+	// Phriend Settings → Features (#2009)
+	features: (frappe.boot.phriend && frappe.boot.phriend.features) || {},
+	// leave me in peace (#2010)
+	quiet: (frappe.boot.phriend && frappe.boot.phriend.quiet) || null,
+	can_configure: !!(frappe.boot.phriend && frappe.boot.phriend.can_configure),
+	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
+	// one voice (#2011)
+	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
+	// events (#2012): the user's own realtime room. Phriend mounts before Desk creates its
+	// socket, and frappe.realtime.on() does nothing without one: wait for it (found in #2014).
+	on_event: (cb) => {
+		let tries = 0;
+		const attach = () => {
+			if (frappe.realtime && frappe.realtime.socket) frappe.realtime.on("phriend_event", cb);
+			else if (++tries < 120) setTimeout(attach, 500);
+		};
+		attach();
+	},
 };
 
 frappe.provide("phriend");

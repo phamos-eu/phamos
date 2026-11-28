@@ -2,6 +2,22 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Bookstack Configuration", {
+	onload(frm) {
+		// Result of a sync started with "Sync All" (phamos.bookstack_integration.sync.run_sync_job).
+		// Registered once per page load; the Bookstack Browser has a listener of its own.
+		if (frappe._bookstack_sync_listener) return;
+		frappe._bookstack_sync_listener = true;
+		frappe.realtime.on("bookstack_sync_done", (stats) => {
+			if (cur_frm?.doctype !== "Bookstack Configuration") return;
+			const failed = stats.failed || stats.errors;
+			frappe.msgprint({
+				title: failed ? __("Sync finished with errors") : __("Sync complete"),
+				message: `<pre>${frappe.utils.escape_html(JSON.stringify(stats, null, 2))}</pre>`,
+				indicator: failed ? "orange" : "green",
+			});
+			if (cur_frm.doc.name === stats.instance) cur_frm.reload_doc();
+		});
+	},
 	refresh(frm) {
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("Test Connection"), () => {
@@ -14,16 +30,15 @@ frappe.ui.form.on("Bookstack Configuration", {
 				frappe.confirm(
 					__("Pull shelves, books, chapters, pages, users and roles from {0}?", [frm.doc.title]),
 					() => {
-						frappe.show_alert({ message: __("Sync started..."), indicator: "blue" });
-						frm.call({
-							doc: frm.doc,
-							method: "sync_all",
-							freeze: true,
-							freeze_message: __("Syncing Bookstack..."),
-						}).then((r) => {
-							if (r.message) frappe.msgprint({ title: __("Sync complete"), message: `<pre>${JSON.stringify(r.message, null, 2)}</pre>`, indicator: "green" });
-							frm.reload_doc();
-						});
+						// A background job (#2004): a first copy of a big book takes minutes.
+						frappe
+							.xcall("phamos.bookstack_integration.sync.start_sync", { instance: frm.doc.name })
+							.then(() =>
+								frappe.show_alert({
+									message: __("Sync started in the background. The result shows here when it is done."),
+									indicator: "blue",
+								}, 10)
+							);
 					}
 				);
 			}, __("Actions"));

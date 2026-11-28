@@ -47,7 +47,7 @@ class _DapTestCase(FrappeTestCase):
 			frappe.db.set_value("Project", name, "percent_billable", percent_billable)
 		return name
 
-	def _assign(self, project):
+	def _assign(self, project, status="Open"):
 		frappe.get_doc(
 			{
 				"doctype": "ToDo",
@@ -55,6 +55,7 @@ class _DapTestCase(FrappeTestCase):
 				"reference_type": "Project",
 				"reference_name": project,
 				"description": "Assigned",
+				"status": status,
 			}
 		).insert(ignore_permissions=True)
 
@@ -100,9 +101,55 @@ class TestDevActionPanelBilling(_DapTestCase):
 			{self.billable: "75", self.internal: "75", self.no_implementation: "0"},
 		)
 
-	def test_new_project_and_timesheet_record_default_to_zero_percent_billable(self):
-		self.assertEqual(frappe.new_doc("Project").percent_billable, "0")
+	def test_new_project_leaves_percent_billable_to_the_rule(self):
+		# Empty on a new project, so the customer / internal rule decides (#1896).
+		self.assertFalse(frappe.new_doc("Project").percent_billable)
 		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
+
+	def _customer(self):
+		name = "DAP Billing Customer"
+		if not frappe.db.exists("Customer", name):
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": name,
+					"customer_type": "Company",
+					"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}) or "All Customer Groups",
+					"territory": frappe.db.get_value("Territory", {"is_group": 0}) or "All Territories",
+				}
+			).insert(ignore_permissions=True)
+		return name
+
+	def test_customer_project_without_percent_billable_presets_100_internal_0(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		customer_project = self._project("DAP Customer", percent_billable="", customer=customer)
+		internal = self._project("DAP Own", percent_billable="", customer=customer, custom_is_internal_project=1)
+		no_customer = self._project("DAP Own", percent_billable="")
+		self.assertEqual(billing_context(customer_project), {"percent_billable": "100"})
+		self.assertEqual(billing_context(internal), {"percent_billable": "0"})
+		self.assertEqual(billing_context(no_customer), {"percent_billable": "0"})
+		for project in (customer_project, internal, no_customer):
+			self._assign(project)
+		rows = {p["name"]: p["percent_billable"] for p in self._as_user(dap.get_dev_all_projects)}
+		self.assertEqual(
+			(rows[customer_project], rows[internal], rows[no_customer]), ("100", "0", "0")
+		)
+
+	def test_project_value_wins_over_the_customer_rule(self):
+		from phamos.phamos.timesheet_utils import billing_context
+
+		customer = self._customer()
+		zero = self._project("DAP Customer", percent_billable="0", customer=customer)
+		half = self._project("DAP Own", percent_billable="50", custom_is_internal_project=1)
+		self.assertEqual(billing_context(zero), {"percent_billable": "0"})
+		self.assertEqual(billing_context(half), {"percent_billable": "50"})
+
+	def test_customer_project_timer_starts_at_100(self):
+		project = self._project("DAP Customer", percent_billable="", customer=self._customer())
+		started = self._as_user(dap.start_project_timer, project, 3600, "Customer work")
+		self.assertEqual(frappe.db.get_value("Timesheet Record", started["name"], "percent_billable"), "100")
 
 	def test_project_without_percent_billable_presets_zero_everywhere(self):
 		from phamos.api import personal_timer
@@ -132,7 +179,7 @@ class TestDevActionPanelBilling(_DapTestCase):
 
 
 class TestDevActionPanelOneProjectList(_DapTestCase):
-	"""Every Open project plus mine in any status; last used first, then assigned to me, then the rest."""
+	"""Every Open project plus mine in any status; assigned to me first, then the rest, last used first in each."""
 
 	def _listed(self):
 		rows = self._as_user(dap.get_dev_all_projects)
@@ -146,6 +193,97 @@ class TestDevActionPanelOneProjectList(_DapTestCase):
 		self.assertIn(completed_mine, names)
 		self.assertEqual(rows[completed_mine]["is_assigned"], 1)
 		self.assertLess(names.index(completed_mine), names.index(unassigned))
+
+	def test_previously_assigned_project_stays_on_top_cancelled_does_not(self):
+		unassigned = self._project(prefix="DAP List A")
+		done = self._project(prefix="DAP List Z")
+		cancelled = self._project(prefix="DAP List Z")
+		self._assign(done, status="Closed")
+		self._assign(cancelled, status="Cancelled")
+		names, rows = self._listed()
+		self.assertEqual(rows[done]["is_assigned"], 1)
+		self.assertEqual(rows[cancelled]["is_assigned"], 0)
+		self.assertLess(names.index(done), names.index(unassigned))
+
+	def test_assigned_project_beats_a_more_recently_used_one(self):
+		mine = self._project(prefix="DAP List Z")
+		self._assign(mine)
+		used = self._project(prefix="DAP List A")
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"employee": self.employee,
+				"project": used,
+				"goal": "Used, not assigned",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		names, _ = self._listed()
+		self.assertLess(names.index(mine), names.index(used))
+
+	def test_filter_button_returns_matching_names_only(self):
+		wanted = self._project(prefix="DAP Filter Wanted")
+		other = self._project(prefix="DAP Filter Other")
+		names = self._as_user(
+			dap.get_matching_names, "Project", '[["Project", "project_name", "like", "%Filter Wanted%", false]]'
+		)
+		self.assertIn(wanted, names)
+		self.assertNotIn(other, names)
+		self.assertRaises(frappe.ValidationError, dap.get_matching_names, "User", "[]")
+
+	def test_filter_button_only_matches_what_the_panel_lists(self):
+		listed = self._project(prefix="DAP Scope")
+		hidden = self._project(prefix="DAP Scope", status="Completed")  # not Open, not mine
+		names = self._as_user(dap.get_matching_names, "Project", [["Project", "project_name", "like", "DAP Scope%"]])
+		self.assertIn(listed, names)
+		self.assertNotIn(hidden, names)
+
+	def test_filter_button_refuses_malformed_filters_and_non_panel_users(self):
+		self.assertRaises(frappe.ValidationError, self._as_user, dap.get_matching_names, "Project", '{"status": "Open"}')
+		self.assertRaises(frappe.ValidationError, self._as_user, dap.get_matching_names, "Project", '[["Project", "status"]]')
+		frappe.db.set_value("Employee", self.employee, "user_id", None)
+		self.assertRaises(frappe.PermissionError, self._as_user, dap.get_matching_names, "Project", "[]")
+
+	def test_filter_button_field_lists_match_the_frontend(self):
+		# FrappeFilter's dropdown (filterFields.js) must offer exactly what the server accepts.
+		import re
+
+		path = frappe.get_app_path("phamos", "public", "js", "dev_action_panel", "filterFields.js")
+		with open(path) as f:
+			source = f.read()
+		for doctype, fields in dap.FILTERABLE_FIELDS.items():
+			key = f'"{doctype}"' if " " in doctype else doctype
+			listed = re.search(rf"{re.escape(key)}:\s*\[(.*?)\]", source, re.S)
+			self.assertIsNotNone(listed, doctype)
+			self.assertEqual(set(re.findall(r'"([a-z_]+)"', listed.group(1))), set(fields), doctype)
+
+	def test_filter_button_only_filters_on_fields_the_panel_shows(self):
+		# A field the panel never shows (would be a yes/no oracle on its value, record by record).
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"Project",
+			[["Project", "estimated_costing", ">", 0]],
+		)
+		# A child table / another doctype in the row.
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"Project",
+			[["Project User", "user", "=", USER]],
+		)
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"GitLab Issue",
+			[["GitLab Issue", "description", "like", "%secret%"]],
+		)
 
 	def test_project_with_two_open_todos_is_listed_once(self):
 		project = self._project()
@@ -200,6 +338,79 @@ class TestDevActionPanelIssueList(_DapTestCase):
 
 	def _issues(self):
 		return {row["name"]: row for row in self._as_user(dap.get_my_issues)}
+
+	def test_filter_button_never_matches_closed_issues(self):
+		opened = self._issue("DAP Scope issue")
+		closed = self._issue("DAP Scope issue")
+		frappe.db.set_value("GitLab Issue", closed, "state", "closed")
+		names = self._as_user(
+			dap.get_matching_names, "GitLab Issue", [["GitLab Issue", "title", "=", "DAP Scope issue"]]
+		)
+		self.assertEqual(names, [opened])
+
+	def _family(self):
+		parent = self._issue("DAP Family parent")
+		children = [self._issue("DAP Family child", parent=parent) for _ in range(2)]
+		standalone = self._issue("DAP Family standalone")
+		return parent, children, standalone
+
+	def _matching(self, *rows):
+		# Narrowed to this test's issues; the site may hold other open issues.
+		return set(
+			self._as_user(
+				dap.get_matching_names,
+				"GitLab Issue",
+				[["GitLab Issue", "title", "like", "DAP Family%"], *[["GitLab Issue", *r] for r in rows]],
+			)
+		)
+
+	def test_gitlab_parent_issue_filter_lists_the_parent_and_its_children(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", parent]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "=", standalone]), {standalone})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "in", f"{parent},{standalone}"]), {parent, *children, standalone}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "!=", parent]), {standalone})
+
+	def test_gitlab_child_issue_filter_lists_child_issues_only(self):
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "set"]), set(children))
+		self.assertEqual(self._matching(["gitlab_child_issue", "is", "not set"]), {parent, standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", children[0]]), {children[0]})
+		self.assertEqual(self._matching(["gitlab_child_issue", "=", parent]), set())
+		# Both together: the children of one parent.
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "=", parent], ["gitlab_child_issue", "is", "set"]), set(children)
+		)
+
+	def test_gitlab_family_filters_match_like_as_sql_does(self):
+		# % and _ anywhere, case-insensitive, like the column filters (MariaDB LIKE).
+		parent, children, standalone = self._family()
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", f"%{parent}%"]), {parent, *children})
+		self.assertEqual(
+			self._matching(["gitlab_parent_issue", "like", f"{parent[:2]}%{parent[-2:]}"]), {parent, *children}
+		)
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "_"]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent.upper()]), {parent, *children})
+		# A run of % is one wildcard; \% and \_ are literal.
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", "%" * 40 + parent[-3:]]), {parent, *children})
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent + "\\%"]), set())
+		self.assertEqual(self._matching(["gitlab_parent_issue", "like", parent[:-1] + "\\_"]), set())
+		self.assertEqual(self._matching(["gitlab_parent_issue", "not like", f"%{parent}%"]), {standalone})
+		self.assertEqual(self._matching(["gitlab_child_issue", "like", f"%{children[0]}%"]), {children[0]})
+		self.assertEqual(
+			self._matching(["gitlab_child_issue", "not like", f"%{children[0]}%"]), {parent, standalone, children[1]}
+		)
+
+	def test_gitlab_family_filters_refuse_conditions_they_cannot_answer(self):
+		self.assertRaises(
+			frappe.ValidationError,
+			self._as_user,
+			dap.get_matching_names,
+			"GitLab Issue",
+			[["GitLab Issue", "gitlab_parent_issue", ">", "x"]],
+		)
 
 	def test_running_issue_assigned_to_someone_else_is_marked_running(self):
 		running = self._issue("Running, not assigned to me")

@@ -10,6 +10,18 @@ app_license = "AGPL-3.0"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits open inside it. Frappe's
+	# "Default App" opens an app's first tile it shows. So Ophice is listed twice, and exactly one
+	# of the two shows: here, first, while the start-page switch (#2077, Cockpit Settings) is on;
+	# otherwise further down, so a site whose default app is already "phamos" keeps landing in the
+	# Personal Cockpit after this release (review of the release).
+	{
+		"name": "ophice",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_start_tile_permission",
+	},
 	{
 		"name": "personal_cockpit",
 		"logo": "/assets/phamos/manifest/personal-icon-192.png",
@@ -60,11 +72,42 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.general_management_spa.check_app_permission",
 	},
 	{
+		"name": "team_cockpit",
+		"logo": "/assets/phamos/manifest/team-icon-192.png",
+		"title": "Team Cockpit",
+		"route": "/team-cockpit",
+		"has_permission": "phamos.api.team_cockpit.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
+	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
+	# Ophice while it is not the start page (see the first tile).
+	{
+		"name": "ophice_tile",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_tile_permission",
+	},
+	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher and "Open in Cockpit"
+	# skip it (no route in spa_boot.COCKPITS, no phamos.api.bookstack module).
+	{
+		"name": "bookstack",
+		"logo": "/assets/phamos/manifest/bookstack-icon-192.png",
+		"title": "Bookstack",
+		"route": "/app/bookstack",
+		"has_permission": "phamos.bookstack_integration.api.check_app_permission",
 	},
 ]
 
@@ -99,7 +142,12 @@ app_include_js = [
 # Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
 # `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
 web_include_css = ["web_profile.bundle.css"]
-web_include_js = ["web_profile.bundle.js"]
+web_include_js = [
+	"web_profile.bundle.js",
+	# Phriend for Desk users on the website pages (#2104): a small loader; the ball loads only
+	# when the server says Phriend is for the user
+	"phriend_web.bundle.js",
+]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
@@ -130,13 +178,16 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
-    "Customer": "public/js/customer.js",
-    "Company": "public/js/company.js",
+    # party_account.js before customer.js / supplier.js: they call phamos.party_account (#1529)
+    "Customer": ["public/js/party_account.js", "public/js/customer.js"],
+    "Supplier": ["public/js/party_account.js", "public/js/supplier.js"],
+    "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 
 }
 
 doctype_list_js = {
+    "Accounting Receipt": "public/js/accounting_receipt_list.js",
     "Event": "public/js/event_list.js",
     "Monthly Implementation Summary": "public/js/monthly_implementation_summary_list.js",
 }
@@ -151,6 +202,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/ophice", "to_route": "ophice"},
+    {"from_route": "/ophice/<path:app_path>", "to_route": "ophice"},
     {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
     {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
@@ -165,6 +218,10 @@ website_route_rules = [
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
     {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
+    {"from_route": "/team-cockpit", "to_route": "team_cockpit"},
+    {"from_route": "/team-cockpit/<path:app_path>", "to_route": "team_cockpit"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -190,6 +247,18 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
+# Documentation from BookStack (phamos/phamos#2005, #2044). The text is German; the English pages
+# show it with English navigation until it is translated. Keep in sync with web_profile/docs.py.
+for _lang, _slug in {"de": "dokumentation", "en": "documentation"}.items():
+    website_route_rules += [
+        {"from_route": f"/{_lang}/{_slug}", "to_route": "documentation/index", "defaults": {"lang": _lang}},
+        # before <book_slug>, which would catch it (#2046)
+        {"from_route": f"/{_lang}/{_slug}/" + {"de": "suche", "en": "search"}[_lang], "to_route": "documentation/search",
+         "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>", "to_route": "documentation/book", "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>/<page_slug>", "to_route": "documentation/page",
+         "defaults": {"lang": _lang}},
+    ]
 # Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
 SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
 for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
@@ -201,15 +270,9 @@ for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
-# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
-# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
-# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
-    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
-    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
-    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 
@@ -263,13 +326,15 @@ after_migrate = [
 	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
+	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751), Team on Issue and Task (#1955)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
+	"phamos.setup.issue_assistant.after_migrate",  # Issue Assistant role, user, bot, agent, Customer switch (#2111)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
-	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
 # Uninstallation
@@ -388,12 +453,6 @@ doc_events = {
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
-    # Company-wide events (Events tab from phamos/setup/event_schedule.py), synced like Team's.
-    "Company": {
-        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
-    },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },
@@ -401,7 +460,11 @@ doc_events = {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Issue": {
+		"on_update": "phamos.api.issue_chat.on_record_update",
+		# the Issue Assistant's first look at a new Issue, in the background (#2111)
+		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
+	},
 	"Task": {
 		"after_insert": "phamos.api.issue_chat.on_task_insert",
 		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
@@ -428,7 +491,10 @@ doc_events = {
     "Delivery Note": {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": [
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.clear_timesheet_stamps_on_delivery_note_cancel",
+            "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        ],
     },
     # Event tickets: Attendee links and payment status (phamos.marketing.billing). Only on_change: it runs
     # once after every save, submit and cancel, and payments reach an invoice through db_set, which runs
@@ -464,16 +530,31 @@ doc_events = {
         "before_validate": "phamos.marketing.crm.lead_set_direction",
     },
     "Customer": {
+        # Debtor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
         "on_update": [
             "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer",
             "phamos.web_profile.mirror.push_to_profiles",
         ]
     },
+    # a published GitLab Release sets the planned Implementation Release to Released (#1986)
+    "GitLab Release": {
+        "on_update": "phamos.phamos.doctype.implementation_release.implementation_release.link_published_release",
+    },
     "Implementation": {
         "on_update": [
             "phamos.phamos.doctype.timesheet_record.timesheet_record.sync_implementation_time_limit_summary_on_save",
             "phamos.web_profile.mirror.push_to_profiles",
+            # direct edits of agreed plan values wait for the customer's confirmation (#1971)
+            "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
         ],
+    },
+    "Implementation Release": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+    },
+    "Implementation Feature": {
+        "on_update": "phamos.phamos.doctype.implementation_change.implementation_change.record_direct_edits",
+        "after_insert": "phamos.phamos.doctype.implementation_change.implementation_change.record_feature_added",
     },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
     "Employee": {
@@ -484,10 +565,22 @@ doc_events = {
         ]
     },
     "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Supplier": {
+        # Creditor account when "Create Automatically and Require" is on (#1529)
+        "before_validate": "phamos.accounting.party_account.ensure_party_accounts",
+        "on_update": "phamos.web_profile.mirror.push_to_profiles",
+    },
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Event Schedule (phamos/setup/event_schedule.py, #1949), synced like Team's.
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+        ],
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
+    },
     "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
@@ -525,6 +618,7 @@ fixtures = [
             "name", "in", [
                 "Bookstack User",
                 "Bookstack Manager",
+                "Ophice Map Editor",
             ]
         ]
     ]},
@@ -554,13 +648,24 @@ fixtures = [
 ]
 
 scheduler_events = {
+    # BookStack (#2004): on the long queue, a first copy of a big book takes minutes
+    "hourly_long": [
+        # keep the website copy of published books fresh
+        "phamos.bookstack_integration.sync.sync_published_content",
+    ],
+    "daily_long": [
+        "phamos.bookstack_integration.sync.sync_all_instances",
+    ],
     "daily": [
+        # Phriend: rating questions for reports that went live (#2014)
+        "phamos.phriend.feedback.create_due_requests",
+        # Implementation Release: capacity shrinks every day, leave changes (#1986)
+        "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
-        "phamos.bookstack_integration.sync.sync_all_instances",
         # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)
@@ -589,6 +694,10 @@ scheduler_events = {
         # Personal Cockpit: end focus sessions that ran past their limit (#1556).
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
+        ],
+        # Ophice: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
+        "* * * * *": [
+            "phamos.api.ophice.burn_due_encounters",
         ],
         # Personal Cockpit: fix today's day plans that were never started (#1559).
         "0 10 * * *": [
@@ -622,6 +731,8 @@ override_doctype_dashboards = {
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
+    "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
+    "Lead": "phamos.custom_scripts.custom_python.lead_dashboard.get_lead_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
@@ -679,6 +790,8 @@ user_data_fields = [
 	},
 	{"doctype": "Idea Writing Session", "filter_by": "user"},
 	{"doctype": "Idea Vote", "filter_by": "user"},
+	# Phriend's rating questions and answers (#2014)
+	{"doctype": "Phriend Feedback", "filter_by": "user", "redact_fields": ["comment"]},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

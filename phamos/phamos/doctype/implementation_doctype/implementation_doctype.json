@@ -1,0 +1,151 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 20:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "doctype_name",
+  "app",
+  "kind",
+  "column_break_head",
+  "module",
+  "reusable",
+  "showcase",
+  "showcase_reviewed_by",
+  "description_section",
+  "description",
+  "screenshots",
+  "used_in_section",
+  "used_in_implementations"
+ ],
+ "fields": [
+  {
+   "fieldname": "doctype_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Doctype Name",
+   "reqd": 1,
+   "description": "Name of the doctype, report, print format or script as it is called in the system, e.g. \"Delivery Trip\".",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "app",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "App",
+   "description": "The app or repository it lives in, e.g. \"phamos\" or a customer app.",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Kind",
+   "options": "New DocType\nCustomization\nReport\nPrint Format\nWorkflow\nScript\nIntegration",
+   "default": "New DocType"
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "module",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Module",
+   "options": "Implementation Module"
+  },
+  {
+   "fieldname": "reusable",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Reusable",
+   "description": "Can be used again in other projects as it is or with small changes."
+  },
+  {
+   "fieldname": "showcase",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Showcase",
+   "description": "May be shown to prospects. Set it only after checking that nothing confidential from a customer is in the entry; you are recorded as the reviewer. Changing the description or screenshots withdraws it."
+  },
+  {
+   "fieldname": "showcase_reviewed_by",
+   "fieldtype": "Link",
+   "label": "Showcase Reviewed By",
+   "options": "User",
+   "depends_on": "showcase",
+   "description": "Set automatically to whoever sets Showcase, after checking that the entry and its screenshots contain nothing confidential.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "description_section",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description",
+   "description": "What it does and what problem it solves, in words a prospect understands."
+  },
+  {
+   "fieldname": "screenshots",
+   "fieldtype": "Table",
+   "label": "Screenshots",
+   "options": "Implementation Doctype Screenshot"
+  },
+  {
+   "fieldname": "used_in_section",
+   "fieldtype": "Section Break",
+   "label": "Used In"
+  },
+  {
+   "fieldname": "used_in_implementations",
+   "fieldtype": "Small Text",
+   "is_virtual": 1,
+   "read_only": 1,
+   "label": "Implementations",
+   "description": "The implementations whose features use this entry."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Implementation Feature",
+   "link_fieldname": "implementation_doctype",
+   "parent_doctype": "Implementation Feature",
+   "table_fieldname": "doctypes",
+   "is_child_table": 1
+  }
+ ],
+ "modified": "2026-11-18 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Doctype",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "naming_rule": "By script",
+ "autoname": "",
+ "title_field": "doctype_name",
+ "track_changes": 1,
+ "search_fields": "doctype_name,app,kind"
+}

@@ -682,7 +682,9 @@ def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 		"""
 		Convert iCalendar RRULE into dateutil rrule.
 
-		DTSTART remains in the original event timezone.
+		DTSTART remains in the original event timezone. It is always the first occurrence, also
+		when its weekday is not in the rule's BYDAY (#1991): dateutil would drop it, so it goes in
+		as an extra date, like the RDATE our invites carry for it (ics.vevent).
 		"""
 
 		rrule_prop = component.get("RRULE")
@@ -699,10 +701,13 @@ def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 			)
 
 
-			return rrulestr(
+			rules = rrulestr(
 				rule_string,
 				dtstart=dtstart,
+				forceset=True,
 			)
+			rules.rdate(dtstart)
+			return rules
 
 		except Exception:
 

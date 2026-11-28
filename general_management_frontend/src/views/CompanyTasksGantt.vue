@@ -15,7 +15,7 @@
 				v-else-if="loading && !hasLoadedOnce"
 				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
-				Loading…
+				{{ __("Loading…") }}
 			</div>
 			<TaskGantt
 				v-else
@@ -27,6 +27,7 @@
 				@select="onSelect"
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
+				@dependency-remove="onGanttDependencyRemove"
 				@created="onTaskCreated"
 			>
 				<template #toolbar><slot name="toolbar" /></template>
@@ -66,6 +67,7 @@ import TaskReadOnlyDetail from "@spa/components/TaskReadOnlyDetail.vue"
 import { buildCompanyRows, GROUP_ROW_PREFIX, isGroupRow } from "@spa/utils/companyGantt.js"
 import { todayIsoInUserTz } from "@spa/utils/datetime"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
@@ -127,7 +129,7 @@ async function loadOptions() {
 		formOptions.value = await call(`${API}.get_form_options`)
 		configError.value = formOptions.value[spaConfig.departmentField]
 			? ""
-			: `Configure ${spaConfig.label} Department in Cockpit Settings.`
+			: __("Configure {0} Department in Cockpit Settings.", [spaConfig.label])
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
@@ -209,19 +211,33 @@ async function onGanttDateChange({ name, exp_start_date, exp_end_date }) {
 	}
 }
 
-async function onGanttDependencyChange({ name, depends_on }) {
+// Drag-to-link and the arrow popover on the Gantt (#2001); the panel's "Depends on" uses the same calls.
+async function saveGanttDependency(method, { name, depends_on }, done, failed) {
 	try {
-		const updated = await call(`${API}.add_task_dependency`, { name, depends_on })
+		const updated = await call(`${API}.${method}`, { name, depends_on })
 		await loadGroups()
 		if (selectedName.value === name && selectedTask.value) selectedTask.value = updated
-		toast({ title: "Dependency linked", icon: "check-circle", iconClasses: "text-ink-green-4" })
+		toast({ title: done, icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
 		toast({
-			title: e?.messages?.[0] || e?.message || "Could not link tasks",
+			title: e?.messages?.[0] || e?.message || failed,
 			icon: "x-circle",
 			iconClasses: "text-ink-red-4",
 		})
 	}
+}
+
+function onGanttDependencyChange(link) {
+	return saveGanttDependency("add_task_dependency", link, __("Dependency linked"), __("Could not link tasks"))
+}
+
+function onGanttDependencyRemove(link) {
+	return saveGanttDependency(
+		"remove_task_dependency",
+		link,
+		__("Dependency removed"),
+		__("Could not remove the dependency")
+	)
 }
 
 async function onTaskCreated(name) {

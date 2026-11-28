@@ -14,6 +14,7 @@ from frappe import _
 
 from phamos.api import department_cockpit as dc
 from phamos.cockpits.settings import COCKPIT_SETTINGS, COCKPITS, cockpit_window
+from phamos.events import team_daily_schedule
 from phamos.setup.general_management import GENERAL_MANAGEMENT_ROLE
 
 ACCESS_ROLES = ("System Manager", GENERAL_MANAGEMENT_ROLE)
@@ -186,7 +187,14 @@ def ensure_task_chat(name):
 @frappe.whitelist(methods=["POST"])
 @_require_access
 def update_issue(
-	name, subject=None, description=None, priority=None, issue_type=None, project=None, modified=None
+	name,
+	subject=None,
+	description=None,
+	priority=None,
+	issue_type=None,
+	project=None,
+	custom_team=None,
+	modified=None,
 ):
 	"""Update whitelisted Issue fields within General Management scope."""
 	fields = {}
@@ -200,6 +208,8 @@ def update_issue(
 		fields["issue_type"] = issue_type
 	if project is not None:
 		fields["project"] = project
+	if custom_team is not None:
+		fields["custom_team"] = custom_team
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_issue(CONFIG, name, **fields)
@@ -249,10 +259,14 @@ def create_checklist(
 
 
 @frappe.whitelist()
-@frappe.validate_and_sanitize_search_inputs
 @_require_access
+@frappe.validate_and_sanitize_search_inputs
 def checklist_reference_query(doctype, txt, searchfield, start, page_len, filters):
-	"""Search General Management-scoped Issue/Task parents for Checklist creation."""
+	"""Search General Management-scoped Issue/Task parents for Checklist creation.
+
+	The access check sits outside frappe's sanitiser: that one finds `searchfield` among the
+	positional arguments by the names of the function it wraps, so it must wrap this one (#1956).
+	"""
 	return dc.checklist_reference_query(CONFIG, doctype, txt, searchfield, start, page_len, filters)
 
 
@@ -290,6 +304,7 @@ def update_task(
 	progress=None,
 	project=None,
 	custom_task_owner=None,
+	custom_team=None,
 	modified=None,
 ):
 	"""Update whitelisted Task fields within General Management scope."""
@@ -312,6 +327,8 @@ def update_task(
 		fields["project"] = project
 	if custom_task_owner is not None:
 		fields["custom_task_owner"] = custom_task_owner
+	if custom_team is not None:
+		fields["custom_team"] = custom_team
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)
@@ -387,6 +404,20 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+@_require_access
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
 
 
 # --- Company view: "All departments" on the Tasks Gantt (#1948) ---------------------------------
@@ -476,9 +507,9 @@ def get_company_task(name):
 
 
 # --- Company appointments (#1949) ---------------------------------------------------------------
-# Company-wide appointments are the rows of the Company's Events table ("Team Daily Schedule",
-# #1814); saving the Company sends them as Mailcow invites (phamos.events.team_daily_schedule).
-# The Company is the one of the General Management Department.
+# Company-wide appointments are the rows of the General Management Department's Event Schedule
+# ("Team Daily Schedule", phamos/setup/event_schedule.py); saving the Department sends them as
+# Mailcow invites (phamos.events.team_daily_schedule), whose source link then points to it.
 
 EVENT_TABLE = "event_schedule"
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
@@ -498,15 +529,12 @@ APPOINTMENT_FIELDS = (
 )
 
 
-def _appointments_company():
-	"""The Company of the General Management Department, or throw."""
+def _appointments_department():
+	"""The General Management Department from Cockpit Settings, or throw."""
 	department = frappe.db.get_single_value(COCKPIT_SETTINGS, CONFIG.department_field)
 	if not department:
 		frappe.throw(_("Configure {0} Department in Cockpit Settings.").format(CONFIG.label))
-	company = frappe.db.get_value("Department", department, "company")
-	if not company:
-		frappe.throw(_("Department {0} has no Company.").format(department))
-	return company
+	return department
 
 
 def _split_emails(value):
@@ -514,9 +542,15 @@ def _split_emails(value):
 
 
 def _sync_error_line(text):
-	"""Last line of a stored sync error (often a traceback), short enough for the cockpit."""
+	"""One line of a stored sync error, short enough for the cockpit. A traceback's last line is
+	the exception; any other message (e.g. "Mailcow PUT failed (503): <html>…") starts with the
+	part that matters and may end in a server's HTML."""
 	lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-	return lines[-1][:300] if lines else ""
+	if not lines:
+		return ""
+	# "…" marks a traceback whose start was cut (team_daily_schedule._truncate_error keeps the end).
+	is_traceback = lines[0].startswith(("Traceback (most recent call last)", "…"))
+	return (lines[-1] if is_traceback else lines[0])[:300]
 
 
 def _serialize_appointment(row):
@@ -530,6 +564,8 @@ def _serialize_appointment(row):
 			"optional_attendees": _split_emails(row.optional_attendees),
 			"synced": bool(frappe.utils.cint(row.mailcow_synced)),
 			"sync_error": _sync_error_line(row.mailcow_last_error),
+			# a background job is sending the invite now; the dialog doesn't allow changes meanwhile
+			"sending": team_daily_schedule.row_is_being_sent(row),
 		}
 	)
 	return data
@@ -549,34 +585,48 @@ def _allowed_mailboxes():
 	)
 
 
-def _save_company_events(company_doc):
-	"""Save the Company's Events table for a manager without Company rights (decision 7, #1949).
+def _save_department_events(department_doc):
+	"""Save the Department's Event Schedule for a manager without Department rights (#1949).
 
-	The callers change only rows of event_schedule; ignore_permissions skips the Company write
+	The callers change only rows of event_schedule; ignore_permissions skips the Department write
 	check, while validation, the Mailcow sync (doc_events) and the version history still run.
+	The Mailcow PUT/DELETE run in a background job after the commit (decision 10, #1949), so the
+	call returns right away; the rows show "pending" until the job reports back.
 	"""
-	company_doc.flags.ignore_permissions = True
-	company_doc.save()
+	department_doc.flags.ignore_permissions = True
+	department_doc.flags[team_daily_schedule.BACKGROUND_FLAG] = True
+	department_doc.save()
 
 
-def _company_row(company_doc, name):
-	row = next((r for r in company_doc.get(EVENT_TABLE) or [] if r.name == name), None)
+def _department_row(department_doc, name):
+	row = next((r for r in department_doc.get(EVENT_TABLE) or [] if r.name == name), None)
 	if not row:
-		frappe.throw(_("Appointment {0} is not in the events of {1}.").format(name, company_doc.name))
+		frappe.throw(_("Appointment {0} is not in the events of {1}.").format(name, department_doc.name))
 	return row
+
+
+def _check_not_being_sent(row):
+	"""Refuse to change or cancel an appointment whose invite a background job is still sending.
+	A second job would send the same version and could mark the first one failed (#1949)."""
+	if team_daily_schedule.row_is_being_sent(row):
+		frappe.throw(_("The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it."))
 
 
 @frappe.whitelist()
 @_require_access
 def get_company_appointments():
-	"""Company-wide appointments: the Events rows of the General Management Department's Company.
+	"""Company-wide appointments: the Event Schedule rows of the General Management Department.
 
 	Returns:
-		dict: company and appointments (rows with attendee lists and the Mailcow sync status).
+		dict: department, department_label and appointments (rows with attendee lists and the
+		Mailcow sync status).
 	"""
-	company = _appointments_company()
-	rows = frappe.get_doc("Company", company).get(EVENT_TABLE) or []
-	return {"company": company, "appointments": [_serialize_appointment(row) for row in rows]}
+	department_doc = frappe.get_doc("Department", _appointments_department())
+	return {
+		"department": department_doc.name,
+		"department_label": department_doc.department_name,
+		"appointments": [_serialize_appointment(row) for row in department_doc.get(EVENT_TABLE) or []],
+	}
 
 
 @frappe.whitelist()
@@ -614,7 +664,8 @@ def get_appointment_options():
 @frappe.whitelist(methods=["POST"])
 @_require_access
 def save_appointment(appointment):
-	"""Create or update a company appointment (an Events row of the Company) and send its invite.
+	"""Create or update a company appointment (an Event Schedule row of the General Management
+	Department) and send its invite.
 
 	Args:
 		appointment (dict | str): `name` of the row to update (none: new), the fields in
@@ -634,6 +685,15 @@ def save_appointment(appointment):
 		frappe.throw(_("Pick a mailbox with a Mailcow calendar to send the invite."))
 	if (data.repeat_on or "") not in REPEAT_OPTIONS:
 		frappe.throw(_("Unknown repeat option {0}").format(data.repeat_on))
+	if frappe.utils.cint(data.repeat_this_event):
+		if not data.repeat_on:
+			frappe.throw(_("Choose how often the appointment repeats"))
+		if data.repeat_till and frappe.utils.getdate(data.repeat_till) < frappe.utils.getdate(data.start):
+			frappe.throw(_("Repeat until cannot be before the start"))
+	for field in ("required_attendees", "optional_attendees"):
+		value = data.get(field) or []
+		if not isinstance(value, list) or not all(isinstance(email, str) for email in value):
+			frappe.throw(_("Attendees must be a list of email addresses"))
 
 	values = {field: data.get(field) for field in APPOINTMENT_FIELDS if field in data}
 	values["subject"] = data.subject.strip()
@@ -644,15 +704,17 @@ def save_appointment(appointment):
 	values["required_attendees"] = ", ".join(data.required_attendees or [])
 	values["optional_attendees"] = ", ".join(data.optional_attendees or [])
 
-	company_doc = frappe.get_doc("Company", _appointments_company())
+	department_doc = frappe.get_doc("Department", _appointments_department())
 	if data.name:
-		row = _company_row(company_doc, data.name)
+		row = _department_row(department_doc, data.name)
+		_check_not_being_sent(row)
 		row.update(values)
 	else:
-		row = company_doc.append(EVENT_TABLE, values)
-	_save_company_events(company_doc)
+		row = department_doc.append(EVENT_TABLE, values)
+	_save_department_events(department_doc)
 
-	# The sync writes its status straight to the row in the database: read it back.
+	# The sync writes its status straight to the row in the database: read it back ("pending"
+	# until the background job has sent the invite).
 	saved = frappe.get_doc("Team Daily Schedule", row.name)
 	return _serialize_appointment(saved)
 
@@ -661,8 +723,8 @@ def save_appointment(appointment):
 @_require_access
 def delete_appointment(name):
 	"""Remove a company appointment; the Mailcow sync cancels its invite."""
-	company_doc = frappe.get_doc("Company", _appointments_company())
-	_company_row(company_doc, name)
-	company_doc.set(EVENT_TABLE, [row for row in company_doc.get(EVENT_TABLE) if row.name != name])
-	_save_company_events(company_doc)
+	department_doc = frappe.get_doc("Department", _appointments_department())
+	_check_not_being_sent(_department_row(department_doc, name))
+	department_doc.set(EVENT_TABLE, [row for row in department_doc.get(EVENT_TABLE) if row.name != name])
+	_save_department_events(department_doc)
 	return {"deleted": name}

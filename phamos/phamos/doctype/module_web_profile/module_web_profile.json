@@ -25,6 +25,8 @@
   "image",
   "content_section",
   "translations",
+  "faqs",
+  "documentation",
   "mirrored_values"
  ],
  "fields": [
@@ -134,6 +136,20 @@
    "fieldtype": "Table",
    "label": "Texts per Language",
    "options": "Web Profile Content"
+  },
+  {
+   "description": "Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.",
+   "fieldname": "faqs",
+   "fieldtype": "Table",
+   "label": "FAQ",
+   "options": "Web Profile FAQ"
+  },
+  {
+   "description": "BookStack books shown as \"Documentation\" on the module page, in this order. Only books published on the website appear; the book page links back to this module.",
+   "fieldname": "documentation",
+   "fieldtype": "Table",
+   "label": "Documentation",
+   "options": "Web Profile Book"
   },
   {
    "fieldname": "mirrored_values",

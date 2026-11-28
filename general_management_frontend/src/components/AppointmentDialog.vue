@@ -1,5 +1,5 @@
 <template>
-	<!-- New / edit a company appointment (#1949): a row of the Company's Events table. -->
+	<!-- New / edit a company appointment (#1949): a row of the General Management Department's Event Schedule. -->
 	<Dialog :options="dialogOptions" :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)">
 		<template #body-content>
 			<form ref="formEl" class="space-y-4" @submit.prevent="save">
@@ -40,6 +40,10 @@
 								{{ __(DAY_LABELS[i]) }}
 							</button>
 						</div>
+						<!-- The start's weekday isn't ticked: the start is an extra first appointment. -->
+						<div v-if="startOutsideDays" class="text-xs text-ink-gray-5" role="status">
+							{{ __("The start is the first appointment. After it, the appointment repeats on the ticked days.") }}
+						</div>
 					</div>
 				</div>
 
@@ -50,9 +54,21 @@
 
 				<FormControl v-model="form.description" :label="__('Description')" type="textarea" size="sm" :rows="3" />
 
+				<div
+					v-if="appointment?.sync_error"
+					class="rounded border border-outline-red-1 bg-surface-red-1 px-2.5 py-2 text-xs text-ink-red-4"
+				>
+					{{ __("The invite was not sent: {0}", [appointment.sync_error]) }}
+				</div>
+				<div
+					v-else-if="sending"
+					class="rounded border border-outline-gray-2 bg-surface-gray-2 px-2.5 py-2 text-xs text-ink-gray-7"
+				>
+					{{ __("The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.") }}
+				</div>
 				<ErrorMessage v-if="error" :message="error" />
 
-				<div v-if="appointment?.name" class="border-t border-outline-gray-2 pt-3">
+				<div v-if="appointment?.name && !sending" class="border-t border-outline-gray-2 pt-3">
 					<Button v-if="!confirmingCancel" theme="red" variant="subtle" @click="confirmingCancel = true">
 						{{ __("Cancel appointment") }}
 					</Button>
@@ -74,7 +90,7 @@ import { computed, ref, watch } from "vue"
 import { Button, call, Dialog, ErrorMessage, FormControl } from "frappe-ui"
 import AttendeePicker from "@spa/components/AttendeePicker.vue"
 import { normalizeAttendees } from "@spa/utils/attendeePicker.js"
-import { WEEKDAYS } from "@spa/utils/appointments.js"
+import { startOutsideWeeklyDays, WEEKDAYS } from "@spa/utils/appointments.js"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
@@ -99,6 +115,8 @@ const saving = ref(false)
 const deleting = ref(false)
 const confirmingCancel = ref(false)
 const error = ref("")
+// A background job is sending this appointment's invite: no changes until it is done (#1949).
+const sending = computed(() => Boolean(props.appointment?.sending))
 
 const mailboxOptions = computed(() => [
 	{ label: __("Pick a mailbox…"), value: "" },
@@ -111,13 +129,21 @@ const dialogOptions = computed(() => ({
 	size: "2xl",
 	actions: [
 		{ label: __("Close"), variant: "subtle", onClick: () => emit("update:modelValue", false) },
-		{ label: saving.value ? __("Saving…") : __("Save and send"), variant: "solid", loading: saving.value, onClick: save },
+		{
+			label: saving.value ? __("Saving…") : __("Save and send"),
+			variant: "solid",
+			loading: saving.value,
+			disabled: sending.value,
+			onClick: save,
+		},
 	],
 }))
 
 /** "2026-12-01 10:00:00" <-> "2026-12-01T10:00" for datetime-local inputs. */
 const toInput = (value) => (value ? String(value).replace(" ", "T").slice(0, 16) : "")
 const fromInput = (value) => (value ? `${value.replace("T", " ")}:00`.slice(0, 19) : "")
+
+const startOutsideDays = computed(() => startOutsideWeeklyDays({ ...form.value, start: fromInput(form.value.start) }))
 
 function reset() {
 	const a = props.appointment || {}

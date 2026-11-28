@@ -63,8 +63,12 @@
 					<button
 						type="button"
 						class="flex w-full items-center gap-1.5 bg-surface-gray-1 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6 hover:bg-surface-gray-2 dark:bg-surface-gray-2"
-						:title="__('Add everyone in {0}', [group.label])"
-						@click="update(addDepartment(modelValue, group))"
+						:title="
+							departmentState(modelValue, group) === 'all'
+								? __('Remove everyone in {0}', [group.label])
+								: __('Add everyone in {0}', [group.label])
+						"
+						@click="update(toggleDepartment(modelValue, group))"
 					>
 						<FeatherIcon :name="groupIcon(group)" class="h-3 w-3" />
 						<span class="flex-1 truncate">{{ group.label }}</span>
@@ -97,13 +101,13 @@ import { Avatar, FeatherIcon, FormControl } from "frappe-ui"
 import {
 	SECTIONS,
 	addAttendees,
-	addDepartment,
 	departmentState,
 	isPicked,
 	moveAttendee,
 	peopleIndex,
 	personFor,
 	removeAttendee,
+	toggleDepartment,
 } from "@spa/utils/attendeePicker.js"
 import { __ } from "@spa/utils/i18n.js"
 

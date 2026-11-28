@@ -5,15 +5,13 @@ from frappe import _
 
 
 def get_data():
+	# Delivery Notes and Sales Invoices point at their MIS; the MIS keeps no link to them (#1987).
 	return {
-		"fieldname": "name",
+		"fieldname": "custom_monthly_implementation_summary",
 		"internal_links": {
-			"Sales Order": ["mis_delivery_notes", "sales_order"],
-			"Delivery Note": ["mis_delivery_notes", "delivery_note"],
-			"Sales Invoice": ["mis_sales_invoices", "sales_invoice"],
+			"Sales Order": ["sales_order_status_information", "sales_order"],
 		},
 		"transactions": [
 			{"label": _("Related"), "items": ["Sales Order", "Delivery Note", "Sales Invoice"]},
 		],
 	}
-

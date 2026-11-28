@@ -208,6 +208,10 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     groupedData[impl].nonBillable[idx] += row.non_billable_time_spent || 0;
                 });
 
+                // groupedData keeps 0 for tooltips and the legend; only the plotted areas blank open months.
+                const today = frappe.datetime.get_today();
+                const hours = values => phamos.open_months.blankOpenMonths(values, categories, today);
+
                 const series = [];
                 Object.entries(groupedData).forEach(([impl, data]) => {
                     // Skip Internal Projects if hidden
@@ -228,7 +232,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         series.push({
                             name: `${impl} - Billable`,
                             type: 'area',
-                            data: data.billable,
+                            data: hours(data.billable),
                             color: colors[0],
                             stack: 'time_spent'
                         });
@@ -237,7 +241,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         series.push({
                             name: `${impl} - Non-Billable`,
                             type: 'area',
-                            data: data.nonBillable,
+                            data: hours(data.nonBillable),
                             color: colors[1],
                             stack: 'time_spent'
                         });
@@ -247,7 +251,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         series.push({
                             name: `${impl} - Total`,
                             type: 'area',
-                            data: combinedData,
+                            data: hours(combinedData),
                             color: colors[0],
                             stack: 'time_spent'
                         });
@@ -256,14 +260,14 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         series.push({
                             name: `${impl} - Non-Billable`,
                             type: 'area',
-                            data: data.nonBillable,
+                            data: hours(data.nonBillable),
                             color: colors[1],
                             stack: 'time_spent'
                         });
                         series.push({
                             name: `${impl} - Billable`,
                             type: 'area',
-                            data: data.billable,
+                            data: hours(data.billable),
                             color: colors[0],
                             stack: 'time_spent'
                         });
@@ -292,8 +296,9 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     }
                     allMonthMessages += `<hr/>`;
 
-                    // Sum of averages = total prediction
-                    return Object.values(implAverages).reduce((a, b) => a + b, 0);
+                    // Sum of averages = total prediction. No prediction: a gap in the line, not a drop to 0.
+                    const averages = Object.values(implAverages);
+                    return averages.length ? averages.reduce((a, b) => a + b, 0) : null;
                 });
 
                 // Push cumulative dotted line
@@ -916,7 +921,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
         renderPage(1);
     }
 
-    load_chart();
+    frappe.require("open_months.bundle.js").then(load_chart);
     Object.values(filters).forEach(ctrl => {
         ctrl.df.onchange = () => schedule_chart_reload();
     });
