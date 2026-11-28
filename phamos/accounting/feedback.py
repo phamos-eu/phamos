@@ -20,7 +20,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cint, cstr, flt, getdate, now_datetime
+from frappe.utils import cint, cstr, flt, getdate
 
 LEARNED_FIELDS = (
 	"supplier_reference", "posting_date", "due_date", "sum", "net_total", "total_taxes", "supplier",
@@ -71,29 +71,16 @@ def ai_user():
 def collect(doc, user=None):
 	"""After a person saved a receipt: record corrections on its latest run and suggest rules.
 	`user` is who made the change (default: the session user)."""
+	from phamos.ai_agents import feedback
+
 	user = user or frappe.session.user
-	if not doc.get("ai_run") or user == ai_user():
+	if not doc.get("ai_run") or user == ai_user() or feedback.is_ai_user(user):
 		return None
 	run = frappe.get_doc("AI Agent Run", doc.ai_run)
 	if run.status != "Completed":
 		return None
 	found = corrections_for(doc, run)
-	previous = {c["field"]: c for c in frappe.parse_json(run.corrections or "[]") or []}
-	now = now_datetime()
-	for c in found:
-		old = previous.get(c["field"])
-		c["user"] = old["user"] if old and old.get("human_value") == c["human_value"] else user
-		c["at"] = old["at"] if old and old.get("human_value") == c["human_value"] else str(now)
-	new = [c for c in found if c["field"] not in previous or previous[c["field"]].get("human_value") != c["human_value"]]
-	values = {"corrections": frappe.as_json(found) if found else None, "feedback_collected_at": now}
-	if found:
-		values.update(outcome="Corrected", corrected_by=user)
-	elif doc.status in DONE_STATUSES:
-		values["outcome"] = "Accepted"
-	else:
-		values["outcome"] = None
-	run.db_set(values, update_modified=False)
-	for c in new:
+	for c in feedback.record(run, found, user, done=doc.status in DONE_STATUSES):
 		suggest_rule(doc, run, c)
 	return found
 
@@ -157,12 +144,13 @@ def suggest_rule(doc, run, correction):
 	if field not in RULE_FIELDS or not doc.supplier:
 		return None
 	key = f"{doc.supplier}::{field}"
-	existing = frappe.db.get_value("AI Skill", {"suggestion_key": key}, ["name", "dismissed", "occurrences", "origin"], as_dict=True)
-	if existing:
-		if not existing.dismissed and existing.origin == "Suggested":
-			frappe.db.set_value("AI Skill", existing.name, {"occurrences": (existing.occurrences or 0) + 1, "source_run": run.name})
-		return existing.name
+	from phamos.ai_agents import feedback
 
+	return feedback.suggestion(key, run, lambda: _rule_skill(doc, run, correction))
+
+
+def _rule_skill(doc, run, correction):
+	field = correction["field"]
 	text = cstr(doc.get("ai_document_text"))
 	human_label = label_before(text, field, correction["human_value"]) if text else None
 	ai_label = label_before(text, field, correction["ai_value"]) if text else None
@@ -176,57 +164,34 @@ def suggest_rule(doc, run, correction):
 		action = _("Read the {0} carefully: on {1} documents it was read as \"{2}\" but is \"{3}\".").format(
 			what, supplier_name, correction["ai_value"], correction["human_value"])
 	user = frappe.utils.get_fullname(correction.get("user") or frappe.session.user)
-	agent = frappe.db.get_value("AI Agent Run", run.name, "agent")
-	skill = frappe.get_doc(
-		{
-			"doctype": "AI Skill",
-			"skill_name": _("Read {0}: {1}").format(supplier_name, what)[:140],
-			"agent": agent,
-			"enabled": 0,
-			"phase": "Extract",
-			"order": 50,
-			"origin": "Suggested",
-			"party_doctype": "Supplier",
-			"party": doc.supplier,
-			"on_fail": "Continue",
-			"occurrences": 1,
-			"source_run": run.name,
-			"suggestion_key": key,
-			"description": _("Suggested after {0} corrected the {1} on {2}.").format(user, what, doc.name),
-			"prompt_rules": [
-				{
-					"enabled": 1,
-					"order": 1,
-					"case_description": _("Documents from {0}").format(supplier_name),
-					"action": action,
-					"reason": _("{0} corrected \"{1}\" to \"{2}\" on {3} ({4}).").format(
-						user, correction["ai_value"], correction["human_value"], doc.name, run.name),
-				}
-			],
-		}
-	)
-	skill.insert(ignore_permissions=True)
-	return skill.name
+	return {
+		"skill_name": _("Read {0}: {1}").format(supplier_name, what)[:140],
+		"phase": "Extract",
+		"order": 50,
+		"party_doctype": "Supplier",
+		"party": doc.supplier,
+		"on_fail": "Continue",
+		"description": _("Suggested after {0} corrected the {1} on {2}.").format(user, what, doc.name),
+		"prompt_rules": [
+			{
+				"enabled": 1,
+				"order": 1,
+				"case_description": _("Documents from {0}").format(supplier_name),
+				"action": action,
+				"reason": _("{0} corrected \"{1}\" to \"{2}\" on {3} ({4}).").format(
+					user, correction["ai_value"], correction["human_value"], doc.name, run.name),
+			}
+		],
+	}
 
 
 def accept_suggestion(name):
-	skill = frappe.get_doc("AI Skill", name)
-	skill.check_permission("write")
-	if skill.origin != "Suggested":
-		frappe.throw(_("{0} is not a suggestion.").format(name))
-	skill.enabled = 1
-	skill.origin = "Learned"
-	skill.dismissed = 0
-	skill.save()
-	return skill.name
+	from phamos.ai_agents import feedback
+
+	return feedback.accept_suggestion(name)
 
 
 def dismiss_suggestion(name):
-	skill = frappe.get_doc("AI Skill", name)
-	skill.check_permission("write")
-	if skill.origin != "Suggested":
-		frappe.throw(_("{0} is not a suggestion.").format(name))
-	skill.dismissed = 1
-	skill.enabled = 0
-	skill.save()
-	return skill.name
+	from phamos.ai_agents import feedback
+
+	return feedback.dismiss_suggestion(name)

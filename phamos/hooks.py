@@ -371,6 +371,8 @@ permission_query_conditions = {
 	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_query",
 	"Idea Vote": "phamos.cockpits.permissions.idea_vote_query",
 	"Version": "phamos.cockpits.permissions.version_query",
+	# trainers see only the Issue Assistant's skills (#2225)
+	"AI Skill": "phamos.ai_agents.permissions.ai_skill_query",
 }
 
 has_permission = {
@@ -381,6 +383,7 @@ has_permission = {
 	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_has_permission",
 	"Idea Vote": "phamos.cockpits.permissions.idea_vote_has_permission",
 	"Version": "phamos.cockpits.permissions.version_has_permission",
+	"AI Skill": "phamos.ai_agents.permissions.ai_skill_has_permission",
 }
 
 # DocType Class
@@ -417,6 +420,8 @@ doc_events = {
 			"phamos.api.issue_chat.sync_assignee",
 			# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
 			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+			# A person changing the Issue Assistant's assignment is a correction (#2225).
+			"phamos.ai_agents.agents.issue_feedback.on_todo_update",
 		],
 		"on_trash": [
 			"phamos.cockpits.todo_hooks.on_trash",
@@ -461,7 +466,11 @@ doc_events = {
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
 	"Issue": {
-		"on_update": "phamos.api.issue_chat.on_record_update",
+		"on_update": [
+			"phamos.api.issue_chat.on_record_update",
+			# the Issue Assistant learns from people correcting it (#2225)
+			"phamos.ai_agents.agents.issue_feedback.on_issue_update",
+		],
 		# the Issue Assistant's first look at a new Issue, in the background (#2111)
 		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
 	},
@@ -676,6 +685,8 @@ scheduler_events = {
         "phamos.marketing.billing.sync_payment_status",
         # Employment Contract: Upcoming -> Active -> Expired as dates pass (#1596)
         "phamos.phamos.doctype.employment_contract.employment_contract.update_contract_statuses",
+        # Issue Assistant: runs nobody corrected become Accepted (#2225)
+        "phamos.ai_agents.agents.issue_feedback.mark_accepted_daily",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)

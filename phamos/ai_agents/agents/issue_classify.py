@@ -49,7 +49,12 @@ def run_classify(ctx, skill):
 	}
 	candidates = person_candidates(doc, exclude={ctx.agent.user})
 	images = screenshot_images(doc)
-	prompt = build_prompt(doc, options, candidates, bool(images))
+	from phamos.ai_agents import runner
+	from phamos.ai_agents.agents.issue import get_party
+
+	ctx.party = get_party(doc)  # Identify may have set the Customer since the run started
+	rules = runner.prompt_rules(ctx, "Classify")  # accepted rules for this Customer (#2225)
+	prompt = build_prompt(doc, options, candidates, bool(images), rules)
 	try:
 		answer, model = llm.chat_json(prompt, model=ctx.agent.llm_model or None, system=SYSTEM, images=images)
 	except llm.LLMNotConfigured as e:
@@ -88,7 +93,7 @@ def implementation_of(doc):
 	return None
 
 
-def build_prompt(doc, options, candidates, has_image):
+def build_prompt(doc, options, candidates, has_image, rules=None):
 	from phamos.ai_agents.agents.issue import customer_of, sender_text, source_text
 
 	implementation = implementation_of(doc)
@@ -117,8 +122,13 @@ def build_prompt(doc, options, candidates, has_image):
 		},
 		indent=1,
 	)
+	learned = ""
+	if rules:
+		learned = "Rules people taught you for this customer; follow them when they fit:\n" + "\n".join(
+			f"- When: {r.case_description} Then: {r.action}" for r in rules) + "\n\n"
 	return (
 		f"The Issue and the lists to choose from:\n{data}\n\n"
+		+ learned +
 		f"Write all texts in this language: {frappe.local.lang or 'en'}.\n"
 		"Answer with one JSON object with exactly these keys and nothing else (do not repeat the input):\n"
 		+ frappe.as_json(ANSWER_FORMAT, indent=1)

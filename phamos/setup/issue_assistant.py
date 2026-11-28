@@ -73,6 +73,7 @@ CUSTOMER_FIELDS = [
 
 def after_migrate():
 	ensure_role()
+	ensure_trainer_role()
 	user = ensure_user()
 	bot = ensure_raven_bot()
 	ensure_settings(user)
@@ -98,8 +99,29 @@ def ensure_role():
 			update_permission_property(doctype, ASSISTANT_ROLE, 0, ptype, 1, validate=False)
 
 
-def _has_role_rule(doctype):
-	filters = {"parent": doctype, "role": ASSISTANT_ROLE, "permlevel": 0}
+TRAINER_RIGHTS = {"AI Skill": ("read", "write"), "AI Agent Run": ("read",)}
+
+
+def ensure_trainer_role():
+	"""Issue Assistant Trainer (#2225): accepts, edits and dismisses the Issue Assistant's suggestions.
+	Limited to that agent's skills by phamos/ai_agents/permissions.py."""
+	from phamos.ai_agents.permissions import TRAINER_ROLE
+
+	if not frappe.db.exists("Role", TRAINER_ROLE):
+		frappe.get_doc({"doctype": "Role", "role_name": TRAINER_ROLE, "desk_access": 1, "is_custom": 1}).insert(
+			ignore_permissions=True)
+	for doctype, rights in TRAINER_RIGHTS.items():
+		if not _has_role_rule(doctype, TRAINER_ROLE):
+			add_permission(doctype, TRAINER_ROLE, permlevel=0, ptype="read")
+		rule = frappe.db.get_value("Custom DocPerm", {"parent": doctype, "role": TRAINER_ROLE, "permlevel": 0},
+			list(rights), as_dict=True) or {}
+		for ptype in rights:
+			if not rule.get(ptype):  # setting a right clears caches: only when it is missing
+				update_permission_property(doctype, TRAINER_ROLE, 0, ptype, 1, validate=False)
+
+
+def _has_role_rule(doctype, role=ASSISTANT_ROLE):
+	filters = {"parent": doctype, "role": role, "permlevel": 0}
 	return frappe.db.exists("Custom DocPerm", filters) or frappe.db.exists("DocPerm", filters)
 
 

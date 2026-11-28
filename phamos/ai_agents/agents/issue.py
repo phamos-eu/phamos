@@ -211,7 +211,15 @@ def run_classify(ctx, skill):
 	return issue_classify.run_classify(ctx, skill)
 
 
-SKILLS = {"check_gate": run_check_gate, "identify": run_identify, "classify": run_classify}
+def run_sender_mapping(ctx, skill):
+	"""An accepted mapping rule (#2225); applied by Identify, this step only reports a match."""
+	from phamos.ai_agents.agents import issue_identify
+
+	return issue_identify.run_sender_mapping(ctx, skill)
+
+
+SKILLS = {"check_gate": run_check_gate, "identify": run_identify, "classify": run_classify,
+	"sender_mapping": run_sender_mapping}
 
 
 def get_party(doc):

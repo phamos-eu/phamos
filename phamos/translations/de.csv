@@ -3360,3 +3360,21 @@ Average,Durchschnitt
 Internal,Intern
 assigning {0} without you naming them,"{0} zuweisen, ohne dass Sie die Person nennen"
 The reply could not be posted: {0},Die Antwort konnte nicht gepostet werden: {0}
+Learning,Lernen
+Accept after (days),Akzeptiert nach (Tagen)
+Statistics window (days),Statistikzeitraum (Tage)
+A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later correction still counts (#2225).,"Ein Lauf, den in diesen Tagen niemand korrigiert, gilt als akzeptiert (früher, wenn die Anfrage geschlossen wird). Eine spätere Korrektur zählt trotzdem (#2225)."
+How far back the correction rates look.,Wie weit die Korrekturquoten zurückreichen.
+Issue Assistant Trainer,Anfrage-Assistent-Trainer
+An AI agent can't accept or dismiss suggestions.,Ein KI-Agent kann Vorschläge weder annehmen noch verwerfen.
+E-mails from {0}: {1} {2},E-Mails von {0}: {1} {2}
+Suggested after {0} changed {1} from {2} to {3} on {4}.,"Vorgeschlagen, nachdem {0} {1} in {4} von {2} auf {3} geändert hat."
+Suggested after {0} corrected the {1} on {2}.,"Vorgeschlagen, nachdem {0} {1} in {2} korrigiert hat."
+"Issues from {0} like ""{1}""",Anfragen von {0} wie „{1}“
+"{0} changed ""{1}"" to ""{2}"" on {3} ({4}).",{0} hat „{1}“ in {3} auf „{2}“ geändert ({4}).
+"Suggest {0} as the person for such Issues, not {1}.","Für solche Anfragen {0} als Person vorschlagen, nicht {1}."
+Don't suggest {0} as the person for such Issues.,Für solche Anfragen {0} nicht als Person vorschlagen.
+"Such Issues have the {0} ""{1}"", not ""{2}"".","Solche Anfragen haben {0} „{1}“, nicht „{2}“."
+"Leave the {0} empty for such Issues instead of ""{1}"".",Bei solchen Anfragen {0} leer lassen statt „{1}“.
+Learned rule for {0},Gelernte Regel für {0}
+Not this sender,Nicht dieser Absender

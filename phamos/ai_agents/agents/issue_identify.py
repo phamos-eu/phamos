@@ -70,6 +70,7 @@ def identify(doc):
 
 	email = sender_email(doc)
 	out = {"email": email, "employee": _result()}
+	learned = learned_values(email)  # accepted mapping rules (#2225) come before everything found by data
 	party = find_party(email) if email else frappe._dict(customers=[], customer=None, contact=None, confidence=NONE)
 	employee = employee_for_email(email) if email else None
 	if employee:
@@ -82,6 +83,8 @@ def identify(doc):
 		out["customer"] = _result(doc.customer, REVIEW, candidates=list(party.customers), via="erpnext")
 	elif doc.get("customer"):
 		out["customer"] = _result(doc.customer, STRONG, via="issue")
+	elif learned.get("customer"):
+		out["customer"] = _result(learned["customer"], STRONG, via="rule")
 	elif party.customer and party.confidence == STRONG:
 		out["customer"] = _result(party.customer, STRONG, via="contact")
 	elif len(party.customers or []) > 1:
@@ -93,20 +96,24 @@ def identify(doc):
 	contact_strong = bool(party.contact) and out["customer"]["confidence"] == STRONG and (
 		out["customer"]["via"] == "contact" or out["customer"]["value"] in (party.customers or []))
 	out["contact"] = _result(party.contact, STRONG if contact_strong else NONE, via="email")
+	if learned.get("contact"):
+		out["contact"] = _result(learned["contact"], STRONG, via="rule")
 
-	out["implementation"] = find_implementation(doc, out["customer"], email)
+	out["implementation"] = find_implementation(doc, out["customer"], email, learned)
 	# an Implementation found by a stakeholder row tells the Customer too (Implementation.customer is required)
 	if out["customer"]["confidence"] == NONE and out["implementation"]["confidence"] == STRONG:
 		customer = frappe.db.get_value("Implementation", out["implementation"]["value"], "customer")
 		if customer:
 			out["customer"] = _result(customer, STRONG, via="implementation")
-	out["project"] = find_project(doc, out["implementation"])
+	out["project"] = find_project(doc, out["implementation"], learned)
 	return out
 
 
-def find_implementation(doc, customer, email):
+def find_implementation(doc, customer, email, learned=None):
 	if doc.get("custom_implementation"):
 		return _result(doc.custom_implementation, STRONG, via="issue")
+	if (learned or {}).get("custom_implementation"):
+		return _result(learned["custom_implementation"], STRONG, via="rule")
 	if customer["confidence"] == STRONG:
 		names = frappe.get_all("Implementation", filters={"customer": customer["value"],
 			"status": ("not in", CLOSED_IMPLEMENTATION)}, pluck="name", order_by="name asc")
@@ -134,9 +141,11 @@ def find_implementation(doc, customer, email):
 	return _result()
 
 
-def find_project(doc, implementation):
+def find_project(doc, implementation, learned=None):
 	if not project_is_empty(doc):
 		return _result(doc.project, STRONG, via="issue")
+	if (learned or {}).get("project"):
+		return _result(learned["project"], STRONG, via="rule")
 	if implementation["confidence"] != STRONG:
 		return _result()
 	names = frappe.get_all("Project", filters={"custom_implementation": implementation["value"], "status": "Open"},
@@ -146,6 +155,46 @@ def find_project(doc, implementation):
 	if names:
 		return _result(confidence=REVIEW, candidates=names, via="implementation")
 	return _result()
+
+
+def learned_values(email):
+	"""{field: value} from the assistant's accepted mapping rules (#2225) for this sender: an exact e-mail
+	rule wins over a domain rule. Values whose record no longer exists are left out."""
+	from phamos.ai_agents.agents.issue_feedback import MAPPING_HANDLER, agent_name
+
+	email = (email or "").strip().lower()
+	if not email:
+		return {}
+	domain = email.split("@")[-1]
+	rows = frappe.get_all("AI Skill", filters={"agent": agent_name(), "handler": MAPPING_HANDLER, "enabled": 1,
+		"dismissed": 0}, fields=["params"], order_by="`order` asc, creation asc")
+	by_domain, by_email = {}, {}
+	for row in rows:
+		params = frappe.parse_json(row.params or "{}") or {}
+		match = (params.get("match") or "").strip().lower()
+		target = by_email if match == email else by_domain if match == domain else None
+		if target is None:
+			continue
+		for field, value in (params.get("values") or {}).items():
+			if field in LINK_DOCTYPES and value and frappe.db.exists(LINK_DOCTYPES[field], value):
+				target.setdefault(field, value)
+	return {**by_domain, **by_email}
+
+
+LINK_DOCTYPES = {"customer": "Customer", "contact": "Contact", "custom_implementation": "Implementation",
+	"project": "Project"}
+
+
+def run_sender_mapping(ctx, skill):
+	"""Step of an accepted mapping rule (#2225): says whether it matches this sender. Identify applies it."""
+	from phamos.ai_agents.context import SKIPPED
+
+	params = frappe.parse_json(skill.params or "{}") or {}
+	match = (params.get("match") or "").strip().lower()
+	email = (sender_email(ctx.doc) or "").strip().lower()
+	if match and email and match in (email, email.split("@")[-1]):
+		return SkillResult(status=PASSED, message=_("Learned rule for {0}").format(match))
+	return SkillResult(status=SKIPPED, message=_("Not this sender"))
 
 
 def changed_by_hand(doc, field):

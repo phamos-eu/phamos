@@ -11,9 +11,9 @@ class AISkill(Document):
 		if self.party and not self.party_doctype:
 			frappe.throw(_("Set the party type for the party {0}.").format(self.party))
 		if self.handler:
-			from phamos.ai_agents.registry import get_handlers
+			from phamos.ai_agents.registry import handlers_of
 
-			handlers = get_handlers(self.agent)
+			handlers = handlers_of(self.agent)
 			if self.handler not in handlers:
 				frappe.throw(
 					_("Unknown handler {0}. The agent offers: {1}").format(self.handler, ", ".join(sorted(handlers)))

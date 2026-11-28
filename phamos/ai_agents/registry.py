@@ -20,6 +20,12 @@ def load_handler_module(path):
 def get_handlers(agent):
 	"""Names of the handlers an agent offers (for the AI Skill form)."""
 	frappe.has_permission("AI Agent", "read", doc=agent, throw=True)
+	return handlers_of(agent)
+
+
+def handlers_of(agent):
+	"""Names of the handlers an agent offers, without a permission check (server-side validation: a suggestion
+	is saved in the session of the person whose correction made it, #2225)."""
 	module_path = frappe.db.get_value("AI Agent", agent, "handler_module")
 	if not module_path:
 		return {}

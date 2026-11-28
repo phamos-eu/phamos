@@ -290,8 +290,8 @@ def get_learning(doctype="Accounting Receipt", days=90):
 
 @frappe.whitelist(methods=["POST"])
 def accept_suggestion(name):
-	"""Turn a suggested rule on: it applies to this supplier's documents from now on."""
-	from phamos.accounting import feedback
+	"""Turn a suggested rule on: it applies from now on. Never by an AI agent's user (#2225)."""
+	from phamos.ai_agents import feedback
 
 	feedback.accept_suggestion(name)
 	return get_ai_skill(name)
@@ -300,7 +300,7 @@ def accept_suggestion(name):
 @frappe.whitelist(methods=["POST"])
 def dismiss_suggestion(name):
 	"""Reject a suggested rule; the same suggestion is not made again."""
-	from phamos.accounting import feedback
+	from phamos.ai_agents import feedback
 
 	feedback.dismiss_suggestion(name)
 	return {"name": name, "dismissed": 1}

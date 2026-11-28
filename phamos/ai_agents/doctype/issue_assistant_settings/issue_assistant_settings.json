@@ -13,7 +13,11 @@
   "implementations_section",
   "implementations_html",
   "privacy_section",
-  "excluded_doctypes"
+  "excluded_doctypes",
+  "learning_section",
+  "accept_after_days",
+  "column_break_learning",
+  "stats_window_days"
  ],
  "fields": [
   {
@@ -71,6 +75,31 @@
    "label": "Excluded Pages",
    "options": "Issue Assistant Excluded DocType",
    "description": "Reports from these pages never go to the AI model (HR, salary, leave; #1904)."
+  },
+  {
+   "fieldname": "learning_section",
+   "fieldtype": "Section Break",
+   "label": "Learning"
+  },
+  {
+   "fieldname": "accept_after_days",
+   "fieldtype": "Int",
+   "label": "Accept after (days)",
+   "default": "7",
+   "non_negative": 1,
+   "description": "A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later correction still counts (#2225)."
+  },
+  {
+   "fieldname": "column_break_learning",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stats_window_days",
+   "fieldtype": "Int",
+   "label": "Statistics window (days)",
+   "default": "90",
+   "non_negative": 1,
+   "description": "How far back the correction rates look."
   }
  ],
  "issingle": 1,
