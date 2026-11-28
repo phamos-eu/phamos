@@ -20,6 +20,9 @@ from frappe import _
 from frappe.utils import add_days, cint, cstr, now_datetime
 
 SUGGESTED, LEARNED = "Suggested", "Learned"
+# runs that answered someone in a chat (#2116) set what that person asked for: they are no AI judgement to
+# learn from, so the loop leaves them out (local test of #2226, 2026-11-28)
+NOT_LEARNED_FROM = ("Chat",)
 ACCEPTED, CORRECTED = "Accepted", "Corrected"
 
 
@@ -38,7 +41,8 @@ def is_ai_user(user):
 def latest_run(agent, doctype, name):
 	"""The agent's latest completed run on the document, or None."""
 	run = frappe.db.get_value("AI Agent Run", {"agent": agent, "reference_doctype": doctype,
-		"reference_name": name, "status": "Completed"}, "name", order_by="creation desc")
+		"reference_name": name, "status": "Completed", "trigger": ("not in", NOT_LEARNED_FROM)}, "name",
+		order_by="creation desc")
 	return frappe.get_doc("AI Agent Run", run) if run else None
 
 
@@ -122,7 +126,8 @@ def dismiss_suggestion(name):
 def mark_accepted(agent, days, closed=None):
 	"""Runs of the agent nobody corrected within `days` after they finished become Accepted; so do runs on
 	documents `closed(doctype, names)` names as done. Returns how many were marked."""
-	runs = frappe.get_all("AI Agent Run", filters={"agent": agent, "status": "Completed", "outcome": ("in", ("", None))},
+	runs = frappe.get_all("AI Agent Run", filters={"agent": agent, "status": "Completed", "outcome": ("in", ("", None)),
+		"trigger": ("not in", NOT_LEARNED_FROM)},
 		fields=["name", "reference_doctype", "reference_name", "finished_at", "creation"], limit_page_length=5000)
 	if not runs:
 		return 0
@@ -148,6 +153,7 @@ def rates(agent, days, groups=None):
 	{"runs", "corrected_runs", "fields": {field: {"set", "corrected"}}, "groups": {group: {"set", "corrected"}}}.
 	`groups` maps a field to the step it belongs to (e.g. identify, classify, person)."""
 	rows = frappe.get_all("AI Agent Run", filters={"agent": agent, "status": "Completed",
+		"trigger": ("not in", NOT_LEARNED_FROM),
 		"creation": (">=", add_days(now_datetime(), -cint(days)))}, fields=["fields_set", "corrections", "outcome"],
 		limit_page_length=10000)
 	fields = {}
