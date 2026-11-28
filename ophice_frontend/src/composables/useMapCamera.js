@@ -214,6 +214,16 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 		for (const id of pointers.keys()) capture(target, id)
 	}
 
+	/**
+	 * A press on a chip or button. A finger is only noted, so a second finger can pinch with it;
+	 * it pans only as the second finger of a gesture (isPrimary false) that already has a finger
+	 * down. A primary touch never pans from a chip, even if an old touch was never ended.
+	 */
+	function onChipPointerDown(event) {
+		if (event.pointerType !== "touch") return
+		onPointerDown(event, { pan: !event.isPrimary && pointers.size > 0 })
+	}
+
 	function onPointerMove(event) {
 		const at = pointers.get(event.pointerId)
 		if (!at) return
@@ -350,6 +360,7 @@ export function useMapCamera({ view: viewSource, grid, image, storageKey, startZ
 		panBy,
 		springBack,
 		onPointerDown,
+		onChipPointerDown,
 		onPointerMove,
 		onPointerUp,
 		onClickCapture,
