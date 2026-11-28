@@ -167,7 +167,7 @@ class TestTeamFollows(TeamAssignmentTestCase):
 
 		def get_all(doctype, *args, **kwargs):
 			if doctype == "Employment Contract":
-				return [frappe._dict(weekly_hours=20)] if kwargs["filters"]["employee"] == self.anna else []
+				return [frappe._dict(weekly_hours=20, effective_from=date(2026, 1, 1), valid_until=None, fte_percentage=50)] if kwargs["filters"]["employee"] == self.anna else []
 			return real_get_all(doctype, *args, **kwargs)
 
 		with patch.object(utils.frappe, "get_all", side_effect=get_all):

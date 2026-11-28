@@ -77,7 +77,10 @@
   "ai_accountant_section",
   "ai_accountant_enabled",
   "column_break_ai_accountant",
-  "ai_accountant_user"
+  "ai_accountant_user",
+  "team_cockpit_tab",
+  "team_cockpit_section",
+  "show_member_hours_to_team_leads"
  ],
  "fields": [
   {
@@ -482,12 +485,29 @@
    "label": "AI Accountant User",
    "options": "User",
    "description": "System user the AI Accountant works as, so its changes are separated from human corrections in the document history."
+  },
+  {
+   "fieldname": "team_cockpit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Team Cockpit"
+  },
+  {
+   "fieldname": "team_cockpit_section",
+   "fieldtype": "Section Break",
+   "label": "Statistics"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_member_hours_to_team_leads",
+   "fieldtype": "Check",
+   "label": "Show member hours to team leads",
+   "description": "Team leads and co-leads see logged and available hours of each member on the Team Cockpit's Statistics page. Members always see their own. Switch on only after the privacy owner has confirmed it (#1975)."
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 20:00:00.000000",
+ "modified": "2026-11-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
