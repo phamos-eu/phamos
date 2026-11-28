@@ -12,6 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from phamos.api import team_cockpit
 from phamos.cockpits import team_hours, teams
 from phamos.phamos import team_capacity_utils as utils
+from phamos.phamos.doctype.team_assignment import team_assignment as ta
 from phamos.tests.test_team_assignment import TEAM_A, TeamAssignmentTestCase
 
 # November 2026: Monday 2nd to Friday 6th is one working week
@@ -36,7 +37,8 @@ class TestAvailableHours(TeamAssignmentTestCase):
 		contract = frappe._dict(effective_from=date(2026, 1, 1), valid_until=None, weekly_hours=30, fte_percentage=75)
 		with patch.object(utils, "_contract_on", return_value=contract):
 			self.assertEqual(team_hours.available_hours(self.anna, [(date(2026, 11, 2), date(2026, 11, 8))]), (30, True))
-			self.assertEqual(team_hours.fte(self.anna, [WEEK]), 0.75)
+			days = team_hours.member_days(self.anna, [WEEK])
+			self.assertTrue(all(d.fte == 0.75 for d in days.values()))
 
 	def test_neither_source_means_unknown(self):
 		self.assertEqual(team_hours.available_hours(self.anna, [WEEK]), (0, False))
@@ -51,11 +53,9 @@ class TestAvailableHours(TeamAssignmentTestCase):
 	def test_only_days_in_the_team_count(self):
 		self.assign(self.anna, TEAM_A, "2026-11-04")
 		frappe.local._team_capacity_cache = None  # the assignment's sync cached "no hours"
-		with patch.object(utils, "_weekly_working_hours", return_value=[_wwh(8)]), patch.object(
-			team_hours, "logged_hours", return_value=dict.fromkeys(team_hours.GROUPS, 0.0)
-		):
-			rows = team_hours.member_stats(TEAM_A, *WEEK)
-		self.assertEqual([(r.employee, r.available) for r in rows], [(self.anna, 24)])
+		periods = ta.members_between(TEAM_A, *WEEK)
+		with patch.object(utils, "_weekly_working_hours", return_value=[_wwh(8)]):
+			self.assertEqual(team_hours.available_hours(self.anna, periods[self.anna]), (24, True))
 
 
 class TestHourGroups(FrappeTestCase):
@@ -67,18 +67,55 @@ class TestHourGroups(FrappeTestCase):
 		self.assertEqual(team_hours.hour_group(frappe._dict(row, internal_customer=1)), "internal")
 		self.assertEqual(team_hours.hour_group(frappe._dict(row, project=None)), "internal")
 
-	def test_rates_leave_out_members_without_hours(self):
+	def test_rates_leave_out_days_without_hours(self):
+		def day(available, known, fte, billable=0.0, non_billable=0.0, internal=0.0):
+			return frappe._dict(available=available, known=known, fte=fte, billable=billable, non_billable=non_billable, internal=internal)
+
+		# A: a whole working week known, 1.0 FTE, 30 h logged (20 billable)
+		a_days = {date(2026, 11, 2 + i): day(8, True, 1, billable=4, internal=2) for i in range(5)}
+		# B: hours unknown, no contract; 10 h logged
+		b_days = {date(2026, 11, 2): day(0, False, 0, billable=10)}
 		rows = [
-			frappe._dict(known=True, available=40, logged=30, billable=20, non_billable=5, internal=5, fte=1),
-			frappe._dict(known=False, available=None, logged=10, billable=10, non_billable=0, internal=0, fte=0),
+			team_hours.member_row("A", "A", a_days, *WEEK),
+			team_hours.member_row("B", "B", b_days, *WEEK),
 		]
-		totals = team_hours.totals(rows)
-		self.assertEqual(totals.booked_rate, 75)
-		self.assertEqual(totals.billable_rate, 50)
+		totals = team_hours.totals(rows, 5)
+		self.assertEqual((totals.booked_rate, totals.billable_rate), (75, 50))
 		# the absolute totals still include everyone
 		self.assertEqual(totals.logged, 40)
-		# only members with a contract FTE: 30 h / 1 FTE, the other 10 h have no FTE
+		# only hours on days with a contract FTE: 30 h / 1 FTE
 		self.assertEqual(totals.hours_per_fte, 30)
+		self.assertFalse(rows[1].known)
+
+	def test_hours_per_fte_weights_part_period_members(self):
+		def day(fte, hours):
+			return frappe._dict(available=8, known=True, fte=fte, billable=hours, non_billable=0.0, internal=0.0)
+
+		# A in the team all 30 days, B (also 1.0 FTE) only the last 6 days
+		a_days = {date(2026, 11, i): day(1, 5) for i in range(1, 31)}
+		b_days = {date(2026, 11, i): day(1, 3) for i in range(25, 31)}
+		rows = [
+			team_hours.member_row("A", "A", a_days, date(2026, 11, 1), date(2026, 11, 30)),
+			team_hours.member_row("B", "B", b_days, date(2026, 11, 1), date(2026, 11, 30)),
+		]
+		totals = team_hours.totals(rows, 30)
+		# 168 h over 1.2 FTE, not over 2
+		self.assertEqual((totals.fte, totals.hours_per_fte), (1.2, 140))
+
+
+class TestPeriods(FrappeTestCase):
+	def test_windows_compare_the_same_days(self):
+		w = team_hours.month_windows(date(2026, 3, 31))
+		self.assertEqual(w["current"], (date(2026, 3, 1), date(2026, 3, 31)))
+		# February has no 31st: the whole February
+		self.assertEqual(w["previous"], (date(2026, 2, 1), date(2026, 2, 28)))
+		self.assertEqual(w["last_year"], (date(2025, 3, 1), date(2025, 3, 31)))
+
+	def test_leap_day(self):
+		w = team_hours.month_windows(date(2028, 2, 29))
+		self.assertEqual(w["previous"], (date(2028, 1, 1), date(2028, 1, 29)))
+		self.assertEqual(w["last_year"], (date(2027, 2, 1), date(2027, 2, 28)))
+		self.assertEqual(team_hours.same_day_last_year(date(2028, 2, 29)), date(2027, 2, 28))
 
 
 class TestLoggedHours(TeamAssignmentTestCase):
@@ -104,11 +141,12 @@ class TestLoggedHours(TeamAssignmentTestCase):
 		if internal or frappe.db.get_value("Customer", customer, "is_internal_customer"):
 			self.skipTest("the first customer project is internal")
 		# drafts count, as in the Team Capacity Overview and the Implementation (docstatus != 2)
-		logged = team_hours.logged_hours(self.anna, [WEEK])
-		self.assertEqual((logged["billable"], logged["internal"]), (3, 2))
+		logged = team_hours._logged_by_day(self.anna, *WEEK)
+		self.assertEqual(logged[date(2026, 11, 2)]["billable"], 3)
+		self.assertEqual(logged[date(2026, 11, 3)]["internal"], 2)
 		timesheet.submit()
 		timesheet.cancel()
-		self.assertEqual(sum(team_hours.logged_hours(self.anna, [WEEK]).values()), 0)
+		self.assertEqual(team_hours._logged_by_day(self.anna, *WEEK), {})
 
 
 class TestWhoSeesWhat(TeamAssignmentTestCase):
@@ -117,11 +155,7 @@ class TestWhoSeesWhat(TeamAssignmentTestCase):
 		self.assign(self.anna, TEAM_A, "2026-01-01", role="Lead")
 		self.assign(self.ben, TEAM_A, "2026-01-01")
 		self.addCleanup(frappe.set_user, "Administrator")
-		stub = patch.object(
-			team_hours,
-			"logged_hours",
-			return_value=dict.fromkeys(team_hours.GROUPS, 0.0),
-		)
+		stub = patch.object(team_hours, "_logged_by_day", return_value={})
 		stub.start()
 		self.addCleanup(stub.stop)
 
@@ -154,3 +188,52 @@ class TestImplementations(FrappeTestCase):
 		currency_fields = {f.fieldname for f in meta.fields if f.fieldtype == "Currency"}
 		self.assertFalse(currency_fields & set(team_cockpit.IMPLEMENTATION_FIELDS))
 		self.assertTrue(all(meta.has_field(f) or f == "name" for f in team_cockpit.IMPLEMENTATION_FIELDS))
+
+
+class TestAbsences(FrappeTestCase):
+	def test_half_day_and_holiday_inside_leave(self):
+		holidays = [date(2026, 11, 4)]
+		leave = frappe._dict(
+			from_date=date(2026, 10, 30), to_date=date(2026, 11, 5), half_day=1, half_day_date=date(2026, 11, 5), leave_type="X"
+		)
+		real_get_all = frappe.get_all
+
+		def get_all(doctype, *args, **kwargs):
+			if doctype == "Holiday":
+				return holidays
+			if doctype == "Leave Application":
+				return [leave]
+			return real_get_all(doctype, *args, **kwargs)
+
+		with patch.object(utils, "employee_holiday_list", return_value="HL"), patch.object(
+			team_hours.frappe, "get_all", side_effect=get_all
+		):
+			absent = team_hours._absences("EMP", *WEEK)
+		# the leave started before the period: only its days inside count
+		self.assertNotIn(date(2026, 10, 30), absent)
+		self.assertEqual(absent[date(2026, 11, 2)], 1)
+		# the holiday inside the leave counts once, as a whole day
+		self.assertEqual(absent[date(2026, 11, 4)], 1)
+		# only the half day is halved
+		self.assertEqual(absent[date(2026, 11, 5)], 0.5)
+
+
+class TestImplementationsEndpoint(TeamAssignmentTestCase):
+	def test_a_user_without_a_team_is_refused(self):
+		frappe.set_user(frappe.db.get_value("Employee", self.anna, "user_id"))
+		self.addCleanup(frappe.set_user, "Administrator")
+		with patch.object(team_cockpit, "check_app_permission", return_value=True):
+			with self.assertRaises(frappe.PermissionError):
+				team_cockpit.get_team_implementations()
+
+	def test_only_the_teams_implementations_and_no_currency(self):
+		name = frappe.get_all("Implementation", filters={"status": ["not in", ["Cancelled", "Completed"]]}, limit=1, pluck="name")
+		if not name:
+			self.skipTest("needs an open Implementation")
+		frappe.db.set_value("Implementation", name[0], "team", TEAM_A, update_modified=False)
+		with patch.object(teams, "require_active_team", return_value=TEAM_A):
+			data = team_cockpit.get_team_implementations()
+		self.assertEqual([r.name for r in data["implementations"]], [name[0]])
+		currency = {f.fieldname for f in frappe.get_meta("Implementation").fields if f.fieldtype == "Currency"}
+		self.assertFalse(currency & set(data["implementations"][0].keys()))
+		self.assertEqual(len(data["implementations"][0].months), 6)

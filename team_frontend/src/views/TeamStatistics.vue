@@ -22,12 +22,12 @@
 
 			<div
 				v-if="data.missing_hours.length"
-				class="rounded-lg border border-outline-amber-2 bg-surface-amber-1 px-3 py-2 text-sm text-ink-amber-4"
+				class="rounded-lg border border-outline-amber-2 bg-surface-amber-1 px-3 py-2 text-sm text-ink-amber-3"
 			>
 				{{ __("{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.", [names(data.missing_hours)]) }}
 			</div>
 
-			<div class="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+			<div class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-rows-1">
 				<div class="min-h-0 overflow-auto">
 					<PeriodBars
 						:title="__('Logged hours — 12 months')"
@@ -65,8 +65,8 @@
 									<td class="truncate px-3 py-1.5 text-ink-gray-9">{{ row.employee_name }}</td>
 									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ row.known ? hours(row.available) : "—" }}</td>
 									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-9">{{ hours(row.logged) }}</td>
-									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ rate(row.logged, row) }}</td>
-									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ rate(row.billable, row) }}</td>
+									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ percent(row.booked_rate) }}</td>
+									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ percent(row.billable_rate) }}</td>
 									<td class="px-3 py-1.5 text-right tabular-nums text-ink-gray-7">{{ hours(row.internal) }}</td>
 								</tr>
 							</tbody>
@@ -115,17 +115,17 @@ function comparison(current, previous, kind) {
 	return formatComparison(current, previous, kind)
 }
 
-function rate(value, row) {
-	if (!row.known || !row.available) return "—"
-	return percent((value / row.available) * 100)
-}
-
 function names(rows) {
 	return rows.map((r) => r.employee_name).join(", ")
 }
 
+// The server sends ISO dates; months and days are written in the user's language.
 function shortDay(value) {
 	return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+}
+
+function monthLabel(value) {
+	return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
 }
 
 const current = computed(() => data.value.windows.current.totals)
@@ -134,8 +134,8 @@ const lastYear = computed(() => data.value.windows.last_year)
 
 function lines(field, kind = "number") {
 	return [
-		`${comparison(current.value[field], previous.value.totals[field], kind)} ${__("vs {0}", [previous.value.label])}`,
-		`${comparison(current.value[field], lastYear.value.totals[field], kind)} ${__("vs {0}", [lastYear.value.label])}`,
+		`${comparison(current.value[field], previous.value.totals[field], kind)} ${__("vs {0}", [monthLabel(previous.value.start)])}`,
+		`${comparison(current.value[field], lastYear.value.totals[field], kind)} ${__("vs {0}", [monthLabel(lastYear.value.start)])}`,
 	].join(" · ")
 }
 
@@ -155,7 +155,7 @@ const kpis = computed(() => {
 
 const monthPeriods = computed(() =>
 	data.value.months.map((month) => ({
-		label: month.label,
+		label: monthLabel(month.start),
 		values: [
 			[
 				{ value: month.totals.billable, color: GROUP_COLORS.billable, label: __("Billable") },

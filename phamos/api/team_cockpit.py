@@ -498,7 +498,7 @@ def get_team_implementations():
 	"""The active team's open Implementations, hours only: time limit, sold against delivered,
 	actual hours of the last 6 months against the prediction, maturity, forecast, trend, module
 	levels. Fields are listed explicitly so no currency field leaves the server."""
-	from frappe.utils import add_months, get_first_day, get_last_day, getdate, today
+	from frappe.utils import add_months, get_first_day, getdate, today
 
 	team = teams.require_active_team()
 	rows = frappe.get_all(
@@ -509,7 +509,7 @@ def get_team_implementations():
 		limit_page_length=0,
 	)
 	if not rows:
-		return {"team": team, "implementations": []}
+		return {"team": team, "implementations": [], "can_open": False}
 
 	names = [r.name for r in rows]
 	modules = frappe.get_all(
@@ -542,9 +542,10 @@ def get_team_implementations():
 		row.modules = [m for m in modules if m.parent == row.name]
 		for m in row.modules:
 			m.pop("parent")
-		row.months = [
-			{"label": m.strftime("%b %Y"), "hours": monthly.get((row.name, m.strftime("%Y-%m")), 0)} for m in months
-		]
+		# ISO month start; the page formats it in the user's language
+		row.months = [{"start": m, "hours": monthly.get((row.name, m.strftime("%Y-%m")), 0)} for m in months]
 		# predicted_time_next_3_months is a 3-month total: a monthly figure to compare with
 		row.predicted_per_month = round((row.predicted_time_next_3_months or 0) / 3, 1)
-	return {"team": team, "implementations": rows}
+	# Team members see their team's implementations here (#1975), but only those who may read
+	# Implementation get the link to its Desk form.
+	return {"team": team, "implementations": rows, "can_open": bool(frappe.has_permission("Implementation", "read"))}

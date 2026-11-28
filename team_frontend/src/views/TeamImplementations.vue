@@ -28,9 +28,15 @@
 						</tr>
 						<tr v-for="row in rows" :key="row.name" class="border-t border-outline-gray-1 align-middle">
 							<td class="max-w-56 px-3 py-1.5">
-								<a :href="`/app/implementation/${encodeURIComponent(row.name)}`" target="_blank" class="block truncate font-medium text-ink-gray-9 hover:underline">
+								<a
+									v-if="canOpen"
+									:href="`/app/implementation/${encodeURIComponent(row.name)}`"
+									target="_blank"
+									class="block truncate font-medium text-ink-gray-9 hover:underline"
+								>
 									{{ row.name }}
 								</a>
+								<span v-else class="block truncate font-medium text-ink-gray-9">{{ row.name }}</span>
 								<div class="truncate text-xs text-ink-gray-5">{{ row.customer }}</div>
 							</td>
 							<td class="px-3 py-1.5 text-ink-gray-7">{{ __(row.status) }}</td>
@@ -57,14 +63,14 @@
 								<div class="relative flex h-8 items-end gap-0.5" :title="sparkTitle(row)">
 									<div
 										v-for="month in row.months"
-										:key="month.label"
-										class="w-3 rounded-sm bg-ink-blue-3"
+										:key="month.start"
+										class="w-3 rounded-sm bg-surface-blue-3"
 										:style="{ height: `${barHeight(month.hours, row)}%` }"
 									/>
 									<div
 										v-if="row.predicted_per_month"
-										class="pointer-events-none absolute inset-x-0 border-t border-dashed border-ink-amber-3"
-										:style="{ bottom: `${barHeight(row.predicted_per_month, row)}%` }"
+										class="pointer-events-none absolute inset-x-0 border-t border-dashed"
+										:style="{ bottom: `${barHeight(row.predicted_per_month, row)}%`, borderColor: 'var(--ink-amber-3)' }"
 									/>
 								</div>
 							</td>
@@ -90,10 +96,16 @@ import spaConfig from "../config"
 const loading = ref(true)
 const error = ref("")
 const rows = ref([])
+// Only users who may read Implementation get the link to its Desk form.
+const canOpen = ref(false)
 
 function hours(value) {
 	if (value == null) return "—"
 	return Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })
+}
+
+function monthLabel(value) {
+	return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
 }
 
 function maturity(row) {
@@ -114,9 +126,9 @@ function trendClass(trend) {
 
 function limitClass(row) {
 	const used = row.time_limit_percent_used || 0
-	if (used >= 100) return "bg-ink-red-4"
-	if (used >= 80) return "bg-ink-amber-3"
-	return "bg-ink-green-3"
+	if (used >= 100) return "bg-surface-red-5"
+	if (used >= 80) return "bg-surface-amber-3"
+	return "bg-surface-green-3"
 }
 
 function barHeight(value, row) {
@@ -125,7 +137,7 @@ function barHeight(value, row) {
 }
 
 function sparkTitle(row) {
-	const months = row.months.map((m) => `${m.label}: ${hours(m.hours)} h`).join("\n")
+	const months = row.months.map((m) => `${monthLabel(m.start)}: ${hours(m.hours)} h`).join("\n")
 	return row.predicted_per_month ? `${months}\n${__("Predicted: {0} h per month", [hours(row.predicted_per_month)])}` : months
 }
 
@@ -157,6 +169,7 @@ async function load() {
 	try {
 		const data = await call(`${spaConfig.api}.get_team_implementations`)
 		rows.value = data.implementations || []
+		canOpen.value = Boolean(data.can_open)
 	} catch (e) {
 		error.value = e.messages?.[0] || e.message || __("Could not load the implementations.")
 	} finally {

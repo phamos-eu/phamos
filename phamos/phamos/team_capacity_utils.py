@@ -109,6 +109,13 @@ def get_employee_weekly_hours(employee, on_date):
 	return (contract.weekly_hours or 0) if contract else 0
 
 
+def employee_holiday_list(employee):
+	"""The employee's Holiday List, else their company's default, as HRMS reads it; None if neither."""
+	from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+
+	return get_holiday_list_for_employee(employee, raise_exception=False) or None
+
+
 def _weekly_working_hours(employee):
     """The employee's submitted Weekly Working Hours: validity and hours per weekday, newest first."""
     if not frappe.db.exists("DocType", "Weekly Working Hours"):
@@ -141,7 +148,7 @@ def get_period_leave_hours(employee, period_start, period_end):
     total = 0.0
     holiday_dates = set()
 
-    holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+    holiday_list = employee_holiday_list(employee)
     if holiday_list:
         holidays_key = (holiday_list, period_start, period_end)
         if holidays_key in cache["holidays_by_period"]:

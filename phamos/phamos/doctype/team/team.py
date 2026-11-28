@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from phamos.phamos.team_capacity_utils import (
     LEAVE_FIELDS,
+    employee_holiday_list,
     get_employee_daily_hours,
     get_period_leave_hours,
     leave_day_share,
@@ -83,7 +84,7 @@ def refresh_team_capacity(doc, today, month_start, month_end, week_start, week_e
         employee_holiday_dates = set()
 
         # Holidays for current month
-        holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+        holiday_list = employee_holiday_list(employee)
         if holiday_list:
             holidays = frappe.db.get_all(
                 "Holiday",
