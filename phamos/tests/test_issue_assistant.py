@@ -916,6 +916,30 @@ class TestChat(ChatTestCase):
 			self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
 		self.assertEqual(frappe.db.get_value("Customer", CUSTOMER, "customer_details"), "before")
 
+	def test_assign_only_whom_the_colleague_names(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "assign", "user": DESK_USER}]},
+			"mistral-test")
+		with patch("frappe.desk.form.assign_to.notify_assignment"):
+			run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
+			self.assertNotIn(DESK_USER, self.assignees(doc))
+			self.answer(doc, self.reply_in_thread(brief, f"please assign {DESK_USER}"))
+		self.assertIn(DESK_USER, self.assignees(doc))
+
+	def test_a_failed_reply_still_records_the_changes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+		message = self.reply_in_thread(brief, f"project is {self.project}")
+		with patch("phamos.ai_agents.agents.issue_chat_answer.post_reply", side_effect=Exception("raven down")), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			run, reply = self.answer(doc, message)
+		self.assertEqual(run.status, "Completed")
+		self.assertIn("raven down", run.error)
+		self.assertIn("project", run.fields_set)
+
 	def test_named_means_a_whole_word(self):
 		self.assertTrue(self.chat.named_in_message("custom_implementation", "AG", "die ag soll es sein"))
 		self.assertFalse(self.chat.named_in_message("custom_implementation", "AG", "guten tag, bitte"))

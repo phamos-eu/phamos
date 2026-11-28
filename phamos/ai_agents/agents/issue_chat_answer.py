@@ -55,6 +55,12 @@ def named_in_message(field, value, text):
 	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text) for n in names)
 
 
+def person_named(user, full_name, text):
+	"""Whether the colleague's message names the person: e-mail, full name or first name, as whole words."""
+	names = {cstr(user).lower(), cstr(full_name).lower(), cstr(full_name).split(" ")[0].lower()}
+	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text) for n in names)
+
+
 CHAT_SYSTEM = (
 	"You are the phamos Issue Assistant, a colleague in phamos' ERPNext who helps staff with one support "
 	"Issue in its chat. Answer the colleague's last message briefly and plainly. Use only the data you are "
@@ -178,8 +184,14 @@ def execute(run_name, commit=True):
 		issue = frappe.get_doc("Issue", run.reference_name)
 		message = frappe.get_doc("Raven Message", run.chat_message)
 		text = compose_answer(issue, message, asker, agent, result)
-		post_reply(issue, message, agent.raven_bot, text, asker, result["links"])
-		run.db_set({"status": "Completed", "summary": text, "finished_at": now_datetime(),
+		reply_error = None
+		try:
+			post_reply(issue, message, agent.raven_bot, text, asker, result["links"])
+		except Exception as e:
+			# the changes are made: the run still records them, with the reason the reply is missing (AI review)
+			frappe.log_error(title=f"Issue Assistant: chat reply on {issue.name} could not be posted")
+			reply_error = _("The reply could not be posted: {0}").format(str(e)[:900])
+		run.db_set({"status": "Completed", "summary": text, "finished_at": now_datetime(), "error": reply_error,
 			"llm_model": result["model"], "llm_calls": result["calls"],
 			"analysis": frappe.as_json({"chat": result}), "fields_set": ", ".join(a["field"] for a in result["applied"]
 				if a.get("field"))})
@@ -273,6 +285,10 @@ def apply_action(issue_name, action, asker, result):
 			row = frappe.db.get_value("User", user, ["enabled", "user_type", "full_name"], as_dict=True) if user else None
 			if not row or not row.enabled or row.user_type != "System User":
 				result["refused"].append(_("assigning {0}").format(user or _("nobody")))
+				return
+			if user != asker and not person_named(user, row.full_name, result.get("message_text", "")):
+				# like the customer: text in the Issue must not choose whom to assign (AI review on !1386)
+				result["refused"].append(_("assigning {0} without you naming them").format(row.full_name or user))
 				return
 			if not frappe.has_permission("Issue", "write", doc=issue_name):
 				result["refused"].append(_("you may not change this Issue"))
