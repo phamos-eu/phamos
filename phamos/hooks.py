@@ -168,6 +168,7 @@ doctype_js = {
 	"Issue" : [
 		"public/js/issue.js",
 		"public/js/phriend_issue.js",  # Phriend reports: screenshot, Create GitLab Issue (#1850)
+		"public/js/issue_drafts.js",  # the Issue Assistant's e-mail drafts: review and send (#2229)
 	],
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",

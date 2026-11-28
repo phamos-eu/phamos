@@ -3327,3 +3327,27 @@ vs {0},ggü. {0}
 {0} of {1} h,{0} von {1} h
 "{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
 "{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"
+The Issue has no reporter e-mail address to write to.,"Die Anfrage hat keine E-Mail-Adresse des Meldenden, an die geschrieben werden kann."
+E-mail draft {0} not found.,E-Mail-Entwurf {0} nicht gefunden.
+It names another customer: {0},Er nennt einen anderen Kunden: {0}
+It contains another customer's e-mail address: {0},Er enthält die E-Mail-Adresse eines anderen Kunden: {0}
+It contains another customer's domain: {0},Er enthält die Domain eines anderen Kunden: {0}
+It contains another party's phone number.,Er enthält die Telefonnummer einer anderen Partei.
+Not an e-mail address: {0},Keine E-Mail-Adresse: {0}
+Recipient {0} is not a contact of this Issue's customer.,Empfänger {0} ist kein Kontakt des Kunden dieser Anfrage.
+No outgoing Email Account for this Issue. Set one up first.,Kein ausgehendes E-Mail-Konto für diese Anfrage. Bitte zuerst einrichten.
+e-mail draft to {0},E-Mail-Entwurf an {0}
+Open the e-mail draft,E-Mail-Entwurf öffnen
+Draft (not sent),Entwurf (nicht gesendet)
+Draft for Issue,Entwurf für Anfrage
+An e-mail draft by the Issue Assistant (#2229). It goes out only when a person presses Send on the Issue.,"Ein E-Mail-Entwurf des Anfrage-Assistenten (#2229). Er wird erst versendet, wenn eine Person an der Anfrage auf Senden klickt."
+The Issue Assistant prepared an e-mail draft to the reporter. It is not sent yet.,Der Anfrage-Assistent hat einen E-Mail-Entwurf an den Meldenden vorbereitet. Er ist noch nicht gesendet.
+The Issue Assistant prepared {0} e-mail drafts to the reporter. They are not sent yet.,Der Anfrage-Assistent hat {0} E-Mail-Entwürfe an den Meldenden vorbereitet. Sie sind noch nicht gesendet.
+Review and send,Prüfen und senden
+E-mail draft,E-Mail-Entwurf
+E-mail draft – not sent,E-Mail-Entwurf – nicht gesendet
+Your signature is added when you send. Recipients must be contacts of this Issue's customer.,Ihre Signatur wird beim Senden angehängt. Empfänger müssen Kontakte des Kunden dieser Anfrage sein.
+Save draft,Entwurf speichern
+E-mail sent,E-Mail gesendet
+Draft saved,Entwurf gespeichert
+Discard this e-mail draft?,Diesen E-Mail-Entwurf verwerfen?

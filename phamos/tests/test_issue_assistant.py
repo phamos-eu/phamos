@@ -759,8 +759,8 @@ class TestConnections(IssueAssistantTestCase):
 		self.assertEqual(counts.get("AI Agent Run"), 2)
 
 
-class TestChat(IssueAssistantTestCase):
-	"""#2116: staff address the assistant in the Issue chat."""
+class ChatTestCase(IssueAssistantTestCase):
+	"""Fixtures for the Issue chat (#2116): a Raven-enabled colleague, a brief, messages, answers."""
 
 	CHAT_USER = "issue-assistant-chat@example.com"
 	PROJECT = "Issue Assistant Chat Project"
@@ -829,6 +829,11 @@ class TestChat(IssueAssistantTestCase):
 			order_by="creation desc")
 		return run, reply or ""
 
+
+
+class TestChat(ChatTestCase):
+	"""#2116: staff address the assistant in the Issue chat."""
+
 	def test_reply_under_the_brief_is_answered_other_messages_not(self):
 		doc, channel, brief = self.issue_with_brief()
 		self.addressed(self.reply_in_thread(brief, "why this person?")).assert_called_once()
@@ -890,7 +895,7 @@ class TestChat(IssueAssistantTestCase):
 
 	def test_system_prompt_forbids_promising_what_it_cannot_do(self):
 		# local test 2026-11-28: asked for an e-mail, it answered "I will prepare the email now"
-		self.assertIn("cannot send or draft e-mails", self.chat.CHAT_SYSTEM)
+		self.assertIn("you cannot send e-mails", self.chat.CHAT_SYSTEM)
 		self.assertIn("Never say you will do something", self.chat.CHAT_SYSTEM)
 
 	def test_prompt_has_the_thread_and_no_other_issue(self):
@@ -903,3 +908,84 @@ class TestChat(IssueAssistantTestCase):
 		self.assertIn("what do you know?", prompt)
 		self.assertIn(doc.name, prompt)
 		self.assertNotIn("Another customer's secret Issue", prompt)
+
+
+class TestDrafts(ChatTestCase):
+	"""#2229: e-mail drafts to the reporter, written in the chat, sent by a person."""
+
+	OTHER = "Issue Assistant Draft Other GmbH"
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		if not frappe.db.exists("Customer", self.OTHER):
+			frappe.get_doc({"doctype": "Customer", "customer_name": self.OTHER,
+				"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}),
+				"territory": frappe.db.get_value("Territory", {"is_group": 0})}).insert(ignore_permissions=True)
+		from phamos.ai_agents.agents import issue_drafts
+
+		self.drafts = issue_drafts
+
+	def draft_via_chat(self, body="Guten Tag, bitte senden Sie uns die ERPNext-Version. Viele Grüße"):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		self.llm.return_value = ({"answer": "Here is a draft.", "actions": [{"type": "draft_email",
+			"subject": "Rückfrage zu Ihrer Anfrage", "body": body}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "please prepare an email asking for the version"))
+		self.assertEqual(run.status, "Completed", run.error)
+		draft = frappe.db.get_value("Communication", {"custom_draft_issue": doc.name, "custom_draft": 1}, "name")
+		return doc, draft, reply
+
+	def test_chat_writes_a_draft_and_links_it(self):
+		doc, draft, reply = self.draft_via_chat()
+		self.assertTrue(draft)
+		comm = frappe.get_doc("Communication", draft)
+		self.assertEqual((comm.recipients, comm.reference_name, comm.communication_medium),
+			(self.CHAT_USER, None, "Other"))
+		self.assertIn(f"/app/issue/{doc.name}?draft={draft}", reply)
+
+	def test_a_draft_sends_nothing_and_is_no_reply_yet(self):
+		doc, draft, _reply = self.draft_via_chat()
+		self.assertFalse(frappe.db.exists("Email Queue", {"reference_doctype": "Communication", "reference_name": draft}))
+		self.assertFalse(frappe.get_all("Communication", filters={"reference_doctype": "Issue",
+			"reference_name": doc.name, "sent_or_received": "Sent"}))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "first_responded_on"))
+
+	def test_send_links_and_sends_the_same_record(self):
+		doc, draft, _reply = self.draft_via_chat()
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(self.CHAT_USER)
+		with patch("frappe.core.doctype.communication.communication.Communication.send_email") as send, \
+				patch("frappe.core.doctype.communication.communication.Communication.get_outgoing_email_account",
+					return_value=frappe._dict(name="x")):
+			self.drafts.send_draft(draft)
+		send.assert_called_once()
+		comm = frappe.get_doc("Communication", draft)
+		self.assertEqual((comm.custom_draft, comm.reference_doctype, comm.reference_name, comm.communication_medium),
+			(0, "Issue", doc.name, "Email"))
+
+	def test_send_needs_write_on_the_issue(self):
+		doc, draft, _reply = self.draft_via_chat()
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(WEBSITE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			self.drafts.send_draft(draft)
+
+	def test_another_customer_or_foreign_recipient_blocks_sending(self):
+		doc, draft, _reply = self.draft_via_chat(body=f"Wie bei {self.OTHER} ist das ein bekanntes Problem.")
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(self.CHAT_USER)
+		with patch("frappe.core.doctype.communication.communication.Communication.send_email") as send:
+			with self.assertRaises(frappe.ValidationError):
+				self.drafts.send_draft(draft)
+			with self.assertRaises(frappe.ValidationError):
+				self.drafts.send_draft(draft, content="<p>Hallo</p>", recipients="someone@elsewhere.example")
+		send.assert_not_called()
+		self.assertEqual(frappe.db.get_value("Communication", draft, "custom_draft"), 1)
+
+	def test_discard_deletes_the_draft(self):
+		doc, draft, _reply = self.draft_via_chat()
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(self.CHAT_USER)
+		self.assertEqual([d["name"] for d in self.drafts.get_drafts(doc.name)], [draft])
+		self.drafts.discard_draft(draft)
+		self.assertFalse(frappe.db.exists("Communication", draft))

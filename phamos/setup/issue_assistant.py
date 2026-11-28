@@ -80,6 +80,7 @@ def after_migrate():
 	ensure_identify_skill()
 	ensure_classify_skill()
 	ensure_customer_fields()
+	ensure_communication_fields()
 	switch_on_own_implementation(user)
 
 
@@ -261,3 +262,24 @@ def switch_on_own_implementation(user):
 		return
 	switch_on_implementation(implementation, user)
 	frappe.db.set_global(OWN_IMPLEMENTATION_SEEDED, 1)
+
+
+COMMUNICATION_FIELDS = [
+	{"fieldname": CUSTOMER_SECTION, "label": "Implementation Specific", "fieldtype": "Section Break",
+		"insert_after": "", "collapsible": 0},
+	{"fieldname": "custom_draft", "label": "Draft (not sent)", "fieldtype": "Check", "default": "0", "read_only": 1,
+		"insert_after": CUSTOMER_SECTION, "no_copy": 1,
+		"description": "An e-mail draft by the Issue Assistant (#2229). It goes out only when a person presses Send on the Issue."},
+	{"fieldname": "custom_draft_issue", "label": "Draft for Issue", "fieldtype": "Link", "options": "Issue",
+		"read_only": 1, "insert_after": "custom_draft", "no_copy": 1},
+	{"fieldname": "custom_ai_agent_run", "label": "AI Agent Run", "fieldtype": "Link", "options": "AI Agent Run",
+		"read_only": 1, "insert_after": "custom_draft_issue", "no_copy": 1},
+]
+
+
+def ensure_communication_fields():
+	"""Communication fields for the assistant's e-mail drafts (#2229)."""
+	meta = frappe.get_meta("Communication")
+	missing = [f for f in COMMUNICATION_FIELDS if not meta.has_field(f["fieldname"])]
+	if missing:
+		create_custom_fields({"Communication": [{**f, "module": "AI Agents"} for f in missing]}, update=False)
