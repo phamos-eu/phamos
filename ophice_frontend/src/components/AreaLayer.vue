@@ -74,6 +74,7 @@
 		<Teleport to="body">
 			<span
 				v-if="peek"
+				ref="peekEl"
 				class="area__title area__title--peek"
 				:style="{ left: `${peek.x}px`, top: `${peek.y}px`, '--area-h': peek.hue }"
 				data-testid="area-title-peek"
@@ -95,7 +96,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from "vue"
 import { isCutOff } from "../utils/ophiceView.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
@@ -112,11 +113,24 @@ const props = defineProps({
 
 // The full name of a cut-off space name, while the mouse is on it (#2096).
 const peek = ref(null)
-function peekTitle(area, event) {
+const peekEl = ref(null)
+// Space between the full name and the window's edge.
+const PEEK_MARGIN = 8
+async function peekTitle(area, event) {
 	const label = event.currentTarget
 	if (props.editing || !isCutOff(label)) return
 	const rect = label.getBoundingClientRect()
-	peek.value = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
+	const shown = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
+	peek.value = shown
+	// Centred on the label, a long name near the window's left or right edge would itself be
+	// cut off: once it is rendered and its width known, keep it inside the window.
+	await nextTick()
+	// Gone or replaced by another label meanwhile (peek holds a reactive proxy of `shown`).
+	if (toRaw(peek.value) !== shown || !peekEl.value) return
+	const half = peekEl.value.offsetWidth / 2
+	const min = half + PEEK_MARGIN
+	const max = window.innerWidth - half - PEEK_MARGIN
+	peek.value.x = max < min ? window.innerWidth / 2 : Math.min(Math.max(shown.x, min), max)
 }
 // Editing, new spaces, or the map moving under the mouse (keys walk and pan, the wheel zooms):
 // no stale name left floating where the label no longer is.
@@ -454,7 +468,7 @@ function cancel() {
 .area__title--peek {
 	position: fixed;
 	z-index: 60;
-	max-width: 24rem;
+	max-width: min(24rem, calc(100vw - 16px));
 	transform: translate(-50%, -50%);
 	color: #fff;
 	white-space: nowrap;
