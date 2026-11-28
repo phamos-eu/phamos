@@ -14,7 +14,8 @@
   "namespace",
   "group",
   "last_synced",
-  "frappe_project"
+  "frappe_project",
+  "merge_requests_synced_at"
  ],
  "fields": [
   {
@@ -72,6 +73,13 @@
    "fieldtype": "Link",
    "label": "Implementation",
    "options": "Implementation"
+  },
+  {
+   "fieldname": "merge_requests_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Merge Requests Synced At",
+   "read_only": 1,
+   "description": "Last merge request sync; the next one fetches what changed since then (#1977)."
   }
  ],
  "grid_page_length": 50,
@@ -86,7 +94,7 @@
    "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2026-05-08 08:00:39.961563",
+ "modified": "2026-11-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Project",

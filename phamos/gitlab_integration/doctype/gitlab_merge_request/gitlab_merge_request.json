@@ -1,0 +1,192 @@
+{
+ "actions": [],
+ "autoname": "format:MR-{gitlab_project}-{iid}",
+ "creation": "2026-11-28 10:00:00.000000",
+ "description": "A GitLab merge request, synced every 2 hours and by webhook (#1977).",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "gitlab_project",
+  "iid",
+  "web_url",
+  "state",
+  "column_break_author",
+  "author_username",
+  "author_email",
+  "source_branch",
+  "target_branch",
+  "sha",
+  "section_break_times",
+  "created_at",
+  "merged_at",
+  "closed_at",
+  "column_break_lines",
+  "lines_added",
+  "lines_removed",
+  "files_changed",
+  "section_break_issues",
+  "issues"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "label": "GitLab Project",
+   "options": "GitLab Project",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "iid",
+   "fieldtype": "Int",
+   "label": "IID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "web_url",
+   "fieldtype": "Data",
+   "label": "URL",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_author",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "author_username",
+   "fieldtype": "Data",
+   "label": "Author Username",
+   "read_only": 1
+  },
+  {
+   "fieldname": "author_email",
+   "fieldtype": "Data",
+   "label": "Author Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_branch",
+   "fieldtype": "Data",
+   "label": "Source Branch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_branch",
+   "fieldtype": "Data",
+   "label": "Target Branch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sha",
+   "fieldtype": "Data",
+   "label": "Head SHA",
+   "read_only": 1,
+   "description": "The line counts are taken again when it changes."
+  },
+  {
+   "fieldname": "section_break_times",
+   "fieldtype": "Section Break",
+   "label": "Times"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At",
+   "read_only": 1,
+   "description": "UTC, as GitLab sends it"
+  },
+  {
+   "fieldname": "merged_at",
+   "fieldtype": "Datetime",
+   "label": "Merged At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "closed_at",
+   "fieldtype": "Datetime",
+   "label": "Closed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lines",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "lines_added",
+   "fieldtype": "Int",
+   "label": "Lines Added",
+   "read_only": 1,
+   "description": "Without the excluded paths in GitLab Settings"
+  },
+  {
+   "fieldname": "lines_removed",
+   "fieldtype": "Int",
+   "label": "Lines Removed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "files_changed",
+   "fieldtype": "Int",
+   "label": "Files Changed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_issues",
+   "fieldtype": "Section Break",
+   "label": "Issues"
+  },
+  {
+   "fieldname": "issues",
+   "fieldtype": "Table",
+   "label": "Linked GitLab Issues",
+   "options": "GitLab Merge Request Issue",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-28 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Gitlab Integration",
+ "name": "GitLab Merge Request",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "created_at",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

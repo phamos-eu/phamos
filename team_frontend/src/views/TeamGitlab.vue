@@ -22,12 +22,21 @@
 			</div>
 
 			<div class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-rows-1">
-				<div class="min-h-0 overflow-auto">
+				<div class="flex min-h-0 flex-col gap-3 overflow-auto">
 					<PeriodBars
 						:title="__('Closed items — 12 months')"
 						:subtitle="__('Own implementations, other implementations and internal repositories; opened items under each month.')"
 						:periods="monthPeriods"
 						:series="seriesLegend"
+						compact
+					/>
+					<!-- Lines of merged merge requests, a team trend without a target (#1977) -->
+					<PeriodBars
+						:title="__('Lines changed — 12 months')"
+						:subtitle="__('Lines added (full bar) and removed (pale bar) in merged merge requests, without generated files; merged merge requests under each month.')"
+						:periods="linePeriods"
+						:series="seriesLegend"
+						:format="(value) => lineCount(value)"
 						compact
 					/>
 				</div>
@@ -52,6 +61,18 @@
 								</tr>
 							</tbody>
 						</table>
+					</div>
+					<div>
+						<h2 class="text-base font-semibold text-ink-gray-9">{{ __("Merge requests this month") }}</h2>
+						<ul class="mt-2 space-y-1.5 text-sm">
+							<li v-for="row in mergeRequestRows" :key="row.label" class="flex justify-between gap-2">
+								<span class="text-ink-gray-7">{{ row.label }}</span>
+								<span class="tabular-nums text-ink-gray-9">
+									{{ row.value }}
+									<span class="text-xs text-ink-gray-5">· {{ row.comparison }}</span>
+								</span>
+							</li>
+						</ul>
 					</div>
 					<div>
 						<h2 class="text-base font-semibold text-ink-gray-9">{{ __("SLA of the team's Issues") }}</h2>
@@ -112,6 +133,14 @@ const seriesLegend = Object.keys(GROUP_COLORS).map((key) => ({ label: GROUP_LABE
 
 function days(value) {
 	return value == null ? "—" : __("{0} d", [Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })])
+}
+
+function lineCount(value) {
+	return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
+}
+
+function total(byGroup) {
+	return Object.values(byGroup || {}).reduce((sum, value) => sum + (value || 0), 0)
 }
 
 function hoursLabel(value) {
@@ -188,6 +217,52 @@ const closingRows = computed(() => [
 		summary: current.value.parent_item_days,
 	},
 ])
+
+const mergeRequests = computed(() => data.value.merge_requests)
+
+const mergeRequestRows = computed(() => {
+	const c = mergeRequests.value.current
+	const p = mergeRequests.value.previous
+	const vs = __("vs {0}", [monthLabel(previous.value.start)])
+	return [
+		{ label: __("Merged"), value: c.merged_total, comparison: `${comparison(c.merged_total, p.merged_total)} ${vs}` },
+		{
+			label: __("Lines added"),
+			value: lineCount(total(c.lines_added)),
+			comparison: `${comparison(total(c.lines_added), total(p.lines_added))} ${vs}`,
+		},
+		{
+			label: __("Lines removed"),
+			value: lineCount(total(c.lines_removed)),
+			comparison: `${comparison(total(c.lines_removed), total(p.lines_removed))} ${vs}`,
+		},
+		{
+			label: __("Time to merge (median)"),
+			value: days(c.days_to_merge.median),
+			comparison: `${comparison(c.days_to_merge.median, p.days_to_merge.median)} ${vs}`,
+		},
+	]
+})
+
+const linePeriods = computed(() =>
+	data.value.months.map((month) => ({
+		label: monthLabel(month.start),
+		values: [
+			Object.keys(GROUP_COLORS).map((key) => ({
+				value: month.lines_added[key],
+				color: GROUP_COLORS[key],
+				label: `${__("Added")} · ${GROUP_LABELS[key]}`,
+			})),
+			Object.keys(GROUP_COLORS).map((key) => ({
+				value: month.lines_removed[key],
+				color: GROUP_COLORS[key],
+				opacity: 0.45,
+				label: `${__("Removed")} · ${GROUP_LABELS[key]}`,
+			})),
+		],
+		footer: month.mtd ? __("{0} merged so far", [month.merged_total]) : __("{0} merged", [month.merged_total]),
+	}))
+)
 
 const monthPeriods = computed(() =>
 	data.value.months.map((month) => ({

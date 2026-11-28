@@ -1002,19 +1002,19 @@ def register_webhooks_for_all_projects():
             )
 
             if existing_hook:
-                if existing_hook.get("note_events"):
+                if existing_hook.get("note_events") and existing_hook.get("merge_requests_events"):
                     results.append(f"⏭ {project['title']} — already registered")
                     continue
-                # Hook exists from before Note Hook support was added — enable it.
+                # Hook exists from before Note or Merge Request Hook support (#1977) — enable them.
                 update_resp = requests.put(
                     f"{existing_url}/{existing_hook['id']}",
-                    json={"note_events": True, "enable_ssl_verification": False},
+                    json={"note_events": True, "merge_requests_events": True, "enable_ssl_verification": False},
                     headers=headers,
                 )
                 if update_resp.status_code == 200:
-                    results.append(f"🔄 {project['title']} — enabled note_events on existing webhook")
+                    results.append(f"🔄 {project['title']} — enabled note and merge request events on existing webhook")
                 else:
-                    results.append(f"❌ {project['title']} — failed to enable note_events: {update_resp.text}")
+                    results.append(f"❌ {project['title']} — failed to enable note and merge request events: {update_resp.text}")
                 continue
 
             # ── Step 2: Webhook register ──
@@ -1022,6 +1022,7 @@ def register_webhooks_for_all_projects():
                 "url": webhook_url,
                 "issues_events": True,
                 "note_events": True,
+                "merge_requests_events": True,
                 "enable_ssl_verification": False,
             }
 
@@ -1051,6 +1052,10 @@ def sync_gitlab_data():
         sync_gitlab_milestones()
         sync_all_issues()
         sync_gitlab_releases()
+        # merge requests for the Team Cockpit (#1977)
+        from phamos.gitlab_integration.merge_requests import sync_all_merge_requests
+
+        sync_all_merge_requests()
     except Exception:
         # a warning on the Phriend of the warning role (#2012); the job still fails as before
         from phamos.phriend import events as phriend_events
@@ -1100,12 +1105,16 @@ def gitlab_webhook_receiver():
 
     event_type = frappe.request.headers.get("X-Gitlab-Event", "")
 
-    if event_type not in ("Issue Hook", "Note Hook"):
+    if event_type not in ("Issue Hook", "Note Hook", "Merge Request Hook"):
         return {"status": "ignored", "event": event_type}
 
     try:
         if event_type == "Issue Hook":
             _handle_issue_webhook(payload)
+        elif event_type == "Merge Request Hook":
+            from phamos.gitlab_integration.merge_requests import handle_merge_request_webhook
+
+            handle_merge_request_webhook(payload)
         else:
             _handle_note_webhook(payload)
     except Exception:

@@ -9,7 +9,9 @@
   "access_token",
   "webhook_base_url",
   "webhook_secret",
-  "cycle_time_trigger_label"
+  "cycle_time_trigger_label",
+  "merge_requests_section",
+  "merge_request_line_exclusions"
  ],
  "fields": [
   {
@@ -42,13 +44,25 @@
    "fieldname": "cycle_time_trigger_label",
    "fieldtype": "Data",
    "label": "Cycle Time Trigger Label"
+  },
+  {
+   "fieldname": "merge_requests_section",
+   "fieldtype": "Section Break",
+   "label": "Merge Requests"
+  },
+  {
+   "fieldname": "merge_request_line_exclusions",
+   "fieldtype": "Small Text",
+   "label": "Paths left out of line counts",
+   "default": "yarn.lock\npackage-lock.json\npoetry.lock\n*/public/dist/*\npublic/dist/*\n*/public/*/assets/*\n*.min.js\n*.map\n*.csv\n*.po",
+   "description": "One pattern per line (* matches any characters, also /). Changes in these files don't count as lines added or removed (#1977)."
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-05-08 08:18:16.457383",
+ "modified": "2026-11-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Settings",

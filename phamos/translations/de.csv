@@ -3360,3 +3360,35 @@ Average,Durchschnitt
 Internal,Intern
 assigning {0} without you naming them,"{0} zuweisen, ohne dass Sie die Person nennen"
 The reply could not be posted: {0},Die Antwort konnte nicht gepostet werden: {0}
+Lines changed — 12 months,Geänderte Zeilen – 12 Monate
+"Lines added (full bar) and removed (pale bar) in merged merge requests, without generated files; merged merge requests under each month.","Hinzugefügte (voller Balken) und entfernte Zeilen (blasser Balken) in gemergten Merge Requests, ohne generierte Dateien; unter jedem Monat die gemergten Merge Requests."
+Merge requests this month,Merge Requests in diesem Monat
+Lines added,Zeilen hinzugefügt
+Lines removed,Zeilen entfernt
+Time to merge (median),Zeit bis zum Merge (Median)
+Removed,Entfernt
+{0} merged so far,bisher {0} gemergt
+{0} merged,{0} gemergt
+GitLab Merge Request,GitLab Merge Request
+GitLab Merge Request Issue,GitLab Merge Request Issue
+Linked GitLab Issues,Verknüpfte GitLab Issues
+Head SHA,Head-SHA
+Author Username,Benutzername des Autors
+Author Email,E-Mail des Autors
+Source Branch,Quell-Branch
+Target Branch,Ziel-Branch
+Merged At,Gemergt am
+Closed At,Geschlossen am
+Files Changed,Geänderte Dateien
+Lines Added,Zeilen hinzugefügt
+Lines Removed,Zeilen entfernt
+Merge Requests,Merge Requests
+Paths left out of line counts,Bei Zeilenzahlen ausgelassene Pfade
+Merge Requests Synced At,Merge Requests synchronisiert am
+IID,IID
+The line counts are taken again when it changes.,"Ändert er sich, werden die Zeilen neu gezählt."
+"UTC, as GitLab sends it","UTC, wie GitLab es sendet"
+Without the excluded paths in GitLab Settings,Ohne die in den GitLab-Einstellungen ausgeschlossenen Pfade
+"One pattern per line (* matches any characters, also /). Changes in these files don't count as lines added or removed (#1977).","Ein Muster pro Zeile (* passt auf beliebige Zeichen, auch /). Änderungen in diesen Dateien zählen nicht als hinzugefügte oder entfernte Zeilen (#1977)."
+Last merge request sync; the next one fetches what changed since then (#1977).,"Letzte Synchronisierung der Merge Requests; die nächste holt, was sich seitdem geändert hat (#1977)."
+"A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
