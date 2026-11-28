@@ -3538,6 +3538,7 @@ Last merge request sync; the next one fetches what changed since then (#1977).,"
 "A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
 Added,Hinzugefügt
 Merged,Gemergt
+{0} changed:,{0} hat geändert:
 {0} of {1} checked in · updated {2},{0} von {1} eingecheckt · aktualisiert {2}
 Loading team mates…,Teammitglieder werden geladen…
 Nobody is in this team today.,Heute ist niemand in diesem Team.
@@ -3561,6 +3562,7 @@ Open the team chat in Raven,Teamchat in Raven öffnen
 Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
 Team chat of {0},Teamchat von {0}
 Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
+(hidden),(verborgen)
 {0} absent (half day),{0} abwesend (halber Tag)
 {0} absent,{0} abwesend
 "The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"
