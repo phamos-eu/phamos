@@ -335,6 +335,7 @@ after_migrate = [
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
 	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
+	"phamos.setup.issue_chat_card.after_migrate",  # fields on the Issue chat's card (#2234)
 ]
 
 # Uninstallation
