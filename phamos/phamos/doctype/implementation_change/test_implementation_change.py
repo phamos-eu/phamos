@@ -4,6 +4,8 @@
 """Plan changes with both sides' consent and the baseline of a planning session (#1971)."""
 
 import json
+from unittest.mock import patch
+from urllib.parse import quote
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -14,12 +16,14 @@ from phamos.phamos.doctype.implementation_baseline.implementation_baseline impor
 )
 from phamos.phamos.doctype.implementation_change.implementation_change import (
 	AWAITING,
-	_insert_change,
 	agree_change,
 	confirm_change,
 	dispute_change,
-	propose_change,
 	reject_change,
+	withdraw_change,
+)
+from phamos.phamos.doctype.implementation_change.implementation_change import (
+	propose_change as _propose_change,
 )
 from phamos.phamos.doctype.implementation_feature.test_implementation_feature import make_feature
 from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import (
@@ -29,6 +33,7 @@ from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import (
 )
 
 CUSTOMER_USER = "ic-change-customer@example.com"
+PM_USER = "ic-change-pm@example.com"
 OUTSIDER_USER = "ic-change-outsider@example.com"
 
 
@@ -45,6 +50,13 @@ def _website_user(email):
 			.name
 		)
 	return contact
+
+
+def propose_change(*args, **kwargs):
+	"""The cockpit's propose_change with the reason it needs (#2219); the reason's own test calls
+	it without."""
+	kwargs.setdefault("reason", "Test")
+	return _propose_change(*args, **kwargs)
 
 
 def changes_of(implementation, **filters):
@@ -362,17 +374,13 @@ class TestImplementationChange(FrappeTestCase):
 		# against a change both sides agreed to outside a Planning meeting
 		chapter = make_chapter(self.implementation.name, title="Warehouse")
 		self.assertEqual(chapter.status, "Planned")
-		# chapters are not proposed through propose_change; the Desk form inserts the change
-		name = _insert_change(
+		name = propose_change(
 			self.implementation.name,
 			"Implementation Chapter",
-			chapter.name,
 			"Dates",
-			{"planned_start": "2026-01-01", "target_date": "2026-06-30"},
 			{"planned_start": "2026-02-01", "target_date": "2026-09-30"},
-			status="Proposed",
-			agreed_by_phamos="Administrator",
-		).name
+			chapter.name,
+		)
 
 		self.as_customer()
 		self.assertEqual(agree_change(name), "Applied")
@@ -389,8 +397,169 @@ class TestImplementationChange(FrappeTestCase):
 		name = propose_change(
 			self.implementation.name, "Implementation Feature", "Priority", {"priority": "High"}, self.feature.name
 		)
-		reject_change(name)
+		reject_change(name, "Not needed")
 		frappe.set_user(OUTSIDER_USER)
 		# an existing (rejected) change and a missing one give the same answer
 		self.assertRaises(frappe.PermissionError, agree_change, name)
 		self.assertRaises(frappe.PermissionError, agree_change, "CHG-99999")
+
+	# chapter proposals and decisions in the cockpit (#2219)
+
+	def propose_chapter(self, chapter, values, change_type="Dates", **kwargs):
+		return propose_change(
+			self.implementation.name, "Implementation Chapter", change_type, values, chapter, **kwargs
+		)
+
+	def test_a_customer_proposes_a_chapters_dates_and_target_level(self):
+		chapter = make_chapter(self.implementation.name, title="Warehouse")
+		self.as_customer()
+		dates = self.propose_chapter(chapter.name, {"target_date": "2026-07-31"}, reason="Stocktaking in June")
+		level = self.propose_chapter(chapter.name, {"target_level": 4}, "Target level")
+		frappe.set_user("Administrator")
+		self.assertEqual(agree_change(dates), "Applied")
+		self.assertEqual(agree_change(level), "Applied")
+		chapter.reload()
+		self.assertEqual((str(chapter.target_date), chapter.target_level), ("2026-07-31", 4))
+		change = frappe.get_doc("Implementation Change", dates)
+		self.assertEqual((change.reason, json.loads(change.old_values)), ("Stocktaking in June", {"target_date": "2026-06-30"}))
+
+	def test_what_cannot_be_proposed_for_a_chapter(self):
+		planned = make_chapter(self.implementation.name, title="Warehouse")
+		draft = make_chapter(self.implementation.name, title="Idea", plan=False)
+		cancelled = make_chapter(self.implementation.name, title="Gone")
+		frappe.db.set_value("Implementation Chapter", cancelled.name, "status", "Cancelled")
+		refused = {
+			"Draft chapter isn't agreed": (draft.name, "Dates", {"target_date": "2026-07-31"}),
+			"not planned any more": (cancelled.name, "Dates", {"target_date": "2026-07-31"}),
+			"title and description change in a Stakeholder Meeting": (
+				planned.name,
+				"Scope change",
+				{"chapter_title": "Bigger"},
+			),
+			"may set only": (planned.name, "Dates", {"target_level": 5}),
+			"Target Date must be after Planned Start": (planned.name, "Dates", {"target_date": "2025-12-01"}),
+		}
+		for message, (chapter, change_type, values) in refused.items():
+			with self.subTest(message), self.assertRaisesRegex(frappe.ValidationError, message):
+				self.propose_chapter(chapter, values, change_type)
+		self.assertEqual(changes_of(self.implementation.name), [])
+
+	def test_one_open_proposal_per_record_and_type_and_the_proposer_withdraws(self):
+		chapter = make_chapter(self.implementation.name, title="Warehouse")
+		first = self.propose_chapter(chapter.name, {"target_date": "2026-07-31"})
+		self.as_customer()
+		with self.assertRaisesRegex(frappe.ValidationError, "A proposal for this is open"):
+			self.propose_chapter(chapter.name, {"target_date": "2026-08-31"})
+		# another type of change for the same chapter is a separate decision
+		self.propose_chapter(chapter.name, {"target_level": 4}, "Target level")
+		# only the side that proposed takes it back
+		self.assertRaises(frappe.ValidationError, withdraw_change, first)
+		frappe.set_user("Administrator")
+		self.assertEqual(withdraw_change(first, "Wrong month"), "Withdrawn")
+		self.assertEqual(frappe.db.get_value("Implementation Change", first, "decision_reason"), "Wrong month")
+		self.assertRaises(frappe.ValidationError, withdraw_change, first)
+		# withdrawn, it no longer blocks a new one
+		self.as_customer()
+		self.assertTrue(self.propose_chapter(chapter.name, {"target_date": "2026-08-31"}))
+
+	def test_a_change_made_outside_the_cockpit_is_checked_the_same(self):
+		def insert(**values):
+			return frappe.get_doc(
+				{
+					"doctype": "Implementation Change",
+					"implementation": self.implementation.name,
+					"target_doctype": "Implementation Feature",
+					"target_name": self.feature.name,
+					"change_type": "Dates",
+					"status": "Proposed",
+					**values,
+				}
+			).insert()
+
+		# as the Desk form saves it: no values
+		with self.assertRaisesRegex(frappe.ValidationError, "proposed in the Implementation Cockpit"):
+			insert()
+		with self.assertRaisesRegex(frappe.ValidationError, "may set only"):
+			insert(proposed_values=json.dumps({"priority": "High"}))
+		other = make_feature(make_implementation().name, title="Elsewhere")
+		with self.assertRaisesRegex(frappe.ValidationError, "another implementation"):
+			insert(target_name=other.name, proposed_values=json.dumps({"target_date": "2027-01-31"}))
+		with self.assertRaisesRegex(frappe.ValidationError, "not valid|before|after"):
+			insert(proposed_values=json.dumps({"target_date": "2026-11-01"}))
+		self.assertTrue(insert(proposed_values=json.dumps({"target_date": "2027-01-31"})).name)
+
+	def test_proposing_rejecting_and_disputing_need_a_reason(self):
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"Give a short reason",
+			_propose_change,
+			self.implementation.name,
+			"Implementation Feature",
+			"Priority",
+			{"priority": "High"},
+			self.feature.name,
+			reason="  ",
+		)
+		name = propose_change(
+			self.implementation.name,
+			"Implementation Feature",
+			"Priority",
+			{"priority": "High"},
+			self.feature.name,
+			reason="Go-live first",
+		)
+		self.as_customer()
+		self.assertRaisesRegex(frappe.ValidationError, "Give a short reason", reject_change, name)
+		self.assertEqual(reject_change(name, "Not before January"), "Rejected")
+		change = frappe.get_doc("Implementation Change", name)
+		# the decision's reason is kept apart from the proposer's
+		self.assertEqual((change.reason, change.decision_reason), ("Go-live first", "Not before January"))
+
+	def add_internal_pm(self, user=PM_USER):
+		if not frappe.db.exists("User", user):
+			frappe.get_doc(
+				{"doctype": "User", "email": user, "first_name": "IC PM", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		contact = frappe.db.get_value("Contact", {"user": user}) or (
+			frappe.get_doc({"doctype": "Contact", "first_name": "IC PM", "user": user}).insert(ignore_permissions=True).name
+		)
+		self.implementation.reload()
+		self.implementation.append(
+			"stakeholders",
+			{
+				"contact": contact,
+				"full_name": "IC PM",
+				"stakeholder_organisation": "Internal",
+				"stakeholder_type": "Project Manager",
+			},
+		)
+		self.implementation.save()
+
+	@patch("phamos.phriend.events.send")
+	def test_the_internal_pm_hears_of_the_customers_decisions(self, send):
+		self.add_internal_pm()
+		chapter = make_chapter(self.implementation.name, title="Warehouse")
+		# a staff proposal reaches no staff
+		staff = self.propose_chapter(chapter.name, {"target_date": "2026-07-31"})
+		send.assert_not_called()
+
+		self.as_customer()
+		reject_change(staff, "Too late for us")
+		customer = self.propose_chapter(chapter.name, {"target_date": "2026-07-15"})
+		frappe.set_user("Administrator")
+		self.assertEqual([c.args[:2] for c in send.call_args_list], [(PM_USER, "plan_change")] * 2)
+		text, link = send.call_args_list[1].args[2:]
+		self.assertIn("proposes a change to Warehouse", text)
+		self.assertEqual(link, f"/implementation-cockpit/{quote(self.implementation.name)}/decisions")
+
+		# without an internal PM the account manager hears of it
+		send.reset_mock()
+		self.implementation.reload()
+		self.implementation.stakeholders = [r for r in self.implementation.stakeholders if r.stakeholder_organisation != "Internal"]
+		self.implementation.account_manager = "Administrator"
+		self.implementation.save()
+		self.as_customer()
+		withdraw_change(customer)
+		self.propose_chapter(chapter.name, {"target_date": "2026-07-20"})
+		self.assertEqual([c.args[0] for c in send.call_args_list], ["Administrator"])
+

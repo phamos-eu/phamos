@@ -78,7 +78,7 @@ class TestCockpitRoadmap(FrappeTestCase):
 		frappe.set_user(CUSTOMER_USER)
 		self.assertEqual(bars(get_roadmap(self.implementation)), {})
 
-	def test_customers_get_no_draft_or_cancelled_chapters_and_cannot_propose(self):
+	def test_customers_get_no_draft_or_cancelled_chapters_and_both_sides_propose(self):
 		agreed = make_chapter(self.implementation, "Agreed", "2026-01-01", "2026-01-10", self.warehouse)
 		draft = make_chapter(self.implementation, "Draft", "2026-01-11", "2026-01-20", self.warehouse, [agreed], plan=False)
 		cancelled = make_chapter(self.implementation, "Gone", "2026-02-01", "2026-02-10", self.warehouse, plan=False)
@@ -87,8 +87,7 @@ class TestCockpitRoadmap(FrappeTestCase):
 		staff = get_roadmap(self.implementation)
 		self.assertEqual(set(bars(staff)), {agreed, draft, cancelled})
 		self.assertEqual(staff["dependencies"], [{"from": agreed, "to": draft, "conflict": False}])
-		# hidden until a date change can be proposed with its dates (#2219): the Desk form couldn't
-		self.assertFalse(staff["can_propose"])
+		self.assertTrue(staff["can_propose"])
 
 		frappe.get_doc(
 			{
@@ -105,7 +104,8 @@ class TestCockpitRoadmap(FrappeTestCase):
 		customer = get_roadmap(self.implementation)
 		self.assertEqual(set(bars(customer)), {agreed})
 		self.assertEqual(customer["dependencies"], [])
-		self.assertFalse(customer["can_propose"])
+		# both sides propose plan changes in the cockpit (#2219 decision 2)
+		self.assertTrue(customer["can_propose"])
 		# a release planned against a Draft chapter stays hidden with it
 		self.assertEqual(customer["markers"], [])
 

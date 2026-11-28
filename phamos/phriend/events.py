@@ -28,6 +28,8 @@ KINDS = {
 	"ai_run_failed": {"level": "note", "gesture": "alert", "warn_field": "warn_ai_run_failed", "now": True},
 	"email_failed": {"level": "note", "gesture": "alert", "warn_field": "warn_email_failed", "now": True},
 	"gitlab_sync_failed": {"level": "note", "gesture": "alert", "warn_field": "warn_gitlab_sync_failed", "now": True},
+	# a customer proposed, agreed, rejected, confirmed or disputed a plan change (#2219)
+	"plan_change": {"level": "note", "gesture": "alert"},
 }
 
 
@@ -135,6 +137,12 @@ def gitlab_sync_failed():
 	send_to_warning_role("gitlab_sync_failed", _("The GitLab sync failed. See the Error Log."), "/app/error-log")
 
 
+def plan_change(users, text, link):
+	"""A customer's decision on a plan change, for the implementation's internal PMs (#2219)."""
+	for user in users:
+		send(user, "plan_change", text, link)
+
+
 def test_event(kind):
 	"""Debug (phriend.emit): a sample of `kind` to the current user."""
 	samples = {
@@ -143,6 +151,7 @@ def test_event(kind):
 		"ai_run_failed": (_("The AI agent couldn't finish on {0} {1}.").format(_("Issue"), "ISS-TEST"), "/app/issue"),
 		"email_failed": (_("Some e-mails from {0} could not be read. See the Error Log.").format("Receipts"), "/app/error-log"),
 		"gitlab_sync_failed": (_("The GitLab sync failed. See the Error Log."), "/app/error-log"),
+		"plan_change": (_("{0} proposes a change to {1}.").format("IC Customer", "Quotations"), "/implementation-cockpit"),
 	}
 	if kind not in samples:
 		frappe.throw(_("Unknown Phriend event: {0}").format(kind))

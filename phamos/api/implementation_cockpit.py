@@ -14,6 +14,8 @@ Every endpoint resolves that scope first and returns allow-listed fields only. I
 users, so they see what the customer sees.
 """
 
+import json
+
 import frappe
 from frappe import _
 from frappe.query_builder import Order
@@ -186,6 +188,8 @@ def get_overview(implementation):
 		"review_cadence": doc.review_cadence,
 		"next_review_due": doc.next_review_due,
 		"manager": manager,
+		# plan changes waiting for the viewer's side (#2219): the Overview links to Decisions
+		"decisions_waiting": _decisions_waiting(implementation),
 	}
 
 
@@ -1016,15 +1020,43 @@ ROADMAP_CHAPTER_FIELDS = (
 )
 
 
-def _can_propose_dates():
-	"""Whether the Roadmap shows "Propose a date change". Off for everyone for now (#2219).
+def _plan_side(implementation):
+	"""The viewer's side in plan changes (#1971): "phamos" for staff who may change the
+	implementation, "customer" for its customer stakeholders, None for anyone else. Both sides
+	propose and decide in the cockpit (#2219 decision 2)."""
+	from phamos.phamos.doctype.implementation_change.implementation_change import side_of
 
-	The button opened the Implementation Change form in Desk, where the new dates can't be
-	entered: the values are read-only there, so a saved change had none. #2219 brings a way to
-	propose a chapter's dates; then staff who may create an Implementation Change get the button
-	again (is_internal_user() and create permission).
-	"""
-	return False
+	return side_of(implementation)
+
+
+def _chapter_dependencies(chapter_names):
+	"""{chapter: [the chapters it waits for]}, each once, for the given chapters."""
+	depends_on = {}
+	for row in frappe.get_all(
+		"Implementation Chapter Dependency",
+		filters={"parent": ["in", list(chapter_names) or [""]], "parenttype": "Implementation Chapter"},
+		fields=["parent", "chapter"],
+	):
+		if row.chapter not in depends_on.setdefault(row.parent, []):
+			depends_on[row.parent].append(row.chapter)
+	return depends_on
+
+
+def _path_rows(chapters, depends_on, dates=None):
+	"""The chapters that decide the end date, as critical_path() takes them: agreed (Planned, In
+	Progress, Blocked) and not done. `dates`: {chapter: (planned_start, target_date)} to try other
+	dates for some of them (the proposal preview)."""
+	dates = dates or {}
+	return [
+		{
+			"name": c.name,
+			"planned_start": dates.get(c.name, (c.planned_start, c.target_date))[0],
+			"target_date": dates.get(c.name, (c.planned_start, c.target_date))[1],
+			"depends_on": depends_on.get(c.name, []),
+		}
+		for c in chapters
+		if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH and not _target_reached(c)
+	]
 
 
 def _baseline_rows(implementation):
@@ -1184,29 +1216,20 @@ def get_roadmap(implementation):
 	if not internal:
 		chapters = [c for c in chapters if c.status not in CHAPTER_STATUSES_HIDDEN_FROM_CUSTOMERS]
 	chapter_names = {c.name for c in chapters}
-	depends_on = {}
-	for row in frappe.get_all(
-		"Implementation Chapter Dependency",
-		filters={"parent": ["in", list(chapter_names) or [""]], "parenttype": "Implementation Chapter"},
-		fields=["parent", "chapter"],
-	):
-		if row.chapter not in depends_on.setdefault(row.parent, []):
-			depends_on[row.parent].append(row.chapter)
-
-	path = critical_path(
-		[
-			{
-				"name": c.name,
-				"planned_start": c.planned_start,
-				"target_date": c.target_date,
-				"depends_on": depends_on.get(c.name, []),
-			}
-			for c in chapters
-			if c.status in CHAPTER_STATUSES_ON_CRITICAL_PATH and not _target_reached(c)
-		]
-	)["items"]
+	depends_on = _chapter_dependencies(chapter_names)
+	path = critical_path(_path_rows(chapters, depends_on))["items"]
 
 	baseline, baseline_chapters, baseline_features = _baseline_rows(implementation)
+	side = _plan_side(implementation)
+	# open date and target level proposals per chapter (#2219), drawn as an outline on its bar
+	proposals = {}
+	for row in _change_rows(
+		implementation,
+		side,
+		{"target_doctype": "Implementation Chapter", "status": ["in", OPEN_CHANGE_STATUSES]},
+	):
+		if row["target"]["name"] in chapter_names:
+			proposals.setdefault(row["target"]["name"], []).append(row)
 
 	def chapter_bar(chapter):
 		then = baseline_chapters.get(chapter.name)
@@ -1235,6 +1258,7 @@ def get_roadmap(implementation):
 			if then
 			else None,
 			"is_new": bool(baseline) and not then,
+			"proposals": proposals.get(chapter.name, []),
 		}
 
 	features = [f for f in _feature_rows(implementation) if f.status != "Dropped"]
@@ -1303,6 +1327,7 @@ def get_roadmap(implementation):
 					"cycle": False,
 					"baseline": None,
 					"is_new": False,
+					"proposals": [],
 				}
 			)
 	for feature in features:
@@ -1332,5 +1357,219 @@ def get_roadmap(implementation):
 		"markers": markers,
 		"baseline": {"name": baseline.name, "baseline_date": baseline.baseline_date} if baseline else None,
 		"range": {"start": min(dates), "end": max(dates)} if dates else None,
-		"can_propose": _can_propose_dates(),
+		"can_propose": bool(side),
+	}
+
+
+# Decisions on plan changes (#2219): proposals, direct edits and their decisions, for both sides.
+OPEN_CHANGE_STATUSES = ("Proposed", "Agreed")
+AWAITING_CUSTOMER = "Applied – awaiting customer"
+CHANGE_FIELDS = (
+	"name",
+	"change_type",
+	"status",
+	"target_doctype",
+	"target_name",
+	"old_values",
+	"proposed_values",
+	"reason",
+	"decision_reason",
+	"dispute_reason",
+	"proposed_by",
+	"agreed_by_phamos",
+	"agreed_by_customer",
+	"stakeholder_meeting",
+	"creation",
+	"decided_on",
+	"applied_on",
+)
+
+
+def _waiting_for(change):
+	"""Which side must act: the other side of a proposal, the customer on a direct edit, phamos on
+	a dispute (to settle it, e.g. in the next meeting). None once decided or while it waits for
+	its meeting (Agreed)."""
+	from phamos.phamos.doctype.implementation_change.implementation_change import proposer_side
+
+	if change.status == "Proposed":
+		return {"phamos": "customer", "customer": "phamos"}.get(proposer_side(change))
+	if change.status == AWAITING_CUSTOMER:
+		return "customer"
+	if change.status == "Disputed":
+		return "phamos"
+	return None
+
+
+def _change_actions(change, side):
+	"""What the viewer's side may do with a change, as buttons (the API checks it again)."""
+	from phamos.phamos.doctype.implementation_change.implementation_change import proposer_side
+
+	if not side:
+		return []
+	if change.status == "Proposed":
+		return ["withdraw"] if side == proposer_side(change) else ["agree", "reject"]
+	if change.status == AWAITING_CUSTOMER and side == "customer":
+		return ["confirm", "dispute"]
+	if change.status == "Disputed" and side == "customer":
+		return ["confirm"]
+	return []
+
+
+def _json_values(value):
+	try:
+		parsed = json.loads(value or "{}")
+	except ValueError:
+		return {}
+	return parsed if isinstance(parsed, dict) else {}
+
+
+def _change_rows(implementation, side, filters=None):
+	"""The implementation's plan changes for the cockpit, newest first: what changes from what to
+	what, why, who proposed and decided, and what waits for whom. Names only, no e-mail
+	addresses. Staff and customers see the same rows (#2219 decision 8); `actions` depend on
+	`side`."""
+	from phamos.phamos.doctype.implementation_change.implementation_change import TITLE_FIELDS
+
+	changes = frappe.get_all(
+		"Implementation Change",
+		filters={"implementation": implementation, **(filters or {})},
+		fields=list(CHANGE_FIELDS),
+		order_by="creation desc",
+	)
+	labels = {}
+	for doctype, field in TITLE_FIELDS.items():
+		names = [c.target_name for c in changes if c.target_doctype == doctype and c.target_name]
+		if names:
+			labels[doctype] = dict(
+				frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", field], as_list=True)
+			)
+	users = {c.proposed_by for c in changes if c.proposed_by} | {c.agreed_by_phamos for c in changes if c.agreed_by_phamos}
+	user_names = dict(
+		frappe.get_all("User", filters={"name": ["in", list(users) or [""]]}, fields=["name", "full_name"], as_list=True)
+	)
+	contact_names = dict(
+		frappe.get_all(
+			"Contact",
+			filters={"name": ["in", [c.agreed_by_customer for c in changes if c.agreed_by_customer] or [""]]},
+			fields=["name", "full_name"],
+			as_list=True,
+		)
+	)
+	metas = {}
+	rows = []
+	for change in changes:
+		old, new = _json_values(change.old_values), _json_values(change.proposed_values)
+		meta = metas.setdefault(change.target_doctype, frappe.get_meta(change.target_doctype))
+		rows.append(
+			{
+				"name": change.name,
+				"change_type": change.change_type,
+				"status": change.status,
+				"target": {
+					"doctype": change.target_doctype,
+					"name": change.target_name,
+					"label": labels.get(change.target_doctype, {}).get(change.target_name)
+					or change.target_name
+					or implementation,
+				},
+				"values": [
+					{"field": field, "label": _(df.label) if df else field, "old": old.get(field), "new": new.get(field)}
+					for field, df in ((f, meta.get_field(f)) for f in dict.fromkeys([*new, *old]))
+				],
+				"reason": change.reason,
+				"decision_reason": change.decision_reason,
+				"dispute_reason": change.dispute_reason,
+				"proposed_by": {
+					"name": user_names.get(change.proposed_by) or change.proposed_by,
+					"side": "phamos" if is_internal_user(change.proposed_by) else "customer",
+				}
+				if change.proposed_by
+				else None,
+				"agreed_by_phamos": user_names.get(change.agreed_by_phamos) if change.agreed_by_phamos else None,
+				"agreed_by_customer": contact_names.get(change.agreed_by_customer) if change.agreed_by_customer else None,
+				"stakeholder_meeting": change.stakeholder_meeting,
+				"created": change.creation,
+				"decided_on": change.decided_on,
+				"applied_on": change.applied_on,
+				"waiting_for": _waiting_for(change),
+				"actions": _change_actions(change, side),
+			}
+		)
+	return rows
+
+
+def _decisions_waiting(implementation):
+	"""How many plan changes wait for the viewer's side (the count in the nav and on the Overview)."""
+	side = _plan_side(implementation)
+	if not side:
+		return 0
+	rows = _change_rows(
+		implementation, side, {"status": ["in", ("Proposed", AWAITING_CUSTOMER, "Disputed")]}
+	)
+	return sum(1 for row in rows if row["waiting_for"] == side)
+
+
+@frappe.whitelist()
+def get_changes(implementation):
+	"""Every plan change of the implementation for the Decisions page (#2219), newest first, with
+	what waits for the viewer and what they may do."""
+	_require_implementation(implementation)
+	side = _plan_side(implementation)
+	rows = _change_rows(implementation, side)
+	return {
+		"side": side,
+		"changes": rows,
+		"waiting_count": sum(1 for row in rows if side and row["waiting_for"] == side),
+	}
+
+
+@frappe.whitelist()
+def preview_chapter_dates(implementation, chapter, planned_start=None, target_date=None):
+	"""What new dates for one chapter would do to the plan, before anyone proposes or agrees
+	(#2219 decision 11). Nothing is saved and nothing is refused for it.
+
+	Returns `end_date` now and with the new dates, `end_shift_days`, the chapter's `slack_days`
+	with the new dates, and `clashes`: the dependencies the new dates would overlap. Only agreed
+	chapters count, which staff and customers both see.
+	"""
+	_require_implementation(implementation)
+	chapters = frappe.get_all(
+		"Implementation Chapter",
+		filters={"implementation": implementation, "status": ["in", CHAPTER_STATUSES_ON_CRITICAL_PATH]},
+		fields=list(ROADMAP_CHAPTER_FIELDS),
+	)
+	by_name = {c.name: c for c in chapters}
+	if chapter not in by_name:
+		frappe.throw(_("Choose a planned chapter of this implementation."))
+	current = by_name[chapter]
+	new_start = getdate(planned_start) if planned_start else current.planned_start
+	new_end = getdate(target_date) if target_date else current.target_date
+	if new_start and new_end and getdate(new_end) < getdate(new_start):
+		frappe.throw(_("Target Date must be after Planned Start."))
+
+	depends_on = _chapter_dependencies(by_name)
+	before = _path_rows(chapters, depends_on)
+	after = _path_rows(chapters, depends_on, {chapter: (new_start, new_end)})
+
+	def end_of(rows):
+		dates = [getdate(row["target_date"]) for row in rows if row["target_date"]]
+		return max(dates) if dates else None
+
+	end_before, end_after = end_of(before), end_of(after)
+	moved = {**current, "planned_start": new_start, "target_date": new_end}
+	clashes = [
+		{"chapter": name, "title": by_name[name].chapter_title or name, "direction": "depends on"}
+		for name in depends_on.get(chapter, [])
+		if name in by_name and dependency_conflict(by_name[name], moved)
+	] + [
+		{"chapter": other.name, "title": other.chapter_title or other.name, "direction": "needed by"}
+		for other in chapters
+		if chapter in depends_on.get(other.name, []) and dependency_conflict(moved, other)
+	]
+	slack = critical_path(after, end_after)["items"].get(chapter, {}) if end_after else {}
+	return {
+		"end_date": {"now": end_before, "new": end_after},
+		"end_shift_days": _days_between(end_before, end_after) or 0,
+		"slack_days": slack.get("slack_days"),
+		"clashes": clashes,
 	}

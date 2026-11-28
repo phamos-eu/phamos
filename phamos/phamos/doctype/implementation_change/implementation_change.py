@@ -14,8 +14,14 @@ Two ways in:
 Direct edits are recorded once the implementation has a baseline, i.e. after the first planning
 session. Before that the plan is still being drafted together.
 
-Chapters keep their own lock: their agreed content changes only through a Stakeholder Meeting,
-which records what changed as Applied (`record_meeting_chapter_changes`).
+Chapters keep their own lock against direct edits. Their dates and target level change through a
+proposal both sides agree to (#2219, applied under the flag of #2050); their title and description
+change only in a Stakeholder Meeting, which records what changed as Applied
+(`record_meeting_chapter_changes`).
+
+Every new proposal is checked in `validate()`, whatever made it (the cockpit, a Desk form, code):
+only agreed fields of its type, a record of the same implementation, values the record accepts, and
+one open proposal per record and type (#2219).
 
 Releases (#1986) are triaged the same way: a new target date ("Dates", `target_date`), a new
 order of their features ("Rank", `ranking`: the feature names in the new order) or a feature
@@ -72,6 +78,11 @@ NEW_FEATURE_FIELDS = (
 	"target_level",
 	"definition_of_done",
 )
+# Open proposals: one side asked (Proposed), or both agreed and it waits for its meeting (Agreed).
+OPEN = ("Proposed", "Agreed")
+# What may be proposed for a chapter outside a meeting (#2219 decision 1). Its title and
+# description (Scope change) change in a Stakeholder Meeting, with their Chapter Revision.
+CHAPTER_PROPOSAL_TYPES = ("Dates", "Target level")
 
 
 class ImplementationChange(Document):
@@ -83,9 +94,14 @@ class ImplementationChange(Document):
 			frappe.throw(_("An applied or rejected change cannot be edited. Propose a new change instead."))
 		if self.status in ("Proposed", "Agreed") and self.stakeholder_meeting:
 			check_planning_meeting(self.stakeholder_meeting, self.implementation)
+		if self.is_new() and self.status == "Proposed":
+			_check_new_proposal(self)
 
 	@property
 	def values(self):
+		# code may set the JSON field as a dict; the form and the database hold text
+		if isinstance(self.proposed_values, dict):
+			return self.proposed_values
 		return json.loads(self.proposed_values or "{}")
 
 	def apply(self):
@@ -105,7 +121,7 @@ class ImplementationChange(Document):
 			target = frappe.get_doc(self.target_doctype, self.target_name)
 			# the values as they are now, which may differ from those at the time of the proposal
 			self.old_values = frappe.as_json({field: target.get(field) for field in self.values})
-			target.update(self.values)
+			target.update(_typed(target, self.values))
 			if self.change_type == "Definition of done" and self.target_doctype == "Implementation Feature":
 				_set_dod_agreement(target, self.agreed_by_customer)
 			target.flags.from_implementation_change = True
@@ -164,9 +180,9 @@ def _customer_contact(implementation, user=None):
 	return contacts[0] if contacts else None
 
 
-def _side(implementation):
+def side_of(implementation):
 	"""'phamos' for internal users who may change the implementation, 'customer' for a customer
-	stakeholder; anyone else may not take part."""
+	stakeholder, None for anyone else. For the cockpit's flags; actions go through _side."""
 	from phamos.api.implementation_cockpit import is_internal_user
 
 	if is_internal_user():
@@ -174,7 +190,24 @@ def _side(implementation):
 			return "phamos"
 	elif _customer_contact(implementation):
 		return "customer"
-	frappe.throw(_("You cannot take part in plan changes of this implementation."), frappe.PermissionError)
+	return None
+
+
+def _side(implementation):
+	"""The caller's side (side_of); anyone else may not take part."""
+	side = side_of(implementation)
+	if not side:
+		frappe.throw(_("You cannot take part in plan changes of this implementation."), frappe.PermissionError)
+	return side
+
+
+def proposer_side(change):
+	"""The side that proposed: the one whose consent a Proposed change carries alone."""
+	if change.agreed_by_phamos and not change.agreed_by_customer:
+		return "phamos"
+	if change.agreed_by_customer and not change.agreed_by_phamos:
+		return "customer"
+	return None
 
 
 # Direct edits ----------------------------------------------------------------------------------
@@ -348,14 +381,15 @@ def propose_change(
 ):
 	"""Propose a change to agreed plan values. The proposer's side counts as agreed.
 
-	Returns the name of the new Implementation Change.
+	Returns the name of the new Implementation Change. The values are checked when it is inserted
+	(`_check_new_proposal`); the type and fields already here, before the current values are read.
 	"""
 	side = _side(implementation)
 	values = frappe.parse_json(proposed_values) or {}
 	if not isinstance(values, dict) or not values:
 		frappe.throw(_("Name the values to change."))
+	_require_reason(reason)
 	_validate_proposal(implementation, target_doctype, target_name, change_type, values)
-	_check_values_on_a_copy(implementation, target_doctype, target_name, change_type, values)
 	if stakeholder_meeting:
 		check_planning_meeting(stakeholder_meeting, implementation)
 	change = _insert_change(
@@ -370,6 +404,8 @@ def propose_change(
 		stakeholder_meeting=stakeholder_meeting,
 		**_consent_of(side, implementation),
 	)
+	if side == "customer":
+		_tell_phamos(change, _("{0} proposes a change to {1}."))
 	return change.name
 
 
@@ -417,6 +453,31 @@ def _validate_release_ranking(implementation, release, values):
 		frappe.throw(_("Move the feature to another planned release of this implementation."))
 
 
+def _typed(doc, values):
+	"""The values as the record stores them: proposed values come as JSON text, and a record's own
+	checks compare them with its stored dates and numbers (a chapter compares its two dates; with
+	only one of them proposed, text met a date). Values that don't convert stay as they are, for
+	the checks to refuse."""
+	from frappe.utils import cint, flt
+
+	out = dict(values)
+	for field, value in values.items():
+		df = doc.meta.get_field(field)
+		if not df or value in (None, ""):
+			continue
+		try:
+			if df.fieldtype == "Date":
+				out[field] = getdate(value)
+			elif df.fieldtype == "Int" and not isinstance(value, bool):
+				out[field] = cint(value) if str(value).strip().lstrip("-").isdigit() else value
+			elif df.fieldtype in ("Float", "Percent") and not isinstance(value, bool):
+				float(value)
+				out[field] = flt(value)
+		except (ValueError, TypeError):
+			pass
+	return out
+
+
 def _check_values_on_a_copy(implementation, target_doctype, target_name, change_type, values):
 	"""Refuse values the target would refuse, to the proposer, before the other side sees them.
 
@@ -429,7 +490,7 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 		return
 	if target_name:
 		doc = frappe.get_doc(target_doctype, target_name)
-		doc.update(values)
+		doc.update(_typed(doc, values))
 	else:
 		doc = frappe.get_doc(
 			{"doctype": "Implementation Feature", "implementation": implementation, "status": "Agreed", **values}
@@ -465,6 +526,53 @@ def _check_values_on_a_copy(implementation, target_doctype, target_name, change_
 	del log[before:]
 
 
+def _check_new_proposal(change):
+	"""The checks every new proposal passes, from any path (#2219 decision 6). The Desk form can't
+	enter values, so a change made there is refused here with a pointer to the cockpit."""
+	try:
+		values = change.values
+	except ValueError:
+		values = None
+	if not isinstance(values, dict) or not values:
+		frappe.throw(_("Name the values to change. Plan changes are proposed in the Implementation Cockpit."))
+	_validate_proposal(change.implementation, change.target_doctype, change.target_name, change.change_type, values)
+	_check_one_open(change)
+	_check_values_on_a_copy(
+		change.implementation, change.target_doctype, change.target_name, change.change_type, values
+	)
+
+
+def _check_one_open(change):
+	"""One open proposal per record and change type (#2219 decision 7), so both sides decide one
+	thing at a time. A release's Rank proposals are exempt: several features may be moved out of
+	one release at once (#1986). A new feature (Scope add without a target) has no record yet."""
+	if not change.target_name or (change.target_doctype == "Implementation Release" and change.change_type == "Rank"):
+		return
+	if frappe.db.exists(
+		"Implementation Change",
+		{
+			"target_doctype": change.target_doctype,
+			"target_name": change.target_name,
+			"change_type": change.change_type,
+			"status": ["in", OPEN],
+			"name": ["!=", change.name or ""],
+		},
+	):
+		frappe.throw(_("A proposal for this is open: agree, reject or withdraw it first."))
+
+
+def _validate_chapter_proposal(chapter, change_type):
+	"""Only an agreed chapter's dates and target level are proposed (#2219 decisions 1 and 8): a
+	Draft chapter isn't agreed yet and is edited directly, a cancelled one isn't planned any more."""
+	if change_type not in CHAPTER_PROPOSAL_TYPES:
+		frappe.throw(_("A chapter's title and description change in a Stakeholder Meeting."))
+	status = frappe.db.get_value("Implementation Chapter", chapter, "status")
+	if status == "Draft":
+		frappe.throw(_("A Draft chapter isn't agreed yet: edit it directly."))
+	if status == "Cancelled":
+		frappe.throw(_("A cancelled chapter is not planned any more."))
+
+
 def _validate_proposal(implementation, target_doctype, target_name, change_type, values):
 	if change_type == "Scope add" and target_doctype == "Implementation Feature" and not target_name:
 		unknown = set(values) - set(NEW_FEATURE_FIELDS)
@@ -473,9 +581,8 @@ def _validate_proposal(implementation, target_doctype, target_name, change_type,
 				_("A new feature needs a title and may set only: {0}").format(", ".join(NEW_FEATURE_FIELDS))
 			)
 		return
-	if target_doctype not in ("Implementation Feature", "Implementation", "Implementation Release"):
-		# chapters change through a Stakeholder Meeting only
-		frappe.throw(_("Changes can be proposed for features, releases and the implementation."))
+	if target_doctype not in AGREED_FIELDS:
+		frappe.throw(_("Changes can be proposed for features, releases, chapters and the implementation."))
 	if not target_name or not frappe.db.exists(target_doctype, target_name):
 		frappe.throw(_("Choose the record to change."))
 	owner = (
@@ -485,6 +592,8 @@ def _validate_proposal(implementation, target_doctype, target_name, change_type,
 	)
 	if owner != implementation:
 		frappe.throw(_("The record belongs to another implementation."))
+	if target_doctype == "Implementation Chapter":
+		_validate_chapter_proposal(target_name, change_type)
 	if target_doctype == "Implementation Release":
 		# a released or cancelled release is history: it is not re-planned, and stays out of the cut line
 		if frappe.db.get_value("Implementation Release", target_name, "status") not in ("Planned", "In Progress"):
@@ -550,17 +659,36 @@ def agree_change(name, contact=None):
 	change.save(ignore_permissions=True)
 	if not change.stakeholder_meeting:
 		change.apply()
+	if side == "customer":
+		_tell_phamos(change, _("{0} agreed to the change of {1}."))
 	return change.status
 
 
 @frappe.whitelist()
 def reject_change(name, reason=None):
-	"""Either side rejects a proposal; the proposer withdraws it this way too."""
-	change = _get_change(name, ("Proposed", "Agreed"))[0]
+	"""Either side rejects a proposal, with a reason (#2219 decision 13). The reason is kept apart
+	from the proposer's (`decision_reason`). The proposer's side rather withdraws (withdraw_change)."""
+	_require_reason(reason)
+	change, side = _get_change(name, ("Proposed", "Agreed"))
 	change.status = "Rejected"
 	change.decided_on = now_datetime()
-	if reason:
-		change.reason = "\n".join(filter(None, [change.reason, reason]))
+	change.decision_reason = reason.strip()
+	change.save(ignore_permissions=True)
+	if side == "customer":
+		_tell_phamos(change, _("{0} rejected the change of {1}."))
+	return change.status
+
+
+@frappe.whitelist()
+def withdraw_change(name, reason=None):
+	"""The proposer's side takes its open proposal back before the other side decided (#2219
+	decision 7). A reason is optional."""
+	change, side = _get_change(name, ("Proposed",))
+	if side != proposer_side(change):
+		frappe.throw(_("Only the side that proposed it can withdraw it."))
+	change.status = "Withdrawn"
+	change.decided_on = now_datetime()
+	change.decision_reason = (reason or "").strip() or None
 	change.save(ignore_permissions=True)
 	return change.status
 
@@ -572,12 +700,14 @@ def confirm_change(name, contact=None):
 	A phamos user may record a confirmation the customer gave elsewhere (a call, a meeting) by
 	naming the customer's Contact.
 	"""
-	change = _get_change(name, (AWAITING, "Disputed"))[0]
+	change, side = _get_change(name, (AWAITING, "Disputed"))
 	contact = _customer_side_contact(change, contact)
 	change.agreed_by_customer = contact
 	change.status = "Applied"
 	change.decided_on = now_datetime()
 	change.save(ignore_permissions=True)
+	if side == "customer":
+		_tell_phamos(change, _("{0} confirmed the change of {1}."))
 	if change.change_type == "Definition of done" and change.target_doctype == "Implementation Feature":
 		feature = frappe.get_doc("Implementation Feature", change.target_name)
 		# only when the text is still the one confirmed
@@ -593,13 +723,15 @@ def dispute_change(name, reason, contact=None):
 	"""The customer disputes a direct edit. Nothing is undone; it goes on the next session's agenda."""
 	if not (reason or "").strip():
 		frappe.throw(_("Say why you dispute the change."))
-	change = _get_change(name, (AWAITING,))[0]
+	change, side = _get_change(name, (AWAITING,))
 	_customer_side_contact(change, contact)
 	change.agreed_by_customer = None
 	change.dispute_reason = reason
 	change.status = "Disputed"
 	change.decided_on = now_datetime()
 	change.save(ignore_permissions=True)
+	if side == "customer":
+		_tell_phamos(change, _("{0} disputes the change of {1}."))
 	return change.status
 
 
@@ -622,3 +754,62 @@ def _customer_side_contact(change, contact=None):
 	if contact not in customer_contacts:
 		frappe.throw(_("{0} is not a customer stakeholder of this implementation.").format(contact))
 	return contact
+
+
+def _require_reason(reason):
+	if not (reason or "").strip():
+		frappe.throw(_("Give a short reason."))
+
+
+# Telling phamos ---------------------------------------------------------------------------------
+
+TITLE_FIELDS = {
+	"Implementation Chapter": "chapter_title",
+	"Implementation Feature": "title",
+	"Implementation Release": "title",
+}
+
+
+def target_label(change):
+	"""What the change is about, as people call it: the chapter's, feature's or release's title."""
+	field = TITLE_FIELDS.get(change.target_doctype)
+	if field and change.target_name:
+		return frappe.db.get_value(change.target_doctype, change.target_name, field) or change.target_name
+	return change.target_name or change.implementation
+
+
+def internal_project_managers(implementation):
+	"""Who hears of a customer's plan decision (#2219 decision 5): the implementation's Internal
+	stakeholders of type Project Manager with a user; without one, its account manager."""
+	contacts = frappe.get_all(
+		"Implementation Stakeholder",
+		filters={
+			"parent": implementation,
+			"parenttype": "Implementation",
+			"stakeholder_organisation": "Internal",
+			"stakeholder_type": "Project Manager",
+		},
+		pluck="contact",
+	)
+	users = frappe.get_all(
+		"Contact", filters={"name": ["in", [c for c in contacts if c] or [""]], "user": ["is", "set"]}, pluck="user"
+	)
+	if not users:
+		users = [frappe.db.get_value("Implementation", implementation, "account_manager")]
+	return [user for user in dict.fromkeys(users) if user]
+
+
+def _tell_phamos(change, message):
+	"""A customer acted on a plan change: a Phriend note for the internal PMs, linking to the
+	cockpit's Decisions page (#2219 decision 4). A staff action never reaches staff this way."""
+	from urllib.parse import quote
+
+	from phamos.phriend.events import plan_change
+
+	contact = change.agreed_by_customer or _customer_contact(change.implementation)
+	who = (contact and frappe.db.get_value("Contact", contact, "full_name")) or _("The customer")
+	plan_change(
+		internal_project_managers(change.implementation),
+		message.format(who, target_label(change)),
+		f"/implementation-cockpit/{quote(change.implementation, safe='')}/decisions",
+	)
