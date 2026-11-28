@@ -291,6 +291,68 @@ class TestBriefInChat(IssueAssistantTestCase):
 		self.assertTrue(frappe.db.exists("Raven Channel Member", {"channel_id": channel, "user_id": bot_user}))
 
 
+class TestBriefThread(IssueAssistantTestCase):
+	"""#2231: the brief invites to its thread, the first reader joins, the reader's language, the source."""
+
+	IMPLEMENTATION = "IA-BRIEF-THREAD"
+
+	def setUp(self):
+		super().setUp()
+		if "raven" not in frappe.get_installed_apps() or not frappe.get_all("Raven Workspace", limit=1):
+			self.skipTest("Raven with a workspace is needed")
+		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 1)
+		self.implementation(self.IMPLEMENTATION)
+		frappe.db.set_value("Implementation", self.IMPLEMENTATION, "account_manager", DESK_USER)
+		frappe.get_doc("User", DESK_USER).add_roles("Raven User")  # only Raven users can read the chat
+		self.addCleanup(frappe.db.set_value, "User", DESK_USER, "language", frappe.db.get_value("User", DESK_USER, "language"))
+
+	def brief_of(self, doc):
+		channel = frappe.db.get_value("Raven Channel", {"linked_doctype": "Issue", "linked_document": doc.name})
+		brief = frappe.db.get_value("Raven Message", {"channel_id": channel, "is_bot_message": 1,
+			"text": ("like", f"%{doc.name}%")}, ["name", "text"], as_dict=True)
+		return channel, brief
+
+	def test_brief_invites_to_its_thread_and_the_reader_joins(self):
+		doc = self.issue(raised_by=WEBSITE_USER, custom_implementation=self.IMPLEMENTATION)
+		run = self.run_assistant(doc)
+		self.assertTrue(run.summary.endswith(assistant.invitation_text()), run.summary)
+		channel, brief = self.brief_of(doc)
+		self.assertIn(frappe.utils.escape_html(assistant.invitation_text()), brief.text)
+		raven_user = frappe.db.get_value("Raven User", {"user": DESK_USER}, "name") or DESK_USER
+		self.assertTrue(frappe.db.exists("Raven Channel Member", {"channel_id": channel, "user_id": raven_user}))
+		self.assertNotIn(DESK_USER, self.assignees(doc), "the reader joins the chat, nobody assigns them")
+		self.assertTrue(frappe.db.exists("Raven Channel", {"name": brief.name, "is_thread": 1}))
+		replies = frappe.get_all("Raven Message", filters={"channel_id": brief.name, "is_bot_message": 1}, pluck="text")
+		self.assertTrue(any(frappe._("Ask me here.") in (t or "") for t in replies), replies)
+
+	def test_no_reader_no_thread(self):
+		frappe.db.set_value("Implementation", self.IMPLEMENTATION, "account_manager", None)
+		doc = self.issue(raised_by=WEBSITE_USER, custom_implementation=self.IMPLEMENTATION)
+		self.run_assistant(doc)
+		channel, brief = self.brief_of(doc)
+		self.assertTrue(brief)
+		self.assertFalse(frappe.db.exists("Raven Channel", {"name": brief.name, "is_thread": 1}))
+
+	def test_suggested_person_comes_before_the_account_manager(self):
+		ctx = frappe._dict(analysis={"classify": {"person": {"user": DESK_USER}}}, agent=frappe._dict(user=self.assistant),
+			doc=frappe._dict(custom_implementation=None))
+		self.assertEqual(assistant.first_reader(ctx), DESK_USER)
+		ctx.analysis = {}
+		ctx.doc = frappe._dict(custom_implementation=self.IMPLEMENTATION)
+		self.assertEqual(assistant.first_reader(ctx), DESK_USER)  # the account manager
+
+	def test_brief_in_the_readers_language(self):
+		frappe.db.set_value("User", DESK_USER, "language", "de")
+		doc = self.issue(raised_by=WEBSITE_USER, custom_implementation=self.IMPLEMENTATION)
+		run = self.run_assistant(doc)
+		self.assertTrue(run.summary.startswith(f"Erster Blick auf {doc.name}"), run.summary)
+
+	def test_portal_issue_says_customer_portal(self):
+		doc = frappe._dict(raised_by=WEBSITE_USER, via_customer_portal=1)
+		self.assertEqual(assistant.source_text(doc), frappe._("Customer portal"))
+		self.assertEqual(assistant.source_text(frappe._dict(raised_by=WEBSITE_USER)), frappe._("E-mail"))
+
+
 class TestManualRun(IssueAssistantTestCase):
 	def checks(self, doc):
 		return {c["key"]: c for c in assistant.get_manual_run_info(doc.name)["checks"]}

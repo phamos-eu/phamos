@@ -467,12 +467,12 @@ def ensure_chat(doc):
 
 
 
-def post_bot_message(doc, bot_name, html):
+def post_bot_message(doc, bot_name, html, members=()):
 	"""Post a bot's message in the record's chat, opening the chat first when it has none (#2111).
 
 	For background jobs: no session user is needed. The record's owner and assignees join as with
-	"Start chat"; the bot joins too, so its message shows as a member's. Returns the message name, or
-	None when the record chat is off.
+	"Start chat"; the bot joins too, so its message shows as a member's. `members` join as well, before the
+	message is posted (#2231). Returns the message name, or None when the record chat is off.
 	"""
 	_require_chat_doctype(doc.doctype)
 	if not is_enabled():
@@ -492,6 +492,9 @@ def post_bot_message(doc, bot_name, html):
 		)
 		member.flags.ignore_system_message = True
 		member.insert(ignore_permissions=True)
+	if members:
+		# they join before the message, so it counts as unread for them (#2231)
+		_ensure_members(channel, members, silent=True)
 	message = bot.send_message(channel.name, html)
 	if bot.raven_user:
 		# Raven shows the message's owner as its sender; the background job runs as the assistant's user

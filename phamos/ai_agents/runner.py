@@ -104,7 +104,7 @@ def execute(run_name, commit=True):
 	but keeps the run with its error.
 	"""
 	run = frappe.get_doc(RUN_DOCTYPE, run_name)
-	previous_user = frappe.session.user
+	previous_user, previous_lang = frappe.session.user, frappe.local.lang
 	started = time.monotonic()
 	frappe.db.savepoint("ai_agent_run")
 	try:
@@ -114,6 +114,8 @@ def execute(run_name, commit=True):
 		module = load_handler_module(agent.handler_module)
 		ctx = AgentContext(run=run, agent=agent, doc=doc, mode=run.mode or "Fill Empty")
 		_set_party(ctx, module)
+		if hasattr(module, "prepare"):
+			module.prepare(ctx)  # e.g. the language the agent writes in (#2231)
 		run.db_set({"status": "Running", "started_at": now_datetime()})
 		_run_phases(ctx, module)
 		if hasattr(module, "finalize"):
@@ -137,6 +139,7 @@ def execute(run_name, commit=True):
 		phriend_events.ai_run_failed(run)
 	finally:
 		frappe.set_user(previous_user)
+		frappe.local.lang = previous_lang
 		locks.release(run.reference_doctype, run.reference_name)
 		if commit:
 			frappe.db.commit()

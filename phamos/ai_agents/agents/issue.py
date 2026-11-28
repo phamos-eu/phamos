@@ -239,8 +239,10 @@ def source_text(doc):
 		return _("Phriend report forwarded from {0}").format(doc.phriend_source_system)
 	if doc.get("phriend_type"):
 		return _("Phriend report")
+	if doc.get("via_customer_portal"):
+		return _("Customer portal")  # also has raised_by: the portal user's address (#2231)
 	if doc.raised_by:
-		return _("Email")
+		return _("E-mail")
 	return _("Created in ERPNext")
 
 
@@ -269,11 +271,60 @@ def brief_lines(ctx):
 		by = frappe.utils.get_fullname(ctx.run.triggered_by)
 		lines.append(_("Started by hand by {0} (manual override).").format(by) if ctx.run.get("manual_override")
 			else _("Started by hand by {0}.").format(by))
+	lines.append(invitation_text())
 	return lines
 
 
+def invitation_text():
+	# where to talk to the assistant: it answers only there (#2228 decisions 1 and 2)
+	return _("Reply in this thread or @mention me to ask me something.")
+
+
+# --- who reads the brief first, and in which language (#2231) --------------------------------
+
+
+def _usable(user):
+	"""An enabled staff user with a Raven account: only they can read the chat."""
+	from phamos.api.issue_chat import _raven_user
+
+	return bool(user) and bool(frappe.db.get_value("User", {"name": user, "enabled": 1, "user_type": "System User"})) \
+		and bool(_raven_user(user))
+
+
+def account_manager(doc):
+	impl = doc.get("custom_implementation") or implementation_of(doc)
+	user = frappe.db.get_value("Implementation", impl, "account_manager") if impl else None
+	return user if _usable(user) else None
+
+
+def first_reader(ctx):
+	"""The person who joins the chat to read the brief: the suggested person, else the Implementation's
+	account manager, else nobody (#2228 decision 3)."""
+	person = ((ctx.analysis.get("classify") or {}).get("person") or {}).get("user")
+	if _usable(person) and person != ctx.agent.user:
+		return person
+	return account_manager(ctx.doc)
+
+
+def user_language(user):
+	"""A user's language, else the site's (#2228 decision 4)."""
+	return (user and frappe.db.get_value("User", user, "language")) or \
+		frappe.db.get_single_value("System Settings", "language") or "de"
+
+
+def prepare(ctx):
+	"""Before the skills: write in the language of the likely first reader. The suggested person is only
+	known after Classify, so the run starts with the account manager's (or the site's) language; the brief's
+	fixed lines follow the actual first reader in `finalize`."""
+	frappe.local.lang = user_language(account_manager(ctx.doc))
+
+
 def finalize(ctx):
-	"""Keep the brief on the run and post it in the Issue chat (when the record chat is on)."""
+	"""Keep the brief on the run and post it in the Issue chat (when the record chat is on). The first
+	reader joins the chat first and the assistant opens the thread under the brief (#2231)."""
+	reader = first_reader(ctx)
+	if reader:
+		frappe.local.lang = user_language(reader)
 	lines = brief_lines(ctx)
 	ctx.summary = "\n".join(lines)
 	if not ctx.agent.raven_bot:
@@ -285,13 +336,42 @@ def finalize(ctx):
 	try:
 		from phamos.api.issue_chat import post_bot_message
 
-		post_bot_message(ctx.doc, ctx.agent.raven_bot, html)
+		brief = post_bot_message(ctx.doc, ctx.agent.raven_bot, html, members=[reader] if reader else ())
 	except Exception:
 		# the brief stays on the run; a broken chat must not fail the assistant's work
 		frappe.db.rollback(save_point="issue_assistant_brief")
 		frappe.log_error(title=f"Issue Assistant: could not post the brief on {ctx.doc.name}")
 		ctx.flags.append({"code": "brief_not_posted", "severity": "warn",
 			"message": _("The brief could not be posted in the Issue chat.")})
+		return
+	if not (brief and reader):
+		return
+	frappe.db.savepoint("issue_assistant_thread")
+	try:
+		open_thread(brief, ctx.agent.raven_bot, reader)
+	except Exception:
+		# the brief stays; people can still open the thread themselves
+		frappe.db.rollback(save_point="issue_assistant_thread")
+		frappe.log_error(title=f"Issue Assistant: could not open the thread under the brief on {ctx.doc.name}")
+
+
+def open_thread(brief, bot_name, reader):
+	"""The thread under the brief with a first reply, so Raven shows "1 reply" (#2228 decision 2). Created in
+	the reader's session: Raven makes the creator the thread's first member and adds the brief's sender."""
+	from raven.api.threads import create_thread
+
+	if not frappe.db.exists("Raven Channel", {"name": brief, "is_thread": 1}):
+		assistant = frappe.session.user
+		frappe.set_user(reader)
+		try:
+			create_thread(brief)
+		finally:
+			frappe.set_user(assistant)
+	bot = frappe.get_doc("Raven Bot", bot_name)
+	reply = bot.send_message(brief, f"<p>{escape_html(_('Ask me here.'))}</p>")
+	if bot.raven_user:
+		frappe.db.set_value("Raven Message", reply, "owner", bot.raven_user, update_modified=False)
+	return reply
 
 
 # Manual start (testing the assistant): a Desk button on Issue opens a dialog that shows each
