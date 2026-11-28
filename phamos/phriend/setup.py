@@ -27,7 +27,19 @@ _FIELDS = [
 		"fieldtype": "Section Break",
 		"insert_after": "",
 		"collapsible": 0,
-		"depends_on": PHRIEND_OR_GITLAB,
+		# on every Issue: it holds the Implementation (#2112); Phriend's own fields carry the condition
+		"depends_on": "",
+	},
+	{
+		# The Implementation the Issue is about: set by Phriend (#1671) or by the Issue Assistant (#2112), shown
+		# in the Implementation Cockpit. On every Issue, first in the section.
+		"fieldname": "custom_implementation",
+		"label": "Implementation",
+		"fieldtype": "Link",
+		"options": "Implementation",
+		"in_standard_filter": 1,
+		"depends_on": "",
+		"insert_after": IMPLEMENTATION_SECTION,
 	},
 	{
 		"fieldname": "phriend_reported_by",
@@ -36,7 +48,8 @@ _FIELDS = [
 		"options": "User",
 		"read_only": 1,
 		"in_standard_filter": 1,
-		"insert_after": IMPLEMENTATION_SECTION,
+		"depends_on": PHRIEND_OR_GITLAB,
+		"insert_after": "custom_implementation",
 	},
 	{
 		"fieldname": "phriend_reported_by_name",
@@ -44,6 +57,7 @@ _FIELDS = [
 		"fieldtype": "Data",
 		"read_only": 1,
 		"fetch_from": "phriend_reported_by.full_name",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_reported_by",
 	},
 	{
@@ -53,16 +67,8 @@ _FIELDS = [
 		"read_only": 1,
 		"in_standard_filter": 1,
 		"description": "Set when the report came from another system (a develop or test system with this one as its target)",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_reported_by_name",
-	},
-	{
-		# The Implementation the report is about (#1671): set by Phriend, shown in the Implementation Cockpit.
-		"fieldname": "custom_implementation",
-		"label": "Implementation",
-		"fieldtype": "Link",
-		"options": "Implementation",
-		"in_standard_filter": 1,
-		"insert_after": "phriend_source_system",
 	},
 	{
 		"fieldname": "phriend_type",
@@ -71,7 +77,7 @@ _FIELDS = [
 		"options": "\nBug\nImprovement\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"depends_on": ONLY_PHRIEND,
-		"insert_after": "custom_implementation",
+		"insert_after": "phriend_source_system",
 	},
 	{
 		"fieldname": "phriend_comment",
@@ -95,13 +101,16 @@ _FIELDS = [
 		"fieldname": "phriend_gitlab_issues",
 		"label": "GitLab Issues",
 		"fieldtype": "HTML",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "gitlab_issue_url",
 	},
-	{"fieldname": "phriend_col", "fieldtype": "Column Break", "insert_after": "phriend_gitlab_issues"},
+	{"fieldname": "phriend_col", "fieldtype": "Column Break", "depends_on": PHRIEND_OR_GITLAB,
+		"insert_after": "phriend_gitlab_issues"},
 	{
 		"fieldname": "phriend_screenshot_preview",
 		"label": "Screenshot Preview",
 		"fieldtype": "HTML",
+		"depends_on": PHRIEND_OR_GITLAB,
 		"insert_after": "phriend_col",
 	},
 	{

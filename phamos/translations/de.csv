@@ -3083,6 +3083,84 @@ Chat sound on,Chat-Ton an
 Chat notifications muted,Chat-Benachrichtigungen stumm
 Dock in the corner,In der Ecke andocken
 Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
+AI processing allowed,KI-Verarbeitung erlaubt
+Issue Assistant Settings,Einstellungen Anfrage-Assistent
+Assistant User,Assistent-Benutzer
+Excluded Pages,Ausgeschlossene Seiten
+First look at {0},Erster Blick auf {0}
+Sender: {0},Absender: {0}
+Phriend report forwarded from {0},"Phriend-Meldung, weitergeleitet von {0}"
+Created in ERPNext,In ERPNext angelegt
+AI model not used: reported from a sensitive page ({0}).,KI-Modell nicht genutzt: gemeldet von einer sensiblen Seite ({0}).
+AI model not used: AI processing is not allowed for customer {0}.,KI-Modell nicht genutzt: KI-Verarbeitung ist für Kunde {0} nicht erlaubt.
+AI model not used: the sender is not known as a customer or a phamos user.,KI-Modell nicht genutzt: Der Absender ist weder als Kunde noch als phamos-Benutzer bekannt.
+AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt werden: Kunde {0} erlaubt KI-Verarbeitung.
+AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
+The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
+AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
+AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
+Started by hand by {0} (manual override).,Von Hand gestartet von {0} (manueller Override).
+Started by hand by {0}.,Von Hand gestartet von {0}.
+Automatic start,Automatischer Start
+AI model,KI-Modell
+Issue Assistant switched on,Issue-Assistent eingeschaltet
+Issue Assistant Settings: tick Enabled,Issue Assistant Settings: Aktiviert ankreuzen
+AI Agent for Issues enabled,KI-Agent für Anfragen aktiviert
+AI Agent {0}: tick Enabled,KI-Agent {0}: Aktiviert ankreuzen
+Run bench migrate to create the AI Agent,"bench migrate ausführen, um den KI-Agenten anzulegen"
+Project in scope,Projekt im Geltungsbereich
+Project on the Issue: one of {0},Projekt der Anfrage: eines von {0}
+Issue Type in scope,Anfragetyp im Geltungsbereich
+Issue Type on the Issue: one of {0},Anfragetyp der Anfrage: einer von {0}
+Not reported from a sensitive page,Nicht von einer sensiblen Seite gemeldet
+no page,keine Seite
+A report from a page other than {0},Eine Meldung von einer anderen Seite als {0}
+Customer allows AI processing,Kunde erlaubt KI-Verarbeitung
+Customer {0}: tick {1} (signed AVV),Kunde {0}: {1} ankreuzen (unterschriebener AVV)
+Internal Issue or known customer,Interne Anfrage oder bekannter Kunde
+"no Customer, created by {0}","kein Kunde, erstellt von {0}"
+Run Issue Assistant,Issue-Assistent starten
+Start anyway,Trotzdem starten
+The Issue Assistant is already working on this Issue.,Der Issue-Assistent arbeitet bereits an dieser Anfrage.
+The Issue Assistant could not start ({0}).,Der Issue-Assistent konnte nicht starten ({0}).
+Issue Assistant started (manual override),Issue-Assistent gestartet (manueller Override)
+Issue Assistant started,Issue-Assistent gestartet
+Would start automatically for a new Issue,Würde bei einer neuen Anfrage automatisch starten
+May use the AI model,Darf das KI-Modell nutzen
+The automatic start runs only when an Issue is created. Starting here always works; past a red check it is recorded as a manual override.,"Der automatische Start läuft nur, wenn eine Anfrage angelegt wird. Hier starten geht immer; an einer roten Prüfung vorbei wird es als manueller Override festgehalten."
+Needed to pass,Nötig zum Bestehen
+Last run,Letzter Lauf
+Manual Override,Manueller Override
+Override Reasons,Override-Gründe
+Started by hand although the automatic start or the AI gate would not have run it.,"Von Hand gestartet, obwohl der automatische Start oder die KI-Prüfung ihn nicht ausgeführt hätte."
+The checks the manual start went past.,"Die Prüfungen, an denen der manuelle Start vorbeiging."
+AI Agent Run {0} not found.,KI-Agenten-Lauf {0} nicht gefunden.
+The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}).
+Issue Assistant finished,Issue-Assistent fertig
+Issue Assistant failed,Issue-Assistent fehlgeschlagen
+Issue Assistant: {0},Issue-Assistent: {0}
+AI model not used: the gate did not allow it.,KI-Modell nicht genutzt: Die Prüfung hat es nicht erlaubt.
+AI model {0} read the Issue.,KI-Modell {0} hat die Anfrage gelesen.
+account manager of {0},Account Manager von {0}
+user with permission on {0},Benutzer mit Berechtigung auf {0}
+internal stakeholder of {0},interner Stakeholder von {0}
+member of project {0},Mitglied im Projekt {0}
+worked on recent Issues of {0},hat an letzten Anfragen von {0} gearbeitet
+AI model not available: {0},KI-Modell nicht verfügbar: {0}
+Missing: {0},Fehlt: {0}
+{0} set to {1}: {2},{0} auf {1} gesetzt: {2}
+{0}: suggests {1} instead of {2}: {3},{0}: schlägt {1} statt {2} vor: {3}
+Assigned {0}: {1},{0} zugewiesen: {1}
+Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
+The screenshot was read too.,Der Screenshot wurde mitgelesen.
+the model call failed ({0}),der Aufruf des Modells ist fehlgeschlagen ({0})
+Identified: {0},Erkannt: {0}
+nothing set,nichts gesetzt
+Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: Mitarbeiter {0} (nur nach E-Mail-Adresse)
+{0} set: {1},{0} gesetzt: {1}
+Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
+(ERPNext picked {0}),(ERPNext hat {0} gewählt)
+"A Customer on the Issue (directly, via Implementation or Project) with AI processing allowed, or the Issue created by a phamos Desk user while logged in","Ein Kunde an der Anfrage (direkt, über Implementation oder Projekt) mit erlaubter KI-Verarbeitung, oder die Anfrage von einem angemeldeten phamos-Desk-Benutzer erstellt"
 Frequently asked questions,Häufige Fragen
 FAQ,FAQ
 Web Profile FAQ,Web-Profil-FAQ

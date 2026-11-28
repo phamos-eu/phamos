@@ -78,10 +78,13 @@ class TestPhriend(FrappeTestCase):
 		meta = frappe.get_meta("Issue")
 		first = meta.fields[0]
 		self.assertEqual((first.fieldname, first.label), (setup.IMPLEMENTATION_SECTION, "Implementation Specific"))
-		# also on Issues that only have a GitLab issue; the Phriend fields inside stay hidden there
-		self.assertEqual(first.depends_on, setup.PHRIEND_OR_GITLAB)
+		# on every Issue, starting with the Implementation (#2112); the Phriend fields carry the condition
+		self.assertFalse(first.depends_on)
+		self.assertEqual(meta.fields[1].fieldname, "custom_implementation")
+		self.assertFalse(meta.fields[1].depends_on)
+		self.assertEqual(meta.fields[2].fieldname, "phriend_reported_by")
+		self.assertEqual(meta.get_field("phriend_reported_by").depends_on, setup.PHRIEND_OR_GITLAB)
 		self.assertEqual(meta.get_field("phriend_type").depends_on, setup.ONLY_PHRIEND)
-		self.assertEqual(meta.fields[1].fieldname, "phriend_reported_by")
 		self.assertEqual(frappe.db.get_value("Custom Field", {"dt": "Issue", "fieldname": "phriend_type"}, "module"),
 			"Phriend")
 

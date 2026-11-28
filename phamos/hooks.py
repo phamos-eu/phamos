@@ -302,6 +302,7 @@ after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
+	"phamos.setup.issue_assistant.after_migrate",  # Issue Assistant role, user, bot, agent, Customer switch (#2111)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
@@ -428,7 +429,11 @@ doc_events = {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Issue": {
+		"on_update": "phamos.api.issue_chat.on_record_update",
+		# the Issue Assistant's first look at a new Issue, in the background (#2111)
+		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
+	},
 	"Task": {
 		"after_insert": "phamos.api.issue_chat.on_task_insert",
 		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
