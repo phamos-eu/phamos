@@ -18,12 +18,13 @@ Suggestions, never applied before a trainer accepts them:
   Classify, party Customer; Classify adds accepted ones to the model's prompt. Its wording is a
   template; the model redrafts it in the background when the Customer allows the AI model.
 
-A run nobody corrected becomes Accepted after "Accept after (days)" or when its Issue is closed.
+A run nobody corrected becomes Accepted after "Accept after (days)" or when its Issue is closed; changes after
+that no longer count as corrections (PM, 2026-11-28).
 """
 
 import frappe
 from frappe import _
-from frappe.utils import cint, cstr
+from frappe.utils import add_days, cint, cstr, now_datetime
 
 from phamos.ai_agents import feedback
 
@@ -115,13 +116,23 @@ def collect(doc, user=None):
 	if feedback.is_ai_user(user):
 		return None
 	run = feedback.latest_run(agent_name(), "Issue", doc.name)
-	if not run:
+	if not run or not still_open(run):
 		return None
 	found = corrections_for(doc, run)
 	for correction in feedback.record(run, found, user, done=doc.get("status") in DONE_STATUSES, keep_accepted=True,
 			corrector_of_new=True):
 		suggest(doc, run, correction)
 	return found
+
+
+def still_open(run):
+	"""Whether changes still count as corrections of this run: only until it is Accepted, i.e. within "Accept
+	after (days)" of the run (or until its Issue is closed). Later changes are normal work, e.g. a move to a
+	successor project (#2220) or re-triage weeks later (PM, 2026-11-28, review of !1392)."""
+	if run.outcome == feedback.ACCEPTED:
+		return False
+	days = settings_days("accept_after_days", DEFAULT_ACCEPT_AFTER_DAYS)
+	return (run.finished_at or run.creation) > add_days(now_datetime(), -days)
 
 
 def on_issue_update(doc, method=None):

@@ -1223,6 +1223,19 @@ class TestLearning(LearningTestCase):
 		self.assertEqual(sorted(keys), sorted([f"Issue::sender::{self.SENDER}::project::{first}",
 			f"Issue::sender::{self.SENDER}::project::{second}"]))
 
+	def test_changes_after_the_accept_window_are_no_correction(self):
+		doc = self.issue(raised_by=self.SENDER)
+		run = self.run_with(doc)
+		run.db_set("finished_at", frappe.utils.add_days(frappe.utils.now_datetime(), -8))
+		run = self.change(doc, project=self.make_project("Issue Assistant Learning Late"))
+		self.assertFalse(run.outcome)
+		# an Accepted run stays Accepted, also inside the window
+		second = self.issue(raised_by=self.SENDER, subject="Accepted")
+		run = self.run_with(second)
+		run.db_set("outcome", "Accepted")
+		run = self.change(second, project=self.make_project("Issue Assistant Learning Late 2"))
+		self.assertEqual(run.outcome, "Accepted")
+
 	def test_rates_count_corrections_per_step(self):
 		doc = self.issue(raised_by=self.SENDER)
 		self.run_with(doc)
