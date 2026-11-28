@@ -2291,8 +2291,8 @@ def new_meeting_url():
 	"""Map editors: a ready meeting URL for a new space (#2094), on the site's Jitsi server with an
 	unguessable room like the encounters get. The space creator fills it in; it stays editable."""
 	_require_map_editor()
-	domain = str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/").lower()
-	return f"https://{domain}/{_new_jitsi_room()}"
+	# The same domain save_area checks against, so the ready URL always passes.
+	return f"https://{_jitsi_domain()}/{_new_jitsi_room()}"
 
 
 @frappe.whitelist(methods=["POST"])

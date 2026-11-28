@@ -147,6 +147,12 @@ watch(kind, (value) => {
 	if (MEETING_KINDS.includes(value) && !url.value) url.value = readyUrl.value
 	else if (!MEETING_KINDS.includes(value) && url.value === readyUrl.value) url.value = ""
 })
+// Typed over or cleared on a meeting kind: that is the editor's choice, and switching the kind
+// back and forth must not bring the ready URL back. (Switching to Cockpit empties the field
+// while the kind is already Cockpit, so it does not count as a choice.)
+watch(url, (value) => {
+	if (readyUrl.value && value !== readyUrl.value && MEETING_KINDS.includes(kind.value)) readyUrl.value = ""
+})
 
 watch(
 	() => props.area,
