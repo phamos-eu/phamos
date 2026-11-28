@@ -80,6 +80,9 @@ class TestPresence(TeamMatesTestCase):
 		frappe.db.set_value("Employee", self.anna, "holiday_list", name)
 		self.assertEqual(team_status._presence(self.anna, NOW), {"presence": "holiday"})
 		self.assertEqual(team_status._presence(self.anna, datetime(2026, 3, 7, 11, 0)), {"presence": "day_off"})
+		# working on the weekend: checked in wins
+		self.checkin(self.anna, "IN", "2026-03-07 09:05:00")
+		self.assertEqual(team_status._presence(self.anna, datetime(2026, 3, 7, 11, 0)), {"presence": "checked_in", "since": "09:05"})
 
 
 class TestTimerAndFocus(TeamMatesTestCase):
@@ -176,3 +179,72 @@ class TestTeamChat(TeamMatesTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			team_cockpit._team_doc(TEAM_A)
 		self.assertEqual(team_cockpit._team_doc(TEAM_B).name, TEAM_B)
+
+
+class TestReviewFindings(TeamMatesTestCase):
+	def test_rows_are_built_once_after_the_commit(self):
+		frappe.local.team_status_pending = None
+		from unittest.mock import MagicMock
+
+		after_commit = MagicMock()
+		with patch.object(team_status, "publish_member_status") as publish, patch.object(
+			team_status.frappe.db, "after_commit", after_commit
+		):
+			team_status.publish_quietly(self.ben)
+			team_status.publish_quietly(self.ben)
+			publish.assert_not_called()
+			after_commit.add.assert_called_once()
+			team_status._flush_pending()
+		publish.assert_called_once_with(self.ben)
+
+	def test_a_newer_draft_without_rows_is_skipped(self):
+		running = TestTimerAndFocus.timer(self, self.anna, [("2026-03-04 09:00:00", None)])
+		empty = frappe.get_doc({"doctype": "Timesheet Record", "employee": self.anna, "from_time": NOW})
+		empty.flags.ignore_validate = True
+		empty.flags.ignore_links = True
+		empty.insert(ignore_permissions=True, ignore_mandatory=True)
+		frappe.db.set_value("Timesheet Record", empty.name, "creation", NOW, update_modified=False)
+		frappe.db.set_value("Timesheet Record", running.name, "creation", "2026-03-04 09:00:00", update_modified=False)
+		self.assertEqual(team_status._timer(self.anna, NOW)["state"], "running")
+
+	def test_a_team_without_assignments_uses_its_own_members(self):
+		doc = frappe.get_doc("Team", TEAM_A)
+		frappe.db.delete("Team Assignment", {"team": TEAM_A})
+		doc.reload()
+		self.assertEqual({r["employee"] for r in team_status.team_mates(TEAM_A, NOW)}, {self.anna, self.ben})
+
+	def test_without_hrms_everyone_is_not_checked_in(self):
+		with patch.object(team_status.frappe.db, "table_exists", return_value=False):
+			self.assertEqual(team_status._presence(self.anna, NOW), {"presence": "not_checked_in"})
+
+	def test_outsiders_cannot_be_added_to_a_team_chat(self):
+		values = {
+			("Raven Channel", "chan"): ("Team", TEAM_A),
+			("Raven User", "ru-cara"): (self.cara_user, "User"),
+			("Raven User", "ru-ben"): (self.ben_user, "User"),
+			("Raven User", "bot"): ("bot@example.com", "Bot"),
+		}
+		real = frappe.db.get_value
+
+		def get_value(*args, **kwargs):
+			doctype = args[0] if args else kwargs.get("doctype")
+			key = (doctype, args[1] if len(args) > 1 else kwargs.get("filters"))
+			return values.get(key) if isinstance(key[1], str) and key in values else real(*args, **kwargs)
+
+		with patch.object(team_chat.frappe.db, "get_value", side_effect=get_value):
+			with self.assertRaises(frappe.PermissionError):
+				team_chat.check_channel_member(frappe._dict(channel_id="chan", user_id="ru-cara"))
+			team_chat.check_channel_member(frappe._dict(channel_id="chan", user_id="ru-ben"))
+			team_chat.check_channel_member(frappe._dict(channel_id="chan", user_id="bot"))
+
+	def test_an_archived_team_chat_comes_back(self):
+		channel = frappe._dict(name="chan", workspace="ws", is_archived=1)
+		with patch.object(team_chat.issue_chat, "is_raven_installed", return_value=True), patch.object(
+			team_chat.issue_chat, "is_enabled", return_value=True
+		), patch.object(team_chat.issue_chat, "find_channel", return_value=channel), patch.object(
+			team_chat.issue_chat, "_set_archived"
+		) as archived, patch.object(team_chat.issue_chat, "_ensure_members"), patch.object(
+			team_chat.issue_chat, "channel_member_users", return_value=[]
+		), patch.object(team_chat.issue_chat, "_remove_members"):
+			team_chat.sync_team_channel(TEAM_A)
+		archived.assert_called_once_with("chan", False)

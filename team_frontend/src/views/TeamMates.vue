@@ -101,7 +101,8 @@ async function load({ quiet = false } = {}) {
 		members.value = data.members || []
 		updatedAt.value = new Date()
 	} catch (e) {
-		error.value = e.messages?.[0] || e.message || __("Could not load the team mates.")
+		// a failed background reload keeps the list; only the first load shows the error
+		if (!quiet || !members.value.length) error.value = e.messages?.[0] || e.message || __("Could not load the team mates.")
 	} finally {
 		loading.value = false
 	}
@@ -116,7 +117,8 @@ useUserRealtime(
 		if (index >= 0) members.value.splice(index, 1, payload.row)
 		updatedAt.value = new Date()
 	},
-	{ debounceMs: 100 }
+	// every row counts: two colleagues checking in at once must both arrive
+	{ debounceMs: 0 }
 )
 
 let timer = null

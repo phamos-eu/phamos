@@ -455,6 +455,10 @@ doc_events = {
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
+    # a team's chat is for the team's people only (#1978)
+    "Raven Channel Member": {
+        "before_insert": "phamos.cockpits.team_chat.check_channel_member",
+    },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },

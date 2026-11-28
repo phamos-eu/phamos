@@ -5,7 +5,8 @@
 
 Per person in the team today (Team Assignment, #1974):
 - presence, the first that applies: absent (approved leave; the leave type is not shown, #1720),
-  holiday (public holiday) or day off (weekly off), checked in since hh:mm, not checked in
+  checked in since hh:mm (also on a holiday or weekend: someone working then is there),
+  holiday (public holiday) or day off (weekly off), not checked in
 - in focus: an active Focus Session that has not run past its limit
 - timer: the project and task of a running or paused timer (decision 1 of #1978); no durations
 
@@ -30,6 +31,9 @@ TIMER_MAX_AGE_DAYS = 2
 
 def _presence(employee, now):
 	today = getdate(now)
+	if not frappe.db.table_exists("Employee Checkin"):
+		# HRMS not installed: no leave, no check-ins
+		return {"presence": "not_checked_in"}
 	if frappe.db.exists(
 		"Leave Application",
 		{
@@ -41,11 +45,6 @@ def _presence(employee, now):
 		},
 	):
 		return {"presence": "absent"}
-	holiday_list = employee_holiday_list(employee)
-	if holiday_list:
-		weekly_off = frappe.db.get_value("Holiday", {"parent": holiday_list, "holiday_date": today}, "weekly_off")
-		if weekly_off is not None:
-			return {"presence": "day_off" if weekly_off else "holiday"}
 	last = frappe.get_all(
 		"Employee Checkin",
 		filters={"employee": employee},
@@ -55,6 +54,11 @@ def _presence(employee, now):
 	)
 	if last and last[0].log_type == "IN" and getdate(last[0].time) == today:
 		return {"presence": "checked_in", "since": get_datetime(last[0].time).strftime("%H:%M")}
+	holiday_list = employee_holiday_list(employee)
+	if holiday_list:
+		weekly_off = frappe.db.get_value("Holiday", {"parent": holiday_list, "holiday_date": today}, "weekly_off")
+		if weekly_off is not None:
+			return {"presence": "day_off" if weekly_off else "holiday"}
 	return {"presence": "not_checked_in"}
 
 
@@ -74,20 +78,23 @@ def _in_focus(user, now):
 
 def _timer(employee, now):
 	"""{project, project_name, task, task_subject, state} of the running or paused timer, or None."""
-	records = frappe.get_all(
+	# the newest draft that has rows: drafts without rows ("Make Timesheet" leftovers) are no timer,
+	# as the Personal Cockpit reads it
+	record, rows = None, []
+	for candidate in frappe.get_all(
 		"Timesheet Record",
 		filters={"employee": employee, "docstatus": 0, "creation": [">=", add_days(now, -TIMER_MAX_AGE_DAYS)]},
 		fields=["name", "project", "task"],
 		order_by="creation desc",
-		limit=1,
-	)
-	if not records:
-		return None
-	record = records[0]
-	rows = frappe.get_all(
-		"Timesheet Record Item", filters={"parent": record.name}, fields=["to_time"], order_by="idx asc"
-	)
-	if not rows or rows[-1].to_time:
+		limit=5,
+	):
+		rows = frappe.get_all(
+			"Timesheet Record Item", filters={"parent": candidate.name}, fields=["to_time"], order_by="idx asc"
+		)
+		if rows:
+			record = candidate
+			break
+	if not record or rows[-1].to_time:
 		return None
 	state = "running" if (len(rows) - 1) % 2 == 0 else "paused"
 	return {
@@ -114,10 +121,21 @@ def status_row(employee, now=None):
 	}
 
 
+def _people(team, today):
+	"""The team's people today: from Team Assignment, or from the Team itself for a team that has no
+	assignments (as teams.member_teams counts it)."""
+	from phamos.phamos.doctype.team_assignment.team_assignment import has_assignments
+
+	if has_assignments(team):
+		return members_of(team, today)
+	doc = frappe.get_doc("Team", team)
+	return list(dict.fromkeys(e for e in [doc.team_lead, doc.co_team_lead] + [r.employee for r in doc.team_members] if e))
+
+
 def team_mates(team, now=None):
 	"""Status rows of the team's people today, sorted by name."""
 	now = now or now_datetime()
-	rows = [status_row(employee, now) for employee in members_of(team, getdate(now))]
+	rows = [status_row(employee, now) for employee in _people(team, getdate(now))]
 	return sorted(rows, key=lambda r: r["employee_name"])
 
 
@@ -136,8 +154,24 @@ def publish_member_status(employee):
 
 
 def publish_quietly(employee):
-	"""For the check-in, timer and focus hooks: a failing team update must not fail their save."""
-	try:
-		publish_member_status(employee)
-	except Exception:
-		frappe.log_error(title="Team mate status not published")
+	"""For the check-in, timer and focus hooks. The row is built and sent once per person after the
+	transaction commits, so it shows the final state (a deleted check-in, the task a new timer gets
+	right after its insert) and a failure cannot touch the hook's own save. Skipped in imports,
+	patches and migrations."""
+	if not employee or frappe.flags.in_import or frappe.flags.in_patch or frappe.flags.in_migrate:
+		return
+	pending = getattr(frappe.local, "team_status_pending", None)
+	if pending is None:
+		pending = frappe.local.team_status_pending = set()
+		frappe.db.after_commit.add(_flush_pending)
+	pending.add(employee)
+
+
+def _flush_pending():
+	pending = getattr(frappe.local, "team_status_pending", None) or set()
+	frappe.local.team_status_pending = None
+	for employee in pending:
+		try:
+			publish_member_status(employee)
+		except Exception:
+			frappe.log_error(title="Team mate status not published")
