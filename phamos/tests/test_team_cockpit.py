@@ -139,6 +139,12 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"get_team_mates",
 			"get_team_chat",
 			"ensure_team_chat",
+			# appointments with leave and holidays (#1979)
+			"get_team_appointments",
+			"get_appointment_options",
+			"save_appointment",
+			"delete_appointment",
+			"get_team_absences",
 		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 
