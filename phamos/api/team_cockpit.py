@@ -863,3 +863,39 @@ def add_customer_praise(customer, text, employee=None):
 	from phamos.cockpits import team_successes
 
 	return team_successes.add_customer_praise(teams.require_active_team(), customer, text, employee or None)
+
+
+# --- Needs attention (#2235) -----------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_attention():
+	"""The active team's records that need attention: SLA missed or due soon (while SLA tracking is
+	on), then open Issues and Tasks idle for N days. Records, never a figure per person."""
+	from phamos.cockpits import team_attention
+
+	frappe.has_permission("Issue", "read", throw=True)
+	team = teams.require_active_team()
+	idle_days, _due_hours = team_attention._settings()
+	# as the user: records they cannot read stay out (Task rights, User Permissions)
+	items = team_attention.attention_items(team, as_user=True)
+	truncated = len(items) > team_attention.LIST_LIMIT
+	items = items[: team_attention.LIST_LIMIT]
+	return {
+		"team": team,
+		"idle_days": idle_days,
+		"sla_on": team_attention.sla_on(),
+		"truncated": truncated,
+		"items": [
+			{
+				"doctype": i.doctype,
+				"name": i.name,
+				"title": i.title,
+				"kind": i.kind,
+				"detail": i.detail,
+				"assignees": i.assignees,
+			}
+			for i in items
+		],
+	}

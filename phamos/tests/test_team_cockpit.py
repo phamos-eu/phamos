@@ -157,6 +157,8 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"get_success_options",
 			"give_kudos",
 			"add_customer_praise",
+			# needs attention (#2235)
+			"get_team_attention",
 		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 
