@@ -59,6 +59,16 @@ def _send(channel_id, html):
 	return send_message(channel_id=channel_id, text=f"<p>{html}</p>")
 
 
+def _card_lines(channel_id):
+	"""Texts of the Issue cards posted when a field on the card changed (#2234)."""
+	return frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": channel_id, "message_type": "Text", "link_doctype": "Issue"},
+		pluck="text",
+		order_by="creation asc",
+	)
+
+
 def _system_lines(channel_id):
 	return frappe.get_all(
 		"Raven Message",
@@ -451,8 +461,30 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.reload()
 		self.issue.status = "On Hold"
 		self.issue.save()
-		self.assertTrue(any("set the status to On Hold" in t for t in _system_lines(channel_id)))
+		# an Issue's status change comes as a new card (#2234), no extra grey line
+		self.assertTrue(any("On Hold" in t for t in _card_lines(channel_id)), _card_lines(channel_id))
+		self.assertFalse(any("set the status to" in t for t in _system_lines(channel_id)))
 		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+
+	def test_a_card_field_change_posts_a_new_card(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		before = len(_card_lines(channel_id))
+		priority = frappe.db.get_value("Issue Priority", {"name": ("!=", self.issue.priority or "")}, "name")
+		self.issue.reload()
+		self.issue.priority = priority
+		self.issue.save()
+		cards = _card_lines(channel_id)
+		self.assertEqual(len(cards), before + 1)
+		self.assertIn(f"→ {priority}", cards[-1])
+		self.assertIn(frappe._("Priority"), cards[-1])
+
+	def test_other_changes_post_no_card(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		before = len(_card_lines(channel_id))
+		self.issue.reload()
+		self.issue.description = "<p>more detail</p>"
+		self.issue.save()
+		self.assertEqual(len(_card_lines(channel_id)), before)
 
 	def test_closing_archives_and_reopening_restores(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
@@ -469,9 +501,9 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.status = "Open"
 		self.issue.save()
 		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
-		lines = _system_lines(channel_id)
-		self.assertTrue(any("set the status to Closed" in t for t in lines))
-		self.assertTrue(any("set the status to Open" in t for t in lines))
+		cards = _card_lines(channel_id)
+		self.assertTrue(any("→ Closed" in t for t in cards), cards)
+		self.assertTrue(any("Closed → Open" in t for t in cards), cards)
 
 	def test_assignments_are_posted_once(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]

@@ -3461,3 +3461,5 @@ Last merge request sync; the next one fetches what changed since then (#1977).,"
 "A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
 Added,Hinzugefügt
 Merged,Gemergt
+{0}: {1} → {2},{0}: {1} → {2}
+{0} changed {1},{0} hat geändert: {1}

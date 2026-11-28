@@ -462,7 +462,11 @@ doc_events = {
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
 	"Issue": {
-		"on_update": "phamos.api.issue_chat.on_record_update",
+		"on_update": [
+			# a new card in the chat when a field on it changes (#2234); before the chat may be archived
+			"phamos.api.issue_chat.post_card_on_change",
+			"phamos.api.issue_chat.on_record_update",
+		],
 		# the Issue Assistant's first look at a new Issue, in the background (#2111)
 		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
 	},
