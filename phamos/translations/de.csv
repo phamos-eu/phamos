@@ -3640,3 +3640,19 @@ entered by {0},eingetragen von {0}
 {0}: the forecast improved,{0}: die Prognose hat sich verbessert
 "{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
 {0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht
+No activity for {0} days,Seit {0} Tagen keine Aktivität
+First response missed,Erste Antwort verpasst
+First response due,Erste Antwort bald fällig
+Resolution missed,Lösung verpasst
+Resolution due,Lösung bald fällig
+and {0} more in the Team Cockpit,und {0} weitere im Team-Cockpit
+Needs attention since the last summary,Braucht Aufmerksamkeit seit der letzten Übersicht
+Needs attention,Braucht Aufmerksamkeit
+What lies around or misses its SLA,Was liegen bleibt oder sein SLA verpasst
+"Issues whose SLA is missed or due soon, and open Issues and Tasks of the team without activity for {0} days.","Issues, deren SLA verpasst oder bald fällig ist, und offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen."
+Open Issues and Tasks of the team without activity for {0} days.,Offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen.
+Nothing needs attention. Every open record of the team moved recently.,Nichts braucht Aufmerksamkeit. Jeder offene Datensatz des Teams hat sich zuletzt bewegt.
+Could not load what needs attention.,"Konnte nicht laden, was Aufmerksamkeit braucht."
+Not assigned,Nicht zugewiesen
+Needs attention: idle days,Braucht Aufmerksamkeit: Tage ohne Aktivität
+Needs attention: SLA due within hours,Braucht Aufmerksamkeit: SLA fällig innerhalb von Stunden

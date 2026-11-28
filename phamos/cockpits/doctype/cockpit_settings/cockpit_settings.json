@@ -117,6 +117,8 @@
   "column_break_team_window",
   "team_glow",
   "team_picked_up_idle_days",
+  "team_attention_idle_days",
+  "team_attention_sla_due_hours",
   "team_glow_top",
   "team_glow_left",
   "team_glow_bottom",
@@ -841,6 +843,20 @@
    "description": "An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981)."
   },
   {
+   "default": "10",
+   "fieldname": "team_attention_idle_days",
+   "fieldtype": "Int",
+   "label": "Needs attention: idle days",
+   "description": "An open Issue or Task of a team needs attention after this many days without a change, comment, mail or timesheet (#2235)."
+  },
+  {
+   "default": "24",
+   "fieldname": "team_attention_sla_due_hours",
+   "fieldtype": "Int",
+   "label": "Needs attention: SLA due within hours",
+   "description": "An Issue whose SLA response or resolution is due within this many hours needs attention; only while SLA tracking is on (#2235)."
+  },
+  {
    "default": "0",
    "depends_on": "eval:doc.team_glow && doc.team_glow != 'Off'",
    "fieldname": "team_glow_top",
@@ -961,7 +977,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-28 14:00:00.000000",
+ "modified": "2026-11-28 14:30:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",

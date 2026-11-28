@@ -702,6 +702,10 @@ scheduler_events = {
         "30 */2 * * *": [
             "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data_background",
         ],
+        # Team Cockpit: morning summary of what needs attention, weekdays (#2235).
+        "30 7 * * 1-5": [
+            "phamos.cockpits.team_attention.post_all_summaries",
+        ],
         # Personal Cockpit: end focus sessions that ran past their limit (#1556).
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
