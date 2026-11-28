@@ -296,9 +296,12 @@ def get_learning(doctype="Accounting Receipt", days=None):
 		row["source_reference"] = frappe.db.get_value("AI Agent Run", row.source_run, "reference_name") if row.source_run else None
 		row["modified"] = str(row.modified)
 	party_field = _party_field(agent.applies_to_doctype)
+	from phamos.ai_agents.feedback import NOT_LEARNED_FROM
+
 	runs = frappe.get_all(
 		"AI Agent Run",
-		filters={"agent": agent.name, "outcome": "Corrected", "creation": (">=", since)},
+		filters={"agent": agent.name, "outcome": "Corrected", "creation": (">=", since),
+			"trigger": ("not in", NOT_LEARNED_FROM)},
 		fields=["name", "reference_name", "corrections", "corrected_by"],
 		order_by="creation desc",
 		limit_page_length=300,
@@ -314,8 +317,11 @@ def get_learning(doctype="Accounting Receipt", days=None):
 	by_field = {}
 	for c in corrections:
 		by_field[c["field"]] = by_field.get(c["field"], 0) + 1
-	completed = frappe.db.count("AI Agent Run", {"agent": agent.name, "status": "Completed", "creation": (">=", since)})
-	recent = frappe.get_all("AI Agent Run", filters={"agent": agent.name, "status": "Completed"},
+	completed = frappe.db.count("AI Agent Run", {"agent": agent.name, "status": "Completed", "creation": (">=", since),
+		"trigger": ("not in", NOT_LEARNED_FROM)})
+	# its own runs, not chat answers (local test 2026-11-28)
+	recent = frappe.get_all("AI Agent Run", filters={"agent": agent.name, "status": "Completed",
+		"trigger": ("not in", NOT_LEARNED_FROM)},
 		fields=["name", "reference_name", "outcome", "corrected_by", "creation", "fields_set"],
 		order_by="creation desc", limit_page_length=30)
 	for row in recent:
