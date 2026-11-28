@@ -13,7 +13,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from phamos.bookstack_integration import sync
+from phamos.bookstack_integration import selection, sync
 from phamos.bookstack_integration.api_client import BookstackAPIError
 
 INSTANCE = "BS Website Test"
@@ -101,6 +101,7 @@ class _BookstackSyncCase(FrappeTestCase):
 		FakeBookstack.failing = set()
 		patches = [
 			patch.object(sync, "BookstackClient", FakeBookstack),
+			patch.object(selection, "BookstackClient", FakeBookstack),
 			patch.object(frappe.db, "commit"),
 		]
 		for p in patches:
@@ -264,6 +265,167 @@ class TestBookstackWebsiteSync(_BookstackSyncCase):
 		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
 
 
+class TestChooseWhatToSync(_BookstackSyncCase):
+	"""The "Sync…" dialog on Bookstack Configuration (phamos/phamos#2029)."""
+
+	def _choose(self, steps, remove=1):
+		return sync.sync_instance(INSTANCE, steps=steps, remove_deleted_records=remove)
+
+	def _calls(self, steps, remove=1):
+		"""Names of the steps sync_instance plans, without running them."""
+		order = []
+
+		def run(instance, plan):
+			order.extend(name for name, _fn in plan)
+			return {"errors": 0}
+
+		with patch.object(sync, "_run_steps", side_effect=run):
+			self._choose(steps, remove)
+		return order
+
+	def test_only_chosen_steps_run_in_fixed_order(self):
+		self.assertEqual(self._calls(["content", "pages", "books"]), ["books", "pages", "removed", "content"])
+		self.assertEqual(self._calls(["roles", "users"]), ["roles", "users"], "no removal without shelves/books/chapters/pages")
+		self.assertEqual(self._calls(None), ["roles", "users", "books", "shelves", "chapters", "pages", "removed", "content"])
+
+	def test_removal_can_be_switched_off(self):
+		self._sync()
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["id"] != 102]
+
+		self._choose(["books", "chapters", "pages"], remove=0)
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+		self._choose(["books", "chapters", "pages"], remove=1)
+		self.assertFalse(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-102"))
+
+	def test_pages_only_leaves_users_alone(self):
+		FakeBookstack.data["users"] = [{"id": 7, "name": "Neu", "email": "neu@example.test"}]
+
+		self._choose(["books", "pages"])
+
+		self.assertFalse(frappe.db.exists("Bookstack User", {"instance": INSTANCE, "bookstack_id": 7}))
+		self.assertTrue(frappe.db.exists("Bookstack Page", f"{INSTANCE}-BSP-100"))
+
+	def test_unknown_or_empty_choice_runs_nothing(self):
+		with patch.object(sync, "_run_steps") as run:
+			self.assertRaises(frappe.ValidationError, self._choose, ["pages", "everything"])
+			self.assertRaises(frappe.ValidationError, self._choose, "[]")
+			self.assertRaises(frappe.ValidationError, self._choose, [])  # only None means "everything"
+			for odd in ("null", "5", '"pages"', [5], "pages"):
+				self.assertRaises(frappe.ValidationError, self._choose, odd)
+			run.assert_not_called()
+
+	def test_steps_arrive_as_json_from_the_dialog(self):
+		self.assertEqual(self._calls('["pages"]', remove=0), ["pages"])
+
+
+class TestSyncSelection(_BookstackSyncCase):
+	"""Books, chapters and pages left out on the configuration (phamos/phamos#2029)."""
+
+	def _exclude(self, *items):
+		from phamos.bookstack_integration.selection import save_sync_selection
+
+		return save_sync_selection(INSTANCE, [
+			{"item_type": t, "bookstack_id": i, "title": f"{t} {i}"} for t, i in items
+		])
+
+	def _exists(self, doctype, bookstack_id):
+		return frappe.db.exists(doctype, {"instance": INSTANCE, "bookstack_id": bookstack_id})
+
+	def test_left_out_items_are_not_synced(self):
+		self._exclude(("Book", 2), ("Chapter", 10), ("Page", 102))
+		self._sync()
+
+		self.assertFalse(self._exists("Bookstack Book", 2))
+		self.assertFalse(self._exists("Bookstack Page", 200), "page of a left-out book")
+		self.assertFalse(self._exists("Bookstack Chapter", 10))
+		self.assertFalse(self._exists("Bookstack Page", 100), "page of a left-out chapter")
+		self.assertFalse(self._exists("Bookstack Page", 102))
+		self.assertTrue(self._exists("Bookstack Book", 1))
+		self.assertTrue(self._exists("Bookstack Page", 101))
+
+	def test_saving_removes_existing_copies(self):
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Page", 100))
+
+		result = self._exclude(("Chapter", 10), ("Book", 2))
+
+		self.assertEqual(result, {"excluded": 2, "removed": 3})  # page 200 of book 2, chapter 10, its page 100
+		self.assertFalse(self._exists("Bookstack Page", 100))
+		self.assertFalse(self._exists("Bookstack Page", 200))
+		self.assertTrue(self._exists("Bookstack Book", 2), "a left-out book keeps its record")
+		self.assertTrue(self._exists("Bookstack Page", 102))
+
+	def test_left_out_book_keeps_its_settings_and_comes_back_complete(self):
+		self._sync()
+		self._publish(2)
+		self._sync()
+		self.assertIsNotNone(_page(200))
+
+		self._exclude(("Book", 2))
+		self._sync()  # the regular sync must not remove the left-out book either
+		self.assertTrue(self._exists("Bookstack Book", 2))
+		self.assertFalse(self._exists("Bookstack Page", 200))
+
+		self._exclude()  # ticked again
+		self._sync()
+		self.assertEqual(frappe.db.get_value("Bookstack Book", f"{INSTANCE}-BSB-2", "publish_on_website"), 1)
+		self.assertIsNotNone(_page(200), "its pages and their website copy are back")
+
+	def test_left_out_book_deleted_in_bookstack_is_removed(self):
+		self._sync()
+		self._exclude(("Book", 2))
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Book", 2), "still in BookStack: the record stays")
+
+		FakeBookstack.data["books"] = [b for b in FakeBookstack.data["books"] if b["id"] != 2]
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["book_id"] != 2]
+		self._sync()
+		self.assertFalse(self._exists("Bookstack Book", 2), "gone from BookStack: the record goes too")
+		self.assertTrue(self._exists("Bookstack Book", 1))
+
+	def test_preview_counts_what_saving_would_remove(self):
+		from phamos.bookstack_integration.selection import preview_selection
+
+		self._sync()
+		count = preview_selection(INSTANCE, [{"item_type": "Book", "bookstack_id": 1}])
+		self.assertEqual(count, {"chapters": 1, "pages": 3})  # chapter 10; pages 100, 101 (draft), 102
+		self.assertEqual(preview_selection(INSTANCE, []), {"chapters": 0, "pages": 0})
+		self.assertTrue(self._exists("Bookstack Page", 100), "the preview removes nothing")
+
+	def test_ticking_again_brings_items_back(self):
+		self._exclude(("Book", 2))
+		self._sync()
+		self._exclude()
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Page", 200))
+
+	def test_tree_marks_left_out_items(self):
+		from phamos.bookstack_integration.selection import get_sync_tree
+
+		self._exclude(("Page", 102))
+		tree = get_sync_tree(INSTANCE)
+
+		self.assertEqual([b["title"] for b in tree], ["Handbuch", "Intern"])
+		handbuch = tree[0]
+		self.assertEqual([(c["type"], c["title"]) for c in handbuch["children"]],
+			[("Chapter", "Start"), ("Page", "Zweite")], "chapters and loose pages by priority; drafts left out")
+		self.assertEqual([p["title"] for p in handbuch["children"][0]["children"]], ["Erste"])
+		self.assertFalse(handbuch["children"][1]["included"])
+		self.assertTrue(handbuch["included"])
+
+	def test_unknown_type_or_no_write_access_is_refused(self):
+		self.assertRaises(frappe.ValidationError, self._exclude, ("Shelf", 1))
+		self.assertRaises(frappe.ValidationError, self._exclude, ("Book", 0))
+		self._exclude(("Book", 2), ("Book", 2))
+		self.assertEqual(len(frappe.get_doc("Bookstack Configuration", INSTANCE).sync_exclusions), 1, "no duplicates")
+		frappe.set_user("Guest")
+		try:
+			self.assertRaises(frappe.PermissionError, self._exclude, ("Book", 2))
+		finally:
+			frappe.set_user("Administrator")
+
+
 class TestSyncLockAndBackground(_BookstackSyncCase):
 	"""One sync per instance at a time; "Sync All" runs as a background job (#2004)."""
 
@@ -334,6 +496,19 @@ class TestSyncLockAndBackground(_BookstackSyncCase):
 		self.assertIn("already running", stats["failed"])
 		self.assertEqual(len(sync_events(publish)), 1)
 
+	def test_dialog_choice_reaches_the_job(self):
+		with patch.object(sync.frappe, "enqueue") as enqueue:
+			sync.start_sync(INSTANCE, steps='["pages", "books"]', remove_deleted_records=0)
+			kwargs = enqueue.call_args.kwargs
+			self.assertEqual((kwargs["steps"], kwargs["remove_deleted_records"]), (["pages", "books"], 0))
+
+			enqueue.reset_mock()
+			self.assertRaises(frappe.ValidationError, sync.start_sync, INSTANCE, steps='["everything"]')
+			enqueue.assert_not_called()
+
+		with patch.object(sync, "_run_steps", return_value={"errors": 0}) as run, patch.object(sync.frappe, "publish_realtime"):
+			sync.run_sync_job(INSTANCE, "someone@example.com", steps=["pages"], remove_deleted_records=0)
+		self.assertEqual([name for name, _fn in run.call_args.args[1]], ["pages"])
 
 class TestReviewFixes(_BookstackSyncCase):
 	"""Findings of the review of !1270 (2026-11-21)."""
@@ -465,3 +640,29 @@ class TestReviewFixes(_BookstackSyncCase):
 		self.assertIn(f'<video poster="{BASE}/uploads/still.png" src="{BASE}/uploads/clip.mp4"></video>', html)
 		self.assertIn(f'src="{BASE}/uploads/x.png"', html)
 		self.assertIn("<td>Zelle</td>", html)
+
+class TestSelectionUnderLock(_BookstackSyncCase):
+	"""Saving the selection deletes records, so it waits for no sync (review S8, #2029)."""
+
+	def test_saving_the_selection_during_a_sync_is_refused(self):
+		from phamos.bookstack_integration.selection import save_sync_selection
+
+		self._sync()
+		with sync.sync_lock(INSTANCE):
+			self.assertRaises(sync.SyncRunning, save_sync_selection, INSTANCE,
+				[{"item_type": "Book", "bookstack_id": 2, "title": "Intern"}])
+		self.assertTrue(frappe.db.exists("Bookstack Book", f"{INSTANCE}-BSB-2"), "nothing removed")
+		self.assertFalse(sync.is_running(INSTANCE))
+
+	def test_only_a_full_sync_stamps_the_configuration(self):
+		stamp = "2026-01-01 00:00:00"
+		frappe.db.set_value("Bookstack Configuration", INSTANCE, {"last_synced": stamp, "sync_error_count": 7})
+
+		sync.sync_instance(INSTANCE, steps=["roles"])
+		self.assertEqual(str(frappe.db.get_value("Bookstack Configuration", INSTANCE, "last_synced")), stamp)
+		self.assertEqual(frappe.db.get_value("Bookstack Configuration", INSTANCE, "sync_error_count"), 7)
+
+		sync.sync_instance(INSTANCE)
+		self.assertNotEqual(str(frappe.db.get_value("Bookstack Configuration", INSTANCE, "last_synced")), stamp)
+		self.assertEqual(frappe.db.get_value("Bookstack Configuration", INSTANCE, "sync_error_count"), 0)
+

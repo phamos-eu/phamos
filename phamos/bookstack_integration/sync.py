@@ -12,6 +12,7 @@ from frappe.utils import now_datetime
 
 from phamos.bookstack_integration.api_client import BookstackAPIError, BookstackClient
 from phamos.bookstack_integration.content import clean_page_html, plain_text
+from phamos.bookstack_integration.selection import exclusions, is_excluded
 
 
 LOG_TITLE = "Bookstack Sync"
@@ -167,8 +168,14 @@ def sync_shelves(client: BookstackClient, instance: str, seen: dict | None = Non
 def sync_books(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	for book in client.paginate("books"):
+		# Still in BookStack, so seen for remove_deleted(), also when it is left out below.
 		ids.add(book["id"])
+		if is_excluded(excluded, "Book", book):
+			# Left out on the configuration (#2029): not synced, but its record stays while BookStack
+			# still has the book (decided 2026-11-21).
+			continue
 		_upsert("Bookstack Book", instance, book["id"], {
 			"title": book.get("name"),
 			"slug": book.get("slug"),
@@ -188,8 +195,11 @@ def sync_books(client: BookstackClient, instance: str, seen: dict | None = None)
 def sync_chapters(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	books = _by_bookstack_id("Bookstack Book", instance, ("name", "slug"))
 	for chapter in client.paginate("chapters"):
+		if is_excluded(excluded, "Chapter", chapter):
+			continue  # left out on the configuration (#2029)
 		ids.add(chapter["id"])
 		book = books.get(chapter.get("book_id"))
 		book_name = book.name if book else None
@@ -220,9 +230,12 @@ def _chapter_url(client: BookstackClient, chapter: dict, book) -> str | None:
 def sync_pages(client: BookstackClient, instance: str, seen: dict | None = None) -> int:
 	count = 0
 	ids = set()
+	excluded = exclusions(instance)
 	books = _by_bookstack_id("Bookstack Book", instance, ("name", "slug"))
 	chapters = _by_bookstack_id("Bookstack Chapter", instance)
 	for page in client.paginate("pages"):
+		if is_excluded(excluded, "Page", page):
+			continue  # left out on the configuration (#2029)
 		ids.add(page["id"])
 		book = books.get(page.get("book_id"))
 		book_name = book.name if book else None
@@ -451,24 +464,63 @@ except ImportError:  # pragma: no cover
 		pass
 
 
-def sync_instance(instance: str) -> dict[str, Any]:
-	"""Full sync for a single Bookstack Configuration. Runs in a job or the scheduler, never in a
-	web request: the buttons call start_sync (review S1)."""
+# Every step of a full sync, in the order it must run: users link roles, shelves and chapters link
+# books, pages link books and chapters, the website copy reads pages (#2029).
+SYNC_STEPS = {
+	"roles": sync_roles,
+	"users": sync_users,
+	"books": sync_books,
+	"shelves": sync_shelves,
+	"chapters": sync_chapters,
+	"pages": sync_pages,
+	"content": sync_page_content,
+}
+
+
+def _chosen_steps(steps) -> list[str]:
+	"""``steps`` as the dialog sends it (list or JSON), checked; only None means every step."""
+	if steps is None:
+		return list(SYNC_STEPS)
+	try:
+		chosen = frappe.parse_json(steps) if isinstance(steps, str) else steps
+	except ValueError:  # not JSON at all, e.g. "pages"
+		chosen = None
+	if not isinstance(chosen, (list, tuple)) or not all(isinstance(step, str) for step in chosen):
+		frappe.throw(_("Unknown sync step: {0}").format(steps))  # e.g. "null" or "5"
+	unknown = set(chosen) - set(SYNC_STEPS)
+	if unknown:
+		frappe.throw(_("Unknown sync step: {0}").format(", ".join(sorted(unknown))))
+	if not chosen:
+		frappe.throw(_("Choose at least one part to sync."))
+	return chosen
+
+
+def sync_instance(instance: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
+	"""Sync one Bookstack Configuration: every step, or only ``steps`` (names from SYNC_STEPS).
+
+	The chosen steps always run in SYNC_STEPS order. ``remove_deleted_records`` deletes the shelves,
+	books, chapters and pages BookStack no longer returns, for the chosen ones of those only; it runs
+	after them and before the website copy, so a deleted page is not copied.
+
+	Runs in a job or the scheduler, never in a web request: the buttons call start_sync (review S1).
+	"""
 	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
-	stats = _run_steps(instance, [
-		("roles", sync_roles),
-		("users", sync_users),
-		("books", sync_books),
-		("shelves", sync_shelves),
-		("chapters", sync_chapters),
-		("pages", sync_pages),
-		("removed", remove_deleted),
-		("content", sync_page_content),
-	])
-	frappe.db.set_value("Bookstack Configuration", instance, {
-		"last_synced": now_datetime(),
-		"sync_error_count": stats["errors"],
-	})
+
+	chosen = _chosen_steps(steps)
+
+	plan = [(name, fn) for name, fn in SYNC_STEPS.items() if name in chosen]
+	if frappe.utils.cint(remove_deleted_records) and _TRACKED_STEPS & set(chosen):
+		at = next((i for i, (name, _fn) in enumerate(plan) if name == "content"), len(plan))
+		plan.insert(at, ("removed", remove_deleted))
+
+	stats = _run_steps(instance, plan)
+	if set(chosen) == set(SYNC_STEPS):
+		# Only a sync of every part says how complete the copy is; a partial one (e.g. roles only)
+		# would otherwise look like a full sync and hide the errors of the parts it skipped.
+		frappe.db.set_value("Bookstack Configuration", instance, {
+			"last_synced": now_datetime(),
+			"sync_error_count": stats["errors"],
+		})
 	frappe.db.commit()
 	return stats
 
@@ -528,8 +580,11 @@ def _job_id(instance: str) -> str:
 
 
 @frappe.whitelist()
-def start_sync(instance: str) -> dict[str, Any]:
-	"""The "Sync" buttons: queue a full sync of one instance and return at once (#2004).
+def start_sync(instance: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
+	"""The "Sync" buttons: queue a sync of one instance and return at once (#2004).
+
+	``steps`` and ``remove_deleted_records`` as in sync_instance: the dialog's choice (#2029),
+	checked here so a wrong choice fails at once and not in the job.
 
 	A first copy of a big book takes minutes, longer than a web request may run. The result
 	reaches the user who started it as the realtime event ``bookstack_sync_done``.
@@ -539,6 +594,7 @@ def start_sync(instance: str) -> dict[str, Any]:
 	# Read is enough, Bookstack User included (decided 2026-11-21): the removal step only deletes
 	# copies of records BookStack itself no longer has, so a sync cannot lose content.
 	frappe.get_doc("Bookstack Configuration", instance).check_permission("read")
+	chosen = _chosen_steps(steps)
 	if is_running(instance) or is_job_enqueued(_job_id(instance)):
 		raise SyncRunning(_("A sync of {0} is already running. Try again when it has finished.").format(instance))
 	frappe.enqueue(
@@ -549,14 +605,16 @@ def start_sync(instance: str) -> dict[str, Any]:
 		deduplicate=True,
 		instance=instance,
 		user=frappe.session.user,
+		steps=chosen,
+		remove_deleted_records=frappe.utils.cint(remove_deleted_records),
 	)
 	return {"queued": True}
 
 
-def run_sync_job(instance: str, user: str) -> dict[str, Any]:
+def run_sync_job(instance: str, user: str, steps=None, remove_deleted_records=1) -> dict[str, Any]:
 	"""Background job behind start_sync: run the sync, then tell the user who started it."""
 	try:
-		stats = sync_instance(instance)
+		stats = sync_instance(instance, steps=steps, remove_deleted_records=remove_deleted_records)
 	except Exception as exc:
 		frappe.log_error(frappe.get_traceback(), f"{LOG_TITLE} :: {instance}")
 		stats = {"instance": instance, "errors": 1, "failed": str(exc)}

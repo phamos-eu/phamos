@@ -2567,6 +2567,27 @@ Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Sync…,Synchronisieren…
+Sync from {0},Synchronisieren von {0}
+What to sync,Was synchronisiert wird
+Links each user to the roles synced before.,Verknüpft jeden Benutzer mit den zuvor synchronisierten Rollen.
+One call per shelf; links the books.,Ein Aufruf pro Regal; verknüpft die Bücher.
+Website content,Website-Inhalte
+Copies the pages of books published on the website.,Kopiert die Seiten der auf der Webseite veröffentlichten Bücher.
+Removed (deleted in BookStack),Entfernt (in BookStack gelöscht)
+Remove records deleted in BookStack,In BookStack gelöschte Einträge entfernen
+Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchronisieren.
+Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
+"Books, chapters and pages","Bücher, Kapitel und Seiten"
+Save selection,Auswahl speichern
+Selection saved; {0} records removed from ERPNext.,Auswahl gespeichert; {0} Einträge aus ERPNext entfernt.
+Loading books from BookStack…,Bücher werden aus BookStack geladen…
+Filter books…,Bücher filtern…
+{0} of {1} books,{0} von {1} Büchern
+"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced.","Nicht angehakte Bücher, Kapitel und Seiten übernimmt keine Synchronisierung nach ERPNext; vorhandene Kopien werden beim Speichern entfernt. Neue Einträge in BookStack werden synchronisiert."
+Sync Selection,Auswahl für die Synchronisierung
+Left out of the sync,Von der Synchronisierung ausgenommen
+Unknown item type: {0},Unbekannter Typ: {0}
 Bookstack Browser,Bookstack-Browser
 Books,Bücher
 Shelves,Regale
@@ -2576,6 +2597,7 @@ Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
@@ -2609,6 +2631,9 @@ Bubbles per Day,Sprechblasen pro Tag
 One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Only users who may edit this configuration change the selection.,"Nur wer diese Konfiguration bearbeiten darf, ändert die Auswahl."
+"BookStack could not be reached. The saved selection stays as it is, and Sync uses it.",BookStack ist nicht erreichbar. Die gespeicherte Auswahl bleibt unverändert und gilt für die Synchronisierung.
+Invalid BookStack ID: {0},Ungültige BookStack-ID: {0}
 Nothing planned yet,Noch nichts geplant
 On the critical path,Auf dem kritischen Pfad
 Baseline: {0} – {1},Baseline: {0} – {1}
@@ -2634,6 +2659,11 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+"This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"
+Removes what BookStack no longer has. Books and chapters only when their pages are synced too.,"Entfernt, was es in BookStack nicht mehr gibt. Bücher und Kapitel nur, wenn auch ihre Seiten synchronisiert werden."
+Last Full Sync,Letzte vollständige Synchronisierung
+"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.","Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog."
+Sync Errors (last full sync),Synchronisierungsfehler (letzte vollständige Synchronisierung)
 This documentation is in German.,Diese Dokumentation ist auf Deutsch.
 Hide contents,Inhalt ausblenden
 Show contents,Inhalt einblenden
