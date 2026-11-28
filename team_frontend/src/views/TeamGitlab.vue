@@ -99,9 +99,9 @@ const error = ref("")
 const data = ref(null)
 
 const GROUP_COLORS = {
-	own: "var(--ink-green-3)",
-	other: "var(--ink-blue-3)",
-	internal: "var(--ink-gray-4)",
+	own: "var(--chart-series-1)",
+	other: "var(--chart-series-2)",
+	internal: "var(--chart-series-3)",
 }
 const GROUP_LABELS = {
 	own: __("Own implementations"),
