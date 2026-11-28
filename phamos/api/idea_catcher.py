@@ -10,7 +10,9 @@ through the Personal Cockpit's idea logic (phamos.api.personal_ideas).
 - search_my_ideas / suggest_ideas: candidates to link the new idea to. Suggestions compare the
   texts with Mistral embeddings (#2206); off unless Cockpit Settings turns them on.
 - link_idea: "spawned" sets the new idea's spawned_from; "append" adds its text to the chosen
-  idea and deletes the new one.
+  idea and deletes the new one (undo_append takes that back, #2209).
+- add_to_idea: a thought added to one of my ideas from its page in the app (#2210). Reading,
+  editing, growing and voting use the Personal Cockpit's endpoints (phamos.api.personal_cockpit).
 """
 
 import math
@@ -251,14 +253,8 @@ def link_idea(name, target, mode):
 	# then point at itself or close a loop.
 	if doc.name in _ancestors(target_doc.name):
 		frappe.throw(_("{0} grew out of this idea. Link it instead of adding it.").format(target_doc.title))
-	stamp = format_datetime(now_datetime())  # the user's own date and time format
-	added = f"<p><em>{_('Added {0}').format(stamp)}</em></p>{doc.content or ''}"
 	content_before = target_doc.content or ""
-	target_doc.content = content_before + added
-	target_doc.flags.ignore_permissions = True
-	target_doc.save(ignore_version=True)
-	personal_ideas._snapshot(target_doc, force=True)
-	personal_ideas._publish(target_doc)
+	_append(target_doc, doc.content or "")
 	# The caught idea lived only as long as it took to choose; its text now lives in the target.
 	# Ideas that grew out of it now grew out of the target (on_trash would otherwise unlink them).
 	children = frappe.get_all(DOCTYPE, filters={"spawned_from": doc.name}, pluck="name")
@@ -281,6 +277,30 @@ def link_idea(name, target, mode):
 		expires_in_sec=UNDO_SECONDS,
 	)
 	return {"name": None, "target": _short(target_doc.name), "undo": token}
+
+
+def _append(doc, html):
+	"""Add `html` at the bottom of my idea under an "Added <date and time>" line, and save it."""
+	stamp = format_datetime(now_datetime())  # the user's own date and time format
+	doc.content = (doc.content or "") + f"<p><em>{_('Added {0}').format(stamp)}</em></p>{html}"
+	doc.flags.ignore_permissions = True
+	doc.save(ignore_version=True)
+	personal_ideas._snapshot(doc, force=True)
+	personal_ideas._publish(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def add_to_idea(name, text):
+	"""Add a thought to one of my ideas from the app's idea page (#2210), as "Add to it" does."""
+	require_user()
+	text = cstr(text).strip()
+	if not text:
+		frappe.throw(_("Write or dictate your idea first."))
+	if len(text) > MAX_TEXT:
+		frappe.throw(_("That is too long for a quick idea. Write it out in the Personal Cockpit."))
+	doc = personal_ideas._get_my_idea(name)
+	_append(doc, personal_ideas._text_to_html(text))
+	return personal_ideas._serialize(doc)
 
 
 def _undo_key(token):

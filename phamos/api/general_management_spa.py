@@ -8,9 +8,11 @@ gets in: reading Issues or Tasks is not enough. Every whitelisted function check
 """
 
 import functools
+import re
 
 import frappe
 from frappe import _
+from frappe.utils import add_days, today
 
 from phamos.api import department_cockpit as dc
 from phamos.cockpits import appointments
@@ -570,3 +572,84 @@ def save_appointment(appointment):
 def delete_appointment(name):
 	"""Remove a company appointment; the Mailcow sync cancels its invite."""
 	return appointments.delete_appointment(_department_doc(), name)
+
+
+# --- Contracts (#2148) -----------------------------------------------------------------------------
+# ERPNext's standard Contract, typed by phamos' Contract Type (AVV, NDA, ...). Read through
+# frappe.get_list, so the role's Contract rights (phamos/setup/general_management.py) apply.
+
+CONTRACT_FIELDS = (
+	"name",
+	"custom_contract_type",
+	"party_type",
+	"party_name",
+	"party_full_name",
+	"status",
+	"is_signed",
+	"start_date",
+	"end_date",
+	"docstatus",
+)
+CONTRACT_STATUSES = ("Unsigned", "Active", "Inactive")
+CONTRACT_LIMIT = 500
+# Upper bound for the "ends within N days" filter: ten years.
+MAX_ENDING_WITHIN_DAYS = 3650
+
+
+@frappe.whitelist()
+@_require_access
+def get_contracts(contract_type=None, status=None, party=None, ending_within_days=None):
+	"""Contracts for the list, newest first; cancelled ones stay out.
+
+	Args:
+		contract_type: a Contract Type name, or empty for all.
+		status: Unsigned, Active or Inactive, or empty for all.
+		party: text matched against the party's ID and name.
+		ending_within_days: only contracts whose end date lies between today and today + N days.
+
+	Returns:
+		list[dict]: CONTRACT_FIELDS per contract, at most CONTRACT_LIMIT.
+	"""
+	filters = [["docstatus", "<", 2]]
+	if contract_type:
+		filters.append(["custom_contract_type", "=", contract_type])
+	if status:
+		if status not in CONTRACT_STATUSES:
+			frappe.throw(_("Unknown contract status: {0}").format(status))
+		filters.append(["status", "=", status])
+	if ending_within_days not in (None, ""):
+		# cint() would turn "abc" into 0 ("ends today") and a huge number makes add_days overflow,
+		# so only whole numbers in a sane range are accepted.
+		days_text = str(ending_within_days).strip()
+		if not re.fullmatch(r"[0-9]{1,5}", days_text) or int(days_text) > MAX_ENDING_WITHIN_DAYS:
+			frappe.throw(
+				_("Days must be a whole number from 0 to {0}.").format(MAX_ENDING_WITHIN_DAYS)
+			)
+		days = int(days_text)
+		filters.append(["end_date", "between", [today(), add_days(today(), days)]])
+	or_filters = None
+	if party:
+		# Escape LIKE wildcards so a typed % or _ matches itself (MariaDB's LIKE escape is a backslash).
+		escaped = party.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+		pattern = f"%{escaped}%"
+		or_filters = [["party_name", "like", pattern], ["party_full_name", "like", pattern]]
+	return frappe.get_list(
+		"Contract",
+		fields=list(CONTRACT_FIELDS),
+		filters=filters,
+		or_filters=or_filters,
+		order_by="modified desc",
+		limit_page_length=CONTRACT_LIMIT,
+	)
+
+
+@frappe.whitelist()
+@_require_access
+def get_contract_options():
+	"""What the Contracts filters offer: the contract types and the statuses."""
+	return {
+		"types": frappe.get_all("Contract Type", pluck="name", order_by="name asc"),
+		"statuses": list(CONTRACT_STATUSES),
+		# The list stops at this many rows; the page then shows "500+" instead of a wrong total.
+		"limit": CONTRACT_LIMIT,
+	}

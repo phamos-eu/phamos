@@ -13,8 +13,8 @@ from frappe.permissions import add_permission, update_permission_property
 
 GENERAL_MANAGEMENT_ROLE = "phamos General Management"
 
-# Doctypes the cockpit reads and writes (phamos/api/department_cockpit.py).
-DOCTYPES = ("Issue", "Task", "Checklist")
+# Doctypes the cockpit reads and writes (phamos/api/department_cockpit.py; Contract: #2148).
+DOCTYPES = ("Issue", "Task", "Checklist", "Contract")
 GRANTED = ("read", "write", "create", "report", "export", "print", "email", "share")
 # No delete: managers close or cancel records, they don't remove them.
 WITHHELD = ("delete",)

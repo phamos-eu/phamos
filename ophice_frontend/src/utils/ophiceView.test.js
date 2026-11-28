@@ -7,6 +7,7 @@ import {
 	fitTile,
 	follow,
 	imagePlacement,
+	isCutOff,
 	panBounds,
 	rubber,
 	snapHalf,
@@ -66,5 +67,14 @@ describe("Ophice map camera (#2089)", () => {
 	it("snaps to half tiles", () => {
 		expect(snapHalf(3.26)).toBe(3.5)
 		expect(snapHalf(3.2)).toBe(3)
+	})
+})
+
+describe("isCutOff (#2096)", () => {
+	it("is true only when the text is wider than the label", () => {
+		expect(isCutOff({ scrollWidth: 140, clientWidth: 80 })).toBe(true)
+		expect(isCutOff({ scrollWidth: 80, clientWidth: 80 })).toBe(false)
+		expect(isCutOff({ scrollWidth: 81, clientWidth: 80 })).toBe(false) // sub-pixel rounding
+		expect(isCutOff(null)).toBe(false)
 	})
 })

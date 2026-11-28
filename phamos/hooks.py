@@ -334,6 +334,7 @@ after_migrate = [
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.contracts.after_migrate",  # Contract Type on Contract, AVV and NDA (#2148)
 	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 ]
 
@@ -804,6 +805,9 @@ user_data_fields = [
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 ]
+
+# Automatically update python controller files with type annotations for this app.
+export_python_type_annotations = True
 
 # Authentication and authorization
 # --------------------------------

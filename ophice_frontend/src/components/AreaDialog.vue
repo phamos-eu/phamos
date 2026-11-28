@@ -139,6 +139,21 @@ const chatMode = ref("Saved")
 const error = ref("")
 const busy = ref("")
 
+// Kinds that need a meeting; a cockpit space's meeting stays optional and empty (#2094).
+const MEETING_KINDS = ["Meeting", "Guest", "Customer meeting"]
+const readyUrl = ref("")
+watch(kind, (value) => {
+	if (!readyUrl.value) return
+	if (MEETING_KINDS.includes(value) && !url.value) url.value = readyUrl.value
+	else if (!MEETING_KINDS.includes(value) && url.value === readyUrl.value) url.value = ""
+})
+// Typed over or cleared on a meeting kind: that is the editor's choice, and switching the kind
+// back and forth must not bring the ready URL back. (Switching to Cockpit empties the field
+// while the kind is already Cockpit, so it does not count as a choice.)
+watch(url, (value) => {
+	if (readyUrl.value && value !== readyUrl.value && MEETING_KINDS.includes(kind.value)) readyUrl.value = ""
+})
+
 watch(
 	() => props.area,
 	(area) => {
@@ -148,9 +163,24 @@ watch(
 		url.value = area?.meeting_url || ""
 		chatMode.value = area?.chat_mode || "Saved"
 		error.value = ""
+		readyUrl.value = ""
+		if (area && !area.name) prefillMeetingUrl(area)
 	},
 	{ immediate: true }
 )
+
+/** A new space comes with a ready meeting URL with a random room (#2094); it stays editable. */
+async function prefillMeetingUrl(area) {
+	try {
+		const ready = await call("phamos.api.ophice.new_meeting_url")
+		// Only if the dialog still shows this new space and nobody typed a URL meanwhile.
+		if (props.area !== area) return
+		readyUrl.value = ready || ""
+		if (!url.value && MEETING_KINDS.includes(kind.value)) url.value = readyUrl.value
+	} catch {
+		// No ready URL: the field stays empty, as before.
+	}
+}
 
 async function save() {
 	busy.value = "save"

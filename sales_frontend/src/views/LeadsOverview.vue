@@ -70,9 +70,26 @@
 					:note="chartNote"
 					:colors="['var(--ink-blue-3)', 'var(--ink-gray-4)']"
 					:format="(value) => String(value)"
+					:group-size="byDirection && chartView === 'side' ? 2 : 0"
 					selectable
 					@select="(period) => openList(period.filters)"
-				/>
+				>
+					<template v-if="byDirection" #actions>
+						<div class="inline-flex rounded-md bg-surface-gray-2 p-0.5 text-xs" role="group" :aria-label="__('Chart view')">
+							<button
+								v-for="option in chartViewOptions"
+								:key="option.value"
+								type="button"
+								class="rounded px-2 py-1"
+								:class="chartView === option.value ? 'bg-surface-white font-medium text-ink-gray-9 shadow-sm' : 'text-ink-gray-6 hover:text-ink-gray-9'"
+								:aria-pressed="chartView === option.value"
+								@click="setChartView(option.value)"
+							>
+								{{ option.label }}
+							</button>
+						</div>
+					</template>
+				</PeriodBars>
 
 				<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 					<div>
@@ -133,6 +150,7 @@ import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
 import { formatDate, userLocale } from "@spa/utils/datetime"
 import { __ } from "@spa/utils/i18n.js"
 import { createdRangeLabel, leadDeskListUrl, monthLabel, NOT_SET, OVERVIEW_BACK_KEY } from "@spa/utils/leadFilters.js"
+import { chartLegend, chartMode, chartValues } from "@spa/utils/leadChart.js"
 import { leadStatusLabel, leadStatusTheme } from "@/leadListColumns.js"
 import LeadOverviewDialog from "@/components/LeadOverviewDialog.vue"
 
@@ -299,43 +317,46 @@ function trendWord(t) {
 	return (t.tone === "above" ? __("Improved") : __("Declined")) + percent
 }
 
-// All leads: both bars of a month are stacked by direction, the year-earlier one lighter (phamos/phamos#1929).
-const DIRECTION_PARTS = [
-	{ key: "Inbound", label: () => __("Inbound"), color: "var(--ink-blue-3)" },
-	{ key: "Outbound", label: () => __("Outbound"), color: "var(--ink-green-3)" },
-	{ key: NOT_SET, label: () => __("Not set"), color: "var(--ink-amber-3)" },
-]
-const YEAR_EARLIER_OPACITY = 0.4
-// Follows the loaded figures, not the tab, so a tab switch never stacks figures of one direction.
-const stacked = computed(() => Boolean(data.value) && !data.value.direction)
+// All leads: the chart shows the months by direction, side by side or stacked (phamos/phamos#1929, #1950).
+// Follows the loaded figures, not the tab, so a tab switch never splits figures of one direction.
+const byDirection = computed(() => Boolean(data.value) && !data.value.direction)
 
-function directionSegments(split, opacity, suffix) {
-	return DIRECTION_PARTS.map((part) => ({
-		value: split?.[part.key] || 0,
-		color: part.color,
-		opacity,
-		label: suffix ? `${part.label()} · ${suffix}` : part.label(),
-	}))
+const CHART_VIEW_KEY = "phamos-sales-lead-overview-chart-view"
+const chartViewOptions = [
+	{ value: "side", label: __("Side by side") },
+	{ value: "stacked", label: __("Stacked") },
+]
+
+function readChartView() {
+	try {
+		return chartMode(window.localStorage.getItem(CHART_VIEW_KEY))
+	} catch {
+		return chartMode(null)
+	}
+}
+
+const chartView = ref(readChartView())
+
+function setChartView(value) {
+	chartView.value = chartMode(value)
+	try {
+		window.localStorage.setItem(CHART_VIEW_KEY, chartView.value)
+	} catch {
+		// Private window or blocked storage: the choice lasts until the page reloads.
+	}
 }
 
 const chartSeries = computed(() =>
-	stacked.value
-		? DIRECTION_PARTS.map((part) => ({ label: part.label(), color: part.color }))
-		: [{ label: __("Leads") }, { label: __("Same month a year earlier") }]
+	byDirection.value ? chartLegend(chartView.value) : [{ label: __("Leads") }, { label: __("Same month a year earlier") }]
 )
 
-const chartNote = computed(() => (stacked.value ? __("Lighter bar: the same month a year earlier") : ""))
+const chartNote = computed(() => (byDirection.value ? __("Lighter bar: the same month a year earlier") : ""))
 
 const chartPeriods = computed(() =>
 	(data.value?.chart || []).map((m) => ({
 		key: m.key,
 		label: monthLabel(m.key),
-		values: stacked.value
-			? [
-					directionSegments(m.split, 1),
-					directionSegments(m.last_year_split, YEAR_EARLIER_OPACITY, __("Same month a year earlier")),
-				]
-			: [m.count, m.last_year ?? 0],
+		values: byDirection.value ? chartValues(m, chartView.value) : [m.count, m.last_year ?? 0],
 		footer: m.count,
 		footerTone: m.last_year == null || m.count === m.last_year ? null : m.count > m.last_year ? "good" : "bad",
 		filters: m.filters,
