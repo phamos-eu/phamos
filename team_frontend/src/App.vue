@@ -28,6 +28,8 @@ const teams = ref([])
 const navItems = [
 	// who is there and on what they work, live, with the team chat (#1978)
 	{ name: "TeamMates", label: "Team mates", icon: "users", match: ["TeamMates"] },
+	// appointments with leave and public holidays (#1979)
+	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -120,6 +122,7 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamImplementations") return "Implementations"
 	if (route.name === "TeamGitlab") return "GitLab"
 	if (route.name === "TeamMates") return "Team mates"
+	if (route.name === "TeamAppointments") return "Appointments"
 	return "Issues"
 })
 
@@ -143,6 +146,7 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamImplementations") return "The team's implementations, in hours"
 	if (route.name === "TeamGitlab") return "Closing times and SLA of the team"
 	if (route.name === "TeamMates") return "Who is there, and on what they work"
+	if (route.name === "TeamAppointments") return "The team's appointments, leave and public holidays"
 	return "Team issues overview"
 })
 </script>

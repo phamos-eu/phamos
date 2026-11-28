@@ -3545,3 +3545,11 @@ Open the team chat in Raven,Teamchat in Raven öffnen
 Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
 Team chat of {0},Teamchat von {0}
 Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
+{0} absent (half day),{0} abwesend (halber Tag)
+{0} absent,{0} abwesend
+"The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"
+Pick a shorter period.,Wählen Sie einen kürzeren Zeitraum.
+Invites go out from the team mailbox. Set one on the Team in Desk first.,Einladungen gehen vom Team-Postfach aus. Legen Sie es zuerst im Team in Desk fest.
+Set a team mailbox with a Mailcow calendar on team {0} first.,Legen Sie zuerst ein Team-Postfach mit Mailcow-Kalender für Team {0} fest.
+Team Mailbox,Team-Postfach
+The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979).,"Das gemeinsame Postfach, von dem die Termine des Teams versendet werden (braucht ein Mailcow-DAV-Passwort). Teammitglieder können Einladungen nur von diesem Postfach senden (#1979)."

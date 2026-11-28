@@ -1,5 +1,6 @@
 import { createSpaRouter } from "@spa/router.js"
 import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
+import TeamAppointments from "./views/TeamAppointments.vue"
 import TeamGitlab from "./views/TeamGitlab.vue"
 import TeamMates from "./views/TeamMates.vue"
 import TeamImplementations from "./views/TeamImplementations.vue"
@@ -33,6 +34,11 @@ export default createSpaRouter({
 			path: "/team-mates",
 			name: "TeamMates",
 			component: TeamMates,
+		},
+		{
+			path: "/appointments",
+			name: "TeamAppointments",
+			component: TeamAppointments,
 		},
 	],
 })

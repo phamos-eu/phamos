@@ -605,3 +605,138 @@ def ensure_team_chat(name):
 	from phamos.api import issue_chat
 
 	return issue_chat.ensure_chat(_team_doc(name))
+
+
+# --- Appointments with leave and public holidays (#1979) ------------------------------------
+
+
+def _active_team_doc():
+	return frappe.get_doc("Team", teams.require_active_team())
+
+
+def _team_emails(team):
+	"""Invite addresses of the team's people today: company email, else their user."""
+	from phamos.cockpits.team_status import _people
+
+	emails = []
+	for row in frappe.get_all(
+		"Employee",
+		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]], "status": "Active"},
+		fields=["company_email", "user_id"],
+		order_by="employee_name asc",
+	):
+		email = row.company_email or row.user_id
+		if email and email not in emails:
+			emails.append(email)
+	return emails
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_appointments():
+	"""The active team's appointments (its Event Schedule rows), and the default attendees of a
+	new one: every person of the team (decision 1 of #1979)."""
+	from phamos.cockpits import appointments
+
+	doc = _active_team_doc()
+	return {
+		"team": doc.name,
+		"appointments": appointments.list_appointments(doc),
+		"default_attendees": _team_emails(doc.name),
+		"has_mailbox": bool(_team_mailboxes(doc)),
+	}
+
+
+def _team_mailboxes(team_doc):
+	"""Team invites go out only from the Team's shared mailbox (decision 4 of #1979): members must
+	not send as a colleague or a manager."""
+	from phamos.cockpits import appointments
+
+	return appointments.mailbox(team_doc.get("team_mailbox"))
+
+
+@frappe.whitelist()
+@_require_access
+def get_appointment_options():
+	"""What the appointment dialog offers: the team's mailbox and the people by department."""
+	from phamos.cockpits import appointments
+
+	return appointments.appointment_options(mailboxes=_team_mailboxes(_active_team_doc()))
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def save_appointment(appointment):
+	"""Create or update an appointment of the active team and send its invite. Every member may
+	plan (decision 9 of #1954)."""
+	from phamos.cockpits import appointments
+
+	doc = _active_team_doc()
+	mailboxes = _team_mailboxes(doc)
+	if not mailboxes:
+		frappe.throw(_("Set a team mailbox with a Mailcow calendar on team {0} first.").format(doc.name))
+	return appointments.save_appointment(doc, appointment, mailboxes=mailboxes)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def delete_appointment(name):
+	"""Remove an appointment of the active team; the Mailcow sync cancels its invite."""
+	from phamos.cockpits import appointments
+
+	return appointments.delete_appointment(_active_team_doc(), name)
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_absences(start, end):
+	"""The calendar's read-only layer for [start, end] (decision 2 of #1979): approved leave of the
+	team's people as a neutral "absent" (no leave type), and public holidays (no weekly offs) with
+	the people they apply to."""
+	from phamos.cockpits.team_status import _people
+	from phamos.phamos.team_capacity_utils import employee_holiday_list
+
+	start, end = frappe.utils.getdate(start), frappe.utils.getdate(end)
+	if (end - start).days > 120:
+		frappe.throw(_("Pick a shorter period."))
+	team = teams.require_active_team()
+	people = _people(team, frappe.utils.getdate()) or []
+	names = dict(frappe.get_all("Employee", filters={"name": ["in", people or [""]]}, fields=["name", "employee_name"], as_list=True))
+	absences = []
+	if people and frappe.db.table_exists("Leave Application"):
+		for leave in frappe.get_all(
+			"Leave Application",
+			filters={
+				"employee": ["in", people],
+				"docstatus": 1,
+				"status": "Approved",
+				"from_date": ["<=", end],
+				"to_date": [">=", start],
+			},
+			fields=["employee", "from_date", "to_date", "half_day", "half_day_date"],
+		):
+			absences.append(
+				{
+					"employee": leave.employee,
+					"employee_name": names.get(leave.employee, leave.employee),
+					"from_date": leave.from_date,
+					"to_date": leave.to_date,
+					"half_day_date": leave.half_day_date if leave.half_day else None,
+				}
+			)
+	holidays = {}
+	for employee in people:
+		holiday_list = employee_holiday_list(employee)
+		if not holiday_list:
+			continue
+		for row in frappe.get_all(
+			"Holiday",
+			filters={"parent": holiday_list, "holiday_date": ["between", [start, end]], "weekly_off": 0},
+			fields=["holiday_date", "description"],
+		):
+			entry = holidays.setdefault(
+				(row.holiday_date, frappe.utils.strip_html_tags(row.description or "")),
+				{"date": row.holiday_date, "description": frappe.utils.strip_html_tags(row.description or ""), "people": []},
+			)
+			entry["people"].append(names.get(employee, employee))
+	return {"absences": absences, "holidays": sorted(holidays.values(), key=lambda h: h["date"])}
