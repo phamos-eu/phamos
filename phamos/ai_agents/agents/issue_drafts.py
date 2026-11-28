@@ -97,25 +97,17 @@ def subject_with_number(subject, issue_name):
 
 
 def issue_url(issue):
-	"""Where the customer sees the Issue: its page in the Implementation Cockpit when the reporter may open
-	that Implementation there (Customer stakeholder, shown on the customer portal), else the Issue portal.
-	Longer term customers are led to the Implementation Cockpit for everything (PM, 2026-11-28)."""
+	"""The Issue in the Implementation Cockpit, where customers follow it (PM, 2026-11-28: always the
+	cockpit; the customer gets access there like the sender has). Without an Implementation the cockpit's
+	status route finds the page itself."""
 	from urllib.parse import quote
 
 	from phamos.ai_agents.agents.issue import implementation_of
 
 	implementation = implementation_of(issue)
-	if implementation and implementation in _reporter_implementations(issue):
+	if implementation:
 		return get_url(f"/implementation-cockpit/{quote(implementation, safe='')}/issues/{quote(issue.name, safe='')}")
-	return get_url(f"/issues/{quote(issue.name, safe='')}")
-
-
-def _reporter_implementations(issue):
-	"""The Implementations the reporter's User may open in the Implementation Cockpit."""
-	from phamos.api.implementation_cockpit import _customer_implementations
-
-	user = frappe.db.get_value("User", {"email": reporter_email(issue)}, "name") if reporter_email(issue) else None
-	return _customer_implementations(user) if user else []
+	return get_url(f"/implementation-cockpit/status?issue={quote(issue.name, safe='')}")
 
 
 ISSUE_LINK_TEXT = {

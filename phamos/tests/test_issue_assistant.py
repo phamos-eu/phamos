@@ -1070,16 +1070,18 @@ class TestDrafts(ChatTestCase):
 
 	def test_draft_links_to_the_issue_in_the_implementation_cockpit(self):
 		impl = self.implementation()
-		with patch("phamos.ai_agents.agents.issue_drafts._reporter_implementations", return_value=[impl]):
-			doc, draft, _reply = self.draft_via_chat()
+		doc, draft, _reply = self.draft_via_chat()
 		comm = frappe.get_doc("Communication", draft)
 		self.assertIn(f"(#{doc.name})", comm.subject)
 		from urllib.parse import quote
 
 		url = frappe.utils.get_url(f"/implementation-cockpit/{quote(impl, safe='')}/issues/{doc.name}")
 		self.assertIn(f'<a href="{url}">', comm.content)
-		# a reporter who can't open the Implementation in the cockpit gets the Issue portal instead
-		self.assertEqual(self.drafts.issue_url(doc), frappe.utils.get_url(f"/issues/{doc.name}"))
+		# without an Implementation the cockpit's status route finds the page
+		doc.custom_implementation = None
+		with patch("phamos.ai_agents.agents.issue.implementation_of", return_value=None):
+			self.assertEqual(self.drafts.issue_url(doc),
+				frappe.utils.get_url(f"/implementation-cockpit/status?issue={doc.name}"))
 		# the link comes before the closing line, which stays last
 		paragraphs = self.drafts.letter_paragraphs("Hallo,\nText.\nViele Grüße\nBot")
 		html = self.drafts.letter_html("Hallo,\nText.\nViele Grüße\nBot", ["Stand:", url])
