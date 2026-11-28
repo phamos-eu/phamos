@@ -43,8 +43,25 @@ def readers(issue_name, asker=None):
 
 
 def readable(doctype, name, people):
-	"""Whether every one of `people` may read the record."""
-	return all(frappe.has_permission(doctype, "read", doc=name, user=user) for user in people)
+	"""Whether every one of `people` may read the record. Nobody known: no (AI review on !1406)."""
+	if not people:
+		return False
+	doc = frappe.get_doc(doctype, name)  # loaded once, not once per person
+	return all(frappe.has_permission(doctype, "read", doc=doc, user=user) for user in people)
+
+
+def _of_customer(doctype, name, customer):
+	"""Whether a linked record belongs to this Issue's customer, so another customer's data never goes to the
+	model (AI review on !1406). Without a customer only records without one."""
+	if doctype == "Contact":
+		if not customer:
+			return not frappe.db.exists("Dynamic Link", {"parenttype": "Contact", "parent": name,
+				"link_doctype": "Customer"})
+		return bool(frappe.db.exists("Dynamic Link", {"parenttype": "Contact", "parent": name,
+			"link_doctype": "Customer", "link_name": customer}))
+	if doctype in ("Project", "Implementation"):
+		return (frappe.db.get_value(doctype, name, "customer") or None) == (customer or None)
+	return doctype != "Customer" or name == customer
 
 
 def _short(text, limit=MAX_TEXT):
@@ -59,7 +76,7 @@ def build(issue, people):
 	customer = customer_of(issue)
 	return {
 		"related_issues": related_issues(issue, customer, people),
-		"linked_records": linked_records(issue, people),
+		"linked_records": linked_records(issue, customer, people),
 		"activity": activity(issue, people),
 		"time": time_booked(issue, people),
 		"gitlab": gitlab_issues(issue, people),
@@ -78,9 +95,15 @@ def related_issues(issue, customer, people):
 	rows = frappe.get_all("Issue", filters={"name": ("!=", issue.name), "customer": customer or ("is", "not set")},
 		or_filters=or_filters, fields=["name", "subject", "status", "priority", "opening_date", "_assign"],
 		order_by="creation desc", limit_page_length=MAX_RELATED * 3)
+	from phamos.ai_agents.agents.issue import model_allowed
+
 	out = []
 	for row in rows:
 		if not readable("Issue", row.name, people):
+			continue
+		# the gate of each related Issue too: e.g. an outside sender's Issue on an internal project stays out
+		# of the model even when this one is internal (AI review on !1406)
+		if not model_allowed(frappe.get_doc("Issue", row.name)).get("allowed"):
 			continue
 		assignees = frappe.parse_json(row._assign or "[]") or []
 		out.append({"name": row.name, "subject": _short(row.subject, 140), "status": row.status, "priority": row.priority,
@@ -90,8 +113,9 @@ def related_issues(issue, customer, people):
 	return out
 
 
-def linked_records(issue, people):
-	"""Key fields of the Issue's Customer, Contact, Implementation and Project, and its open ToDos."""
+def linked_records(issue, customer, people):
+	"""Key fields of the Issue's Customer, Contact, Implementation and Project (only this customer's), and its
+	open ToDos."""
 	out = {}
 	specs = (
 		("customer", "Customer", ["customer_name", "customer_group"]),
@@ -101,7 +125,8 @@ def linked_records(issue, people):
 	)
 	for field, doctype, fields in specs:
 		name = issue.get(field)
-		if not name or not frappe.db.exists(doctype, name) or not readable(doctype, name, people):
+		if not name or not frappe.db.exists(doctype, name) or not _of_customer(doctype, name, customer) \
+				or not readable(doctype, name, people):
 			continue
 		row = frappe.db.get_value(doctype, name, fields, as_dict=True) or {}
 		if row.get("account_manager"):
@@ -109,8 +134,11 @@ def linked_records(issue, people):
 		out[doctype.lower()] = {"name": name, **row}
 	todos = frappe.get_all("ToDo", filters={"reference_type": "Issue", "reference_name": issue.name, "status": "Open"},
 		fields=["name", "allocated_to", "description", "date"])
+	# a ToDo of a readable Issue is part of the Issue (its assignees show on it anyway); Frappe's own ToDo check
+	# lets only assignee and assigner read it (AI review on !1406)
+	issue_readable = readable("Issue", issue.name, people)
 	out["open_todos"] = [{"for": frappe.utils.get_fullname(t.allocated_to), "what": _short(t.description, 200),
-		"due": str(t.date or "")} for t in todos if readable("ToDo", t.name, people)]
+		"due": str(t.date or "")} for t in todos] if issue_readable else []
 	return out
 
 
@@ -127,11 +155,12 @@ def activity(issue, people):
 		order_by="creation desc", limit_page_length=MAX_EMAILS)
 	versions = frappe.get_all("Version", filters={"ref_doctype": "Issue", "docname": issue.name},
 		fields=["owner", "data", "creation"], order_by="creation desc", limit_page_length=MAX_CHANGES)
+	visible = visible_fields(people)
 	changes = []
 	for version in versions:
 		data = frappe.parse_json(version.data or "{}") or {}
 		for change in data.get("changed") or []:
-			if isinstance(change, (list, tuple)) and len(change) == 3:
+			if isinstance(change, (list, tuple)) and len(change) == 3 and change[0] in visible:
 				changes.append({"field": change[0], "from": _short(change[1], 80), "to": _short(change[2], 80),
 					"by": frappe.utils.get_fullname(version.owner), "when": str(version.creation)})
 	return {
@@ -141,6 +170,19 @@ def activity(issue, people):
 			"text": _short(e.content), "when": str(e.creation)} for e in emails],
 		"changes": changes[:MAX_CHANGES],
 	}
+
+
+def visible_fields(people):
+	"""Issue fields whose changes every reader may see: shown on the timeline (not hidden, or marked "show on
+	timeline") and at a permission level each reader may read (AI review on !1406)."""
+	meta = frappe.get_meta("Issue")
+	levels = None
+	for user in people:
+		user_levels = set(meta.get_permlevel_access("read", user=user)) | {0}
+		levels = user_levels if levels is None else levels & user_levels
+	levels = levels or {0}
+	return {df.fieldname for df in meta.fields
+		if (not df.hidden or df.show_on_timeline) and (df.permlevel or 0) in levels}
 
 
 def time_booked(issue, people):

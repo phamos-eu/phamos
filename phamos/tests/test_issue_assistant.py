@@ -1006,6 +1006,8 @@ class TestChatContext(IssueAssistantTestCase):
 					"territory": frappe.db.get_value("Territory", {"is_group": 0})}).insert(ignore_permissions=True)
 
 	def context_of(self, doc, asker=None):
+		# the chat only answers when the gate allows the Issue; related Issues follow their own gate
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
 		return self.context.build(doc, self.context.readers(doc.name, asker or self.CHAT_USER))
 
 	def test_related_issues_of_the_same_customer_only(self):
@@ -1067,3 +1069,45 @@ class TestChatContext(IssueAssistantTestCase):
 		prompt = self.chat.build_prompt(doc, message, self.CHAT_USER, False)
 		self.assertIn(related.name, prompt)
 		self.assertIn('"related_issues"', prompt)
+
+	def test_linked_records_of_another_customer_stay_out(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		foreign = frappe.get_doc({"doctype": "Project", "project_name": "Context Foreign Project", "status": "Open",
+			"customer": self.OTHER}).insert(ignore_permissions=True).name
+		frappe.db.set_value("Issue", doc.name, "project", foreign)
+		doc.reload()
+		self.assertNotIn("project", self.context_of(doc)["linked_records"])
+
+	def test_change_history_hides_hidden_fields(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		frappe.get_doc({"doctype": "Version", "ref_doctype": "Issue", "docname": doc.name, "data": frappe.as_json(
+			{"changed": [["priority", "Low", "High"], ["first_responded_on", "", "2026-11-28"]]})}).insert(
+			ignore_permissions=True)
+		fields = {c["field"] for c in self.context_of(doc)["activity"]["changes"]}
+		self.assertIn("priority", fields)
+		hidden = frappe.get_meta("Issue").get_field("first_responded_on")
+		if hidden and hidden.hidden and not hidden.show_on_timeline:
+			self.assertNotIn("first_responded_on", fields)
+
+	def test_nobody_known_means_nothing(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		self.assertFalse(self.context.readable("Issue", doc.name, []))
+
+	def test_related_issues_follow_their_own_gate(self):
+		internal_project = frappe.get_doc({"doctype": "Project", "project_name": "Context Internal Project",
+			"status": "Open"}).insert(ignore_permissions=True).name
+		doc, channel, brief = self.issue_with_brief(custom_implementation=None, project=internal_project)
+		internal = self.issue(raised_by=DESK_USER, subject="Internal, same project", project=internal_project)
+		outside = self.issue(raised_by="someone@outside.example", subject="Outside sender", project=internal_project)
+		frappe.db.set_value("Issue", outside.name, "owner", "Guest")  # came in by e-mail, nobody logged in
+		frappe.db.set_value("Issue", internal.name, "owner", DESK_USER)  # a colleague, logged in
+		frappe.db.set_value("Issue", [doc.name, internal.name], "customer", None)
+		frappe.db.set_value("Issue", outside.name, "customer", None)
+		doc.reload()
+		names = [r["name"] for r in self.context_of(doc)["related_issues"]]
+		self.assertIn(internal.name, names)
+		self.assertNotIn(outside.name, names)
+
+	def test_open_todos_of_a_readable_issue(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		self.assertTrue(self.context_of(doc)["linked_records"]["open_todos"])  # the assistant's own assignment
