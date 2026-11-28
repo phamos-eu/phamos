@@ -891,6 +891,27 @@ class TestChat(IssueAssistantTestCase):
 			order_by="creation desc")
 		return run, reply or ""
 
+	def test_follow_up_within_the_window_needs_no_mention(self):
+		frappe.reload_doc("ai_agents", "doctype", "issue_assistant_settings")
+		frappe.db.set_single_value(setup.SETTINGS, "chat_follow_up_minutes", 10)
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "ok", "actions": []}, "mistral-test")
+		self.answer(doc, self.say(channel, "first question"))  # answered, e.g. after an @mention
+		# the same person's next message in the main chat: answered without @mention
+		self.addressed(self.say(channel, "and one more thing")).assert_called_once()
+		# a colleague's message is not addressed to the assistant
+		self.addressed(self.say(channel, "lunch?", user=DESK_USER), user=DESK_USER).assert_not_called()
+		# outside the window: not answered
+		frappe.db.sql("update `tabAI Agent Run` set finished_at = %s where triggered_by = %s and `trigger` = 'Chat'",
+			(frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=-11), self.CHAT_USER))
+		self.addressed(self.say(channel, "still there?")).assert_not_called()
+		# 0 switches it off
+		frappe.db.sql("update `tabAI Agent Run` set finished_at = %s where triggered_by = %s and `trigger` = 'Chat'",
+			(frappe.utils.now_datetime(), self.CHAT_USER))
+		frappe.db.set_single_value(setup.SETTINGS, "chat_follow_up_minutes", 0)
+		self.addressed(self.say(channel, "hello?")).assert_not_called()
+
 	def test_reply_under_the_brief_is_answered_other_messages_not(self):
 		doc, channel, brief = self.issue_with_brief()
 		self.addressed(self.reply_in_thread(brief, "why this person?")).assert_called_once()
