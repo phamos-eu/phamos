@@ -3262,6 +3262,21 @@ Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführe
 None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
 "The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
 Switch Implementations on or off,Implementierungen ein- oder ausschalten
+I can't use the AI model on this Issue: {0},Ich kann das KI-Modell für diese Anfrage nicht nutzen: {0}
+I could not answer: the model call failed ({0}).,Ich konnte nicht antworten: Der Aufruf des Modells ist fehlgeschlagen ({0}).
+I have no answer to that.,Darauf habe ich keine Antwort.
+Set on {0}'s request: {1},Auf Wunsch von {0} gesetzt: {1}
+I can't do that here: {0},Das kann ich hier nicht: {0}
+changing {0},{0} ändern
+that,das
+{0} {1} does not exist,{0} {1} existiert nicht
+you may not change this Issue,Sie dürfen diese Anfrage nicht ändern
+assigning {0},{0} zuweisen
+nobody,niemanden
+assigned {0},{0} zugewiesen
+you may not do that,Das dürfen Sie nicht
+Chat Message,Chat-Nachricht
+The Raven Message the assistant answered (#2116).,"Die Raven-Nachricht, auf die der Assistent geantwortet hat (#2116)."
 Switch an Implementation on,Implementierung einschalten
 applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.
 Actual hours per month; the line is the predicted hours per month,Ist-Stunden pro Monat; die Linie zeigt die geplanten Stunden pro Monat
@@ -3312,6 +3327,8 @@ vs {0},ggü. {0}
 {0} of {1} h,{0} von {1} h
 "{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
 "{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"
+setting {0} without you naming it; please write which one,"{0} setzen, ohne dass Sie ihn nennen; bitte schreiben Sie, welchen"
+it could not be saved ({0}),es konnte nicht gespeichert werden ({0})
 Average first response,Durchschnittliche erste Antwort
 Closed items — 12 months,Geschlossene Einträge – 12 Monate
 Closing time this month,Durchlaufzeit in diesem Monat
@@ -3341,3 +3358,5 @@ median,Median
 Opened,Eröffnet
 Average,Durchschnitt
 Internal,Intern
+assigning {0} without you naming them,"{0} zuweisen, ohne dass Sie die Person nennen"
+The reply could not be posted: {0},Die Antwort konnte nicht gepostet werden: {0}

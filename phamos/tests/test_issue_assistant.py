@@ -757,3 +757,215 @@ class TestConnections(IssueAssistantTestCase):
 			"reference_name": doc.name, "status": "Completed"}).db_insert()
 		counts = {row["doctype"]: row["count"] for row in get_open_count("Issue", doc.name)["count"]["external_links_found"]}
 		self.assertEqual(counts.get("AI Agent Run"), 2)
+
+
+class TestChat(IssueAssistantTestCase):
+	"""#2116: staff address the assistant in the Issue chat."""
+
+	CHAT_USER = "issue-assistant-chat@example.com"
+	PROJECT = "Issue Assistant Chat Project"
+
+	def setUp(self):
+		super().setUp()
+		if "raven" not in frappe.get_installed_apps() or not frappe.get_all("Raven Workspace", limit=1):
+			self.skipTest("Raven with a workspace is needed")
+		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 1)
+		if not frappe.db.exists("User", self.CHAT_USER):
+			frappe.get_doc({"doctype": "User", "email": self.CHAT_USER, "first_name": "Chat Colleague",
+				"send_welcome_email": 0, "roles": [{"role": "Support Team"}, {"role": "Raven User"}]}).insert(
+				ignore_permissions=True)
+		self.project = frappe.db.exists("Project", {"project_name": self.PROJECT}) or frappe.get_doc(
+			{"doctype": "Project", "project_name": self.PROJECT, "status": "Open"}).insert(ignore_permissions=True).name
+		from phamos.ai_agents.agents import issue_chat_answer as chat
+
+		self.chat = chat
+		self.llm = patch("phamos.ai_agents.agents.issue_chat_answer.llm.chat_json").start()
+
+	def issue_with_brief(self, **values):
+		values.setdefault("custom_implementation", self.implementation())
+		doc = self.issue(raised_by=self.CHAT_USER, **values)
+		self.run_assistant(doc)
+		channel = frappe.db.get_value("Raven Channel", {"linked_doctype": "Issue", "linked_document": doc.name})
+		brief = frappe.db.get_value("Raven Message", {"channel_id": channel, "is_bot_message": 1}, "name",
+			order_by="creation desc")
+		return doc, channel, brief
+
+	def say(self, channel, text, user=None):
+		"""A message by the colleague, without running the hooks of this branch's code (the bench may
+		serve another one): on_raven_message is called by the tests themselves."""
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(user or self.CHAT_USER)
+		message = frappe.get_doc({"doctype": "Raven Message", "channel_id": channel, "message_type": "Text",
+			"text": f"<p>{text}</p>"})
+		message.flags.ignore_permissions = True
+		message.insert(ignore_permissions=True)
+		return message
+
+	def reply_in_thread(self, brief, text):
+		from raven.api.threads import create_thread
+
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(self.CHAT_USER)
+		if not frappe.db.exists("Raven Channel", {"name": brief, "is_thread": 1}):
+			create_thread(brief)
+		return self.say(brief, text)
+
+	def addressed(self, message, user=None):
+		with patch.object(self.chat, "queue_answer", return_value="run") as queued:
+			self.addCleanup(frappe.set_user, "Administrator")
+			frappe.set_user(user or message.owner)
+			self.chat.on_raven_message(message)
+			frappe.set_user("Administrator")
+		return queued
+
+	def answer(self, doc, message, user=None):
+		"""Queue and run the answer directly; returns (run, the bot's reply text)."""
+		with patch.object(self.chat.frappe, "enqueue"):
+			run_name = self.chat.queue_answer(doc, message.name, user or self.CHAT_USER)
+		self.chat.execute(run_name, commit=False)
+		run = frappe.get_doc("AI Agent Run", run_name)
+		reply = frappe.db.get_value("Raven Message", {"channel_id": message.channel_id if frappe.db.get_value(
+			"Raven Channel", message.channel_id, "is_thread") else message.name, "is_bot_message": 1}, "text",
+			order_by="creation desc")
+		return run, reply or ""
+
+	def test_reply_under_the_brief_is_answered_other_messages_not(self):
+		doc, channel, brief = self.issue_with_brief()
+		self.addressed(self.reply_in_thread(brief, "why this person?")).assert_called_once()
+		self.addressed(self.say(channel, "lunch at 12?")).assert_not_called()
+
+	def test_mention_of_the_bot_is_answered(self):
+		doc, channel, brief = self.issue_with_brief()
+		bot_raven_user = frappe.db.get_value("Raven Bot", setup.ASSISTANT_NAME, "raven_user")
+		message = self.say(channel, "@assistant what is missing?")
+		message.append("mentions", {"user": bot_raven_user})
+		self.addressed(message).assert_called_once()
+
+	def test_bot_messages_and_readers_without_access_get_nothing(self):
+		doc, channel, brief = self.issue_with_brief()
+		bot_message = frappe.get_doc("Raven Message", brief)
+		self.addressed(bot_message, user=self.CHAT_USER).assert_not_called()
+		message = self.reply_in_thread(brief, "hello")
+		self.addressed(message, user=WEBSITE_USER).assert_not_called()
+
+	def test_issue_of_a_switched_off_implementation_gets_no_answer(self):
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.delete("User Permission", {"user": self.assistant, "allow": "Implementation"})
+		self.addressed(self.reply_in_thread(brief, "hello")).assert_not_called()
+
+	def test_gate_says_no_fixed_reply_and_no_model_call(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)  # customer without the AVV tick
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "summarise please"))
+		self.assertEqual((run.status, run.trigger), ("Completed", "Chat"), run.error)
+		self.llm.assert_not_called()
+		self.assertIn(frappe._("I can't use the AI model on this Issue: {0}").split(":")[0], reply)
+
+	def test_instruction_is_applied_as_the_asker(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}], "ask_back": False}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
+		self.assertEqual(run.status, "Completed", run.error)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), self.project)
+		# saved in the asker's session: the document history shows the asker, not the assistant
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "modified_by"), self.CHAT_USER)
+		self.assertIn("Done.", reply)
+		self.assertIn(self.project, reply)
+
+	def test_customer_is_only_set_when_the_colleague_names_it(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.set_value("Issue", doc.name, "customer", None)
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": "customer",
+			"value": CUSTOMER}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "customer"))
+		self.answer(doc, self.reply_in_thread(brief, f"customer is {CUSTOMER}"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "customer"), CUSTOMER)
+
+	def test_a_failing_save_is_reported_not_lost(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+		with patch("erpnext.support.doctype.issue.issue.Issue.validate", side_effect=frappe.ValidationError("no")), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			run, reply = self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
+		self.assertEqual(run.status, "Completed", run.error)
+		self.assertIn("ValidationError", reply)
+
+	def test_a_failing_save_leaves_no_partial_writes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		frappe.db.set_value("Customer", CUSTOMER, "customer_details", "before")
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+
+		def half_done(*args, **kwargs):
+			frappe.db.set_value("Customer", CUSTOMER, "customer_details", "partial")
+			raise frappe.ValidationError("no")
+
+		with patch("erpnext.support.doctype.issue.issue.Issue.validate", side_effect=half_done), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
+		self.assertEqual(frappe.db.get_value("Customer", CUSTOMER, "customer_details"), "before")
+
+	def test_assign_only_whom_the_colleague_names(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "assign", "user": DESK_USER}]},
+			"mistral-test")
+		with patch("frappe.desk.form.assign_to.notify_assignment"):
+			run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
+			self.assertNotIn(DESK_USER, self.assignees(doc))
+			self.answer(doc, self.reply_in_thread(brief, f"Please assign {DESK_USER.upper()}"))
+		self.assertIn(DESK_USER, self.assignees(doc))
+
+	def test_a_failed_reply_still_records_the_changes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+		message = self.reply_in_thread(brief, f"project is {self.project}")
+		with patch("phamos.ai_agents.agents.issue_chat_answer.post_reply", side_effect=Exception("raven down")), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			run, reply = self.answer(doc, message)
+		self.assertEqual(run.status, "Completed")
+		self.assertIn("raven down", run.error)
+		self.assertIn("project", run.fields_set)
+
+	def test_named_means_a_whole_word(self):
+		self.assertTrue(self.chat.named_in_message("custom_implementation", "AG", "die ag soll es sein"))
+		self.assertFalse(self.chat.named_in_message("custom_implementation", "AG", "guten tag, bitte"))
+
+	def test_actions_outside_the_list_or_when_asking_back_are_not_applied(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Closing it.", "actions": [{"type": "set", "field": "status",
+			"value": "Closed"}, {"type": "delete"}], "ask_back": False}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "close it and delete it"))
+		self.assertNotEqual(frappe.db.get_value("Issue", doc.name, "status"), "Closed")
+		self.assertTrue(frappe.db.exists("Issue", doc.name))
+		self.assertIn(frappe._("I can't do that here: {0}").split(":")[0], reply)
+
+		self.llm.return_value = ({"answer": "Which project?", "actions": [{"type": "set", "field": "project",
+			"value": self.project}], "ask_back": True}, "mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "set the project"))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "project"))
+
+	def test_system_prompt_forbids_promising_what_it_cannot_do(self):
+		# local test 2026-11-28: asked for an e-mail, it answered "I will prepare the email now"
+		self.assertIn("cannot send or draft e-mails", self.chat.CHAT_SYSTEM)
+		self.assertIn("Never say you will do something", self.chat.CHAT_SYSTEM)
+
+	def test_prompt_has_the_thread_and_no_other_issue(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
+		self.issue(raised_by=WEBSITE_USER, subject="Another customer's secret Issue")
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "ok", "actions": []}, "mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "what do you know?"))
+		prompt = self.llm.call_args.args[0]
+		self.assertIn("what do you know?", prompt)
+		self.assertIn(doc.name, prompt)
+		self.assertNotIn("Another customer's secret Issue", prompt)
