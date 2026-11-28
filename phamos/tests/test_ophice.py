@@ -4,6 +4,7 @@
 """Ophice slice 1 (#2054): my own chip's remembered position and the dummy chips."""
 
 import json
+import re
 from unittest import skipUnless
 from unittest.mock import patch
 
@@ -673,7 +674,9 @@ class OphiceAreaTestCase(FrappeTestCase):
 	def test_new_space_gets_a_ready_meeting_url(self):
 		# #2094: a random room on the site's Jitsi server, which saving accepts as it is.
 		url = ophice.new_meeting_url()
-		self.assertRegex(url, r"^https://meet\.jit\.si/ophice-[a-z0-9]{24}$")
+		# Whatever the site's default server is (#2108 moved it off meet.jit.si).
+		domain = re.escape(ophice._jitsi_domain())
+		self.assertRegex(url, rf"^https://{domain}/ophice-[a-z0-9]{{24}}$")
 		self.assertNotEqual(url, ophice.new_meeting_url())
 		name = ophice.save_area("Ready", url, 1, 1, 2, 2)
 		self.assertEqual(frappe.db.get_value("Ophice Area", name, "meeting_url"), url)
