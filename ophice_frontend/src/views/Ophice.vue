@@ -136,7 +136,12 @@
 				:status="me.status"
 				:on-save="saveStatus"
 				@close="statusOpen = false"
-			/>
+			>
+				<!-- From my own chip: my timesheet timer first, as in the Personal Cockpit (#2101). -->
+				<template v-if="statusAt" #top>
+					<MyTimesheet />
+				</template>
+			</StatusMenu>
 			<!-- The area's chat (#2062), above the mini map. -->
 			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
 			<Teleport :to="pipBody || 'body'" :disabled="!pipBody">
@@ -241,6 +246,34 @@
 			>
 				{{ __("Click on the map where you want to meet · Esc to cancel") }}
 			</p>
+			<!--
+				Planting my flag (#2130): the next click on the map plants it. The hint is big in the
+				middle (PM, 2026-11-27); once the mouse reaches it, it fades and waits small at the
+				bottom left, out of the way.
+			-->
+			<Transition name="ophice-flag-hint">
+				<div
+					v-if="placingFlag && !flagHintDocked"
+					class="absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4 rounded-2xl bg-black/80 px-7 py-5 text-white shadow-2xl"
+					data-testid="flag-hint"
+					@pointerenter="flagHintDocked = true"
+				>
+					<span class="h-12 w-12 flex-shrink-0"><FlagIcon :color="flagLook.color" :pattern="flagLook.pattern" /></span>
+					<span class="flex flex-col gap-1">
+						<span class="text-lg font-semibold">{{ __("Click on the map where your flag should stand") }}</span>
+						<span class="text-sm text-white/70">{{ __("Esc to cancel") }}</span>
+					</span>
+				</div>
+			</Transition>
+			<Transition name="ophice-flag-hint">
+				<p
+					v-if="placingFlag && flagHintDocked"
+					class="pointer-events-none absolute bottom-14 left-4 z-40 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+					data-testid="flag-hint-docked"
+				>
+					{{ __("Click on the map where your flag should stand · Esc to cancel") }}
+				</p>
+			</Transition>
 			<!-- Selected people (PM, 2026-11-22): go to them, or set a meeting point for all. -->
 			<div
 				v-if="me && selectedUsers.length && !placingPin"
@@ -290,12 +323,17 @@
 				class="ophice-viewport overflow-hidden"
 				:class="[
 					meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0',
-					{ 'cursor-crosshair': placingPin },
+					{ 'cursor-crosshair': placingPin || placingFlag },
 				]"
 				:style="viewportStyle"
+				ref="viewportEl"
 				data-testid="map-viewport"
 				@pointerdown="onViewportDown"
-				@pointermove="camera().onPointerMove"
+				@pointermove="onViewportMove"
+				@pointerleave="placingFlag && (flagAim = null)"
+				@dragover="onFlagDragOver"
+				@dragleave="onFlagDragLeave"
+				@drop="onFlagDrop"
 				@pointerup="camera().onPointerUp"
 				@pointercancel="camera().onPointerUp"
 				@click.capture="camera().onClickCapture"
@@ -336,6 +374,20 @@
 					@draw="(rect) => (areaDraft = { ...rect })"
 					@pick="(area) => (areaDraft = { ...area })"
 					@change="reshapeArea"
+				/>
+				<!-- Flags (#2130): everyone's, my own to drag and dress. Under the chips. -->
+				<FlagLayer
+					:flags="flags"
+					:tile="tile"
+					:user="me.user"
+					:ghost="flagGhost"
+					:menu-open="flagMenuOpen"
+					:cell-from-point="cellFromPoint"
+					@aim="(cell) => (flagAim = cell)"
+					@drop="moveFlag"
+					@menu="(open) => (flagMenuOpen = open)"
+					@look="setFlagLook"
+					@take-down="takeDownFlag"
 				/>
 				<!-- Perimeters (#2056): touching circles = in conversation. Below the chips, no clicks. -->
 				<div
@@ -435,7 +487,7 @@
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
 					:style="chipStyle(me)"
-					:title="__('{0}: click to set your availability', [me.full_name])"
+					:title="__('{0}: click for your timesheet timer and availability', [me.full_name])"
 					data-testid="my-chip"
 					@click="toggleStatus($event)"
 				>
@@ -664,6 +716,9 @@
 			:status-open="statusOpen"
 			:bell="bell"
 			:bell-title="bellTitle"
+			:flag="myFlag"
+			:flag-look="flagLook"
+			:placing-flag="placingFlag"
 			:ui-scale="uiScale"
 			:scales="UI_SCALES"
 			:can-edit-map="canEditMap"
@@ -675,6 +730,8 @@
 			@open="openCockpit"
 			@status="toggleStatus()"
 			@bell="clickBell"
+			@flag-place="startFlagPlacing"
+			@flag-drag="(on) => (draggingFlag = on)"
 			@text-step="stepUiScale"
 			@text-reset="setUiScale(1)"
 			@areas="editingAreas = !editingAreas"
@@ -761,6 +818,9 @@ import {
 import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
+import FlagLayer from "../components/FlagLayer.vue"
+import FlagIcon from "../components/FlagIcon.vue"
+import { cellAt, flagBlocked } from "../utils/ophiceFlag.js"
 import AreaDialog from "../components/AreaDialog.vue"
 import MeetingPanel from "../components/MeetingPanel.vue"
 import AreaChat from "../components/AreaChat.vue"
@@ -770,6 +830,7 @@ import GoToButton from "../components/GoToButton.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
+import MyTimesheet from "../components/MyTimesheet.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { mountPhriend } from "@spa/phriend.js"
 import router from "../router.js"
@@ -1311,6 +1372,14 @@ function onKeydown(event) {
 	}
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
 	// Esc: stop placing a meeting point, then clear the selection (PM, 2026-11-22).
+	// Esc: stop planting my flag, close its menu (#2130).
+	if (event.key === "Escape" && (placingFlag.value || flagMenuOpen.value)) {
+		event.preventDefault()
+		placingFlag.value = false
+		flagAim.value = null
+		flagMenuOpen.value = false
+		return
+	}
 	if (event.key === "Escape" && (placingPin.value || (selectedUsers.value.length && !chatWith.value))) {
 		event.preventDefault()
 		if (placingPin.value) placingPin.value = null
@@ -2483,9 +2552,10 @@ const selectedOnMap = computed(() => selectedUsers.value.filter(isOnMap))
 function onPersonClick(person, event, order = null, options = {}) {
 	// Placing a meeting point: a chip on the map only places it (onViewportClick); a click
 	// anywhere else (the list) stops placing and selects as usual.
-	if (placingPin.value) {
+	if (placingPin.value || placingFlag.value) {
 		if (event?.target?.closest?.("[data-testid=other-chip]")) return
 		placingPin.value = null
+		placingFlag.value = false
 	}
 	if (!person?.user || person.user === me.value?.user) return
 	if (event?.metaKey || event?.ctrlKey) {
@@ -2525,6 +2595,12 @@ function clearSelection() {
 function onViewportClick(event) {
 	if (placingPin.value) {
 		placePin(event)
+		return
+	}
+	if (placingFlag.value) {
+		placingFlag.value = false
+		flagAim.value = null
+		plantFlag(cellFromPoint(event.clientX, event.clientY))
 		return
 	}
 	if (event.target.closest?.("[data-testid=other-chip], [data-testid=my-chip], [data-no-pan], button")) return
@@ -2781,6 +2857,131 @@ function pinStyle(pin) {
 	}
 }
 
+// --- My flag (#2129, #2130): planted from the sidebar (click then click, or drag and drop),
+// moved by dragging it on the map, dressed and taken down from its menu.
+
+const viewportEl = ref(null)
+const flags = ref([])
+// How my flag looks while it waits in the sidebar; it keeps its look when taken down.
+const flagLook = ref({ color: "red", pattern: "plain" })
+const placingFlag = ref(false)
+const draggingFlag = ref(false)
+const flagAim = ref(null)
+const flagMenuOpen = ref(false)
+// The placing hint moved to the bottom left (the mouse went over it).
+const flagHintDocked = ref(false)
+const myFlag = computed(() => flags.value.find((f) => f.user === me.value?.user) || null)
+const flagGhost = computed(() => {
+	if (!flagAim.value || !me.value) return null
+	return {
+		...flagAim.value,
+		color: myFlag.value?.color || flagLook.value.color,
+		pattern: myFlag.value?.pattern || flagLook.value.pattern,
+		blocked: Boolean(flagBlocked(flagAim.value, { areas: areas.value, flags: flags.value, user: me.value.user })),
+	}
+})
+
+/** The cell of the grid under a point of the screen, or null. */
+function cellFromPoint(clientX, clientY) {
+	const cam = camera()
+	const box = viewportEl.value?.getBoundingClientRect()
+	if (!box || !cam.tile.value || !me.value) return null
+	const x = (clientX - box.left - cam.pan.x - cam.origin.value.x) / cam.tile.value
+	const y = (clientY - box.top - cam.pan.y - cam.origin.value.y) / cam.tile.value
+	return cellAt(x, y, me.value.cols, me.value.rows)
+}
+
+function startFlagPlacing() {
+	chatWith.value = null
+	placingPin.value = null
+	placingFlag.value = !placingFlag.value
+	flagAim.value = null
+	flagHintDocked.value = false
+}
+
+function onViewportMove(event) {
+	camera().onPointerMove(event)
+	if (placingFlag.value) flagAim.value = cellFromPoint(event.clientX, event.clientY)
+}
+
+function onFlagDragOver(event) {
+	if (!draggingFlag.value) return
+	event.preventDefault()
+	if (event.dataTransfer) event.dataTransfer.dropEffect = "move"
+	flagAim.value = cellFromPoint(event.clientX, event.clientY)
+}
+function onFlagDragLeave(event) {
+	if (draggingFlag.value && !viewportEl.value?.contains(event.relatedTarget)) flagAim.value = null
+}
+function onFlagDrop(event) {
+	if (!draggingFlag.value) return
+	event.preventDefault()
+	draggingFlag.value = false
+	placingFlag.value = false
+	flagAim.value = null
+	plantFlag(cellFromPoint(event.clientX, event.clientY))
+}
+
+function upsertFlag(flag) {
+	if (!flag?.user) return
+	flags.value = [...flags.value.filter((f) => f.user !== flag.user), flag]
+}
+
+// `previous` is my flag as it was before the optimistic update (null: none planted), so a
+// refusal can put it back. Only my own entry is restored: other people's flags may have
+// changed meanwhile through realtime and must stay as they are.
+async function saveFlag(args, { thump = false, previous = null } = {}) {
+	try {
+		const flag = await call(`${API}.set_my_flag`, args)
+		upsertFlag(flag)
+		// A soft thump as it goes into the ground (PM, 2026-11-27): for me only; the bell mutes it.
+		if (thump) encounterAlert.thump()
+	} catch (e) {
+		const mine = me.value?.user
+		flags.value = [...flags.value.filter((f) => f.user !== mine), ...(previous ? [previous] : [])]
+		toast({ title: errorText(e) || __("Your flag could not be planted."), icon: "alert-circle" })
+	}
+}
+
+function plantFlag(cell) {
+	if (!cell || !me.value) return
+	const why = flagBlocked(cell, { areas: areas.value, flags: flags.value, user: me.value.user })
+	if (why) {
+		toast({ title: why === "area" ? __("A flag can't stand inside an area.") : __("There is already a flag on this spot."), icon: "alert-circle" })
+		return
+	}
+	// Planted where it lands right away; the server's answer (or its refusal) follows.
+	const previous = myFlag.value || null
+	upsertFlag({ ...(myFlag.value || flagLook.value), user: me.value.user, full_name: me.value.full_name, ...cell })
+	saveFlag({ x: cell.x, y: cell.y }, { thump: true, previous })
+}
+
+function moveFlag(cell) {
+	flagAim.value = null
+	if (!cell || (myFlag.value && cell.x === myFlag.value.x && cell.y === myFlag.value.y)) return
+	plantFlag(cell)
+}
+
+function setFlagLook(look) {
+	if (!myFlag.value) return
+	const previous = myFlag.value
+	upsertFlag({ ...myFlag.value, ...look })
+	saveFlag(look, { previous })
+}
+
+async function takeDownFlag() {
+	flagMenuOpen.value = false
+	const before = flags.value
+	if (myFlag.value) flagLook.value = { color: myFlag.value.color, pattern: myFlag.value.pattern }
+	flags.value = flags.value.filter((f) => f.user !== me.value?.user)
+	try {
+		await call(`${API}.take_down_my_flag`)
+	} catch (e) {
+		flags.value = before
+		toast({ title: errorText(e) || __("Your flag could not be taken down."), icon: "alert-circle" })
+	}
+}
+
 function nameOf(user) {
 	if (user === me.value?.user) return me.value.full_name
 	return others.value.find((o) => o.user === user)?.full_name || user
@@ -2847,11 +3048,12 @@ let nowTimer = null
 
 const AWAY_GRACE_MS = 3600 * 1000
 const statusOpen = ref(false)
-// Where the status menu opens: next to my chip when I click it, else under the header button.
+// Where the status menu opens: next to my chip when I click it (with my timesheet timer on top,
+// #2101, so it is taller), else under the header button.
 const statusAt = ref(null)
 const statusMenuStyle = computed(() => ({
 	left: `${Math.max(8, Math.min(window.innerWidth - 336, statusAt.value.x + 12))}px`,
-	top: `${Math.max(8, Math.min(window.innerHeight - 380, statusAt.value.y + 12))}px`,
+	top: `${Math.max(8, Math.min(window.innerHeight - 480, statusAt.value.y + 12))}px`,
 }))
 
 function toggleStatus(event) {
@@ -3222,6 +3424,8 @@ const SOCKET_EVENTS = [
 	["ophice_move", onRemoteMove],
 	["ophice_pin", upsertPin],
 	["ophice_pin_removed", onPinRemoved],
+	["ophice_flag", upsertFlag],
+	["ophice_flag_removed", (message) => (flags.value = flags.value.filter((f) => f.user !== message?.user))],
 	["ophice_leave", onRemoteLeave],
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
@@ -3445,6 +3649,8 @@ onMounted(async () => {
 		autoCockpit.value = data.auto_cockpit !== false
 		for (const notice of data.notices || []) upsertNotice(notice)
 		pins.value = data.pins || []
+		flags.value = data.flags || []
+		flagLook.value = data.flag_look || flagLook.value
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("Ophice could not be loaded.")
@@ -3870,5 +4076,14 @@ onBeforeUnmount(() => {
 	.ophice-pin__icon {
 		animation: none;
 	}
+}
+/* The flag's placing hint (#2130): fades in the middle, fades in again small at the bottom left. */
+.ophice-flag-hint-enter-active,
+.ophice-flag-hint-leave-active {
+	transition: opacity 250ms ease-out;
+}
+.ophice-flag-hint-enter-from,
+.ophice-flag-hint-leave-to {
+	opacity: 0;
 }
 </style>

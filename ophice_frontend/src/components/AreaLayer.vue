@@ -65,7 +65,13 @@
 				@error="failedLogos[area.jitsi_domain] = true"
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
-			<span v-if="area.kind !== 'Phriend'" class="area__title truncate">{{ area.title }}</span>
+			<span
+				v-if="area.kind !== 'Phriend'"
+				class="area__title truncate"
+				data-testid="area-title"
+				@mouseenter="peekTitle(area, $event)"
+				@mouseleave="peek = null"
+			>{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
 				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-5 w-5" />
@@ -125,6 +131,18 @@
 			{{ __("Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel") }}
 		</p>
 
+		<!-- A cut-off name in full while the mouse is on it (#2096), over the label, outside the
+			 area's clipping. -->
+		<Teleport to="body">
+			<span
+				v-if="peek"
+				ref="peekEl"
+				class="area__title area__title--peek"
+				:style="{ left: `${peek.x}px`, top: `${peek.y}px`, '--area-h': peek.hue }"
+				data-testid="area-title-peek"
+			>{{ peek.title }}</span>
+		</Teleport>
+
 		<div
 			v-if="editing"
 			ref="layer"
@@ -141,7 +159,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from "vue"
+import { isCutOff } from "../utils/ophiceView.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { boxOf, contains, labelPoint, MAX_POINTS, nearestOnSegment, pointsOf, segmentDistance, selfCrossing, shapeOf, svgPoints } from "../utils/ophiceShapes.js"
@@ -155,6 +174,35 @@ const props = defineProps({
 	/** The area whose meeting I am in */
 	activeName: { type: String, default: "" },
 })
+
+// The full name of a cut-off space name, while the mouse is on it (#2096).
+const peek = ref(null)
+const peekEl = ref(null)
+// Space between the full name and the window's edge.
+const PEEK_MARGIN = 8
+async function peekTitle(area, event) {
+	const label = event.currentTarget
+	if (props.editing || !isCutOff(label)) return
+	const rect = label.getBoundingClientRect()
+	const shown = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
+	peek.value = shown
+	// Centred on the label, a long name near the window's left or right edge would itself be
+	// cut off: once it is rendered and its width known, keep it inside the window.
+	await nextTick()
+	// Gone or replaced by another label meanwhile (peek holds a reactive proxy of `shown`).
+	if (toRaw(peek.value) !== shown || !peekEl.value) return
+	const half = peekEl.value.offsetWidth / 2
+	const min = half + PEEK_MARGIN
+	const max = window.innerWidth - half - PEEK_MARGIN
+	peek.value.x = max < min ? window.innerWidth / 2 : Math.min(Math.max(shown.x, min), max)
+}
+// Editing, new spaces, or the map moving under the mouse (keys walk and pan, the wheel zooms):
+// no stale name left floating where the label no longer is.
+watch(() => [props.editing, props.areas], () => (peek.value = null))
+const dropPeek = () => (peek.value = null)
+const PEEK_ENDERS = ["keydown", "wheel", "pointerdown", "blur"]
+onMounted(() => PEEK_ENDERS.forEach((name) => window.addEventListener(name, dropPeek, { passive: true })))
+onBeforeUnmount(() => PEEK_ENDERS.forEach((name) => window.removeEventListener(name, dropPeek)))
 const emit = defineEmits(["draw", "pick", "change"])
 
 // The symbol of each cockpit's app icon; keep in step with spa_shared/scripts/generate_app_manifests.py.
@@ -704,7 +752,9 @@ function cancel() {
 	opacity: 0.9;
 	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
+/* Takes the mouse (the layer does not) so a cut-off name can show in full (#2096). */
 .area__title {
+	pointer-events: auto;
 	max-width: 95%;
 	padding: 1px 6px;
 	border-radius: 4px;
@@ -712,5 +762,20 @@ function cancel() {
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1.4;
+}
+.area__title--peek {
+	position: fixed;
+	z-index: 60;
+	/* One line as long as it fits; a longer name wraps instead of running out of the box, since
+	   the peek exists to show the whole name (an ellipsis would cut it again). */
+	width: max-content;
+	max-width: min(24rem, calc(100vw - 16px));
+	transform: translate(-50%, -50%);
+	color: #fff;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: center;
+	pointer-events: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 </style>

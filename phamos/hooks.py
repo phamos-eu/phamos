@@ -478,6 +478,8 @@ doc_events = {
 			"phamos.api.issue_chat.keep_mention_unread",
 			"phamos.api.issue_chat.assign_mentioned",
 			"phamos.events.raven_bot.handle_lead_option_reply",
+			# staff address the Issue Assistant in an Issue chat (#2116)
+			"phamos.ai_agents.agents.issue_chat_answer.on_raven_message",
 		],
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},

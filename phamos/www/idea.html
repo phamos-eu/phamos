@@ -36,11 +36,14 @@
 	<body>
 		<div class="app">
 			<header class="bar">
-				<div class="bar-title">
+				<button class="back-btn" id="back" hidden aria-label="Back">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+				</button>
+				<div class="bar-title" id="bar-title">
 					<svg class="bulb" viewBox="0 0 24 24" aria-hidden="true">
 						<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" />
 					</svg>
-					<span data-t="Idea"></span>
+					<span id="bar-label" data-t="Idea"></span>
 				</div>
 				<div class="bar-actions">
 					<button class="queue-badge" id="queue" hidden></button>
@@ -57,14 +60,90 @@
 				<button class="ios-hint-close" id="ios-hint-close" aria-label="Close">&times;</button>
 			</div>
 
-			<main class="capture">
-				<textarea id="text" autofocus enterkeyhint="enter" autocapitalize="sentences" spellcheck="true"></textarea>
-				<p class="hint" data-t="Type, or tap the microphone on your keyboard to dictate."></p>
-			</main>
+			<!-- Catch: the start view (#2200) -->
+			<section class="view" id="view-catch">
+				<main class="capture">
+					<textarea id="text" autofocus enterkeyhint="enter" autocapitalize="sentences" spellcheck="true"></textarea>
+					<p class="hint" data-t="Type, or tap the microphone on your keyboard to dictate."></p>
+				</main>
+				<footer class="actions">
+					<button class="btn btn-primary" id="save" disabled data-t="Save"></button>
+				</footer>
+			</section>
 
-			<footer class="actions">
-				<button class="btn btn-primary" id="save" disabled data-t="Save"></button>
-			</footer>
+			<!-- My ideas: latest first (#2210) -->
+			<section class="view scroll" id="view-ideas" hidden>
+				<input class="search" id="ideas-search" type="search" autocomplete="off" />
+				<label class="toggle"><input type="checkbox" id="ideas-closed" /> <span data-t="Show harvested and composted"></span></label>
+				<ul class="list" id="ideas-list"></ul>
+			</section>
+
+			<!-- One of my ideas: read, edit, add to, grow, hand in (#2210) -->
+			<section class="view scroll" id="view-detail" hidden>
+				<textarea class="title-input" id="d-title" maxlength="140" rows="1"></textarea>
+				<div class="grow">
+					<div class="grow-stage">
+						<span class="chip" id="d-stage"></span>
+						<span class="grow-job" id="d-job"></span>
+					</div>
+					<div class="grow-buttons">
+						<select class="stage-select" id="d-stage-select" aria-label="Stage"></select>
+						<button class="btn btn-tonal btn-small" id="d-grow"></button>
+					</div>
+				</div>
+				<div class="editor-tools" id="d-tools">
+					<button data-cmd="bold" aria-label="Bold"><b>B</b></button>
+					<button data-cmd="italic" aria-label="Italic"><i>I</i></button>
+					<button data-cmd="h3" aria-label="Heading">H</button>
+					<button data-cmd="insertUnorderedList" aria-label="List">•</button>
+					<button data-cmd="insertOrderedList" aria-label="Numbered list">1.</button>
+				</div>
+				<div class="editor" id="d-content" contenteditable="true"></div>
+				<div class="detail-actions">
+					<button class="btn btn-primary" id="d-save" disabled data-t="Save changes"></button>
+				</div>
+				<div class="add-box">
+					<div class="section-label" data-t="Add to this idea"></div>
+					<textarea id="d-add" rows="3" autocapitalize="sentences"></textarea>
+					<p class="choose-help" data-t="Your text goes to the bottom of this idea, with date and time."></p>
+					<button class="btn btn-tonal" id="d-add-btn" disabled data-t="Add"></button>
+				</div>
+				<div class="vote-box">
+					<div class="section-label" data-t="Vote"></div>
+					<p class="vote-state" id="d-vote-state"></p>
+					<button class="btn btn-tonal" id="d-vote-toggle"></button>
+				</div>
+			</section>
+
+			<!-- Ideas up for vote, everyone's (#2210) -->
+			<section class="view scroll" id="view-vote" hidden>
+				<ul class="list" id="vote-list"></ul>
+			</section>
+
+			<!-- One idea up for vote -->
+			<section class="view scroll" id="view-vote-detail" hidden>
+				<h2 class="read-title" id="v-title"></h2>
+				<p class="read-meta" id="v-meta"></p>
+				<div class="read-content" id="v-content"></div>
+				<div class="detail-actions">
+					<button class="btn btn-primary" id="v-vote"></button>
+				</div>
+			</section>
+
+			<nav class="tabbar" id="tabbar">
+				<a class="tab" href="#/" data-tab="catch">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" /></svg>
+					<span data-t="Catch"></span>
+				</a>
+				<a class="tab" href="#/ideas" data-tab="ideas">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9" /></svg>
+					<span data-t="My ideas"></span>
+				</a>
+				<a class="tab" href="#/vote" data-tab="vote">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /></svg>
+					<span data-t="Vote"></span>
+				</a>
+			</nav>
 		</div>
 
 		<div class="scrim" id="scrim" hidden></div>

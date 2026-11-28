@@ -1903,3 +1903,89 @@ class OphiceInstantTestCase(FrappeTestCase):
 			value = ophice._as_instant("2026-11-22 10:00:00")
 		self.assertEqual(datetime.fromisoformat(value), datetime(2026, 11, 22, 9, 0, tzinfo=ZoneInfo("UTC")))
 		self.assertEqual(ophice._as_instant(None), "")
+
+
+class OphiceFlagTestCase(FrappeTestCase):
+	"""My flag (#2130): plant, move, dress, take down; not in an area, not on another flag."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.delete("DefaultValue", {"defkey": ophice.FLAG_KEY})
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		self.other = "flag-tester@example.com"
+		if not frappe.db.exists("User", self.other):
+			frappe.get_doc(
+				{"doctype": "User", "email": self.other, "first_name": "Flag", "user_type": "System User", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		# A desk role makes a System User (Ophice is for them only).
+		frappe.get_doc("User", self.other).add_roles("Projects User")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _area(self, x, y, width, height):
+		frappe.get_doc(
+			{"doctype": ophice.AREA_DOCTYPE, "title": "Flag test area", "x": x, "y": y, "width": width, "height": height}
+		).insert(ignore_permissions=True)
+
+	def test_plant_move_dress_take_down(self):
+		flag = ophice.set_my_flag(2, 3)
+		self.assertEqual((flag["x"], flag["y"], flag["pattern"]), (2, 3, "plain"))
+		self.assertEqual(flag["color"], ophice._default_flag_color("Administrator"))
+		ophice.set_my_flag(4.7, "5")
+		ophice.set_my_flag(color="teal", pattern="waves")
+		mine = [f for f in ophice.get_space()["flags"] if f["user"] == "Administrator"]
+		self.assertEqual([(f["x"], f["y"], f["color"], f["pattern"]) for f in mine], [(4, 5, "teal", "waves")])
+		ophice.take_down_my_flag()
+		self.assertEqual([f for f in ophice._flags() if f["user"] == "Administrator"], [])
+		# Taken down, it keeps its look; planted again, it comes back in it.
+		self.assertEqual(ophice.get_space()["flag_look"], {"color": "teal", "pattern": "waves"})
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(color="red")
+		self.assertEqual(ophice.set_my_flag(1, 1)["color"], "teal")
+
+	def test_not_inside_an_area(self):
+		self._area(1, 1, 3, 2)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(3, 2)
+		# Just outside the area's right edge is fine.
+		self.assertEqual(ophice.set_my_flag(4, 2)["x"], 4)
+
+	def test_not_on_another_flag(self):
+		frappe.set_user(self.other)
+		ophice.set_my_flag(6, 6)
+		frappe.set_user("Administrator")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(6, 6)
+		# Back onto my own cell is fine.
+		ophice.set_my_flag(7, 6)
+		ophice.set_my_flag(7, 6)
+
+	def test_refuses_bad_input(self):
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(color="teal")  # not planted yet
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(-1, 0)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(0, 0, color="gold")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(0, 0, pattern="tartan")
+		# Not a number int() can hold: the same friendly error, not a 500.
+		for bad in ("inf", "1e999", "nan", "abc"):
+			with self.assertRaises(frappe.ValidationError):
+				ophice.set_my_flag(bad, 0)
+
+	def test_disabled_users_flags_are_gone(self):
+		frappe.set_user(self.other)
+		ophice.set_my_flag(8, 8)
+		frappe.set_user("Administrator")
+		frappe.db.set_value("User", self.other, "enabled", 0)
+		self.assertNotIn(self.other, [f["user"] for f in ophice._flags()])
+
+	def test_guest_is_refused(self):
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.PermissionError):
+			ophice.set_my_flag(1, 1)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.take_down_my_flag()

@@ -1490,6 +1490,14 @@ Subject is required,Betreff ist erforderlich
 Expected start and end dates are required,Erwarteter Beginn und erwartetes Ende sind erforderlich
 Expected end date cannot be before start date,Das erwartete Ende darf nicht vor dem Beginn liegen
 Estimated time must be more than 0 hours,Die geschätzte Zeit muss mehr als 0 Stunden betragen
+used up,aufgebraucht
+no deliveries yet,noch keine Lieferungen
+Estimated time 1 week,Geschätzt noch 1 Woche
+Estimated time {0} weeks,Geschätzt noch {0} Wochen
+Estimated time 1 month,Geschätzt noch 1 Monat
+Estimated time {0} months,Geschätzt noch {0} Monate
+Delivered Hours: {0} hrs,Gelieferte Stunden: {0} Std.
+Remaining Hours: {0} / {1} hrs ({2}),Verbleibende Stunden: {0} / {1} Std. ({2})
 Task Owner is required,Aufgabenverantwortliche/r ist erforderlich
 Priority is required,Priorität ist erforderlich
 Task Type {0} does not exist,Aufgabentyp {0} existiert nicht
@@ -1882,6 +1890,9 @@ Improved,Verbessert
 Declined,Gesunken
 Same month a year earlier,Gleicher Monat im Vorjahr
 Lighter bar: the same month a year earlier,Hellerer Balken: gleicher Monat im Vorjahr
+Side by side,Nebeneinander
+Stacked,Gestapelt
+Chart view,Diagrammansicht
 No source,Ohne Quelle
 12-month average,12-Monats-Durchschnitt
 There is no complete month of leads yet.,Es gibt noch keinen vollständigen Monat mit Interessenten.
@@ -2841,7 +2852,7 @@ The chats could not be loaded.,Die Chats konnten nicht geladen werden.
 The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
 Open the Implementation,Implementation öffnen
 Working on,Arbeitet an
-"{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+"{0}: click for your timesheet timer and availability","{0}: Klicken für Ihren Zeiterfassungs-Timer und Ihre Verfügbarkeit"
 Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
 Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
 Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
@@ -3086,6 +3097,7 @@ Not on the map right now.,Gerade nicht auf der Karte.
 The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
 {0} set a meeting point,{0} hat einen Treffpunkt gesetzt
 Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+Availability,Verfügbarkeit
 A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
 Call window,Anruffenster
 Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
@@ -3117,7 +3129,7 @@ Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröß
 "Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
 Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
 {0} wants to chat,{0} möchte mit Ihnen chatten
-Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Get a sound and a browser notification when someone starts a chat with you,"Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt"
 Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
 Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
 Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
@@ -3255,10 +3267,65 @@ Sign in to send {0},"Anmelden, um {0} zu senden"
 "Your text goes to the bottom of this idea, with date and time.","Ihr Text kommt unten an diese Idee, mit Datum und Uhrzeit."
 Grew out of this idea,Aus dieser Idee entstanden
 {0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."
+"Your flag: drag it to move it, click it for colour, pattern or to take it down","Ihre Fahne: ziehen, um sie zu versetzen; anklicken für Farbe, Muster oder zum Einholen"
+Flag of {0},Fahne von {0}
+Your flag,Ihre Fahne
+Pattern,Muster
+Red,Rot
+Orange,Orange
+Green,Grün
+Teal,Petrol
+Blue,Blau
+Violet,Violett
+Pink,Pink
+Plain,Schlicht
+Dots,Punkte
+Stripes,Streifen
+Waves,Wellen
+Take down,Einholen
+Back to the sidebar. Drag the flag on the map to move it.,"Zurück in die Seitenleiste. Ziehen Sie die Fahne auf der Karte, um sie zu versetzen."
+"Plant your flag: click it, then click on the map, or drag it onto the map","Fahne aufstellen: anklicken, dann auf die Karte klicken, oder auf die Karte ziehen"
+Click on the map,Auf die Karte klicken
+Plant your flag,Fahne aufstellen
+"Your flag is planted. Drag it on the map to move it; click it for colour, pattern or to take it down.","Ihre Fahne steht. Ziehen Sie sie auf der Karte, um sie zu versetzen; klicken Sie darauf für Farbe, Muster oder zum Einholen."
+Your flag is planted,Ihre Fahne steht
+"Drag it on the map to move it; click it for colour, pattern or to take it down.","Auf der Karte ziehen, um sie zu versetzen; anklicken für Farbe, Muster oder zum Einholen."
+"Click it, then click on the map, or drag it onto the map.","Anklicken, dann auf die Karte klicken, oder auf die Karte ziehen."
+Click on the map where your flag should stand · Esc to cancel,"Klicken Sie auf die Karte, wo Ihre Fahne stehen soll · Esc zum Abbrechen"
+A flag can't stand inside an area.,Eine Fahne kann nicht in einem Bereich stehen.
+There is already a flag on this spot.,Hier steht schon eine Fahne.
+Your flag could not be planted.,Ihre Fahne konnte nicht aufgestellt werden.
+Your flag could not be taken down.,Ihre Fahne konnte nicht eingeholt werden.
+Choose a spot on the map.,Wählen Sie einen Platz auf der Karte.
+Plant your flag on the map first.,Stellen Sie zuerst Ihre Fahne auf der Karte auf.
+Unknown colour.,Unbekannte Farbe.
+Unknown pattern.,Unbekanntes Muster.
+Click on the map where your flag should stand,"Klicken Sie auf die Karte, wo Ihre Fahne stehen soll"
+Esc to cancel,Esc zum Abbrechen
 Install app,App installieren
 "Add to your Home Screen: tap Share, then 'Add to Home Screen'.","Zum Home-Bildschirm hinzufügen: auf Teilen tippen, dann „Zum Home-Bildschirm“."
 Too late to undo. Change the idea in the Personal Cockpit instead.,Zu spät zum Rückgängigmachen. Ändern Sie die Idee stattdessen im Personal Cockpit.
 "{0} was changed in the meantime, so this cannot be undone.","{0} wurde inzwischen geändert, daher lässt sich das nicht rückgängig machen."
+Add to this idea,Zu dieser Idee hinzufügen
+Added,Hinzugefügt
+Another thought on this idea …,Ein weiterer Gedanke zu dieser Idee …
+Catch,Festhalten
+Grow to {0},Wachsen zu {0}
+My ideas,Meine Ideen
+No connection. Try again when you are online.,"Keine Verbindung. Versuchen Sie es erneut, sobald Sie online sind."
+No connection. Your ideas show when you are online.,"Keine Verbindung. Ihre Ideen erscheinen, sobald Sie online sind."
+No idea is up for vote right now.,Gerade steht keine Idee zur Abstimmung.
+No ideas yet.,Noch keine Ideen.
+Now {0},Jetzt {0}
+Only you can see this idea.,Nur Sie sehen diese Idee.
+Open for vote · 1 vote,Zur Abstimmung · 1 Stimme
+Open for vote · {0} votes,Zur Abstimmung · {0} Stimmen
+Save changes,Änderungen speichern
+Save your changes first.,Speichern Sie zuerst Ihre Änderungen.
+Take back my vote,Meine Stimme zurücknehmen
+This idea was changed elsewhere. Reload it to see the latest version.,"Diese Idee wurde anderswo geändert. Laden Sie sie neu, um die aktuelle Fassung zu sehen."
+Title is required,Titel ist erforderlich
+Up for vote,Zur Abstimmung
 Team Assignment,Teamzuordnung
 Co-Lead,Co-Lead
 Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
@@ -3278,6 +3345,21 @@ Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführe
 None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
 "The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
 Switch Implementations on or off,Implementierungen ein- oder ausschalten
+I can't use the AI model on this Issue: {0},Ich kann das KI-Modell für diese Anfrage nicht nutzen: {0}
+I could not answer: the model call failed ({0}).,Ich konnte nicht antworten: Der Aufruf des Modells ist fehlgeschlagen ({0}).
+I have no answer to that.,Darauf habe ich keine Antwort.
+Set on {0}'s request: {1},Auf Wunsch von {0} gesetzt: {1}
+I can't do that here: {0},Das kann ich hier nicht: {0}
+changing {0},{0} ändern
+that,das
+{0} {1} does not exist,{0} {1} existiert nicht
+you may not change this Issue,Sie dürfen diese Anfrage nicht ändern
+assigning {0},{0} zuweisen
+nobody,niemanden
+assigned {0},{0} zugewiesen
+you may not do that,Das dürfen Sie nicht
+Chat Message,Chat-Nachricht
+The Raven Message the assistant answered (#2116).,"Die Raven-Nachricht, auf die der Assistent geantwortet hat (#2116)."
 Switch an Implementation on,Implementierung einschalten
 applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.
 Actual hours per month; the line is the predicted hours per month,Ist-Stunden pro Monat; die Linie zeigt die geplanten Stunden pro Monat
@@ -3328,3 +3410,70 @@ vs {0},ggü. {0}
 {0} of {1} h,{0} von {1} h
 "{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
 "{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"
+setting {0} without you naming it; please write which one,"{0} setzen, ohne dass Sie ihn nennen; bitte schreiben Sie, welchen"
+it could not be saved ({0}),es konnte nicht gespeichert werden ({0})
+Average first response,Durchschnittliche erste Antwort
+Closed items — 12 months,Geschlossene Einträge – 12 Monate
+Closing time this month,Durchlaufzeit in diesem Monat
+"Closing time, parent items","Durchlaufzeit, übergeordnete Einträge"
+"Closing time, work items","Durchlaufzeit, Arbeitseinträge"
+Closing times and SLA of the team,Durchlaufzeiten und SLA des Teams
+Comments per closed item,Kommentare pro geschlossenem Eintrag
+Every item that is not a parent of others,"Jeder Eintrag, der keinem anderen übergeordnet ist"
+First responses in time,Erste Antworten rechtzeitig
+"GitLab items assigned to the team's people, wherever they work; this month to {0}, compared with the same days of the previous month and of last year.","GitLab-Einträge, die Personen des Teams zugewiesen sind, egal wo sie arbeiten; dieser Monat bis {0}, verglichen mit denselben Tagen des Vormonats und des Vorjahres."
+Items other items point to,"Einträge, auf die andere Einträge verweisen"
+Median,Median
+Open items,Offene Einträge
+Other implementations,Andere Implementierungen
+Own implementations,Eigene Implementierungen
+"Own implementations, other implementations and internal repositories; opened items under each month.","Eigene Implementierungen, andere Implementierungen und interne Repositories; unter jedem Monat die eröffneten Einträge."
+Parent items,Übergeordnete Einträge
+Resolutions in time,Lösungen rechtzeitig
+SLA of the team's Issues,SLA der Issues des Teams
+SLA tracking is switched off in Support Settings.,Die SLA-Nachverfolgung ist in den Support-Einstellungen ausgeschaltet.
+Work items,Arbeitseinträge
+median,Median
+"median age {0}, oldest {1}","Alter im Median {0}, ältester {1}"
+{0} open or this month's items in the team's own implementations have an assignee that matches no employee by email; they are not counted.,"{0} offene oder in diesem Monat geschlossene Einträge in den eigenen Implementierungen des Teams haben eine zugewiesene Person, die per E-Mail keinem Mitarbeiter zugeordnet werden kann; sie werden nicht gezählt."
+{0} opened,{0} eröffnet
+{0} opened so far,{0} bisher eröffnet
+Opened,Eröffnet
+Average,Durchschnitt
+Internal,Intern
+assigning {0} without you naming them,"{0} zuweisen, ohne dass Sie die Person nennen"
+The reply could not be posted: {0},Die Antwort konnte nicht gepostet werden: {0}
+Lines changed — 12 months,Geänderte Zeilen – 12 Monate
+"Lines added (full bar) and removed (pale bar) in merged merge requests, without generated files; merged merge requests under each month.","Hinzugefügte (voller Balken) und entfernte Zeilen (blasser Balken) in gemergten Merge Requests, ohne generierte Dateien; unter jedem Monat die gemergten Merge Requests."
+Merge requests this month,Merge Requests in diesem Monat
+Lines added,Zeilen hinzugefügt
+Lines removed,Zeilen entfernt
+Time to merge (median),Zeit bis zum Merge (Median)
+Removed,Entfernt
+{0} merged so far,bisher {0} gemergt
+{0} merged,{0} gemergt
+GitLab Merge Request,GitLab Merge Request
+GitLab Merge Request Issue,GitLab Merge Request Issue
+Linked GitLab Issues,Verknüpfte GitLab Issues
+Head SHA,Head-SHA
+Author Username,Benutzername des Autors
+Author Email,E-Mail des Autors
+Source Branch,Quell-Branch
+Target Branch,Ziel-Branch
+Merged At,Gemergt am
+Closed At,Geschlossen am
+Files Changed,Geänderte Dateien
+Lines Added,Zeilen hinzugefügt
+Lines Removed,Zeilen entfernt
+Merge Requests,Merge Requests
+Paths left out of line counts,Bei Zeilenzahlen ausgelassene Pfade
+Merge Requests Synced At,Merge Requests synchronisiert am
+IID,IID
+The line counts are taken again when it changes.,"Ändert er sich, werden die Zeilen neu gezählt."
+"UTC, as GitLab sends it","UTC, wie GitLab es sendet"
+Without the excluded paths in GitLab Settings,Ohne die in den GitLab-Einstellungen ausgeschlossenen Pfade
+"One pattern per line (* matches any characters, also /). Changes in these files don't count as lines added or removed (#1977).","Ein Muster pro Zeile (* passt auf beliebige Zeichen, auch /). Änderungen in diesen Dateien zählen nicht als hinzugefügte oder entfernte Zeilen (#1977)."
+Last merge request sync; the next one fetches what changed since then (#1977).,"Letzte Synchronisierung der Merge Requests; die nächste holt, was sich seitdem geändert hat (#1977)."
+"A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
+Added,Hinzugefügt
+Merged,Gemergt

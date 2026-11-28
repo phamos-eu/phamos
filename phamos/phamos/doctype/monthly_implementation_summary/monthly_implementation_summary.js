@@ -846,6 +846,61 @@ function _mis_maybe_open_timesheet_approval_dialog(frm) {
 	});
 }
 
+// ── Sales Order hours banner (#1484) ────────────────────────────────────────
+// Read on every refresh; nothing of it is stored on the MIS.
+
+function _mis_runway_label(row) {
+	if (row.used_up) return __("used up");
+	if (row.runway_days === null || row.runway_days === undefined) return __("no deliveries yet");
+	const days = flt(row.runway_days);
+	if (days < 56) {
+		const weeks = Math.max(1, Math.round(days / 7));
+		return weeks === 1 ? __("Estimated time 1 week") : __("Estimated time {0} weeks", [weeks]);
+	}
+	const months = Math.round(days / 30.44);
+	return months === 1 ? __("Estimated time 1 month") : __("Estimated time {0} months", [months]);
+}
+
+// One-line strip like the SLA banner on Issue (erpnext set_sla_alert), in the form message area.
+// Hours of all deliverable Sales Orders added up; no Sales Order names.
+function _mis_render_so_hours(frm, total) {
+	$(frm.layout.message).find(".mis-so-hours").closest(".form-message").remove();
+	if (!total) return;
+	// Own dots: on the blue strip Frappe's "orange" indicator can't be told apart from "red".
+	const dot = colour => `<span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+		background:${colour}; margin-right:6px; flex:none;"></span>`;
+	const cell = (colour, html) =>
+		`<div class="col-xs-12 col-sm-6" style="display:flex; align-items:center;">${dot(colour)}<span>${html}</span></div>`;
+	const remaining = __("Remaining Hours: {0} / {1} hrs ({2})", [
+		_mis_number(total.remaining_hours), _mis_number(total.total_hours), _mis_escape(_mis_runway_label(total)),
+	]);
+	frm.dashboard.set_headline(
+		`<div class="mis-so-hours row" style="margin-right:12px;">
+			${cell("#30a66d", __("Delivered Hours: {0} hrs", [_mis_number(total.delivered_hours)]))}
+			${cell(total.level === "red" ? "#e03636" : "#f8a14a", remaining)}
+		</div>`,
+		"blue"
+	);
+}
+
+function _mis_load_so_hours(frm) {
+	// frm is reused when the user moves to another MIS, so a late answer must not paint
+	// its banner over a newer document (or over a newer request for the same one).
+	const request = (frm._mis_so_hours_request = (frm._mis_so_hours_request || 0) + 1);
+	if (frm.is_new()) {
+		_mis_render_so_hours(frm, null);
+		return;
+	}
+	const docname = frm.doc.name;
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_so_hours_alert",
+		args: { docname },
+	}).then(r => {
+		if (request !== frm._mis_so_hours_request || frm.doc.name !== docname) return;
+		_mis_render_so_hours(frm, r.message && r.message.total);
+	});
+}
+
 frappe.ui.form.on("Monthly Implementation Summary", {
 	onload: function(frm) {
 		_mis_set_project_hours_formatter();
@@ -877,6 +932,7 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 	},
 	refresh: function(frm) {
 		const deliveries_loaded = _mis_load_deliveries(frm);
+		_mis_load_so_hours(frm);
 		if (frm.is_new()) {
 			const d = new Date();
 			const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
