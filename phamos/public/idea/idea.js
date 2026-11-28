@@ -380,12 +380,26 @@
 		if (!current || !chosen) return
 		var target = chosen
 		call("link_idea", { name: current.name, target: target.name, mode: mode }, true)
-			.then(function () {
-				closeSheet(
-					mode === "spawned"
-						? __("Linked: grew out of {0}", [target.title])
-						: __("Added to {0}", [target.title])
-				)
+			.then(function (result) {
+				if (mode === "spawned") {
+					closeSheet(__("Linked: grew out of {0}", [target.title]))
+					return
+				}
+				closeSheet()
+				// Undo for a few seconds (#2209): puts both ideas back and opens the sheet again.
+				toast(__("Added to {0}", [target.title]), {
+					label: __("Undo"),
+					duration: UNDO_MS,
+					run: function () {
+						call("undo_append", { token: result.undo }, true)
+							.then(function (idea) {
+								openSheet(idea)
+							})
+							.catch(function (error) {
+								toast(error.message)
+							})
+					},
+				})
 			})
 			.catch(function (error) {
 				toast(error.message || __("No connection. The idea is saved; link it later in the Personal Cockpit."))
@@ -408,20 +422,40 @@
 	// --- toast ---------------------------------------------------------------------------
 
 	var toastTimer = null
-	function toast(message) {
+	var UNDO_MS = 8000
+	// A short message; with `action` ({label, run, duration}) it carries one button, e.g. Undo.
+	function toast(message, action) {
 		var el = $("toast")
-		el.textContent = message
+		el.textContent = ""
+		var text = document.createElement("span")
+		text.textContent = message
+		el.appendChild(text)
+		if (action) {
+			var button = document.createElement("button")
+			button.className = "toast-action"
+			button.textContent = action.label
+			button.addEventListener("click", function () {
+				hideToast()
+				action.run()
+			})
+			el.appendChild(button)
+		}
+		el.classList.toggle("has-action", !!action)
 		el.hidden = false
 		requestAnimationFrame(function () {
 			el.classList.add("open")
 		})
 		clearTimeout(toastTimer)
-		toastTimer = setTimeout(function () {
-			el.classList.remove("open")
-			setTimeout(function () {
-				el.hidden = true
-			}, 250)
-		}, 3200)
+		toastTimer = setTimeout(hideToast, (action && action.duration) || 3200)
+	}
+
+	function hideToast() {
+		var el = $("toast")
+		clearTimeout(toastTimer)
+		el.classList.remove("open")
+		setTimeout(function () {
+			if (!el.classList.contains("open")) el.hidden = true
+		}, 250)
 	}
 
 	// Keyboard (hardware keyboards, desktop): Cmd/Ctrl+Enter or Cmd/Ctrl+S saves, as cockpit dialogs

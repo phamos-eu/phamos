@@ -31,6 +31,7 @@ TITLE_WORDS = 8
 MAX_TEXT = 20000  # characters; longer texts belong in the Personal Cockpit's editor
 CLIENT_ID_TTL = 7 * 24 * 3600  # an offline phone resends within a week at most
 LINK_MODES = ("spawned", "append")
+UNDO_SECONDS = 60  # the page offers Undo for 8 seconds; the rest is slack for a slow network
 SEARCH_LIMIT = 20
 # Nearby ideas (#2206)
 SUGGEST_CANDIDATES = 60  # my most recently changed open ideas that are compared
@@ -252,15 +253,74 @@ def link_idea(name, target, mode):
 		frappe.throw(_("{0} grew out of this idea. Link it instead of adding it.").format(target_doc.title))
 	stamp = format_datetime(now_datetime())  # the user's own date and time format
 	added = f"<p><em>{_('Added {0}').format(stamp)}</em></p>{doc.content or ''}"
-	target_doc.content = (target_doc.content or "") + added
+	content_before = target_doc.content or ""
+	target_doc.content = content_before + added
 	target_doc.flags.ignore_permissions = True
 	target_doc.save(ignore_version=True)
 	personal_ideas._snapshot(target_doc, force=True)
 	personal_ideas._publish(target_doc)
 	# The caught idea lived only as long as it took to choose; its text now lives in the target.
 	# Ideas that grew out of it now grew out of the target (on_trash would otherwise unlink them).
+	children = frappe.get_all(DOCTYPE, filters={"spawned_from": doc.name}, pluck="name")
 	frappe.db.set_value(
 		DOCTYPE, {"spawned_from": doc.name}, "spawned_from", target_doc.name, update_modified=False
 	)
+	caught = doc.as_dict(no_default_fields=True)
 	frappe.delete_doc(DOCTYPE, doc.name, ignore_permissions=True, force=True)
-	return {"name": None, "target": _short(target_doc.name)}
+	# Undo (#2209): what it takes to put both ideas back, for a short while.
+	token = frappe.generate_hash(length=16)
+	frappe.cache().set_value(
+		_undo_key(token),
+		{
+			"caught": {**caught, "name": doc.name},
+			"children": children,
+			"target": target_doc.name,
+			"content_before": content_before,
+			"modified_after": str(frappe.db.get_value(DOCTYPE, target_doc.name, "modified")),
+		},
+		expires_in_sec=UNDO_SECONDS,
+	)
+	return {"name": None, "target": _short(target_doc.name), "undo": token}
+
+
+def _undo_key(token):
+	return f"phamos:idea_catcher:undo:{frappe.session.user}:{token}"
+
+
+@frappe.whitelist(methods=["POST"])
+def undo_append(token):
+	"""Take back an "Add to it" (#2209): the target gets its text back, the caught idea returns
+	under its old name, and ideas that grew out of it point at it again.
+
+	Only within UNDO_SECONDS, only by the same user, and only while the target is unchanged
+	since (an edit elsewhere would otherwise be lost).
+	"""
+	require_user()
+	key = _undo_key(cstr(token)[:32])
+	data = frappe.cache().get_value(key, expires=True)
+	if not data:
+		frappe.throw(_("Too late to undo. Change the idea in the Personal Cockpit instead."))
+	target_doc = personal_ideas._get_my_idea(data["target"])
+	if str(target_doc.modified) != data["modified_after"]:
+		frappe.throw(_("{0} was changed in the meantime, so this cannot be undone.").format(target_doc.title))
+	frappe.cache().delete_value(key)
+
+	target_doc.content = data["content_before"]
+	target_doc.flags.ignore_permissions = True
+	target_doc.save(ignore_version=True)
+	personal_ideas._snapshot(target_doc, force=True)
+	personal_ideas._publish(target_doc)
+
+	caught = frappe.get_doc({**data["caught"], "doctype": DOCTYPE})
+	caught.flags.ignore_permissions = True
+	caught.insert(set_name=data["caught"]["name"])
+	personal_ideas._publish(caught)
+	if data["children"]:
+		frappe.db.set_value(
+			DOCTYPE,
+			{"name": ("in", data["children"]), "spawned_from": target_doc.name},
+			"spawned_from",
+			caught.name,
+			update_modified=False,
+		)
+	return _short(caught.name)

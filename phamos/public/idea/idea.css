@@ -466,6 +466,32 @@ body {
 	transform: none;
 }
 
+.toast.has-action {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	text-align: left;
+}
+
+.toast-action {
+	flex: none;
+	border: 0;
+	background: transparent;
+	color: #64b5ff;
+	font: 700 15px var(--font);
+	padding: 4px 6px;
+	cursor: pointer;
+}
+
+[data-platform="ios"] .toast-action {
+	color: var(--accent);
+}
+
+[data-platform="android"] .toast-action {
+	color: #d0bcff;
+}
+
 /* --- iOS: Liquid-Glass-style ---------------------------------------------------------------- */
 /* Translucent surfaces over a soft colour wash, blur + saturation, a light inner edge. The real
    lensing of Liquid Glass is native-only; this is the web approximation. */
@@ -653,5 +679,8 @@ body {
 	[data-platform="android"] .toast {
 		background: #e6e0e9;
 		color: #322f35;
+	}
+	[data-platform="android"] .toast-action {
+		color: #6750a4; /* inverse primary on the light snackbar */
 	}
 }
