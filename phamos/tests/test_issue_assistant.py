@@ -62,6 +62,21 @@ class IssueAssistantTestCase(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
 
+	INTAKE_IMPLEMENTATION = "IA-INTAKE-TEST"
+
+	def implementation(self, name=None, customer=CUSTOMER, switched_on=True, stakeholder_email=None):
+		"""An Implementation of the test Customer, by default switched on for the assistant (#2114)."""
+		name = name or self.INTAKE_IMPLEMENTATION
+		if not frappe.db.exists("Implementation", name):
+			frappe.get_doc({"doctype": "Implementation", "name": name, "customer": customer, "status": "Open"}).db_insert()
+			if stakeholder_email:
+				frappe.get_doc({"doctype": "Implementation Stakeholder", "parent": name, "parenttype": "Implementation",
+					"parentfield": "stakeholders", "email": stakeholder_email,
+					"stakeholder_organisation": "Customer"}).db_insert()
+		if switched_on:
+			setup.switch_on_implementation(name, self.assistant)
+		return name
+
 	def issue(self, **values):
 		with patch("phamos.ai_agents.runner.enqueue_run") as enqueue:
 			doc = frappe.get_doc({"doctype": "Issue", "subject": "Assistant test", **values}).insert(
@@ -99,6 +114,17 @@ class TestSetup(IssueAssistantTestCase):
 		self.assertEqual(fields[fields.index("custom_team") + 1], "custom_implementation")
 		self.assertFalse(frappe.get_meta("Issue").get_field("custom_implementation").depends_on)
 
+	def test_own_implementation_is_switched_on_once(self):
+		own = self.implementation("IA-OWN-TEST", switched_on=False)
+		frappe.db.set_single_value("Phriend Settings", "system_implementation", own)
+		frappe.db.set_global(setup.OWN_IMPLEMENTATION_SEEDED, None)
+		setup.after_migrate()
+		self.assertTrue(assistant.implementation_switched_on(own, self.assistant))
+		# switched off by a person: the next migrate leaves it off
+		frappe.db.delete("User Permission", {"user": self.assistant, "allow": "Implementation", "for_value": own})
+		setup.after_migrate()
+		self.assertFalse(assistant.implementation_switched_on(own, self.assistant))
+
 	def test_role_cannot_delete_issues(self):
 		doc = self.issue(raised_by=DESK_USER)
 		self.assertTrue(frappe.has_permission("Issue", "write", doc=doc, user=self.assistant))
@@ -107,21 +133,51 @@ class TestSetup(IssueAssistantTestCase):
 
 class TestIntake(IssueAssistantTestCase):
 	def test_new_issue_is_queued_only_when_enabled_and_in_scope(self):
-		self.issue(raised_by=DESK_USER)
+		on = self.implementation()
+		self.issue(raised_by=DESK_USER, custom_implementation=on)
 		self.enqueued.assert_called_once()
 
 		self.settings.enabled = 0
 		self.settings.save(ignore_permissions=True)
-		self.issue(raised_by=DESK_USER)
+		self.issue(raised_by=DESK_USER, custom_implementation=on)
 		self.enqueued.assert_not_called()
 
 		self.settings.enabled = 1
 		self.settings.append("scope_issue_types", {"issue_type": self.issue_type()})
 		self.settings.save(ignore_permissions=True)
-		self.issue(raised_by=DESK_USER)
+		self.issue(raised_by=DESK_USER, custom_implementation=on)
 		self.enqueued.assert_not_called()
-		self.issue(raised_by=DESK_USER, issue_type=self.issue_type())
+		self.issue(raised_by=DESK_USER, issue_type=self.issue_type(), custom_implementation=on)
 		self.enqueued.assert_called_once()
+
+	def test_implementation_not_switched_on_is_left_alone(self):
+		off = self.implementation("IA-INTAKE-OFF", switched_on=False)
+		doc = self.issue(raised_by=DESK_USER, custom_implementation=off)
+		self.enqueued.assert_not_called()
+		self.assertEqual(self.assignees(doc), set())
+
+	def test_issue_without_implementation_is_left_alone(self):
+		self.implementation()
+		self.issue(raised_by="someone@unknown.example")
+		self.enqueued.assert_not_called()
+
+	def test_email_of_a_stakeholder_finds_the_switched_on_implementation(self):
+		self.implementation(stakeholder_email="ia-intake-stakeholder@customer.example")
+		self.issue(raised_by="ia-intake-stakeholder@customer.example")
+		self.enqueued.assert_called_once()
+
+	def test_switching_off_stops_new_runs(self):
+		on = self.implementation()
+		frappe.db.delete("User Permission", {"user": self.assistant, "allow": "Implementation", "for_value": on})
+		self.issue(raised_by=DESK_USER, custom_implementation=on)
+		self.enqueued.assert_not_called()
+
+	def test_switch_on_hides_nothing_else_from_the_assistant(self):
+		on = self.implementation()
+		off = self.implementation("IA-INTAKE-OFF", switched_on=False)
+		doc = self.issue(raised_by=DESK_USER, custom_implementation=off)
+		self.assertTrue(frappe.has_permission("Issue", "read", doc=doc, user=self.assistant))
+		self.assertTrue(frappe.has_permission("Implementation", "read", doc=on, user=self.assistant))
 
 	def issue_type(self):
 		if not frappe.db.exists("Issue Type", "Assistant Test Type"):
@@ -248,7 +304,7 @@ class TestManualRun(IssueAssistantTestCase):
 
 	def test_all_green_is_not_an_override(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
-		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER, custom_implementation=self.implementation())
 		self.assertTrue(all(c["ok"] for c in self.checks(doc).values()))
 		with patch("phamos.ai_agents.runner.frappe.enqueue"):
 			result = assistant.start_manual_run(doc.name)
@@ -276,6 +332,16 @@ class TestManualRun(IssueAssistantTestCase):
 		doc = self.issue(raised_by=WEBSITE_USER)
 		self.assertIsNone(runner.get_agent("Issue"))
 		run = runner.run_now("Issue", doc.name, trigger="Manual", override_reasons=["AI Agent disabled"])
+		self.assertEqual(run.status, "Completed", run.error)
+
+	def test_implementation_switch_is_a_check_but_no_blocker(self):
+		off = self.implementation("IA-INTAKE-OFF", switched_on=False)
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER, custom_implementation=off)
+		check = self.checks(doc)["implementation_on"]
+		self.assertFalse(check["ok"])
+		self.assertIn(off, check["needed"])
+		self.assertFalse(assistant.get_manual_run_info(doc.name)["would_start"])
+		run = runner.run_now("Issue", doc.name, trigger="Manual", override_reasons=[check["label"]])
 		self.assertEqual(run.status, "Completed", run.error)
 
 	def test_needs_write_permission(self):

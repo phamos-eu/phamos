@@ -3251,3 +3251,12 @@ The end date of a team assignment cannot be before its start date.,Das Enddatum 
 {0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.,"{0} ist in diesem Zeitraum bereits Team {1} zugeordnet ({2}). Immer nur ein Team: Beenden Sie zuerst diese Zuordnung."
 Team {0} already has a {1} in this period ({2}).,Team {0} hat in diesem Zeitraum bereits eine Rolle {1} ({2}).
 "The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.","Die Zuordnung ist gespeichert, aber Team {0} konnte nicht aktualisiert werden. Der tägliche Job versucht es erneut; siehe Fehlerprotokoll."
+Implementation switched on for the assistant,Implementierung für den Assistenten eingeschaltet
+no Implementation found,keine Implementierung gefunden
+User Permission of {0} on Implementation {1},Benutzerberechtigung von {0} auf Implementierung {1}
+An Implementation on the Issue that the assistant is switched on for,"Eine Implementierung an der Anfrage, für die der Assistent eingeschaltet ist"
+Switched on for,Eingeschaltet für
+Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführen, damit der Benutzer des Assistenten angelegt wird."
+None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
+"The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
+Switch Implementations on or off,Implementierungen ein- oder ausschalten

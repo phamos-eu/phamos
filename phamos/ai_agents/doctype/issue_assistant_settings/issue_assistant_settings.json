@@ -10,6 +10,8 @@
   "column_break_gen",
   "scope_projects",
   "scope_issue_types",
+  "implementations_section",
+  "implementations_html",
   "privacy_section",
   "excluded_doctypes"
  ],
@@ -46,6 +48,17 @@
    "label": "Issue Types",
    "options": "Issue Assistant Issue Type",
    "description": "Only Issues of these types. Empty: all types."
+  },
+  {
+   "fieldname": "implementations_section",
+   "fieldtype": "Section Break",
+   "label": "Implementations"
+  },
+  {
+   "fieldname": "implementations_html",
+   "fieldtype": "HTML",
+   "label": "Switched on for",
+   "options": ""
   },
   {
    "fieldname": "privacy_section",
