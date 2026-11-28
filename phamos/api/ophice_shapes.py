@@ -170,6 +170,9 @@ def overlaps(a, b):
 		return True
 	# Shape, box and points once per area, not once per sample (up to some 16,000 per pair).
 	ra, rb = _resolve(a), _resolve(b)
+	if _outlines_cross(ra, rb):
+		# Edges that cross share ground, however thin the sliver: the raster below can miss it.
+		return True
 	y = top + OVERLAP_STEP / 2
 	while y < bottom:
 		x = left + OVERLAP_STEP / 2
@@ -179,6 +182,27 @@ def overlaps(a, b):
 			x += OVERLAP_STEP
 		y += OVERLAP_STEP
 	return False
+
+
+def _outline(resolved):
+	"""The corners of a rectangle or polygon, in order; None for an ellipse (it has no edges)."""
+	shape, (x, y, w, h), points = resolved
+	if shape == "Polygon":
+		return points
+	if shape == "Rectangle":
+		return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+	return None
+
+
+def _outlines_cross(ra, rb):
+	"""True when an edge of one outline crosses an edge of the other (touching does not count)."""
+	pa, pb = _outline(ra), _outline(rb)
+	if not pa or not pb:
+		return False
+	na, nb = len(pa), len(pb)
+	return any(
+		_segments_cross(pa[i], pa[(i + 1) % na], pb[j], pb[(j + 1) % nb]) for i in range(na) for j in range(nb)
+	)
 
 
 def _cross(o, a, b):

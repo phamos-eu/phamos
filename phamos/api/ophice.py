@@ -923,8 +923,10 @@ def _background_layout(value):
 		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0}
 	ratio = _background_ratio(value) or cols / rows
 	grid, zoom = _grid_on_image(value, cols, rows)
+	# Not clamped to the grid: the grid lies on the image, so growing or shrinking the grid keeps
+	# the squares' size on the image. Limits apply where an editor places the image.
 	width = 1 / grid["tile"]
-	left, top, width = _clamp_box(-grid["x"] * width, -grid["y"] * width, width, ratio, cols, rows)
+	left, top = -grid["x"] * width, -grid["y"] * width
 	cover = _cover_box(ratio, cols, rows)
 	fit = all(abs(a - b) < 1e-3 for a, b in zip((left, top, width), cover))
 	return {"fit": fit, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
