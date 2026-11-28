@@ -93,18 +93,26 @@ def is_colleague(user=None):
 
 def can_read_idea(name, user=None):
 	"""Whether the user may read the idea the way the cockpit shows it: their own, or one handed in
-	for a vote when they are a colleague (System User). Ideas have role permissions for System
+	for a vote when they are a colleague (System User); one shared with a team only for that team's
+	people (#1980). Ideas have role permissions for System
 	Manager only, so frappe.has_permission says no to most employees; the cockpit API and the
 	idea's Raven chat (#1842) go by this rule instead."""
 	user = user or frappe.session.user
 	if not _private(user):
 		return True
-	idea = frappe.db.get_value("Idea", name, ["user", "vote_status"], as_dict=True)
+	idea = frappe.db.get_value("Idea", name, ["user", "vote_status", "team"], as_dict=True)
 	if not idea:
 		return False
 	if idea.user == user:
 		return True
-	return idea.vote_status == IDEA_VOTE_OPEN and is_colleague(user)
+	if idea.vote_status != IDEA_VOTE_OPEN or not is_colleague(user):
+		return False
+	if idea.team:
+		# shared with a team (#1980): its people, and those who see every team
+		from phamos.cockpits import teams
+
+		return teams.sees_all_teams(user) or user in {row["name"] for row in teams.team_users(idea.team)}
+	return True
 
 
 def idea_vote_query(user=None):

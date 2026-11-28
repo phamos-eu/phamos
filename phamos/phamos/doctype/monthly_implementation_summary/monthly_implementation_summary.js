@@ -794,7 +794,9 @@ function _mis_show_timesheet_approval_dialog(frm) {
 	// A grid inside a dialog has no meta; this shows the column search row at any row count
 	grid.meta = { editable_grid: 1, rows_threshold_for_grid_search: 1 };
 	// Grid cells are one line with a fixed height; wrap the text columns and let each row grow to show them in full
-	dialog.$wrapper.addClass("mis-ts-approval").append(`<style>
+	dialog.$wrapper.addClass("mis-ts-approval");
+	// Each open builds a new dialog, so the rules go into <head> once instead of into every dialog
+	if (!document.getElementById("mis-ts-approval-style")) $("head").append(`<style id="mis-ts-approval-style">
 		.mis-ts-approval .rows .data-row .grid-static-col,
 		.mis-ts-approval .rows .data-row .row-index,
 		.mis-ts-approval .rows .data-row .row-check {

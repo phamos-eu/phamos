@@ -28,6 +28,12 @@ const teams = ref([])
 const navItems = [
 	// who is there and on what they work, live, with the team chat (#1978)
 	{ name: "TeamMates", label: "Team mates", icon: "users", match: ["TeamMates"] },
+	// appointments with leave and public holidays (#1979)
+	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
+	// ideas shared with the team (#1980)
+	{ name: "TeamIdeas", label: "Ideas", icon: "zap", match: ["TeamIdeas"] },
+	// successes: daily rules, kudos, customer praise (#1981)
+	{ name: "TeamSuccesses", label: "Successes", icon: "award", match: ["TeamSuccesses"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -120,6 +126,9 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamImplementations") return "Implementations"
 	if (route.name === "TeamGitlab") return "GitLab"
 	if (route.name === "TeamMates") return "Team mates"
+	if (route.name === "TeamAppointments") return "Appointments"
+	if (route.name === "TeamIdeas") return "Ideas"
+	if (route.name === "TeamSuccesses") return "Successes"
 	return "Issues"
 })
 
@@ -143,6 +152,9 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamImplementations") return "The team's implementations, in hours"
 	if (route.name === "TeamGitlab") return "Closing times and SLA of the team"
 	if (route.name === "TeamMates") return "Who is there, and on what they work"
+	if (route.name === "TeamAppointments") return "The team's appointments, leave and public holidays"
+	if (route.name === "TeamIdeas") return "Ideas shared with the team"
+	if (route.name === "TeamSuccesses") return "What the team achieved"
 	return "Team issues overview"
 })
 </script>

@@ -1,3 +1,5 @@
+import { contains } from "./ophiceShapes.js"
+
 // Leaving a meeting by choice (Leave, Esc): the chip is lifted out of the meeting space and set
 // down just outside it, so the others no longer see it standing in the meeting.
 
@@ -7,8 +9,9 @@ export const DROP_MARGIN = 0.8
 const DROP_REACH = 3
 const DROP_STEP = 0.5
 
+// By shape (#2144); the borders below are the box's, so a spot outside the box is outside any shape.
 function inside(area, cx, cy) {
-	return cx >= area.x && cx < area.x + area.width && cy >= area.y && cy < area.y + area.height
+	return contains(area, cx, cy)
 }
 
 /**

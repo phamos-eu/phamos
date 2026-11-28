@@ -35,6 +35,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, escape_html, flt, get_datetime, now_datetime, strip_html
 
+from phamos.api import ophice_shapes as shapes
 from phamos.cockpits.settings import COCKPITS as _COCKPITS
 
 # One shared world for everyone; the frontend draws exactly this grid.
@@ -42,7 +43,7 @@ from phamos.cockpits.settings import COCKPITS as _COCKPITS
 COLS = 40
 ROWS = 25
 GRID_KEY = "phamos_ophice_grid"
-GRID_LIMITS = ((10, 120), (10, 80))
+GRID_LIMITS = ((5, 120), (5, 80))
 EVENT_GRID = "ophice_grid"
 POSITION_KEY = "phamos_ophice_position"
 DUMMIES_CONF_KEY = "ophice_dummies"
@@ -388,17 +389,18 @@ def _free_spot(start, user):
 	while y + 1 <= start.y + start.height + 1e-9:
 		x = start.x
 		while x + 1 <= start.x + start.width + 1e-9:
-			if all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken):
+			if shapes.contains(start, x + 0.5, y + 0.5) and all(
+				math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken
+			):
 				spots.append({"x": float(x), "y": float(y)})
 			x += 1
 		y += 1
 	if spots:
 		return random.choice(spots)
-	# Too small or full: the middle of it (chips are drawn one tile wide).
-	return {
-		"x": _clamp(start.x + start.width / 2 - 0.5, _cols()),
-		"y": _clamp(start.y + start.height / 2 - 0.5, _rows()),
-	}
+	# Too small or full: the middle of it (chips are drawn one tile wide), moved into the shape
+	# when the middle lies outside (an L-shaped polygon, #2144).
+	mx, my = shapes.nearest_inside(start, start.x + start.width / 2, start.y + start.height / 2)
+	return {"x": _clamp(mx - 0.5, _cols()), "y": _clamp(my - 0.5, _rows())}
 
 
 def _clear_spot(position, user):
@@ -961,11 +963,18 @@ def _background():
 	return value if isinstance(value, dict) else {}
 
 
-# How the image lies on the map (#2089): "fit" (covers the grid), or a place and width in grid
-# tiles; the height follows the image's ratio. It may reach beyond the grid: those parts are
-# shown dimmed. "zoom" is everyone's starting zoom (1 = the whole grid fits the window).
+# Where the grid lies on the image (#2139): the image is the world, the grid is placed on it.
+# Stored as "grid": {"x", "y", "tile"}, all in image widths: the grid's top left corner and the
+# size of one square. Changing the number of squares keeps their size: the grid grows or shrinks.
+# The API still answers in squares ("layout": where the image lies, seen from the grid), so the
+# maps draw as before. The image may reach beyond the grid; its own edges fade out (BackgroundImage).
+# "zoom" is everyone's starting zoom (1 = the whole map fills the window's height, #2224).
+# The legacy conversion below (_legacy_box, _legacy_zoom) also serves the patch
+# ophice_grid_on_background and values stored before it ran: keep it while sites may not have migrated.
 BACKGROUND_MIN_WIDTH = 5
 ZOOM_RANGE = (1.0, 3.0)
+# The window size the old starting zoom (1 = the whole grid fits) is converted for (#2139).
+ZOOM_REFERENCE_VIEW = (1600, 1000)
 
 
 def _background_ratio(value):
@@ -986,15 +995,29 @@ def _background_ratio(value):
 	return round(width / height, 6) if height else None
 
 
-def _background_layout(value):
-	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
-	cols, rows = _grid()
-	zoom = round(max(ZOOM_RANGE[0], min(ZOOM_RANGE[1], frappe.utils.flt(layout.get("zoom")) or 1)), 2)
+def _clamp_zoom(zoom):
+	return round(max(ZOOM_RANGE[0], min(ZOOM_RANGE[1], frappe.utils.flt(zoom) or 1)), 2)
+
+
+def _cover_box(ratio, cols, rows):
+	"""The image covering the grid, centred: (left, top, width) in squares."""
+	if ratio >= cols / rows:
+		width = rows * ratio
+		return (cols - width) / 2, 0.0, width
+	return 0.0, (rows - cols / ratio) / 2, float(cols)
+
+
+def _clamp_box(left, top, width, ratio, cols, rows):
+	width = max(BACKGROUND_MIN_WIDTH, min(4 * cols, width))
+	height = width / ratio
+	return max(-width, min(cols, left)), max(-height, min(rows, top)), width
+
+
+def _legacy_box(layout, ratio, cols, rows):
+	"""Where the image lay before #2139, in squares: "fit", the first % layout (#2058) or tiles (#2089)."""
 	if layout.get("fit", True):
-		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": zoom}
-	ratio = _background_ratio(value) or cols / rows
+		return _cover_box(ratio, cols, rows)
 	if "width" not in layout:
-		# The first layout (#2058): size in % of the grid width, CSS background-position in %.
 		width = frappe.utils.flt(layout.get("scale") or 100) / 100 * cols
 		height = width / ratio
 		left = (cols - width) * frappe.utils.flt(layout.get("x", 50)) / 100
@@ -1003,40 +1026,93 @@ def _background_layout(value):
 		width = frappe.utils.flt(layout.get("width")) or cols
 		left = frappe.utils.flt(layout.get("left"))
 		top = frappe.utils.flt(layout.get("top"))
-	width = max(BACKGROUND_MIN_WIDTH, min(4 * cols, width))
-	height = width / ratio
-	left = max(-width, min(cols, left))
-	top = max(-height, min(rows, top))
-	return {"fit": False, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
+	return _clamp_box(left, top, width, ratio, cols, rows)
 
 
-@frappe.whitelist(methods=["POST"])
-def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
-	"""Place and size of the background image on the map, and the starting zoom, for everyone."""
-	_require_map_editor()
-	value = _background()
+def _grid_from_box(left, top, width):
+	"""The image at (left, top), width squares wide, seen the other way round: the grid on the image."""
+	return {"x": round(-left / width, 6), "y": round(-top / width, 6), "tile": round(1 / width, 8)}
+
+
+def _legacy_zoom(zoom, box, ratio, cols, rows):
+	"""The old starting zoom (1 = the grid fits) as the new one (1 = the image fits), for a typical window.
+
+	Approximate: it assumes a 1600 x 1000 window and is clamped to ZOOM_RANGE, so a map whose image
+	is much larger or smaller than the grid may start at a slightly different zoom than before."""
+	view_w, view_h = ZOOM_REFERENCE_VIEW
+	width = box[2]
+	grid_fit = min(view_w / cols, view_h / rows)
+	image_fit = min(view_w / width, view_h / (width / ratio))
+	return _clamp_zoom((frappe.utils.flt(zoom) or 1) * grid_fit / image_fit)
+
+
+def _grid_on_image(value, cols=None, rows=None):
+	"""(grid, zoom) of a background value: stored since #2139, else converted from the old layout."""
+	if cols is None:
+		cols, rows = _grid()
+	ratio = _background_ratio(value) or cols / rows
+	grid = value.get("grid")
+	if isinstance(grid, dict) and frappe.utils.flt(grid.get("tile")) > 0:
+		grid = {key: frappe.utils.flt(grid.get(key)) for key in ("x", "y", "tile")}
+		return grid, _clamp_zoom(value.get("zoom"))
+	layout = value.get("layout") if isinstance(value.get("layout"), dict) else {}
+	box = _legacy_box(layout, ratio, cols, rows)
+	return _grid_from_box(*box), _legacy_zoom(layout.get("zoom"), box, ratio, cols, rows)
+
+
+def _background_layout(value):
+	"""Where the image lies, seen from the grid, in squares: what the maps draw."""
+	cols, rows = _grid()
 	if not value.get("url"):
-		frappe.throw(_("Upload a background first."))
-	value["layout"] = {
-		"fit": bool(frappe.utils.cint(fit)),
-		"left": frappe.utils.flt(left),
-		"top": frappe.utils.flt(top),
-		"width": frappe.utils.flt(width) or _cols(),
-		"zoom": frappe.utils.flt(zoom) or 1,
-	}
-	layout = _background_layout(value)
-	value["layout"] = layout
+		return {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0}
+	ratio = _background_ratio(value) or cols / rows
+	grid, zoom = _grid_on_image(value, cols, rows)
+	# Not clamped to the grid: the grid lies on the image, so growing or shrinking the grid keeps
+	# the squares' size on the image. Limits apply where an editor places the image.
+	width = 1 / grid["tile"]
+	left, top = -grid["x"] * width, -grid["y"] * width
+	cover = _cover_box(ratio, cols, rows)
+	fit = all(abs(a - b) < 1e-3 for a, b in zip((left, top, width), cover))
+	return {"fit": fit, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": zoom}
+
+
+def _save_background(value):
+	value.pop("layout", None)
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")))
+	layout = _background_layout(value)
 	_publish(EVENT_BACKGROUND, {"url": value["url"], "layout": layout, "ratio": _background_ratio(value), "by": frappe.session.user})
 	return layout
 
 
+@frappe.whitelist(methods=["POST"])
+def set_background_layout(fit=1, left=0, top=0, width=None, zoom=1):
+	"""Place and size of the background image on the map, and the starting zoom, for everyone.
+	Given in squares as the image seen from the grid; stored as the grid on the image (#2139)."""
+	_require_map_editor()
+	value = _background()
+	if not value.get("url"):
+		frappe.throw(_("Upload a background first."))
+	cols, rows = _grid()
+	ratio = _background_ratio(value) or cols / rows
+	if frappe.utils.cint(fit):
+		box = _cover_box(ratio, cols, rows)
+	else:
+		box = _clamp_box(frappe.utils.flt(left), frappe.utils.flt(top), frappe.utils.flt(width) or cols, ratio, cols, rows)
+	value["grid"] = _grid_from_box(*box)
+	value["zoom"] = _clamp_zoom(zoom)
+	return _save_background(value)
+
+
 def _set_background(value):
 	previous = _background().get("file")
+	if value:
+		# A new image: the grid lies on it as large as fits, centred; zoom 1 shows the whole image.
+		cols, rows = _grid()
+		value["grid"] = _grid_from_box(*_cover_box(_background_ratio(value) or cols / rows, cols, rows))
+		value["zoom"] = 1.0
 	frappe.db.set_default(BACKGROUND_KEY, json.dumps(value, separators=(",", ":")) if value else "")
 	if previous and previous != value.get("file") and frappe.db.exists("File", previous):
 		frappe.delete_doc("File", previous, ignore_permissions=True, delete_permanently=True)
-	# A new image starts fitted to the grid.
 	_publish(
 		EVENT_BACKGROUND,
 		{
@@ -1760,7 +1836,7 @@ def _areas():
 		AREA_DOCTYPE,
 		fields=[
 			"name", "title", "x", "y", "width", "height", "meeting_url", "jitsi_domain", "jitsi_room",
-			"color_hue", "chat_mode", "kind", "cockpit",
+			"color_hue", "chat_mode", "kind", "cockpit", "shape", "points",
 		],
 		order_by="creation asc",
 		limit=MAX_AREAS,
@@ -1770,6 +1846,9 @@ def _areas():
 	tiles = None
 	for area in areas:
 		area.chat_mode = area.chat_mode or "Saved"
+		# Shapes (#2144): the points as a list for the page; a broken polygon falls back to its box.
+		area.points = [list(p) for p in shapes.points_of(area)]
+		area.shape = shapes.shape_of(area) if area.points or shapes.shape_of(area) != "Polygon" else "Rectangle"
 		area.kind = area.kind or "Meeting"
 		if area.cockpit:
 			# The cockpit's app icon, shown on its space (#2076).
@@ -1808,22 +1887,35 @@ def _clean_rect(x, y, width, height):
 	return x, y, width, height
 
 
-def _overlaps(name, x, y, width, height):
+def _overlaps(name, candidate):
+	"""The title of an area the candidate shares ground with (#2144: by shape, not by box)."""
 	for area in _areas():
 		if area.name == name:
 			continue
-		if x < area.x + area.width and area.x < x + width and y < area.y + area.height and area.y < y + height:
+		if shapes.overlaps(candidate, area):
 			return area.title
 	return None
 
 
 @frappe.whitelist(methods=["POST"])
 def save_area(
-	title, meeting_url="", x=0, y=0, width=1, height=1, name=None, chat_mode="Saved", kind="Meeting", cockpit=""
+	title,
+	meeting_url="",
+	x=0,
+	y=0,
+	width=1,
+	height=1,
+	name=None,
+	chat_mode="Saved",
+	kind="Meeting",
+	cockpit="",
+	shape="Rectangle",
+	points=None,
 ):
 	"""Create or change a space, for everyone (map editors only, #2071). A meeting space has a
 	Jitsi meeting and a chat; the start space (#2072, only one) has neither; a cockpit space
-	(#2076) belongs to a cockpit and may have a meeting."""
+	(#2076) belongs to a cockpit and may have a meeting. Shape (#2144): a rectangle, an ellipse
+	filling the box, or a polygon whose corner points set the box."""
 	_require_map_editor()
 	if chat_mode not in CHAT_MODES:
 		frappe.throw(_("Unknown chat mode."))
@@ -1848,8 +1940,16 @@ def save_area(
 		domain = room = ""
 	else:
 		domain, room = _parse_meeting_url(meeting_url)
-	x, y, width, height = _clean_rect(x, y, width, height)
-	clash = _overlaps(name, x, y, width, height)
+	shape = shape or "Rectangle"
+	if shape not in shapes.SHAPES:
+		frappe.throw(_("Unknown shape."))
+	corners = shapes.clean_points(points, _cols(), _rows()) if shape == "Polygon" else []
+	if corners:
+		x, y, width, height = shapes.box_of(corners)
+	else:
+		x, y, width, height = _clean_rect(x, y, width, height)
+	candidate = {"x": x, "y": y, "width": width, "height": height, "shape": shape, "points": corners}
+	clash = _overlaps(name, candidate)
 	if clash:
 		frappe.throw(_("This overlaps the area {0}.").format(clash))
 	values = {
@@ -1862,6 +1962,8 @@ def save_area(
 		"y": y,
 		"width": width,
 		"height": height,
+		"shape": shape,
+		"points": json.dumps(corners, separators=(",", ":")) if corners else None,
 		"chat_mode": chat_mode,
 		"cockpit": cockpit,
 	}
@@ -1906,11 +2008,7 @@ def _inside_area(area, user):
 	position = _position_of(user)
 	if not position:
 		return False
-	cx, cy = position[0] + 0.5, position[1] + 0.5
-	return (
-		area.x - AREA_SLACK <= cx < area.x + area.width + AREA_SLACK
-		and area.y - AREA_SLACK <= cy < area.y + area.height + AREA_SLACK
-	)
+	return shapes.contains(area, position[0] + 0.5, position[1] + 0.5, AREA_SLACK)
 
 
 def _call_area_at(position):
@@ -2397,7 +2495,7 @@ def get_people():
 		}
 		if chip and (not hidden or row.user == me):
 			cx, cy = chip["x"] + 0.5, chip["y"] + 0.5
-			area = next((a for a in areas if a.x <= cx < a.x + a.width and a.y <= cy < a.y + a.height), None)
+			area = next((a for a in areas if shapes.contains(a, cx, cy)), None)
 			person["area"] = area.title if area else ""
 			person["in_chat"] = row.user in chatting
 		people.append(person)
@@ -2428,6 +2526,15 @@ def cockpit_choices():
 	"""Map editors: the cockpits a space can belong to (all of them, not only mine)."""
 	_require_map_editor()
 	return sorted(_cockpit_tiles().values(), key=lambda c: c["title"])
+
+
+@frappe.whitelist()
+def new_meeting_url():
+	"""Map editors: a ready meeting URL for a new space (#2094), on the site's Jitsi server with an
+	unguessable room like the encounters get. The space creator fills it in; it stays editable."""
+	_require_map_editor()
+	# The same domain save_area checks against, so the ready URL always passes.
+	return f"https://{_jitsi_domain()}/{_new_jitsi_room()}"
 
 
 @frappe.whitelist(methods=["POST"])

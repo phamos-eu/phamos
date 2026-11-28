@@ -12,6 +12,7 @@
   "state",
   "start_date",
   "due_date",
+  "closed_on",
   "description",
   "web_url",
   "gitlab_project"
@@ -35,6 +36,13 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Due Date"
+  },
+  {
+   "fieldname": "closed_on",
+   "fieldtype": "Datetime",
+   "label": "Closed On",
+   "read_only": 1,
+   "description": "When the sync first saw the milestone closed (Team successes, #1981)"
   },
   {
    "fieldname": "description",
@@ -82,7 +90,7 @@
    "link_fieldname": "gitlab_milestone"
   }
  ],
- "modified": "2026-04-29 07:09:35.075398",
+ "modified": "2026-11-28 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Milestones",

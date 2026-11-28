@@ -1659,6 +1659,18 @@ Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
 "You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
 DATEV auto-send failed,Automatischer DATEV-Versand fehlgeschlagen
+Send to DATEV,An DATEV senden
+Send test,Test senden
+Test send: the receipt is not marked as sent to DATEV.,Testversand: Der Beleg wird nicht als an DATEV gesendet markiert.
+DATEV address: {0},DATEV-Adresse: {0}
+No DATEV address is configured.,Es ist keine DATEV-Adresse eingerichtet.
+"This document was already sent on {0} by {1}.","Dieser Beleg wurde bereits am {0} von {1} gesendet."
+Building the PDF…,PDF wird erstellt …
+with the note for the accounting office,mit dem Hinweis für die Buchhaltung
+Could not build the DATEV PDF.,Das DATEV-PDF konnte nicht erstellt werden.
+{0} is not a valid email address.,{0} ist keine gültige E-Mail-Adresse.
+Test send to DATEV: sent to {0} by {1}.,Testversand an DATEV: von {1} an {0} gesendet.
+Test send queued to {0}. The receipt is not marked as sent to DATEV.,Testversand an {0} eingereiht. Der Beleg wird nicht als an DATEV gesendet markiert.
 Sick Leave Types,Krankheitsarten
 Sick days this year,Krankheitstage dieses Jahr
 Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
@@ -2567,6 +2579,27 @@ Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Sync…,Synchronisieren…
+Sync from {0},Synchronisieren von {0}
+What to sync,Was synchronisiert wird
+Links each user to the roles synced before.,Verknüpft jeden Benutzer mit den zuvor synchronisierten Rollen.
+One call per shelf; links the books.,Ein Aufruf pro Regal; verknüpft die Bücher.
+Website content,Website-Inhalte
+Copies the pages of books published on the website.,Kopiert die Seiten der auf der Webseite veröffentlichten Bücher.
+Removed (deleted in BookStack),Entfernt (in BookStack gelöscht)
+Remove records deleted in BookStack,In BookStack gelöschte Einträge entfernen
+Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchronisieren.
+Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
+"Books, chapters and pages","Bücher, Kapitel und Seiten"
+Save selection,Auswahl speichern
+Selection saved; {0} records removed from ERPNext.,Auswahl gespeichert; {0} Einträge aus ERPNext entfernt.
+Loading books from BookStack…,Bücher werden aus BookStack geladen…
+Filter books…,Bücher filtern…
+{0} of {1} books,{0} von {1} Büchern
+"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced.","Nicht angehakte Bücher, Kapitel und Seiten übernimmt keine Synchronisierung nach ERPNext; vorhandene Kopien werden beim Speichern entfernt. Neue Einträge in BookStack werden synchronisiert."
+Sync Selection,Auswahl für die Synchronisierung
+Left out of the sync,Von der Synchronisierung ausgenommen
+Unknown item type: {0},Unbekannter Typ: {0}
 Bookstack Browser,Bookstack-Browser
 Books,Bücher
 Shelves,Regale
@@ -2576,6 +2609,7 @@ Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
@@ -2609,6 +2643,9 @@ Bubbles per Day,Sprechblasen pro Tag
 One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Only users who may edit this configuration change the selection.,"Nur wer diese Konfiguration bearbeiten darf, ändert die Auswahl."
+"BookStack could not be reached. The saved selection stays as it is, and Sync uses it.",BookStack ist nicht erreichbar. Die gespeicherte Auswahl bleibt unverändert und gilt für die Synchronisierung.
+Invalid BookStack ID: {0},Ungültige BookStack-ID: {0}
 Nothing planned yet,Noch nichts geplant
 On the critical path,Auf dem kritischen Pfad
 Baseline: {0} – {1},Baseline: {0} – {1}
@@ -2634,6 +2671,11 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+"This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"
+Removes what BookStack no longer has. Books and chapters only when their pages are synced too.,"Entfernt, was es in BookStack nicht mehr gibt. Bücher und Kapitel nur, wenn auch ihre Seiten synchronisiert werden."
+Last Full Sync,Letzte vollständige Synchronisierung
+"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.","Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog."
+Sync Errors (last full sync),Synchronisierungsfehler (letzte vollständige Synchronisierung)
 This documentation is in German.,Diese Dokumentation ist auf Deutsch.
 Hide contents,Inhalt ausblenden
 Show contents,Inhalt einblenden
@@ -3032,6 +3074,7 @@ Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldun
 Zoom out,Verkleinern
 Zoom in,Vergrößern
 Show the whole grid,Ganzes Raster zeigen
+Show the whole image,Ganzes Bild zeigen
 {0} × {1} tiles,{0} × {1} Kacheln
 Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
 "Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
@@ -3136,10 +3179,44 @@ to close,zum Schließen
 Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
 "Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Unknown shape.,Unbekannte Form.
+A polygon needs its corner points.,Ein Vieleck braucht seine Eckpunkte.
+A corner point is not a number.,Ein Eckpunkt ist keine Zahl.
+A polygon needs at least 3 corners.,Ein Vieleck braucht mindestens 3 Ecken.
+A polygon can have at most {0} corners.,Ein Vieleck kann höchstens {0} Ecken haben.
+The polygon is too small.,Das Vieleck ist zu klein.
+The edges of the polygon cross each other.,Die Kanten des Vielecks kreuzen sich.
+Shape,Form
+Rectangle,Rechteck
+Ellipse,Ellipse
+Polygon,Vieleck
+"On the map: drag a corner to move it, click an edge to add a corner, double-click a corner to remove it.","Auf der Karte: Ecke ziehen, um sie zu verschieben, auf eine Kante klicken, um eine Ecke hinzuzufügen, Ecke doppelklicken, um sie zu entfernen."
+Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel,Klicken setzt Ecken · erste Ecke anklicken oder Enter schließt · Rücktaste: letzte Ecke zurück · Esc: abbrechen
+"Drag on the map to draw an area, or click corner by corner for a polygon; click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Drag on the grid to mark a meeting area, or click corner by corner for a polygon; click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten"
 Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
 Chat notifications muted,Chat-Benachrichtigungen stumm
+Contracts,Verträge
+Contract Type,Vertragsart
+"AVVs, NDAs and other contracts","AVVs, NDAs und andere Verträge"
+Ends within,Endet innerhalb von
+Party,Partei
+Search party,Partei suchen
+{0} contracts,{0} Verträge
+{0}+ contracts,{0}+ Verträge
+No contracts,Keine Verträge
+Signed,Unterschrieben
+All types,Alle Arten
+Any time,Beliebig
+Could not load the contracts,Die Verträge konnten nicht geladen werden
+Unsigned,Nicht unterschrieben
+Active,Aktiv
+Inactive,Inaktiv
+Supplier,Lieferant
+Unknown contract status: {0},Unbekannter Vertragsstatus: {0}
+Days must be a whole number from 0 to {0}.,Die Tage müssen eine ganze Zahl von 0 bis {0} sein.
 Dock in the corner,In der Ecke andocken
 Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
 AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
@@ -3486,3 +3563,98 @@ Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
 Team chat of {0},Teamchat von {0}
 Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
 (hidden),(verborgen)
+{0} absent (half day),{0} abwesend (halber Tag)
+{0} absent,{0} abwesend
+"The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"
+Pick a shorter period.,Wählen Sie einen kürzeren Zeitraum.
+Invites go out from the team mailbox. Set one on the Team in Desk first.,Einladungen gehen vom Team-Postfach aus. Legen Sie es zuerst im Team in Desk fest.
+Set a team mailbox with a Mailcow calendar on team {0} first.,Legen Sie zuerst ein Team-Postfach mit Mailcow-Kalender für Team {0} fest.
+Team Mailbox,Team-Postfach
+The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979).,"Das gemeinsame Postfach, von dem die Termine des Teams versendet werden (braucht ein Mailcow-DAV-Passwort). Teammitglieder können Einladungen nur von diesem Postfach senden (#1979)."
+"Ideas shared with {0}: the same vote as the company's, read by the team only.","Mit {0} geteilte Ideen: dieselbe Abstimmung wie im Unternehmen, nur vom Team gelesen."
+the team,dem Team
+New team idea,Neue Team-Idee
+Loading ideas…,Ideen werden geladen…
+"No idea is shared with the team yet. Share one of yours from your Personal Cockpit, or start a new one here.",Noch keine Idee mit dem Team geteilt. Teilen Sie eine Ihrer Ideen im Personal Cockpit oder beginnen Sie hier eine neue.
+Voted,Abgestimmt
+Edit in my Personal Cockpit,Im Personal Cockpit bearbeiten
+"It is your idea: you write it out in your Personal Cockpit. Your team can read it, vote and chat right away.","Es ist Ihre Idee: Sie schreiben sie im Personal Cockpit aus. Ihr Team kann sie sofort lesen, abstimmen und darüber chatten."
+Share with team,Mit dem Team teilen
+Could not open the idea,Die Idee konnte nicht geöffnet werden
+Could not vote,Die Stimme konnte nicht abgegeben werden
+Could not load the ideas.,Die Ideen konnten nicht geladen werden.
+Ideas shared with the team,Mit dem Team geteilte Ideen
+Shared with {0},Geteilt mit {0}
+Open to the company,Für das Unternehmen öffnen
+"Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.","Diese Idee mit Ihrem Team teilen? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten. Ihre Schreibsitzungen und der Verlauf bleiben privat."
+Idea shared with your team,Idee mit Ihrem Team geteilt
+Could not share the idea,Die Idee konnte nicht geteilt werden
+Team {0} only,Nur Team {0}
+A composted idea cannot be shared. Take it up again first.,Eine kompostierte Idee kann nicht geteilt werden. Nehmen Sie sie zuerst wieder auf.
+You are not in a team to share it with.,"Sie sind in keinem Team, mit dem Sie sie teilen können."
+Only the people of the idea's team can join its chat.,Nur die Personen des Teams der Idee können ihrem Chat beitreten.
+Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company.,"Mit diesem Team geteilt: nur seine Personen lesen die Idee und stimmen ab (#1980). Leer, solange sie für das ganze Unternehmen offen ist."
+Move to my team,In mein Team verschieben
+"Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.","Diese Idee in Ihr Team verschieben? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten; die Stimmen bleiben."
+"A success of a team: found by a daily rule, or kudos and customer praise (#1981).","Ein Erfolg eines Teams: von einer täglichen Regel gefunden, oder Kudos und Kundenlob (#1981)."
+About (name),Über (Name)
+About (optional),Über (optional)
+Add praise,Lob hinzufügen
+An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981).,"Ein Issue ohne Team gilt als aufgegriffen, wenn es so viele Tage ohne Aktivität war, bevor ein Team es übernahm (#1981)."
+Could not load the successes.,Die Erfolge konnten nicht geladen werden.
+Could not save.,Konnte nicht gespeichert werden.
+Customer praise,Kundenlob
+Each of the {0} members with working hours booked at least {1} %.,Jedes der {0} Mitglieder mit Arbeitszeit hat mindestens {1} % gebucht.
+Everyone booked their hours in {0},Alle haben im {0} ihre Stunden gebucht
+Fastest month: items closed in {0} days (median),Schnellster Monat: Einträge in {0} Tagen geschlossen (Median)
+For what,Wofür
+Give kudos,Kudos geben
+Given By,Gegeben von
+Idea harvested: {0},Idee geerntet: {0}
+Idle for {0} days before the team took it on.,"{0} Tage ohne Aktivität, bevor das Team es übernahm."
+Kudos,Kudos
+Kudos and customer praise: who entered it,Kudos und Kundenlob: wer es eingetragen hat
+Kudos go to someone else.,Kudos gehen an jemand anderen.
+Kudos go to someone in team {0}.,Kudos gehen an jemanden im Team {0}.
+Loading successes…,Erfolge werden geladen…
+Milestone on time: {0},Meilenstein pünktlich: {0}
+More than in any of the {0} months before.,Mehr als in jedem der {0} Monate davor.
+No open item older than {0} days,Kein offener Eintrag älter als {0} Tage
+No successes yet. The daily rules add them as the team delivers; kudos and praise you can add now.,"Noch keine Erfolge. Die täglichen Regeln fügen sie hinzu, wenn das Team liefert; Kudos und Lob können Sie jetzt hinzufügen."
+Nobody in particular,Niemand Bestimmtes
+"One success per team, rule and period (#1981)","Ein Erfolg je Team, Regel und Zeitraum (#1981)"
+Pick a customer…,Kunden wählen…
+Pick a team mate…,Teammitglied wählen…
+Pick the customer who praised.,"Wählen Sie den Kunden, der gelobt hat."
+Picked up,Aufgegriffen
+Picked up: idle days,Aufgegriffen: Tage ohne Aktivität
+Picked up: {0},Aufgegriffen: {0}
+Praise from {0},Lob von {0}
+Quick responses: {0} Issues answered within their SLA time last week,Schnelle Antworten: {0} Issues letzte Woche innerhalb ihrer SLA-Zeit beantwortet
+Record month: {0} items closed,Rekordmonat: {0} Einträge geschlossen
+Resolved in time: {0} Issues within their SLA last week,Rechtzeitig gelöst: {0} Issues letzte Woche innerhalb ihrer SLA
+a module,ein Modul
+SLA,SLA
+Say what the kudos are for.,"Sagen Sie, wofür die Kudos sind."
+Shipped: {0},Ausgeliefert: {0}
+Successes,Erfolge
+Team Success,Teamerfolg
+Team ideas,Team-Ideen
+The parent item and all {0} of its items are closed.,Der übergeordnete Eintrag und alle {0} seiner Einträge sind geschlossen.
+The praise goes to someone in team {0}.,Das Lob geht an jemanden im Team {0}.
+"The rule that found it, or Kudos / Customer praise","Die Regel, die ihn gefunden hat, oder Kudos / Kundenlob"
+The team booked at least {0} % of its available hours every week.,Das Team hat jede Woche mindestens {0} % seiner verfügbaren Stunden gebucht.
+The team sees the kudos and that they are from you; they are also posted in the team chat.,Das Team sieht die Kudos und dass sie von Ihnen sind; sie werden auch im Teamchat gepostet.
+What did the customer say?,Was hat der Kunde gesagt?
+What the team achieved,Was das Team erreicht hat
+What they said,Was gesagt wurde
+"Who the success is about, if one person","Um wen es beim Erfolg geht, falls um eine Person"
+entered by {0},eingetragen von {0}
+{0} complete weeks in a row,{0} vollständige Wochen in Folge
+"{0} items open, the oldest {1} days.","{0} Einträge offen, der älteste {1} Tage."
+{0} reached maturity level {1},{0} hat Reifegrad {1} erreicht
+{0} → {1},{0} → {1}
+{0}: hours budget kept three months in a row,{0}: Stundenbudget drei Monate in Folge eingehalten
+{0}: the forecast improved,{0}: die Prognose hat sich verbessert
+"{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
+{0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht

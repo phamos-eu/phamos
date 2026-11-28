@@ -85,3 +85,4 @@ phamos.patches.v1_0.fill_docs_search_text #2046
 phamos.patches.v1_0.backfill_reviewed_revision_on_meeting_reviews
 phamos.patches.v1_0.ophice_areas_to_site_jitsi_server #2108
 phamos.patches.v1_0.create_team_assignments #1974
+phamos.patches.v1_0.ophice_grid_on_background #2139

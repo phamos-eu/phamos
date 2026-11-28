@@ -334,6 +334,7 @@ after_migrate = [
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.contracts.after_migrate",  # Contract Type on Contract, AVV and NDA (#2148)
 	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
 	"phamos.setup.issue_chat_card.after_migrate",  # fields on the Issue chat's card (#2234)
 ]
@@ -676,6 +677,8 @@ scheduler_events = {
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # Team Cockpit: successes found by the daily rules (#1981)
+        "phamos.cockpits.team_successes.run_all_teams",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
@@ -809,6 +812,9 @@ user_data_fields = [
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 ]
+
+# Automatically update python controller files with type annotations for this app.
+export_python_type_annotations = True
 
 # Authentication and authorization
 # --------------------------------
