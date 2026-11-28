@@ -96,7 +96,7 @@ def identify(doc):
 	contact_strong = bool(party.contact) and out["customer"]["confidence"] == STRONG and (
 		out["customer"]["via"] == "contact" or out["customer"]["value"] in (party.customers or []))
 	out["contact"] = _result(party.contact, STRONG if contact_strong else NONE, via="email")
-	if learned.get("contact"):
+	if learned.get("contact") and _contact_fits(learned["contact"], out["customer"]["value"]):
 		out["contact"] = _result(learned["contact"], STRONG, via="rule")
 
 	out["implementation"] = find_implementation(doc, out["customer"], email, learned)
@@ -144,7 +144,7 @@ def find_implementation(doc, customer, email, learned=None):
 def find_project(doc, implementation, learned=None):
 	if not project_is_empty(doc):
 		return _result(doc.project, STRONG, via="issue")
-	if (learned or {}).get("project"):
+	if (learned or {}).get("project") and _project_fits(learned["project"], implementation):
 		return _result(learned["project"], STRONG, via="rule")
 	if implementation["confidence"] != STRONG:
 		return _result()
@@ -179,6 +179,19 @@ def learned_values(email):
 			if field in LINK_DOCTYPES and value and frappe.db.exists(LINK_DOCTYPES[field], value):
 				target.setdefault(field, value)
 	return {**by_domain, **by_email}
+
+
+def _contact_fits(contact, customer):
+	"""A learned Contact only with its own Customer (or when no Customer is known)."""
+	return not customer or bool(frappe.db.exists("Dynamic Link", {"parenttype": "Contact", "parent": contact,
+		"link_doctype": "Customer", "link_name": customer}))
+
+
+def _project_fits(project, implementation):
+	"""A learned Project only within the Implementation found (or when none is known)."""
+	if not implementation.get("value"):
+		return True
+	return frappe.db.get_value("Project", project, "custom_implementation") in (None, "", implementation["value"])
 
 
 LINK_DOCTYPES = {"customer": "Customer", "contact": "Contact", "custom_implementation": "Implementation",

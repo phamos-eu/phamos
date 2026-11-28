@@ -373,6 +373,7 @@ permission_query_conditions = {
 	"Version": "phamos.cockpits.permissions.version_query",
 	# trainers see only the Issue Assistant's skills (#2225)
 	"AI Skill": "phamos.ai_agents.permissions.ai_skill_query",
+	"AI Agent Run": "phamos.ai_agents.permissions.ai_agent_run_query",
 }
 
 has_permission = {
@@ -384,6 +385,7 @@ has_permission = {
 	"Idea Vote": "phamos.cockpits.permissions.idea_vote_has_permission",
 	"Version": "phamos.cockpits.permissions.version_has_permission",
 	"AI Skill": "phamos.ai_agents.permissions.ai_skill_has_permission",
+	"AI Agent Run": "phamos.ai_agents.permissions.ai_agent_run_has_permission",
 }
 
 # DocType Class

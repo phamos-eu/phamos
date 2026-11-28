@@ -74,11 +74,16 @@ def run_person(run):
 	return person if isinstance(person, dict) and person.get("user") else None
 
 
+# an assignment that is still there: Closed means the person finished it, only Cancelled means removed
+# (AI review on !1392)
+ASSIGNED = ("Open", "Closed")
+
+
 def human_assignees(issue_name):
-	"""Users assigned to the Issue by a person (not by an AI agent), open ToDos only."""
+	"""Users assigned to the Issue by a person (not by an AI agent), not removed."""
 	ai = feedback.ai_users()
-	rows = frappe.get_all("ToDo", filters={"reference_type": "Issue", "reference_name": issue_name, "status": "Open"},
-		fields=["allocated_to", "assigned_by"])
+	rows = frappe.get_all("ToDo", filters={"reference_type": "Issue", "reference_name": issue_name,
+		"status": ("in", ASSIGNED)}, fields=["allocated_to", "assigned_by"])
 	return sorted({r.allocated_to for r in rows if r.allocated_to not in ai and r.assigned_by not in ai})
 
 
@@ -93,7 +98,7 @@ def corrections_for(doc, run):
 	if person:
 		user = person["user"]
 		open_for_user = frappe.db.exists("ToDo", {"reference_type": "Issue", "reference_name": doc.name,
-			"allocated_to": user, "status": "Open"})
+			"allocated_to": user, "status": ("in", ASSIGNED)})
 		others = [u for u in human_assignees(doc.name) if u != user]
 		if (person.get("assigned") and not open_for_user) or (not person.get("assigned") and others and not open_for_user):
 			found.append({"field": PERSON, "ai_value": user, "human_value": ", ".join(others) or None, "group": "person"})
@@ -113,7 +118,8 @@ def collect(doc, user=None):
 	if not run:
 		return None
 	found = corrections_for(doc, run)
-	for correction in feedback.record(run, found, user, done=doc.get("status") in DONE_STATUSES):
+	for correction in feedback.record(run, found, user, done=doc.get("status") in DONE_STATUSES, keep_accepted=True,
+			corrector_of_new=True):
 		suggest(doc, run, correction)
 	return found
 
@@ -171,11 +177,17 @@ def suggest_mapping(doc, run, correction):
 	"""A sender → value rule for Identify. Not when the value was only cleared, or the sender is unknown."""
 	from phamos.ai_agents.agents.issue_identify import sender_email
 
+	from phamos.marketing.crm import employee_for_email
+
 	email = cstr(sender_email(doc)).strip().lower()
 	field, value = correction["field"], correction["human_value"]
-	if not email or not value:
+	if not email or not value or employee_for_email(email):
+		# a colleague files Issues for many customers: a rule on their address would map all of them to one
+		# (AI review on !1392)
 		return None
-	key = f"Issue::sender::{email}::{field}"
+	# the value is part of the key: another value is another suggestion, and a dismissed wrong one doesn't
+	# block a right one (AI review on !1392)
+	key = f"Issue::sender::{email}::{field}::{value}"
 	who = frappe.utils.get_fullname(correction.get("user") or frappe.session.user)
 
 	def make():
@@ -201,7 +213,7 @@ def suggest_prompt_rule(doc, run, correction):
 	if not customer:
 		return None
 	field = correction["field"]
-	key = f"Issue::rule::{customer}::{field}"
+	key = f"Issue::rule::{customer}::{field}::{correction['ai_value'] or ''}->{correction['human_value'] or ''}"
 	customer_name = frappe.db.get_value("Customer", customer, "customer_name") or customer
 	who = frappe.utils.get_fullname(correction.get("user") or frappe.session.user)
 	ai_value, human_value = _display(field, correction["ai_value"]), _display(field, correction["human_value"])
@@ -277,6 +289,14 @@ def draft_wording(skill, issue):
 		return
 	answer = answer if isinstance(answer, dict) else {}
 	case, action = cstr(answer.get("case_description")).strip(), cstr(answer.get("action")).strip()
-	if case and action:
-		frappe.db.set_value("AI Prompt Rule", rule.name, {"case_description": case[:500], "action": action[:1000]})
-		frappe.db.commit()  # nosemgrep: background job
+	if not (case and action):
+		return
+	# the call takes a while: write only when nobody accepted, enabled or edited the rule meanwhile, so text
+	# drawn from the customer's Issue never lands in a rule a person already approved (AI review on !1392)
+	now = frappe.db.get_value("AI Skill", skill, ["origin", "enabled"], as_dict=True, for_update=True)
+	current = frappe.db.get_value("AI Prompt Rule", rule.name, ["case_description", "action"], as_dict=True)
+	if (not now or now.origin != feedback.SUGGESTED or now.enabled or not current
+			or (current.case_description, current.action) != (rule.case_description, rule.action)):
+		return
+	frappe.db.set_value("AI Prompt Rule", rule.name, {"case_description": case[:500], "action": action[:1000]})
+	frappe.db.commit()  # nosemgrep: background job

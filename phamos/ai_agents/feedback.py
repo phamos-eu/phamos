@@ -24,8 +24,11 @@ ACCEPTED, CORRECTED = "Accepted", "Corrected"
 
 
 def ai_users():
-	"""The users of all AI agents: their changes never count as corrections, and they never accept."""
-	return set(frappe.get_all("AI Agent", filters={"user": ("is", "set")}, pluck="user"))
+	"""The users of all AI agents: their changes never count as corrections, and they never accept. Read once
+	per request: the Issue and ToDo hooks ask on every save (AI review on !1392)."""
+	if frappe.flags.ai_agent_users is None:
+		frappe.flags.ai_agent_users = set(frappe.get_all("AI Agent", filters={"user": ("is", "set")}, pluck="user"))
+	return frappe.flags.ai_agent_users
 
 
 def is_ai_user(user):
@@ -39,12 +42,14 @@ def latest_run(agent, doctype, name):
 	return frappe.get_doc("AI Agent Run", run) if run else None
 
 
-def record(run, found, user, done=False):
+def record(run, found, user, done=False, keep_accepted=False, corrector_of_new=False):
 	"""Store the corrections `found` ([{field, ai_value, human_value, ...}]) on the run. Returns the ones
 	that are new since the last time (a field first corrected now, or corrected to another value).
 
-	A correction keeps its first user and time while its value stays. No corrections: the run is
-	Accepted when `done`, else stays open; an earlier Accepted is kept."""
+	A correction keeps its first user and time while its value stays. No corrections: the run is Accepted
+	when `done`, else open. The defaults keep the Accounting loop as it was; the Issue Assistant keeps an
+	Accepted from its daily job (`keep_accepted`) and names who made the newest correction, not whoever
+	saved last (`corrector_of_new`). Nothing is written when nothing changed."""
 	previous = {c["field"]: c for c in frappe.parse_json(run.corrections or "[]") or []}
 	now = now_datetime()
 	for c in found:
@@ -53,14 +58,20 @@ def record(run, found, user, done=False):
 		c["user"] = old.get("user") if same else user
 		c["at"] = old.get("at") if same else str(now)
 	new = [c for c in found if c["field"] not in previous or previous[c["field"]].get("human_value") != c["human_value"]]
-	values = {"corrections": frappe.as_json(found) if found else None, "feedback_collected_at": now}
+	values = {"corrections": frappe.as_json(found) if found else None}
 	if found:
-		values.update(outcome=CORRECTED, corrected_by=new[0]["user"] if new else run.corrected_by or user)
-	elif done or run.outcome == ACCEPTED:
+		corrector = (new[0]["user"] if new else run.corrected_by or user) if corrector_of_new else user
+		values.update(outcome=CORRECTED, corrected_by=corrector)
+	elif done or (keep_accepted and run.outcome == ACCEPTED):
 		values.update(outcome=ACCEPTED, corrected_by=None)
 	else:
 		values.update(outcome=None, corrected_by=None)
-	run.db_set(values, update_modified=False)
+	before = {"corrections": frappe.parse_json(run.corrections or "null") or None, "outcome": run.outcome or None,
+		"corrected_by": run.corrected_by or None}
+	after = {"corrections": found or None, "outcome": values["outcome"], "corrected_by": values["corrected_by"]}
+	if before != after or not run.feedback_collected_at:
+		values["feedback_collected_at"] = now
+		run.db_set(values, update_modified=False)
 	return new
 
 

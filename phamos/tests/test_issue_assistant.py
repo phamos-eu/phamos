@@ -1046,7 +1046,7 @@ class TestLearning(IssueAssistantTestCase):
 		other = self.make_project("Issue Assistant Learning Other")
 		run = self.change(doc, project=other)
 		self.assertEqual((run.outcome, run.corrected_by), ("Corrected", DESK_USER))
-		key = f"Issue::sender::{self.SENDER}::project"
+		key = f"Issue::sender::{self.SENDER}::project::{other}"
 		skill = frappe.get_doc("AI Skill", {"suggestion_key": key})
 		self.assertEqual((skill.origin, skill.enabled, skill.handler, skill.occurrences), ("Suggested", 0, "sender_mapping", 1))
 		self.assertEqual(frappe.parse_json(skill.params)["values"], {"project": other})
@@ -1061,7 +1061,7 @@ class TestLearning(IssueAssistantTestCase):
 		self.run_with(doc)
 		run = self.change(doc, user=self.assistant, project=self.make_project("Issue Assistant Learning AI"))
 		self.assertFalse(run.outcome)
-		self.assertFalse(frappe.db.exists("AI Skill", {"suggestion_key": f"Issue::sender::{self.SENDER}::project"}))
+		self.assertFalse(frappe.db.exists("AI Skill", {"suggestion_key": ("like", f"Issue::sender::{self.SENDER}::project%")}))
 
 	def test_reassigning_away_from_its_person_suggests_a_prompt_rule(self):
 		doc = self.issue(raised_by=self.SENDER, priority="High")
@@ -1073,7 +1073,7 @@ class TestLearning(IssueAssistantTestCase):
 		remove("Issue", doc.name, DESK_USER)  # by Administrator, a person
 		run = frappe.get_doc("AI Agent Run", {"reference_name": doc.name})
 		self.assertEqual(run.outcome, "Corrected")
-		skill = frappe.get_doc("AI Skill", {"suggestion_key": f"Issue::rule::{doc.customer}::person"})
+		skill = frappe.get_doc("AI Skill", {"suggestion_key": ("like", f"Issue::rule::{doc.customer}::person::%")})
 		self.assertEqual((skill.phase, skill.party_doctype, skill.party, skill.enabled), ("Classify", "Customer", doc.customer, 0))
 		self.assertIn(frappe.utils.get_fullname(DESK_USER), skill.prompt_rules[0].action)
 		# the model may word it better, in the background
@@ -1100,7 +1100,7 @@ class TestLearning(IssueAssistantTestCase):
 		run = self.run_with(doc)
 		self.assertFalse(frappe.db.get_value("Issue", doc.name, "custom_implementation"))
 		self.change(doc, custom_implementation=self.IMPLEMENTATION)
-		skill = frappe.db.get_value("AI Skill", {"suggestion_key": f"Issue::sender::{sender}::custom_implementation"})
+		skill = frappe.db.get_value("AI Skill", {"suggestion_key": ("like", f"Issue::sender::{sender}::custom_implementation%")})
 		self.assertFalse(skill, "nothing set by the run, so nothing to correct")
 		# a rule written from a correction elsewhere, accepted by a trainer
 		key = f"Issue::sender::{sender}::custom_implementation"
@@ -1122,10 +1122,11 @@ class TestLearning(IssueAssistantTestCase):
 		self.run_with(doc)
 		other = self.make_project("Issue Assistant Learning Dismiss")
 		run = self.change(doc, project=other)
-		key = f"Issue::sender::{self.SENDER}::project"
+		key = f"Issue::sender::{self.SENDER}::project::{other}"
 		name = frappe.db.get_value("AI Skill", {"suggestion_key": key})
 		self.as_user(self.assistant)
-		with self.assertRaises(frappe.PermissionError):
+		# refused for being an AI agent, not merely for lacking write
+		with patch("frappe.model.document.Document.check_permission"), self.assertRaises(frappe.PermissionError):
 			self.feedback.accept_suggestion(name)
 		frappe.set_user(self.TRAINER)
 		self.feedback.dismiss_suggestion(name)
@@ -1157,6 +1158,65 @@ class TestLearning(IssueAssistantTestCase):
 			self.run_assistant(doc)
 		self.assertIn("Suggest Maria as the person.", chat.call_args[0][0])
 		self.assertTrue(skill.name)
+
+	def test_a_closed_assignment_is_no_correction(self):
+		doc = self.issue(raised_by=self.SENDER, priority="High")
+		self.run_with(doc, {"person": {"user": DESK_USER, "confidence": "strong", "reason": "project member"}})
+		todo = frappe.get_doc("ToDo", {"reference_name": doc.name, "allocated_to": DESK_USER})
+		self.as_user(DESK_USER)
+		todo.status = "Closed"  # done, not removed
+		todo.save(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		self.assertFalse(frappe.db.get_value("AI Agent Run", {"reference_name": doc.name}, "outcome"))
+
+	def test_a_suggested_prompt_rule_does_not_reach_the_model(self):
+		doc = self.issue(raised_by=self.SENDER)
+		frappe.get_doc({"doctype": "AI Skill", "agent": setup.ASSISTANT_NAME, "skill_name": "rule", "enabled": 0,
+			"origin": "Suggested", "phase": "Classify", "order": 50, "party_doctype": "Customer", "party": doc.customer,
+			"prompt_rules": [{"enabled": 1, "order": 1, "case_description": "x", "action": "Never seen."}]}).insert(
+			ignore_permissions=True)
+		with patch("phamos.ai_agents.agents.issue_classify.llm.chat_json", return_value=({}, "mistral-test")) as chat:
+			self.run_assistant(doc)
+		self.assertNotIn("Never seen.", chat.call_args[0][0])
+
+	def test_trainer_permissions_end_to_end(self):
+		mine = frappe.get_doc({"doctype": "AI Skill", "agent": setup.ASSISTANT_NAME, "skill_name": "x"})
+		self.assertTrue(frappe.has_permission("AI Skill", "write", doc=mine, user=self.TRAINER))
+		self.assertFalse(frappe.has_permission("AI Skill", "write", doc=mine, user=DESK_USER))
+		from phamos.ai_agents import permissions
+
+		other_run = frappe.get_doc({"doctype": "AI Agent Run", "agent": "Some Accounting Agent"})
+		own_run = frappe.get_doc({"doctype": "AI Agent Run", "agent": setup.ASSISTANT_NAME})
+		self.assertFalse(permissions.ai_agent_run_has_permission(other_run, "read", self.TRAINER))
+		self.assertTrue(permissions.ai_agent_run_has_permission(own_run, "read", self.TRAINER))
+		self.assertIn(setup.ASSISTANT_NAME, permissions.ai_agent_run_query(self.TRAINER))
+
+	def test_model_wording_never_overwrites_an_accepted_rule(self):
+		doc = self.issue(raised_by=self.SENDER)
+		skill = frappe.get_doc({"doctype": "AI Skill", "agent": setup.ASSISTANT_NAME, "skill_name": "rule", "enabled": 0,
+			"origin": "Suggested", "phase": "Classify", "order": 50, "party_doctype": "Customer", "party": doc.customer,
+			"prompt_rules": [{"enabled": 1, "order": 1, "case_description": "case", "action": "template"}]}).insert(
+			ignore_permissions=True)
+
+		def accept_meanwhile(*args, **kwargs):
+			frappe.db.set_value("AI Skill", skill.name, {"origin": "Learned", "enabled": 1})
+			return ({"case_description": "from the model", "action": "model text"}, "mistral-test")
+
+		with patch("phamos.ai_agents.llm.chat_json", side_effect=accept_meanwhile), \
+				patch("phamos.ai_agents.agents.issue_feedback.frappe.db.commit"):
+			self.learning.draft_wording(skill.name, doc.name)
+		self.assertEqual(frappe.db.get_value("AI Prompt Rule", skill.prompt_rules[0].name, "action"), "template")
+
+	def test_a_different_value_is_a_different_suggestion(self):
+		doc = self.issue(raised_by=self.SENDER)
+		self.run_with(doc)
+		first, second = self.make_project("Issue Assistant Learning A"), self.make_project("Issue Assistant Learning B")
+		self.change(doc, project=first)
+		self.change(doc, project=second)
+		keys = frappe.get_all("AI Skill", filters={"suggestion_key": ("like", f"Issue::sender::{self.SENDER}::project::%")},
+			pluck="suggestion_key")
+		self.assertEqual(sorted(keys), sorted([f"Issue::sender::{self.SENDER}::project::{first}",
+			f"Issue::sender::{self.SENDER}::project::{second}"]))
 
 	def test_rates_count_corrections_per_step(self):
 		doc = self.issue(raised_by=self.SENDER)

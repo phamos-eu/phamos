@@ -44,3 +44,22 @@ def ai_skill_query(user=None):
 	if user == "Administrator" or "System Manager" in roles or not _trainer_only(roles):
 		return ""
 	return f"`tabAI Skill`.agent = {frappe.db.escape(_issue_agent())}"
+
+
+def ai_agent_run_has_permission(doc, ptype=None, user=None, debug=False):
+	"""Trainers read the Issue Assistant's runs, not the Accounting ones (AI review on !1392)."""
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	roles = set(frappe.get_roles(user))
+	if "System Manager" in roles or not _trainer_only(roles):
+		return True
+	return doc.get("agent") == _issue_agent()
+
+
+def ai_agent_run_query(user=None):
+	user = user or frappe.session.user
+	roles = set(frappe.get_roles(user))
+	if user == "Administrator" or "System Manager" in roles or not _trainer_only(roles):
+		return ""
+	return f"`tabAI Agent Run`.agent = {frappe.db.escape(_issue_agent())}"
