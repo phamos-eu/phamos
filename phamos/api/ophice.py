@@ -1135,6 +1135,11 @@ def open_encounter(with_user):
 		frappe.throw(_("Move closer to chat."))
 	if _call_area_at(mine) or _call_area_at(theirs):
 		frappe.throw(_("This space has its own meeting: use its call and chat."))
+	# Only "Available" can be met (#2168): no chat and no call that turns on someone's mic and camera.
+	if _status_of(with_user):
+		frappe.throw(_("Not available right now."))
+	if _status_of(me):
+		frappe.throw(_("Set yourself to Available first."))
 
 	pair_key = _pair_key(me, with_user)
 	_lock_pair(pair_key)
