@@ -28,7 +28,8 @@ export function inPolygon(points, px, py) {
 	return inside
 }
 
-function nearestOnSegment([ax, ay], [bx, by], px, py) {
+/** The point of segment a-b nearest to (px, py). */
+export function nearestOnSegment([ax, ay], [bx, by], px, py) {
 	const dx = bx - ax
 	const dy = by - ay
 	const length = dx * dx + dy * dy

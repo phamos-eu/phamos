@@ -144,7 +144,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { boxOf, contains, labelPoint, MAX_POINTS, pointsOf, segmentDistance, selfCrossing, shapeOf, svgPoints } from "../utils/ophiceShapes.js"
+import { boxOf, contains, labelPoint, MAX_POINTS, nearestOnSegment, pointsOf, segmentDistance, selfCrossing, shapeOf, svgPoints } from "../utils/ophiceShapes.js"
 
 const props = defineProps({
 	areas: { type: Array, default: () => [] },
@@ -379,13 +379,23 @@ function reshapePolygon(g, dx, dy) {
 function onDown(event) {
 	if (event.button !== 0) return
 	const hit = pen.value ? { kind: "draw" } : hitAt(event)
-	gesture.value = { ...hit, start: tileAt(event), corner: cornerAt(event), clientX: event.clientX, clientY: event.clientY }
+	gesture.value = { ...hit, start: tileAt(event), corner: edgeCorner(hit, event) || cornerAt(event), clientX: event.clientX, clientY: event.clientY }
 	try {
 		// Keeps the drag when the pointer leaves the grid; some pointers can't be captured.
 		layer.value.setPointerCapture(event.pointerId)
 	} catch {
 		// dragging still works while the pointer stays on the grid
 	}
+}
+
+/** A new corner on a polygon's edge: the edge's point nearest the pointer, on the half-square grid. */
+function edgeCorner(hit, event) {
+	if (hit.kind !== "edge") return null
+	const box = layer.value.getBoundingClientRect()
+	const points = pointsOf(hit.area)
+	const pointer = [(event.clientX - box.left) / props.tile, (event.clientY - box.top) / props.tile]
+	const [x, y] = nearestOnSegment(points[hit.index], points[(hit.index + 1) % points.length], ...pointer)
+	return [Math.max(0, Math.min(props.cols, snap(x))), Math.max(0, Math.min(props.rows, snap(y)))]
 }
 
 function onMove(event) {
@@ -420,7 +430,11 @@ function onUp() {
 		// A click without dragging: free grid sets a polygon corner; an edge gets a new corner;
 		// a corner does nothing (a double-click removes it); else edit the area.
 		if (g.kind === "draw") return penClick(g)  // a gesture carries clientX / clientY like an event
-		if (g.kind === "edge") return emit("change", g.area, reshapePolygon(g, 0, 0))
+		if (g.kind === "edge") {
+			const split = reshapePolygon(g, 0, 0)
+			if (!selfCrossing(split.points)) emit("change", g.area, split)
+			return
+		}
 		if (g.kind === "point") return
 		if (g.area) emit("pick", g.area)
 		return

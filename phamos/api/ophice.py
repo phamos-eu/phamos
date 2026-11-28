@@ -823,8 +823,10 @@ def _background():
 # Stored as "grid": {"x", "y", "tile"}, all in image widths: the grid's top left corner and the
 # size of one square. Changing the number of squares keeps their size: the grid grows or shrinks.
 # The API still answers in squares ("layout": where the image lies, seen from the grid), so the
-# maps draw as before. It may reach beyond the grid: those parts are shown dimmed.
-# "zoom" is everyone's starting zoom (1 = the whole image fits the window).
+# maps draw as before. The image may reach beyond the grid; its own edges fade out (BackgroundImage).
+# "zoom" is everyone's starting zoom (1 = the whole map fills the window's height, #2224).
+# The legacy conversion below (_legacy_box, _legacy_zoom) also serves the patch
+# ophice_grid_on_background and values stored before it ran: keep it while sites may not have migrated.
 BACKGROUND_MIN_WIDTH = 5
 ZOOM_RANGE = (1.0, 3.0)
 # The window size the old starting zoom (1 = the whole grid fits) is converted for (#2139).
@@ -889,7 +891,10 @@ def _grid_from_box(left, top, width):
 
 
 def _legacy_zoom(zoom, box, ratio, cols, rows):
-	"""The old starting zoom (1 = the grid fits) as the new one (1 = the image fits), for a typical window."""
+	"""The old starting zoom (1 = the grid fits) as the new one (1 = the image fits), for a typical window.
+
+	Approximate: it assumes a 1600 x 1000 window and is clamped to ZOOM_RANGE, so a map whose image
+	is much larger or smaller than the grid may start at a slightly different zoom than before."""
 	view_w, view_h = ZOOM_REFERENCE_VIEW
 	width = box[2]
 	grid_fit = min(view_w / cols, view_h / rows)

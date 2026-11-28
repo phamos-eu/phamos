@@ -70,11 +70,20 @@ def _box(area):
 
 def contains(area, px, py, slack=0.0):
 	"""True when the point (squares) lies in the area, or within `slack` of its edge."""
-	x, y, w, h = _box(area)
+	return _contains(_resolve(area), px, py, slack)
+
+
+def _resolve(area):
+	"""(shape, box, points) of an area, read once: a polygon with broken points is a rectangle."""
 	shape = shape_of(area)
 	points = points_of(area) if shape == "Polygon" else []
 	if shape == "Polygon" and not points:
 		shape = "Rectangle"
+	return shape, _box(area), points
+
+
+def _contains(resolved, px, py, slack=0.0):
+	shape, (x, y, w, h), points = resolved
 	if shape == "Rectangle":
 		return x - slack <= px < x + w + slack and y - slack <= py < y + h + slack
 	if not (x - slack <= px <= x + w + slack and y - slack <= py <= y + h + slack):
@@ -159,11 +168,13 @@ def overlaps(a, b):
 		return False
 	if shape_of(a) == "Rectangle" and shape_of(b) == "Rectangle":
 		return True
+	# Shape, box and points once per area, not once per sample (up to some 16,000 per pair).
+	ra, rb = _resolve(a), _resolve(b)
 	y = top + OVERLAP_STEP / 2
 	while y < bottom:
 		x = left + OVERLAP_STEP / 2
 		while x < right:
-			if contains(a, x, y) and contains(b, x, y):
+			if _contains(ra, x, y) and _contains(rb, x, y):
 				return True
 			x += OVERLAP_STEP
 		y += OVERLAP_STEP

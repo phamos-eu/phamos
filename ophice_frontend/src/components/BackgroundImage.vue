@@ -273,11 +273,12 @@ function round(value) {
 	from { transform: translateY(calc(-1 * var(--wave-b))); }
 	to { transform: translateY(0); }
 }
+/* !important: the edge rules that set the wave animations are more specific than these. */
 @media (prefers-reduced-motion: reduce) {
 	.bg-image__tide,
 	.bg-image__wave,
 	.bg-image__wave-b {
-		animation: none;
+		animation: none !important;
 	}
 }
 .bg-frame {
