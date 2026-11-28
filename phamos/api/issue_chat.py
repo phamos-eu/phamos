@@ -697,17 +697,19 @@ def post_card_on_change(doc, method=None):
 	if not channel:
 		return
 	try:
-		parts = [
-			_("{0}: {1} → {2}").format(_(doc.meta.get_label(f)), _card_value(doc, f, before.get(f)), _card_value(doc, f, doc.get(f)))
+		rows = "".join(
+			"<li>{0}: {1} → {2}</li>".format(
+				escape_html(_(doc.meta.get_label(f))), _card_value_html(doc, f, before.get(f)), _card_value_html(doc, f, doc.get(f))
+			)
 			for f in changes
-		]
-		text = _("{0} changed {1}").format(_display_name(frappe.session.user), "; ".join(parts))
+		)
+		who = escape_html(_("{0} changed:").format(_display_name(frappe.session.user)))
 		message = frappe.get_doc(
 			{
 				"doctype": "Raven Message",
 				"channel_id": channel.name,
 				"message_type": "Text",
-				"text": f"<p>{escape_html(text)}</p>",
+				"text": f"<p>{who}</p><ul>{rows}</ul>",
 				"link_doctype": doc.doctype,
 				"link_document": doc.name,
 			}
@@ -718,6 +720,39 @@ def post_card_on_change(doc, method=None):
 			frappe.db.set_value("Raven Message", message.name, "owner", bot_user, update_modified=False)
 	except Exception:
 		frappe.log_error(title=f"Record chat: could not post the new card of {doc.doctype} {doc.name}")
+
+
+# The colours of Raven's own card badges (DocumentLinkRenderer: SELECT_VALUE_THEMES, PRIORITY_BADGES), so a
+# status or priority in the change line looks like the pill on the card. Raven keeps inline styles and drops
+# classes; its CSS variables switch for dark mode, the hex values are the fallback.
+PILL_THEMES = {
+	"Open": "blue", "In Progress": "blue", "Pending": "amber", "On Hold": "amber", "Closed": "gray",
+	"Completed": "green", "Cancelled": "red", "Urgent": "red", "High": "red", "Medium": "amber", "Low": "gray",
+}
+PILL_FALLBACK = {
+	"gray": ("#f3f3f3", "#525252"), "blue": ("#dbeafe", "#1e40af"), "green": ("#dcfce7", "#166534"),
+	"amber": ("#fef3c7", "#92400e"), "red": ("#fee2e2", "#991b1b"),
+}
+PILL_FIELDS = ("status", "priority")
+
+
+def _pill(text, value):
+	theme = PILL_THEMES.get(value, "gray")
+	background, ink = PILL_FALLBACK[theme]
+	ink_step = 6 if theme == "gray" else 8
+	style = (
+		f"display:inline-block;padding:0 8px;border-radius:9999px;font-size:12px;font-weight:500;"
+		f"background-color:var(--surface-{theme}-2, {background});color:var(--ink-{theme}-{ink_step}, {ink})"
+	)
+	return f'<span style="{style}">{escape_html(text)}</span>'
+
+
+def _card_value_html(doc, fieldname, value):
+	"""A changed value for the card's message: status and priority as the card's pills, others in bold."""
+	text = _card_value(doc, fieldname, value)
+	if value and fieldname in PILL_FIELDS:
+		return _pill(text, value)
+	return f"<strong>{escape_html(text)}</strong>" if value else escape_html(text)
 
 
 def _card_value(doc, fieldname, value):

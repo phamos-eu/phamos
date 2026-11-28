@@ -462,7 +462,9 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.status = "On Hold"
 		self.issue.save()
 		# an Issue's status change comes as a new card (#2234), no extra grey line
-		self.assertTrue(any("On Hold" in t for t in _card_lines(channel_id)), _card_lines(channel_id))
+		card = _card_lines(channel_id)[-1]
+		self.assertIn("On Hold", card)
+		self.assertIn("var(--surface-amber-2", card)  # the card's pill colour for On Hold
 		self.assertFalse(any("set the status to" in t for t in _system_lines(channel_id)))
 		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
 
@@ -475,7 +477,7 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.save()
 		cards = _card_lines(channel_id)
 		self.assertEqual(len(cards), before + 1)
-		self.assertIn(f"→ {priority}", cards[-1])
+		self.assertIn(f">{priority}</span>", cards[-1])
 		self.assertIn(frappe._("Priority"), cards[-1])
 
 	def test_other_changes_post_no_card(self):
@@ -502,8 +504,8 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.save()
 		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
 		cards = _card_lines(channel_id)
-		self.assertTrue(any("→ Closed" in t for t in cards), cards)
-		self.assertTrue(any("Closed → Open" in t for t in cards), cards)
+		self.assertTrue(any("Closed</span>" in t for t in cards), cards)
+		self.assertTrue(any("Closed</span> → <span" in t and "Open</span>" in t for t in cards), cards)
 
 	def test_assignments_are_posted_once(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
