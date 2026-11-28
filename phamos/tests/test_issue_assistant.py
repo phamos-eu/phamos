@@ -429,6 +429,20 @@ class TestClassify(IssueAssistantTestCase):
 		self.classify(doc)
 		self.chat.assert_not_called()
 
+	def test_screenshot_of_another_record_is_not_read(self):
+		from phamos.ai_agents.agents.issue_classify import screenshot_images
+
+		png = b"\x89PNG\r\n\x1a\n" + b"1" * 32
+		other = self.issue(raised_by=WEBSITE_USER, customer=self.OTHER_CUSTOMER, subject="Other customer's Issue")
+		file_doc = frappe.get_doc({"doctype": "File", "file_name": f"phriend-{other.name}.png", "is_private": 1,
+			"attached_to_doctype": "Issue", "attached_to_name": other.name, "content": png}).insert(ignore_permissions=True)
+		self.addCleanup(lambda: frappe.delete_doc("File", file_doc.name, force=True, ignore_permissions=True))
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		doc.db_set("phriend_screenshot", file_doc.file_url)
+		self.assertEqual(screenshot_images(doc), [])
+		other.db_set("phriend_screenshot", file_doc.file_url)
+		self.assertEqual(screenshot_images(other), [("image/png", png)])
+
 	def test_model_failure_keeps_the_code_brief(self):
 		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
 		with patch("phamos.ai_agents.agents.issue_classify.llm.chat_json", side_effect=TimeoutError("slow")), \
