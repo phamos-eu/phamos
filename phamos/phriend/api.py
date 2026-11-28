@@ -784,16 +784,67 @@ def _raise_for_gitlab(response, what, sudo=None):
 
 
 @frappe.whitelist()
-def get_gitlab_defaults():
-	frappe.has_permission(REPORT_DOCTYPE, "write", throw=True)
+def get_gitlab_defaults(issue):
+	doc = frappe.get_doc(REPORT_DOCTYPE, issue)
+	doc.check_permission("write")
 	settings = _settings()
 	url, token = _gitlab_url_and_token(settings)
+	implementation = doc.get("custom_implementation")
 	return {
 		"gitlab_url": url,
-		"gitlab_project": settings.gitlab_project or DEFAULT_GITLAB_PROJECT,
+		"implementation": implementation,
+		"gitlab_projects": [
+			{"name": p.name, "label": p.namespace or p.title or p.name} for p in _gitlab_projects_of(implementation)
+		],
 		"gitlab_labels": settings.gitlab_labels,
 		"has_token": bool(token),
 	}
+
+
+def _gitlab_projects_of(implementation):
+	"""The GitLab Projects an Issue of this Implementation may get GitLab issues in (#2167)."""
+	if not implementation:
+		return []
+	return frappe.get_all(
+		"GitLab Project",
+		filters={"implementation": implementation},
+		fields=["name", "project_id", "namespace", "title"],
+		order_by="namespace asc, name asc",
+	)
+
+
+def _gitlab_target(doc, gitlab_project=None):
+	"""The GitLab Project a GitLab issue for this Issue goes to: one of its Implementation's.
+
+	No Implementation, no GitLab Project for it, or a project of another Implementation: no
+	GitLab issue (PM, #2167). Never a free path: the token may reach every project.
+	"""
+	implementation = doc.get("custom_implementation")
+	if not implementation:
+		frappe.throw(
+			_("Set the Implementation on this Issue first. The GitLab project is taken from it."),
+			title=_("No Implementation"),
+		)
+	projects = _gitlab_projects_of(implementation)
+	if not projects:
+		frappe.throw(
+			_("No GitLab Project is linked to Implementation {0}. Link one in {1} first.").format(
+				escape_html(implementation), f'<a href="/app/gitlab-project">{_("GitLab Project")}</a>'
+			),
+			title=_("No GitLab Project"),
+		)
+	if gitlab_project:
+		for project in projects:
+			if project.name == cstr(gitlab_project):
+				return project
+		frappe.throw(
+			_("GitLab Project {0} does not belong to Implementation {1}").format(
+				escape_html(cstr(gitlab_project)), escape_html(implementation)
+			)
+		)
+	if len(projects) > 1:
+		frappe.throw(_("Implementation {0} has several GitLab Projects. Choose one.").format(escape_html(implementation)))
+	return projects[0]
 
 
 @frappe.whitelist()
@@ -810,19 +861,20 @@ def test_gitlab_connection():
 
 
 @frappe.whitelist(methods=["POST"])
-def create_gitlab_issue(issue, labels=None, title=None):
+def create_gitlab_issue(issue, labels=None, title=None, gitlab_project=None):
 	"""A GitLab issue from an Issue, linked to it as a GitLab Issue record.
 
 	Any Issue, and as often as needed: one Issue can hold several GitLab issues (PM, 2026-11-17).
-	`gitlab_issue_url` keeps the first one.
+	`gitlab_issue_url` keeps the first one. It goes to a GitLab Project of the Issue's
+	Implementation; `gitlab_project` picks one when it has several (#2167).
 	"""
 	doc = frappe.get_doc(REPORT_DOCTYPE, issue)
 	doc.check_permission("write")
 
 	settings = _settings()
+	target = _gitlab_target(doc, gitlab_project)
 	base, headers = _gitlab(settings)
-	# internal assistant: always the configured project (phamos/phamos by default), never a user's choice
-	api = _project_api(base, settings.gitlab_project or DEFAULT_GITLAB_PROJECT)
+	api = _project_api(base, target.project_id)
 
 	# GitLab shows the token's owner as author unless we act as the reporter (Sudo, admin token only)
 	sudo = _gitlab_username_for(base, headers, doc.get("phriend_reported_by") or doc.owner)
@@ -873,10 +925,10 @@ def _upload_screenshot(api, headers, file_url, sudo=None):
 	content = file_doc.get_content()
 	if isinstance(content, str):
 		content = content.encode()
-	return _upload_image(api, headers, file_doc.file_name, content)
+	return _upload_image(api, headers, file_doc.file_name, content, sudo)
 
 
-def _upload_image(api, headers, file_name, content):
+def _upload_image(api, headers, file_name, content, sudo=None):
 	"""Upload an image to the GitLab project; returns the markdown that shows it."""
 	mimetype = "image/jpeg" if file_name.endswith(".jpg") else "image/png"
 	response = requests.post(

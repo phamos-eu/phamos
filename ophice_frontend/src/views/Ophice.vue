@@ -420,7 +420,7 @@
 						:movable="isCallBubble(bubble)"
 						:dragging="callDrag !== null"
 						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
-						:call-starts-off="bubble.fromPeer"
+						:call-starts-off="bubble.callOff"
 						:me-chip="me"
 						:style="{
 							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
@@ -758,6 +758,7 @@ import {
 	CALL_DEFAULT,
 	callBox,
 	encounterCallWindowName,
+	encounterOpening,
 	jitsiCallUrl,
 	resizeCall,
 	splitCall,
@@ -995,7 +996,11 @@ const imageBox = computed(() =>
 /** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
 function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
-	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) {
+		// A finger on a chip does not pan, but it can pinch with a second finger (#2213).
+		camera().onChipPointerDown(event)
+		return
+	}
 	camera().onPointerDown(event)
 }
 
@@ -1063,6 +1068,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,
@@ -1632,7 +1638,7 @@ const videoUser = computed(() => {
 const callWindows = {}
 function openEncounterCall(bubble) {
 	// Approached (#2165): in its own window, too, mic and camera off until I turn them on.
-	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.fromPeer })
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.callOff })
 	if (!url) return
 	const name = encounterCallWindowName(bubble.video)
 	const open = callWindows[name]
@@ -1802,7 +1808,8 @@ function checkEncounters() {
 	}
 }
 
-async function openBubble(other, { focus = false, fromPeer = false } = {}) {
+async function openBubble(other, { focus = false, fromPeer = false, answer = false } = {}) {
+	const opening = encounterOpening({ fromPeer, answer })
 	const bubble = reactive({
 		pendingText: "",
 		focusOnOpen: focus,
@@ -1814,12 +1821,12 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		error: "",
 		sending: false,
 		// The other person walked up (#2165): my call joins at once, with mic and camera off.
-		fromPeer,
+		callOff: opening.callOff,
 	})
 	bubbles[other.user] = bubble
 	try {
 		// Starting a chat myself means I'm back (#2168): only Available people meet.
-		if (!fromPeer) await backFromStatus()
+		if (opening.backToAvailable) await backFromStatus()
 		// The server checks that we really stand together: my latest spot goes first.
 		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
@@ -3173,7 +3180,7 @@ async function sendFromPing(ping, text, done) {
 			const other = others.value.find((o) => o.user === ping.user)
 			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
 			// Answering someone who came over (#2165): my call starts with mic and camera off.
-			if (!bubbles[other.user]?.encounter) await openBubble(other, { fromPeer: ping.kind === "walkup" })
+			if (!bubbles[other.user]?.encounter) await openBubble(other, { answer: ping.kind === "walkup" })
 			const bubble = bubbles[other.user]
 			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
 			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
@@ -3194,7 +3201,7 @@ function openFromPing(ping) {
 	if (!other) return
 	nextTick(() => {
 		if (bubbles[other.user]) focusBubble(other.user)
-		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, fromPeer: ping.kind === "walkup" })
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, answer: ping.kind === "walkup" })
 	})
 }
 
