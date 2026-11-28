@@ -1,6 +1,7 @@
 import { createSpaRouter } from "@spa/router.js"
 import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
 import TeamGitlab from "./views/TeamGitlab.vue"
+import TeamMates from "./views/TeamMates.vue"
 import TeamImplementations from "./views/TeamImplementations.vue"
 import TeamStatistics from "./views/TeamStatistics.vue"
 import spaConfig from "./config"
@@ -27,6 +28,11 @@ export default createSpaRouter({
 			path: "/gitlab",
 			name: "TeamGitlab",
 			component: TeamGitlab,
+		},
+		{
+			path: "/team-mates",
+			name: "TeamMates",
+			component: TeamMates,
 		},
 	],
 })

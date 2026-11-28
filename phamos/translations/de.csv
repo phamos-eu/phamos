@@ -3462,3 +3462,26 @@ Last merge request sync; the next one fetches what changed since then (#1977).,"
 Added,Hinzugefügt
 Merged,Gemergt
 {0} changed:,{0} hat geändert:
+{0} of {1} checked in · updated {2},{0} von {1} eingecheckt · aktualisiert {2}
+Loading team mates…,Teammitglieder werden geladen…
+Nobody is in this team today.,Heute ist niemand in diesem Team.
+In focus,Im Fokus
+No project,Kein Projekt
+On a break,In der Pause
+No timer running,Kein Timer läuft
+Public holiday,Feiertag
+Day off,Freier Tag
+Checked in since {0},Eingecheckt seit {0}
+Not checked in,Nicht eingecheckt
+Could not load the team mates.,Die Teammitglieder konnten nicht geladen werden.
+Team mates,Teammitglieder
+"Who is there, and on what they work",Wer da ist und woran gearbeitet wird
+No team chat yet.,Noch kein Teamchat.
+Start one with the people of this team. Messages also show up in Raven.,Starten Sie ihn mit den Personen dieses Teams. Nachrichten erscheinen auch in Raven.
+Start the team chat in Raven,Teamchat in Raven starten
+Join the team chat in Raven,Dem Teamchat in Raven beitreten
+Read the team chat,Teamchat lesen
+Open the team chat in Raven,Teamchat in Raven öffnen
+Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
+Team chat of {0},Teamchat von {0}
+Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
