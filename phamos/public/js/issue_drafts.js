@@ -69,7 +69,8 @@ function issue_drafts_open(frm, draft) {
 		title: __("E-mail draft by the Issue Assistant"),
 		recipients: draft.recipients,
 		cc: draft.cc || "",
-		subject: draft.subject,
+		// drafts from before #2229's subject rule: Frappe's identifier threads the answer back
+		subject: draft.subject.includes(`#${frm.doc.name}`) ? draft.subject : `${draft.subject} (#${frm.doc.name})`,
 		message: draft.content,
 		success() {
 			// sent the usual way: the draft has done its job

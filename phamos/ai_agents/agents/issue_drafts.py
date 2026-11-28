@@ -64,23 +64,144 @@ def create_draft(issue, subject, body, run=None):
 	to = reporter_email(issue)
 	if not to:
 		frappe.throw(_("The Issue has no reporter e-mail address to write to."))
-	content = "".join(f"<p>{escape_html(line)}</p>" for line in cstr(body).split("\n") if line.strip())
+	content = letter_html(body, issue_link_paragraph(issue, body))
 	comm = frappe.get_doc({
 		"doctype": "Communication",
 		"communication_type": "Communication",
 		# not "Email" yet: Frappe would add timeline links to the recipients' Contacts and Customer
 		"communication_medium": "Other",
 		"sent_or_received": "Sent",
-		"subject": cstr(subject).strip()[:140] or issue.subject,
+		"subject": subject_with_number(subject or issue.subject, issue.name),
 		"content": content,
 		"recipients": to,
 		DRAFT_FIELD: 1,
 		ISSUE_FIELD: issue.name,
 		RUN_FIELD: run,
 	})
-	comm.flags.skip_add_signature = True  # the sender's signature comes with Send
+	# the e-mail dialog adds the sender's signature (their User's, else the Email Account's)
+	comm.flags.skip_add_signature = True
 	comm.insert(ignore_permissions=True)
 	return comm.name
+
+
+def subject_with_number(subject, issue_name):
+	"""The subject with the Issue number in Frappe's own form "(#ISS-…)", which also threads the
+	customer's answer back into the Issue when the mail client drops the message id (PM, 2026-11-28)."""
+	identifier = f"#{issue_name}"
+	text = cstr(subject).strip()
+	if identifier not in text:
+		# a bare number from the model, e.g. "(ISS-2026-00637)" or "ISS-2026-00637:", gives way to the identifier
+		text = re.sub(rf"\(?\s*{re.escape(issue_name)}\s*\)?\s*:?", "", text).strip(" -:–")
+		text = f"{text} ({identifier})" if text else identifier
+	return text[:140]
+
+
+def issue_url(issue):
+	"""Where the customer sees the Issue: its page in the Implementation Cockpit when the reporter may open
+	that Implementation there (Customer stakeholder, shown on the customer portal), else the Issue portal.
+	Longer term customers are led to the Implementation Cockpit for everything (PM, 2026-11-28)."""
+	from urllib.parse import quote
+
+	from phamos.ai_agents.agents.issue import implementation_of
+
+	implementation = implementation_of(issue)
+	if implementation and implementation in _reporter_implementations(issue):
+		return get_url(f"/implementation-cockpit/{quote(implementation, safe='')}/issues/{quote(issue.name, safe='')}")
+	return get_url(f"/issues/{quote(issue.name, safe='')}")
+
+
+def _reporter_implementations(issue):
+	"""The Implementations the reporter's User may open in the Implementation Cockpit."""
+	from phamos.api.implementation_cockpit import _customer_implementations
+
+	user = frappe.db.get_value("User", {"email": reporter_email(issue)}, "name") if reporter_email(issue) else None
+	return _customer_implementations(user) if user else []
+
+
+ISSUE_LINK_TEXT = {
+	"de": "Den aktuellen Stand Ihrer Anfrage {0} sehen Sie jederzeit hier:",
+	"en": "You can follow your request {0} here at any time:",
+}
+
+
+GERMAN_MARKERS = ("sehr geehrte", "guten tag", "hallo", "liebe ", "lieber ", "mit freundlichen")
+
+
+def letter_language(body, issue):
+	"""German or English for the added link sentence: the e-mail's own language when its salutation or
+	closing tells, else the reporter's (local test 2026-11-28: German e-mail, English User)."""
+	paragraphs = letter_paragraphs(body)
+	ends = [paragraphs[0][0], paragraphs[-1][0]] if paragraphs else []
+	if any(end.lower().startswith(GERMAN_MARKERS) or any(m in end.lower() for m in ("grüße", "gruß")) for end in ends):
+		return "de"
+	if ends:
+		return "en"
+	return "de" if cstr(reporter_language(issue)).lower().startswith("de") else "en"
+
+
+def issue_link_paragraph(issue, body=""):
+	"""The paragraph with the link to the Issue, in the e-mail's language (German or English)."""
+	return [ISSUE_LINK_TEXT[letter_language(body, issue)].format(issue.name), issue_url(issue)]
+
+
+# closing lines: everything after one of them (a name, "phamos Issue Assistant") is dropped, since the
+# sender's signature follows (PM, 2026-11-28)
+CLOSINGS = (
+	"mit freundlichen grüßen", "mit freundlichem gruß", "freundliche grüße", "viele grüße", "beste grüße",
+	"herzliche grüße", "liebe grüße", "best regards", "kind regards", "regards", "best wishes", "sincerely",
+	"yours sincerely", "cordialement", "met vriendelijke groet",
+)
+LIST_MARKS = ("- ", "* ", "• ", "– ")
+
+
+def _is_closing(line):
+	return line.strip().rstrip(",.!").lower() in CLOSINGS
+
+
+def letter_paragraphs(body):
+	"""The draft's text as paragraphs (lists of lines), laid out like a German business letter: salutation,
+	empty line, paragraphs and lists separated by empty lines, the closing line last, no signature."""
+	lines = [line.rstrip() for line in cstr(body).replace("\r\n", "\n").split("\n")]
+	closing = next((i for i, line in enumerate(lines) if _is_closing(line)), None)
+	if closing is not None:
+		lines = lines[: closing + 1]  # the sender's signature follows; drop the model's own sign-off
+	paragraphs, current = [], []
+
+	def close():
+		if current:
+			paragraphs.append(current[:])
+			current.clear()
+
+	for i, line in enumerate(lines):
+		text = line.strip()
+		if not text:
+			close()
+			continue
+		is_item = text.startswith(LIST_MARKS)
+		was_item = bool(current) and current[-1].startswith(LIST_MARKS)
+		if current and (is_item != was_item or _is_closing(text)):
+			close()  # a list stands apart from the text around it, and so does the closing line
+		current.append(text)
+		if i == 0 and text.endswith(","):
+			close()  # the salutation is a line of its own
+	close()
+	return paragraphs
+
+
+def letter_html(body, link_paragraph=None):
+	"""Paragraphs with an empty line between them, as the e-mail dialog's editor shows them. The link
+	paragraph goes right before the closing line; its URL becomes a link."""
+	paragraphs = letter_paragraphs(body)
+	if link_paragraph:
+		at = len(paragraphs) - 1 if paragraphs and _is_closing(paragraphs[-1][0]) else len(paragraphs)
+		paragraphs.insert(at, list(link_paragraph))
+
+	def line_html(line):
+		if line.startswith(("https://", "http://")) and " " not in line:
+			return f'<a href="{escape_html(line)}">{escape_html(line)}</a>'
+		return escape_html(line)
+
+	return "<p><br></p>".join("<p>" + "<br>".join(line_html(line) for line in p) + "</p>" for p in paragraphs)
 
 
 def draft_url(issue_name, draft):

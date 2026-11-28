@@ -1044,6 +1044,58 @@ class TestDrafts(ChatTestCase):
 			"custom_draft_issue", "custom_ai_agent_run", "custom_implementation_specific_end"])
 		self.assertLess(names.index("custom_implementation_specific_end"), names.index("subject"))
 
+	def test_draft_is_laid_out_like_a_letter_without_a_sign_off(self):
+		# local test 2026-11-28: one line per <p>, no empty lines, signed "phamos Issue Assistant"
+		body = ("Sehr geehrte Frau Berger,\nvielen Dank für Ihre Anfrage.\nBitte senden Sie uns:\n"
+			"- die Rechnungsnummer\n- einen Screenshot\nDanach prüfen wir das.\nMit freundlichen Grüßen\n"
+			"phamos Issue Assistant")
+		self.assertEqual(self.drafts.letter_paragraphs(body), [
+			["Sehr geehrte Frau Berger,"],
+			["vielen Dank für Ihre Anfrage.", "Bitte senden Sie uns:"],
+			["- die Rechnungsnummer", "- einen Screenshot"],
+			["Danach prüfen wir das."],
+			["Mit freundlichen Grüßen"],
+		])
+		html = self.drafts.letter_html(body)
+		self.assertTrue(html.startswith("<p>Sehr geehrte Frau Berger,</p><p><br></p><p>vielen Dank"), html)
+		self.assertNotIn("Issue Assistant", html)
+		self.assertTrue(html.endswith("<p>Mit freundlichen Grüßen</p>"), html)
+
+	def test_subject_has_the_issue_number_as_frappes_identifier(self):
+		f = self.drafts.subject_with_number
+		self.assertEqual(f("Fehlende Angaben", "ISS-1"), "Fehlende Angaben (#ISS-1)")
+		self.assertEqual(f("Fehlende Angaben (ISS-1)", "ISS-1"), "Fehlende Angaben (#ISS-1)")
+		self.assertEqual(f("ISS-1: Fehlende Angaben", "ISS-1"), "Fehlende Angaben (#ISS-1)")
+		self.assertEqual(f("Re: Fehlende Angaben (#ISS-1)", "ISS-1"), "Re: Fehlende Angaben (#ISS-1)")
+
+	def test_draft_links_to_the_issue_in_the_implementation_cockpit(self):
+		impl = self.implementation()
+		with patch("phamos.ai_agents.agents.issue_drafts._reporter_implementations", return_value=[impl]):
+			doc, draft, _reply = self.draft_via_chat()
+		comm = frappe.get_doc("Communication", draft)
+		self.assertIn(f"(#{doc.name})", comm.subject)
+		from urllib.parse import quote
+
+		url = frappe.utils.get_url(f"/implementation-cockpit/{quote(impl, safe='')}/issues/{doc.name}")
+		self.assertIn(f'<a href="{url}">', comm.content)
+		# a reporter who can't open the Implementation in the cockpit gets the Issue portal instead
+		self.assertEqual(self.drafts.issue_url(doc), frappe.utils.get_url(f"/issues/{doc.name}"))
+		# the link comes before the closing line, which stays last
+		paragraphs = self.drafts.letter_paragraphs("Hallo,\nText.\nViele Grüße\nBot")
+		html = self.drafts.letter_html("Hallo,\nText.\nViele Grüße\nBot", ["Stand:", url])
+		self.assertTrue(html.endswith("<p>Viele Grüße</p>"), html)
+		self.assertIn(f'Stand:<br><a href="{url}">', html)
+		self.assertEqual(paragraphs[-1], ["Viele Grüße"])
+
+	def test_link_sentence_follows_the_language_of_the_email(self):
+		issue = frappe._dict(raised_by="", contact=None)
+		self.assertEqual(self.drafts.letter_language("Sehr geehrte Frau Berger,\nText\nMit freundlichen Grüßen", issue), "de")
+		self.assertEqual(self.drafts.letter_language("Dear Ms Berger,\nText\nBest regards", issue), "en")
+
+	def test_prompt_asks_for_a_letter_without_signature(self):
+		self.assertIn("Mit freundlichen Grüßen", self.chat.CHAT_SYSTEM)
+		self.assertIn("No name, signature or company after the closing line", self.chat.CHAT_SYSTEM)
+
 	def test_discard_deletes_the_draft(self):
 		doc, draft, _reply = self.draft_via_chat()
 		self.addCleanup(frappe.set_user, "Administrator")
