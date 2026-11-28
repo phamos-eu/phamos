@@ -1236,6 +1236,16 @@ class TestLearning(LearningTestCase):
 		run = self.change(second, project=self.make_project("Issue Assistant Learning Late 2"))
 		self.assertEqual(run.outcome, "Accepted")
 
+	def test_chat_answers_are_not_compared_or_counted(self):
+		doc = self.issue(raised_by=self.SENDER)
+		run = self.run_with(doc)
+		# a later chat answer (#2116) must not hide the intake run from the comparison
+		frappe.get_doc({"doctype": "AI Agent Run", "agent": setup.ASSISTANT_NAME, "reference_doctype": "Issue",
+			"reference_name": doc.name, "trigger": "Chat", "status": "Completed", "fields_set": "status"}).insert(
+			ignore_permissions=True)
+		self.assertEqual(self.feedback.latest_run(setup.ASSISTANT_NAME, "Issue", doc.name).name, run.name)
+		self.assertNotIn("status", self.learning.rates()["fields"])
+
 	def test_rates_count_corrections_per_step(self):
 		doc = self.issue(raised_by=self.SENDER)
 		self.run_with(doc)
