@@ -16,11 +16,11 @@ from phamos.phamos.doctype.implementation_baseline.implementation_baseline impor
 from phamos.phamos.doctype.implementation_change.implementation_change import (
 	AWAITING,
 	agree_change,
-	propose_change,
 )
 from phamos.phamos.doctype.implementation_change.test_implementation_change import (
 	CUSTOMER_USER,
 	_website_user,
+	propose_change,
 )
 from phamos.phamos.doctype.implementation_feature.test_implementation_feature import make_feature
 from phamos.phamos.doctype.implementation_release.implementation_release import get_triage, preview_triage
@@ -98,6 +98,17 @@ class TestReleaseTriage(FrappeTestCase):
 		self.assertEqual(ranking(self.second), [self.b, self.c])
 		# the cut line follows: first now fits, second carries B
 		self.assertEqual(frappe.db.get_value("Implementation Release", self.first, "fit"), "Green")
+
+	def test_several_moves_out_of_one_release_can_be_open_at_once(self):
+		# one open proposal per record and type (#2219), except a release's Rank proposals
+		first = self.propose_as_customer(self.first, "Rank", {"feature": self.a, "to_release": self.second})
+		second = self.propose_as_customer(self.first, "Rank", {"feature": self.b, "to_release": self.second})
+		statuses = frappe.get_all("Implementation Change", filters={"name": ["in", [first, second]]}, pluck="status")
+		self.assertEqual(statuses, ["Proposed", "Proposed"])
+		# a release's new date is one open proposal at a time
+		self.propose_as_customer(self.first, "Dates", {"target_date": str(getdate(LATER))})
+		with self.assertRaisesRegex(frappe.ValidationError, "A proposal for this is open"):
+			self.propose_as_customer(self.first, "Dates", {"target_date": str(getdate(add_days(LATER, 1)))})
 
 	def test_new_target_date(self):
 		name = self.propose_as_customer(self.first, "Dates", {"target_date": str(getdate(LATER))})

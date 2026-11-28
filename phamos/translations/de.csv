@@ -3658,6 +3658,26 @@ entered by {0},eingetragen von {0}
 {0}: the forecast improved,{0}: die Prognose hat sich verbessert
 "{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
 {0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht
+Withdrawn,Zurückgezogen
+Reason for the decision,Begründung der Entscheidung
+Why the proposal was rejected or withdrawn. The proposer's own reason stays in Reason.,Warum der Vorschlag abgelehnt oder zurückgezogen wurde. Die Begründung des Vorschlags bleibt unter Begründung.
+"Proposed: one side asked. Agreed: both sides agreed, applied at the planning session. Withdrawn: the proposer took it back. Applied – awaiting customer: a PM changed it directly; the customer confirms or disputes it.","Vorgeschlagen: eine Seite hat gefragt. Vereinbart: beide Seiten haben zugestimmt, wird im Planungsmeeting übernommen. Zurückgezogen: die vorschlagende Seite hat ihn zurückgenommen. Übernommen – wartet auf Kunden: ein PM hat es direkt geändert; der Kunde bestätigt oder widerspricht."
+Give a short reason.,Bitte kurz begründen.
+"A proposal for this is open: agree, reject or withdraw it first.","Dazu ist ein Vorschlag offen: erst zustimmen, ablehnen oder zurückziehen."
+A Draft chapter isn't agreed yet: edit it directly.,Ein Kapitel im Entwurf ist noch nicht vereinbart: bearbeiten Sie es direkt.
+A cancelled chapter is not planned any more.,Ein abgesagtes Kapitel ist nicht mehr geplant.
+A chapter's title and description change in a Stakeholder Meeting.,Titel und Beschreibung eines Kapitels ändern sich in einem Stakeholder-Meeting.
+"Changes can be proposed for features, releases, chapters and the implementation.","Änderungen können für Features, Releases, Kapitel und die Implementierung vorgeschlagen werden."
+Name the values to change. Plan changes are proposed in the Implementation Cockpit.,Nennen Sie die zu ändernden Werte. Planänderungen werden im Implementierungs-Cockpit vorgeschlagen.
+Only the side that proposed it can withdraw it.,"Nur die Seite, die ihn vorgeschlagen hat, kann ihn zurückziehen."
+{0} proposes a change to {1}.,{0} schlägt eine Änderung an {1} vor.
+{0} agreed to the change of {1}.,{0} hat der Änderung an {1} zugestimmt.
+{0} rejected the change of {1}.,{0} hat die Änderung an {1} abgelehnt.
+{0} confirmed the change of {1}.,{0} hat die Änderung an {1} bestätigt.
+{0} disputes the change of {1}.,{0} widerspricht der Änderung an {1}.
+The customer,Der Kunde
+Choose a planned chapter of this implementation.,Wählen Sie ein geplantes Kapitel dieser Implementierung.
+Target Date must be after Planned Start.,Das Zieldatum muss nach dem geplanten Start liegen.
 No activity for {0} days,Seit {0} Tagen keine Aktivität
 First response missed,Erste Antwort verpasst
 First response due,Erste Antwort bald fällig

@@ -25,7 +25,7 @@ frappe.ui.form.on("Implementation Change", {
 		}
 		if (["Proposed", "Agreed"].includes(status)) {
 			frm.add_custom_button(__("Reject"), () =>
-				frappe.prompt({ fieldname: "reason", fieldtype: "Small Text", label: __("Reason") }, (v) =>
+				frappe.prompt({ fieldname: "reason", fieldtype: "Small Text", label: __("Reason"), reqd: 1 }, (v) =>
 					call("reject_change", { reason: v.reason }), __("Reject change"))
 			);
 		}
