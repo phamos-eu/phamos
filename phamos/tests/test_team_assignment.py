@@ -281,3 +281,19 @@ class TestSyncEdges(TeamAssignmentTestCase):
 		# the daily job catches up once the Team is fine again
 		ta.sync_all_teams()
 		self.assertEqual([row.employee for row in frappe.get_doc("Team", TEAM_A).team_members], [self.anna])
+
+
+class TestConnections(FrappeTestCase):
+	"""Team Assignments show on the Connections tab of the Team and of the Employee."""
+
+	def test_team_shows_its_assignments(self):
+		dashboard = frappe.get_meta("Team").get_dashboard_data()
+		items = [item for group in dashboard.transactions for item in group["items"]]
+		self.assertIn("Team Assignment", items)
+		self.assertEqual(dashboard.fieldname, "team")
+
+	def test_employee_shows_their_assignments(self):
+		from phamos.custom_scripts.custom_python.employee_dashboard import get_employee_dashboard_data
+
+		data = get_employee_dashboard_data({"transactions": []})
+		self.assertIn("Team Assignment", data["transactions"][0]["items"])
