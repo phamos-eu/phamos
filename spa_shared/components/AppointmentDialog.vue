@@ -52,7 +52,7 @@
 						</div>
 					</div>
 
-					<FormControl v-model="form.description" :label="__('Description')" type="textarea" size="sm" :rows="3" />
+					<FormControl v-model="form.description" :label="__('Description')" type="textarea" size="sm" :rows="7" />
 				</div>
 
 				<div class="flex min-w-0 flex-col">
