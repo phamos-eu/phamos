@@ -900,6 +900,26 @@ class TestChat(ChatTestCase):
 		self.assertEqual(run.status, "Completed", run.error)
 		self.assertIn("ValidationError", reply)
 
+	def test_a_failing_save_leaves_no_partial_writes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		frappe.db.set_value("Customer", CUSTOMER, "customer_details", "before")
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+
+		def half_done(*args, **kwargs):
+			frappe.db.set_value("Customer", CUSTOMER, "customer_details", "partial")
+			raise frappe.ValidationError("no")
+
+		with patch("erpnext.support.doctype.issue.issue.Issue.validate", side_effect=half_done), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
+		self.assertEqual(frappe.db.get_value("Customer", CUSTOMER, "customer_details"), "before")
+
+	def test_named_means_a_whole_word(self):
+		self.assertTrue(self.chat.named_in_message("custom_implementation", "AG", "die ag soll es sein"))
+		self.assertFalse(self.chat.named_in_message("custom_implementation", "AG", "guten tag, bitte"))
+
 	def test_actions_outside_the_list_or_when_asking_back_are_not_applied(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
 		doc, channel, brief = self.issue_with_brief()

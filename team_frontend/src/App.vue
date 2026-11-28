@@ -61,6 +61,8 @@ const navItems = [
 	// Hours only, no currency (#1975)
 	{ name: "TeamStatistics", label: "Statistics", icon: "bar-chart-2", match: ["TeamStatistics"] },
 	{ name: "TeamImplementations", label: "Implementations", icon: "layers", match: ["TeamImplementations"] },
+	// Team totals only (#1976)
+	{ name: "TeamGitlab", label: "GitLab", icon: "git-branch", match: ["TeamGitlab"] },
 ]
 
 const teamGroups = computed(() => [
@@ -114,6 +116,7 @@ const pageTitle = computed(() => {
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
 	if (route.name === "TeamStatistics") return "Statistics"
 	if (route.name === "TeamImplementations") return "Implementations"
+	if (route.name === "TeamGitlab") return "GitLab"
 	return "Issues"
 })
 
@@ -135,6 +138,7 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "TeamStatistics") return "Logged against available hours"
 	if (route.name === "TeamImplementations") return "The team's implementations, in hours"
+	if (route.name === "TeamGitlab") return "Closing times and SLA of the team"
 	return "Team issues overview"
 })
 </script>

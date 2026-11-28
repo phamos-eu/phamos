@@ -18,6 +18,9 @@ bot. Everything else in the chat is left alone. The run is an AI Agent Run with 
   no status change, no delete, nothing sent to a customer.
 """
 
+import html
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import cstr, escape_html, now_datetime, strip_html_tags
@@ -48,7 +51,8 @@ def named_in_message(field, value, text):
 	title_field = NAMED_FIELDS.get(field)
 	if title_field:
 		names.add(cstr(frappe.db.get_value(SETTABLE_FIELDS[field], value, title_field)).lower())
-	return any(n and n in text for n in names)
+	# whole words only, so a short title such as "AG" isn't "named" inside another word (AI review on !1386)
+	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text) for n in names)
 
 
 CHAT_SYSTEM = (
@@ -209,7 +213,7 @@ def compose_answer(issue, message, asker, agent, result):
 	result.update(model=model, calls=1)
 	answer = answer if isinstance(answer, dict) else {}
 	lines = [cstr(answer.get("answer")).strip() or _("I have no answer to that.")]
-	result["message_text"] = strip_html_tags(cstr(message.text)).lower()
+	result["message_text"] = html.unescape(strip_html_tags(cstr(message.text))).lower()
 	if not answer.get("ask_back"):
 		for action in answer.get("actions") or []:
 			if isinstance(action, dict):
@@ -226,6 +230,8 @@ def apply_action(issue_name, action, asker, result):
 	"""One action, in the asker's session: their permissions decide. Anything else is reported."""
 	kind = action.get("type")
 	assistant = frappe.session.user
+	# a failed save must not leave half of its writes behind to be committed with the run (AI review on !1386)
+	frappe.db.savepoint("issue_assistant_action")
 	frappe.set_user(asker)
 	try:
 		if kind == "set":
@@ -280,10 +286,12 @@ def apply_action(issue_name, action, asker, result):
 		else:
 			result["refused"].append(cstr(kind) or _("that"))
 	except frappe.PermissionError:
+		frappe.db.rollback(save_point="issue_assistant_action")
 		frappe.clear_messages()
 		result["refused"].append(_("you may not do that"))
 	except Exception as e:
 		# a hook or validation refused the change: the reply still says what was done and what not
+		frappe.db.rollback(save_point="issue_assistant_action")
 		frappe.clear_messages()
 		frappe.log_error(title=f"Issue Assistant: chat action on {issue_name} failed")
 		result["refused"].append(_("it could not be saved ({0})").format(type(e).__name__))
