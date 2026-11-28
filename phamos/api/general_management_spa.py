@@ -779,7 +779,9 @@ def get_contracts(contract_type=None, status=None, party=None, ending_within_day
 		filters.append(["end_date", "between", [today(), add_days(today(), days)]])
 	or_filters = None
 	if party:
-		pattern = f"%{party}%"
+		# Escape LIKE wildcards so a typed % or _ matches itself (MariaDB's LIKE escape is a backslash).
+		escaped = party.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+		pattern = f"%{escaped}%"
 		or_filters = [["party_name", "like", pattern], ["party_full_name", "like", pattern]]
 	return frappe.get_list(
 		"Contract",
@@ -798,4 +800,6 @@ def get_contract_options():
 	return {
 		"types": frappe.get_all("Contract Type", pluck="name", order_by="name asc"),
 		"statuses": list(CONTRACT_STATUSES),
+		# The list stops at this many rows; the page then shows "500+" instead of a wrong total.
+		"limit": CONTRACT_LIMIT,
 	}

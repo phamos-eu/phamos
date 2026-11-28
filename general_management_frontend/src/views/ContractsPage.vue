@@ -7,7 +7,7 @@
 			<FormControl v-model="status" :label="__('Status')" type="select" size="sm" :options="statusOptions" />
 			<FormControl v-model="ending" :label="__('Ends within')" type="select" size="sm" :options="endingOptions" />
 			<FormControl v-model="party" :label="__('Party')" type="text" size="sm" :placeholder="__('Search party')" />
-			<span class="ml-auto self-center text-xs text-ink-gray-5">{{ __("{0} contracts", [contracts.length]) }}</span>
+			<span class="ml-auto self-center text-xs text-ink-gray-5">{{ countLabel }}</span>
 		</div>
 
 		<div v-if="error" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-ink-red-4">
@@ -73,6 +73,13 @@ const STATUS_CLASS = {
 }
 
 const contracts = ref([])
+// Row cap of get_contracts; at the cap the count reads "500+" so it is not taken as the total.
+const limit = ref(0)
+const countLabel = computed(() =>
+	limit.value && contracts.value.length >= limit.value
+		? __("{0}+ contracts", [limit.value])
+		: __("{0} contracts", [contracts.value.length]),
+)
 const types = ref([])
 const statuses = ref([])
 const contractType = ref("")
@@ -137,6 +144,7 @@ onMounted(async () => {
 		const options = await call(`${spaConfig.api}.get_contract_options`)
 		types.value = options?.types || []
 		statuses.value = options?.statuses || []
+		limit.value = options?.limit || 0
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || __("Could not load the contracts")
 		return

@@ -608,6 +608,8 @@ class TestContracts(FrappeTestCase):
 		self.assertEqual(self._names(party=self.CUSTOMER, contract_type="AVV"), {self.avv})
 		self.assertEqual(self._names(party=self.CUSTOMER, ending_within_days=30), {self.avv})
 		self.assertEqual(self._names(party=self.CUSTOMER, status="Active"), set())
+		# A typed % is a plain character, not a wildcard that matches every contract.
+		self.assertEqual(self._names(party="%"), set())
 
 	def test_needs_the_role(self):
 		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
