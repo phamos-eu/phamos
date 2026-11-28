@@ -232,10 +232,18 @@ function rectStyle(rect) {
 	}
 }
 
+// labelPoint samples the whole polygon, and the layer re-renders on every pointer move (hover):
+// work it out once per area list, not per frame.
+const labelPoints = computed(() => {
+	const points = new Map()
+	for (const area of props.areas) if (shapeOf(area) === "Polygon") points.set(area, labelPoint(area))
+	return points
+})
+
 // Name and logo: centred in the box, or for an L-shaped polygon on a spot inside it (#2144).
 function contentStyle(area) {
 	if (shapeOf(area) !== "Polygon") return { display: "contents" }
-	const [lx, ly] = labelPoint(area)
+	const [lx, ly] = labelPoints.value.get(area) || labelPoint(area)
 	const t = props.tile
 	return {
 		position: "absolute",
@@ -295,6 +303,8 @@ function finishPen() {
 
 function onKey(event) {
 	if (!pen.value) return
+	// Typing elsewhere (chat, a dialog field) keeps its own Backspace, Enter and Esc.
+	if (event.target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return
 	if (event.key === "Escape") pen.value = null
 	else if (event.key === "Enter") finishPen()
 	else if (event.key === "Backspace") {
