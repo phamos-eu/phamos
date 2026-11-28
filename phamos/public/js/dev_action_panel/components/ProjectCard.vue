@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import FrappeDatetime from "./FrappeDatetime.vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   project: Object,
@@ -84,7 +84,10 @@ function openStart() {
 function openStop()  {
   panel.value = panel.value === "stop" ? null : "stop";
   stopValueAdd.value = VALUE_ADD_DEFAULT;
-  stopBillable.value = PERCENT_BILLABLE_DEFAULT; // always 0 on Stop until the user picks another value
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  stopBillable.value = percentBillablePreset(
+    (isActive.value && props.activeProjectSession?.project_percent_billable) || props.project.percent_billable
+  );
   stopEndTime.value = systemNow();
   stopEndTimeModified.value = false;
 }

@@ -233,3 +233,42 @@ class TestMigrationAndCockpit(AgentTestCase):
 		detail = accounting_spa.get_receipt(doc.name)
 		self.assertEqual(detail["items"][0]["item_name"], "Beratung")
 		self.assertEqual(detail["ai"]["summary"], frappe.db.get_value("Accounting Receipt", doc.name, "ai_summary"))
+
+
+class TestAgentRights(FrappeTestCase):
+	"""AI review on !1347: who may read handlers and who may change who an agent runs as."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		ensure_accounting_receipt_setup()
+		self.addCleanup(frappe.db.rollback)
+		self.addCleanup(frappe.set_user, "Administrator")
+
+	def user_with(self, email, roles):
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": email.split("@")[0],
+				"send_welcome_email": 0, "roles": [{"role": r} for r in roles]}).insert(ignore_permissions=True)
+		return email
+
+	def test_get_handlers_needs_read_on_the_agent(self):
+		from phamos.ai_agents.registry import get_handlers
+
+		frappe.set_user(self.user_with("agent-rights-nobody@example.com", ["Blogger"]))
+		with self.assertRaises(frappe.PermissionError):
+			get_handlers(ACCOUNTING_AGENT)
+		frappe.set_user("Administrator")
+		self.assertIn("extract_document", get_handlers(ACCOUNTING_AGENT))
+
+	def test_accounts_manager_cannot_change_who_the_agent_runs_as(self):
+		meta = frappe.get_meta("AI Agent")
+		self.assertEqual(meta.get_field("user").permlevel, 1, "AI Agent not migrated: user should be on level 1")
+		self.assertEqual(meta.get_field("handler_module").permlevel, 1)
+		before = frappe.db.get_value("AI Agent", ACCOUNTING_AGENT, ["user", "handler_module"])
+		frappe.set_user(self.user_with("agent-rights-am@example.com", ["Accounts Manager"]))
+		agent = frappe.get_doc("AI Agent", ACCOUNTING_AGENT)
+		agent.user = "Administrator"
+		agent.handler_module = "os"
+		agent.description = "changed by an Accounts Manager"
+		agent.save()
+		self.assertEqual(frappe.db.get_value("AI Agent", ACCOUNTING_AGENT, ["user", "handler_module"]), before)
+		self.assertEqual(frappe.db.get_value("AI Agent", ACCOUNTING_AGENT, "description"), "changed by an Accounts Manager")

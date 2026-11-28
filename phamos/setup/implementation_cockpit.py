@@ -15,7 +15,19 @@ from phamos.setup.general_management import ensure_permissions as _ensure_permis
 IMPLEMENTATION_ROLE = "phamos Implementation"
 
 # Issue: the cockpit lists the reports of an Implementation and shows their screenshots (private files).
-DOCTYPES = ("Implementation", "Issue")
+# Implementation Feature and the Doctype library: what is built for an implementation (#1968, #1969).
+# Implementation Change / Baseline: plan changes and the agreed plan (#1971), shown in the cockpit.
+# Implementation Release: release planning and its realistic check (#1986).
+DOCTYPES = (
+	"Implementation",
+	"Issue",
+	"Implementation Feature",
+	"Implementation Doctype",
+	"Implementation Change",
+	"Implementation Baseline",
+	"Implementation Release",
+)
+PLANNING_MEETING_TYPE = "Planning"
 GRANTED = ("read", "report", "print")
 # The cockpit shows Implementations; changes are made in Desk by the people who may make them.
 WITHHELD = ("write", "create", "delete")
@@ -29,3 +41,8 @@ def after_migrate():
 		).insert(ignore_permissions=True)
 	for doctype in DOCTYPES:
 		_ensure_permissions(doctype, role=IMPLEMENTATION_ROLE, granted=GRANTED, withheld=WITHHELD)
+	# Stakeholder Meetings of this type apply agreed plan changes and set a baseline (#1971)
+	if not frappe.db.exists("Meeting Type", PLANNING_MEETING_TYPE):
+		frappe.get_doc({"doctype": "Meeting Type", "meeting_type_name": PLANNING_MEETING_TYPE}).insert(
+			ignore_permissions=True
+		)

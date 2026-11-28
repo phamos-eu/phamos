@@ -88,19 +88,31 @@ class BookstackClient:
 
 
 	def paginate(self, path: str, params: dict | None = None, page_size: int | None = None) -> Iterator[dict]:
+		"""Every item of a list endpoint, page by page.
 
+		Raises BookstackAPIError at the end when the answer is broken (no "data" list) or the number
+		of items differs from BookStack's ``total``. The sync then counts the list as failed and deletes
+		nothing on it: an incomplete list would otherwise read as "all the rest was deleted" (review S3).
+		"""
 		params = dict(params or {})
 		params.setdefault("count", page_size or self.DEFAULT_PAGE_SIZE)
 		offset = 0
+		received = 0
+		total = None
 		while True:
 			params["offset"] = offset
 			body = self.get(path, params=params)
-			data = (body or {}).get("data") or []
-			if not data:
-				return
+			if not isinstance(body, dict) or not isinstance(body.get("data"), list):
+				raise BookstackAPIError(200, f"Unexpected answer for {path} at offset {offset}", body)
+			if isinstance(body.get("total"), int):
+				total = body["total"]
+			data = body["data"]
 			for item in data:
 				yield item
-			if len(data) < params["count"]:
-				return
+			received += len(data)
+			if not data or len(data) < params["count"] or (total is not None and received >= total):
+				break
 			offset += len(data)
 			time.sleep(0.05)
+		if total is not None and received != total:
+			raise BookstackAPIError(200, f"{path}: received {received} items, BookStack reports {total}", None)

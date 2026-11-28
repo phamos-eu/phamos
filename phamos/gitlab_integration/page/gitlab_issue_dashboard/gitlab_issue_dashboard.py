@@ -11,13 +11,15 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     issue_scope = _normalize_issue_scope(issue_scope)
     compare_to_company = _to_bool(compare_to_company)
     compare_to_company = compare_to_company and len(selected_projects) == 1
+    # Lead/Touch/Cycle Time cards use the exact picked dates; charts use full months.
+    kpi_from_date, kpi_to_date = _resolve_exact_date_range(from_date, to_date, year)
     from_date, to_date = _resolve_date_range(from_date, to_date, year)
 
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
-    lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
-    touch_time = _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
-    cycle_time = _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
+    lead_time = _format_lead_time_response(kpi_from_date, kpi_to_date, selected_projects, issue_scope, compare_to_company)
+    touch_time = _format_touch_time_response(kpi_from_date, kpi_to_date, selected_projects, issue_scope, compare_to_company)
+    cycle_time = _format_cycle_time_response(kpi_from_date, kpi_to_date, selected_projects, issue_scope, compare_to_company)
     lifetime_tickets = _build_lifetime_ticket_rows(
         from_date, to_date, selected_projects, issue_scope, lifetime_labels, lifetime_label_mode
     )
@@ -32,6 +34,8 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     return {
         "from_date": str(from_date),
         "to_date": str(to_date),
+        "kpi_from_date": str(kpi_from_date),
+        "kpi_to_date": str(kpi_to_date),
         "projects": selected_projects,
         "issue_scope": issue_scope,
         "compare_to_company": compare_to_company,
@@ -328,6 +332,16 @@ def _normalize_projects(projects):
 
 
 def _resolve_date_range(from_date, to_date, year):
+    start_date, end_date = _resolve_exact_date_range(from_date, to_date, year)
+
+    # Charts are grouped by month, so any month touched by the range counts in full.
+    start_date = start_date.replace(day=1)
+    end_date = end_date.replace(day=monthrange(end_date.year, end_date.month)[1])
+
+    return start_date, end_date
+
+
+def _resolve_exact_date_range(from_date, to_date, year):
     if from_date and to_date:
         start_date = getdate(from_date)
         end_date = getdate(to_date)
@@ -343,10 +357,6 @@ def _resolve_date_range(from_date, to_date, year):
 
     if start_date > end_date:
         start_date, end_date = end_date, start_date
-
-    # Charts are grouped by month, so any month touched by the range counts in full.
-    start_date = start_date.replace(day=1)
-    end_date = end_date.replace(day=monthrange(end_date.year, end_date.month)[1])
 
     return start_date, end_date
 

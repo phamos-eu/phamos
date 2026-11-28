@@ -8,19 +8,34 @@ export const FILTERABLE_FIELDS = {
 		"name", "issue_id", "title", "state", "due_date", "start_date",
 		"assignee", "assignee_email", "gitlab_username",
 		"issue_url", "parent_issue", "gitlab_project", "labels",
+		"gitlab_parent_issue", "gitlab_child_issue",
 	],
 	Project: ["name", "project_name", "status", "percent_billable", "customer"],
+}
+
+// Filter-only fields, named like the Timesheet list's GitLab Parent / Child Issue (#1896). They
+// are not columns of GitLab Issue; the server works them out from parent_issue
+// (ISSUE_FAMILY_FIELDS in dev_action_panel.py): "GitLab Parent Issue = #X" shows #X and its
+// child issues, "GitLab Child Issue is set" shows child issues only.
+export const VIRTUAL_FIELDS = {
+	"GitLab Issue": {
+		gitlab_parent_issue: { label: "GitLab Parent Issue", fieldtype: "Link", options: "GitLab Issue" },
+		gitlab_child_issue: { label: "GitLab Child Issue", fieldtype: "Link", options: "GitLab Issue" },
+	},
 }
 
 // Docfields for the field dropdown, so it offers only FILTERABLE_FIELDS (and also works for
 // users without read permission on the doctype, for whom Frappe would list no fields).
 export function filterFields(doctype, getDocfield) {
+	const virtual = VIRTUAL_FIELDS[doctype] || {}
 	return (FILTERABLE_FIELDS[doctype] || [])
-		.map((fieldname) =>
-			fieldname === "name"
-				? { fieldname: "name", label: "ID", fieldtype: "Link", options: doctype, parent: doctype }
-				: getDocfield(doctype, fieldname)
-		)
+		.map((fieldname) => {
+			if (fieldname === "name") {
+				return { fieldname: "name", label: "ID", fieldtype: "Link", options: doctype, parent: doctype }
+			}
+			if (virtual[fieldname]) return { fieldname, ...virtual[fieldname], parent: doctype }
+			return getDocfield(doctype, fieldname)
+		})
 		.filter(Boolean)
 }
 

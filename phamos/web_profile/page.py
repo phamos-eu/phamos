@@ -45,9 +45,11 @@ def set_seo(context, *, title, description, path, alternates, image=None, canoni
 	context.canonical_url = get_url(canonical_path or path)
 	context.alternate_links = [{"lang": lang, "url": get_url(url)} for lang, url in alternates.items()]
 	context.alternate_links.append({"lang": "x-default", "url": get_url(alternates[DEFAULT_LANGUAGE])})
+	# Pages in one language only (the documentation, phamos/phamos#2005) pass just that language.
 	context.language_links = [
 		{"lang": lang, "label": LANGUAGE_NAMES[lang], "url": alternates[lang], "current": lang == context.lang}
 		for lang in LANGUAGES
+		if lang in alternates
 	]
 	context.metatags = {
 		"title": title,
@@ -71,6 +73,21 @@ def breadcrumb_schema(crumbs):
 		"itemListElement": [
 			{"@type": "ListItem", "position": i + 1, "name": c["label"], "item": get_url(c["url"])}
 			for i, c in enumerate(crumbs)
+		],
+	}
+
+
+def faq_schema(faqs):
+	"""FAQPage JSON-LD for the questions shown on the page, or None without questions (phamos/phamos#1823).
+	Answers keep their Text Editor HTML: schema.org allows simple markup (links, lists) in ``text``."""
+	if not faqs:
+		return None
+	return {
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		"mainEntity": [
+			{"@type": "Question", "name": f["question"].strip(), "acceptedAnswer": {"@type": "Answer", "text": f["answer"]}}
+			for f in faqs
 		],
 	}
 
