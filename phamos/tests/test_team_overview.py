@@ -55,22 +55,47 @@ class TestOverview(TeamAssignmentTestCase):
 		self.assertEqual(set(data["hours"]), {"logged", "available", "booked_rate", "billable_rate"})
 		self.assertIsInstance(data["appointments"], list)
 		self.assertEqual(set(data["absences"]), {"absences", "holidays"})
-		self.assertEqual(set(data["attention"]), {"count", "truncated", "items"})
+		self.assertEqual(data["attention"]["count"], 0)
+
+	def test_figures_are_cached_per_team(self):
+		frappe.cache.delete_keys("team_overview:")
+		self.addCleanup(frappe.cache.delete_keys, "team_overview:")
+		tc.get_team_overview()
+		with patch.object(tc, "get_gitlab_statistics", side_effect=AssertionError("not cached")):
+			self.assertEqual(tc.get_team_overview()["gitlab"], {"closed": 7, "opened": 4, "merged": 3})
 
 	def test_at_most_three_records_need_attention(self):
 		for _i in range(5):
 			doc = frappe.get_doc({"doctype": "Issue", "subject": "Idle", "custom_team": TEAM_A}).insert(ignore_permissions=True)
 			frappe.db.set_value("Issue", doc.name, "modified", "2020-01-01 09:00:00", update_modified=False)
+		frappe.db.set_single_value("Cockpit Settings", "team_attention_idle_days", 10)
 		attention = tc.get_team_overview()["attention"]
 		self.assertEqual(attention["count"], 5)
 		self.assertEqual(len(attention["items"]), 3)
+		# records only: the assignees stay on the Needs attention page
+		self.assertNotIn("assignees", attention["items"][0])
 
 	def test_a_failing_tile_leaves_the_others(self):
+		frappe.cache.delete_keys("team_overview:")
+		self.addCleanup(frappe.cache.delete_keys, "team_overview:")
 		with patch.object(tc, "get_gitlab_statistics", side_effect=RuntimeError("no sync")), patch.object(
-			tc, "get_team_attention", side_effect=frappe.PermissionError
-		), patch.object(frappe, "log_error") as log:
+			frappe, "log_error"
+		) as log:
 			data = tc.get_team_overview()
 		self.assertIsNone(data["gitlab"])
-		self.assertIsNone(data["attention"])  # no Issue rights: missing, not an error
 		self.assertIsNotNone(data["hours"])
 		self.assertEqual(log.call_count, 1)
+
+	def test_without_issue_rights_the_attention_tile_is_missing(self):
+		real = frappe.has_permission
+		with patch.object(frappe, "has_permission", side_effect=lambda doctype, *a, **k: doctype != "Issue" and real(doctype, *a, **k)), patch.object(
+			frappe, "log_error"
+		) as log:
+			data = tc.get_team_overview()
+		self.assertIsNone(data["attention"])
+		log.assert_not_called()
+
+	def test_only_for_cockpit_users(self):
+		tc.check_app_permission.return_value = False
+		with self.assertRaises(frappe.PermissionError):
+			tc.get_team_overview()
