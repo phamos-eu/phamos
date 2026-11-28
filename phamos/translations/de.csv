@@ -3351,3 +3351,5 @@ Save draft,Entwurf speichern
 E-mail sent,E-Mail gesendet
 Draft saved,Entwurf gespeichert
 Discard this e-mail draft?,Diesen E-Mail-Entwurf verwerfen?
+setting {0} without you naming it; please write which one,"{0} setzen, ohne dass Sie ihn nennen; bitte schreiben Sie, welchen"
+it could not be saved ({0}),es konnte nicht gespeichert werden ({0})

@@ -878,6 +878,28 @@ class TestChat(ChatTestCase):
 		self.assertIn("Done.", reply)
 		self.assertIn(self.project, reply)
 
+	def test_customer_is_only_set_when_the_colleague_names_it(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.set_value("Issue", doc.name, "customer", None)
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": "customer",
+			"value": CUSTOMER}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "customer"))
+		self.answer(doc, self.reply_in_thread(brief, f"customer is {CUSTOMER}"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "customer"), CUSTOMER)
+
+	def test_a_failing_save_is_reported_not_lost(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "project",
+			"value": self.project}]}, "mistral-test")
+		with patch("erpnext.support.doctype.issue.issue.Issue.validate", side_effect=frappe.ValidationError("no")), \
+				patch("phamos.ai_agents.agents.issue_chat_answer.frappe.log_error"):
+			run, reply = self.answer(doc, self.reply_in_thread(brief, f"project is {self.project}"))
+		self.assertEqual(run.status, "Completed", run.error)
+		self.assertIn("ValidationError", reply)
+
 	def test_actions_outside_the_list_or_when_asking_back_are_not_applied(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
 		doc, channel, brief = self.issue_with_brief()

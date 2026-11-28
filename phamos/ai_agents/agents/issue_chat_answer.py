@@ -37,6 +37,20 @@ SETTABLE_FIELDS = {
 	"priority": "Issue Priority",
 }
 
+# fields that decide whose Issue it is: only set when the colleague's own message names the value
+NAMED_FIELDS = {"customer": "customer_name", "contact": "full_name", "custom_implementation": None,
+	"project": "project_name"}
+
+
+def named_in_message(field, value, text):
+	"""Whether the colleague's message names the value: its ID or its title."""
+	names = {cstr(value).lower()}
+	title_field = NAMED_FIELDS.get(field)
+	if title_field:
+		names.add(cstr(frappe.db.get_value(SETTABLE_FIELDS[field], value, title_field)).lower())
+	return any(n and n in text for n in names)
+
+
 CHAT_SYSTEM = (
 	"You are the phamos Issue Assistant, a colleague in phamos' ERPNext who helps staff with one support "
 	"Issue in its chat. Answer the colleague's last message briefly and plainly. Use only the data you are "
@@ -195,6 +209,7 @@ def compose_answer(issue, message, asker, agent, result):
 	result.update(model=model, calls=1)
 	answer = answer if isinstance(answer, dict) else {}
 	lines = [cstr(answer.get("answer")).strip() or _("I have no answer to that.")]
+	result["message_text"] = strip_html_tags(cstr(message.text)).lower()
 	if not answer.get("ask_back"):
 		for action in answer.get("actions") or []:
 			if isinstance(action, dict):
@@ -220,6 +235,12 @@ def apply_action(issue_name, action, asker, result):
 				return
 			if not frappe.db.exists(SETTABLE_FIELDS[field], value):
 				result["refused"].append(_("{0} {1} does not exist").format(_(SETTABLE_FIELDS[field]), value))
+				return
+			if field in NAMED_FIELDS and not named_in_message(field, value, result.get("message_text", "")):
+				# the Issue's own text (from the customer) must never pick the customer or Implementation: the
+				# colleague has to name it (AI review on !1386)
+				result["refused"].append(_("setting {0} without you naming it; please write which one").format(
+					_(SETTABLE_FIELDS[field])))
 				return
 			doc = frappe.get_doc("Issue", issue_name)
 			if not doc.has_permission("write"):
@@ -261,6 +282,11 @@ def apply_action(issue_name, action, asker, result):
 	except frappe.PermissionError:
 		frappe.clear_messages()
 		result["refused"].append(_("you may not do that"))
+	except Exception as e:
+		# a hook or validation refused the change: the reply still says what was done and what not
+		frappe.clear_messages()
+		frappe.log_error(title=f"Issue Assistant: chat action on {issue_name} failed")
+		result["refused"].append(_("it could not be saved ({0})").format(type(e).__name__))
 	finally:
 		frappe.set_user(assistant)
 
