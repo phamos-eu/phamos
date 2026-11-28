@@ -408,6 +408,17 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertIn("Kaffee &amp; Kuchen &lt;frisch&gt;", html)
 		self.assertNotIn("&amp;amp;", html)
 
+	def test_sponsor_info_keeps_words_of_paragraphs_apart(self):
+		# Paragraphs and line breaks from the text editor become single spaces, not glued words
+		from phamos.web_profile.events import _plain_text
+
+		self.assertEqual(_plain_text("<p>Line one</p><p>Line two</p>"), "Line one Line two")
+		self.assertEqual(_plain_text("Foo<br>Bar<BR/>Baz"), "Foo Bar Baz")
+		self.assertEqual(_plain_text("<ul><li>A</li><li>B</li></ul>"), "A B")
+		self.assertEqual(_plain_text("<p>Kaffee&nbsp;&amp;\n Kuchen</p>"), "Kaffee & Kuchen")
+		self.assertEqual(_plain_text("<b>Fett</b>gedruckt"), "Fettgedruckt")  # inline tags join, as written
+		self.assertEqual(_plain_text(None), "")
+
 	def test_reminders(self):
 		future = add_days(now_datetime(), 3)
 		at = ",".join([future.strftime("%Y-%m-%dT09:00"), future.strftime("%Y-%m-%dT09:00"),
