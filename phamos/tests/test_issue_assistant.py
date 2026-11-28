@@ -1101,7 +1101,8 @@ class TestChatContext(IssueAssistantTestCase):
 		outside = self.issue(raised_by="someone@outside.example", subject="Outside sender", project=internal_project)
 		frappe.db.set_value("Issue", outside.name, "owner", "Guest")  # came in by e-mail, nobody logged in
 		frappe.db.set_value("Issue", internal.name, "owner", DESK_USER)  # a colleague, logged in
-		frappe.db.set_value("Issue", [doc.name, internal.name], "customer", None)
+		for name in (doc.name, internal.name):
+			frappe.db.set_value("Issue", name, "customer", None)
 		frappe.db.set_value("Issue", outside.name, "customer", None)
 		doc.reload()
 		names = [r["name"] for r in self.context_of(doc)["related_issues"]]

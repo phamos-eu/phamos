@@ -42,11 +42,11 @@ def readers(issue_name, asker=None):
 	return sorted(users)
 
 
-def readable(doctype, name, people):
+def readable(doctype, name, people, doc=None):
 	"""Whether every one of `people` may read the record. Nobody known: no (AI review on !1406)."""
 	if not people:
 		return False
-	doc = frappe.get_doc(doctype, name)  # loaded once, not once per person
+	doc = doc or frappe.get_doc(doctype, name)  # loaded once, not once per person
 	return all(frappe.has_permission(doctype, "read", doc=doc, user=user) for user in people)
 
 
@@ -99,11 +99,10 @@ def related_issues(issue, customer, people):
 
 	out = []
 	for row in rows:
-		if not readable("Issue", row.name, people):
-			continue
-		# the gate of each related Issue too: e.g. an outside sender's Issue on an internal project stays out
-		# of the model even when this one is internal (AI review on !1406)
-		if not model_allowed(frappe.get_doc("Issue", row.name)).get("allowed"):
+		related = frappe.get_doc("Issue", row.name)  # once, for both checks (AI review on !1406)
+		# the gate of each related Issue too, first since it is cheap: e.g. an outside sender's Issue on an
+		# internal project stays out of the model even when this one is internal (AI review on !1406)
+		if not model_allowed(related).get("allowed") or not readable("Issue", row.name, people, related):
 			continue
 		assignees = frappe.parse_json(row._assign or "[]") or []
 		out.append({"name": row.name, "subject": _short(row.subject, 140), "status": row.status, "priority": row.priority,
