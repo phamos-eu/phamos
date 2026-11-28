@@ -1068,6 +1068,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,
