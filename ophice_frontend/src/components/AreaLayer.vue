@@ -468,10 +468,15 @@ function cancel() {
 .area__title--peek {
 	position: fixed;
 	z-index: 60;
+	/* One line as long as it fits; a longer name wraps instead of running out of the box, since
+	   the peek exists to show the whole name (an ellipsis would cut it again). */
+	width: max-content;
 	max-width: min(24rem, calc(100vw - 16px));
 	transform: translate(-50%, -50%);
 	color: #fff;
-	white-space: nowrap;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: center;
 	pointer-events: none;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
