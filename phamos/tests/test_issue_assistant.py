@@ -430,6 +430,20 @@ class TestClassify(IssueAssistantTestCase):
 		self.classify(doc)
 		self.chat.assert_not_called()
 
+	def test_screenshot_of_another_record_is_not_read(self):
+		from phamos.ai_agents.agents.issue_classify import screenshot_images
+
+		png = b"\x89PNG\r\n\x1a\n" + b"1" * 32
+		other = self.issue(raised_by=WEBSITE_USER, customer=self.OTHER_CUSTOMER, subject="Other customer's Issue")
+		file_doc = frappe.get_doc({"doctype": "File", "file_name": f"phriend-{other.name}.png", "is_private": 1,
+			"attached_to_doctype": "Issue", "attached_to_name": other.name, "content": png}).insert(ignore_permissions=True)
+		self.addCleanup(lambda: frappe.delete_doc("File", file_doc.name, force=True, ignore_permissions=True))
+		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
+		doc.db_set("phriend_screenshot", file_doc.file_url)
+		self.assertEqual(screenshot_images(doc), [])
+		other.db_set("phriend_screenshot", file_doc.file_url)
+		self.assertEqual(screenshot_images(other), [("image/png", png)])
+
 	def test_model_failure_keeps_the_code_brief(self):
 		doc = self.issue(raised_by=WEBSITE_USER, customer=CUSTOMER)
 		with patch("phamos.ai_agents.agents.issue_classify.llm.chat_json", side_effect=TimeoutError("slow")), \
@@ -616,3 +630,26 @@ class TestConnections(IssueAssistantTestCase):
 			"reference_name": doc.name, "status": "Completed"}).db_insert()
 		counts = {row["doctype"]: row["count"] for row in get_open_count("Issue", doc.name)["count"]["external_links_found"]}
 		self.assertEqual(counts.get("AI Agent Run"), 2)
+
+
+class TestAgentRights(IssueAssistantTestCase):
+	"""AI review on !1347 (develop !1383): who may read handlers and who may change who an agent runs as.
+	On version-15 only System Manager has rights on AI Agent (no AI Accountant here)."""
+
+	def test_get_handlers_needs_read_on_the_agent(self):
+		from phamos.ai_agents.registry import get_handlers
+
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(DESK_USER)
+		with self.assertRaises(frappe.PermissionError):
+			get_handlers(setup.ASSISTANT_NAME)
+		frappe.set_user("Administrator")
+		self.assertIn("check_gate", get_handlers(setup.ASSISTANT_NAME))
+
+	def test_only_system_manager_sets_who_the_agent_runs_as(self):
+		meta = frappe.get_meta("AI Agent")
+		self.assertEqual(meta.get_field("user").permlevel, 1, "AI Agent not migrated: user should be on level 1")
+		self.assertEqual(meta.get_field("handler_module").permlevel, 1)
+		writers = {p.role for p in meta.permissions if p.permlevel == 1 and p.write}
+		self.assertEqual(writers, {"System Manager"})
+		self.assertFalse({p.role for p in meta.permissions} & {"AI Accountant", "Accounts Manager", "Accounts User"})
