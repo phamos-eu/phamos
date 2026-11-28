@@ -3260,5 +3260,20 @@ Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführe
 None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
 "The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
 Switch Implementations on or off,Implementierungen ein- oder ausschalten
+I can't use the AI model on this Issue: {0},Ich kann das KI-Modell für diese Anfrage nicht nutzen: {0}
+I could not answer: the model call failed ({0}).,Ich konnte nicht antworten: Der Aufruf des Modells ist fehlgeschlagen ({0}).
+I have no answer to that.,Darauf habe ich keine Antwort.
+Set on {0}'s request: {1},Auf Wunsch von {0} gesetzt: {1}
+I can't do that here: {0},Das kann ich hier nicht: {0}
+changing {0},{0} ändern
+that,das
+{0} {1} does not exist,{0} {1} existiert nicht
+you may not change this Issue,Sie dürfen diese Anfrage nicht ändern
+assigning {0},{0} zuweisen
+nobody,niemanden
+assigned {0},{0} zugewiesen
+you may not do that,Das dürfen Sie nicht
+Chat Message,Chat-Nachricht
+The Raven Message the assistant answered (#2116).,"Die Raven-Nachricht, auf die der Assistent geantwortet hat (#2116)."
 Switch an Implementation on,Implementierung einschalten
 applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.

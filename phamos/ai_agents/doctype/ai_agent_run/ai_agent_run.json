@@ -11,6 +11,7 @@
   "column_break_main",
   "status",
   "trigger",
+  "chat_message",
   "mode",
   "triggered_by",
   "manual_override",
@@ -85,8 +86,16 @@
    "fieldname": "trigger",
    "fieldtype": "Select",
    "label": "Trigger",
-   "options": "Insert\nField Change\nManual\nScheduled",
+   "options": "Insert\nField Change\nManual\nScheduled\nChat",
    "read_only": 1
+  },
+  {
+   "fieldname": "chat_message",
+   "fieldtype": "Data",
+   "label": "Chat Message",
+   "read_only": 1,
+   "depends_on": "eval:doc.trigger=='Chat'",
+   "description": "The Raven Message the assistant answered (#2116)."
   },
   {
    "fieldname": "mode",
