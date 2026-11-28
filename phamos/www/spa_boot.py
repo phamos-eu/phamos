@@ -1,14 +1,32 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Shared boot payload helpers for department / I Own My Work SPAs."""
+"""Shared boot payload helpers for the cockpit SPAs."""
+
+from contextlib import suppress
 
 import frappe
+from frappe.translate import (
+	get_parent_language,
+	get_translation_dict_from_file,
+	get_translations_from_apps,
+	get_user_translations,
+)
 from frappe.utils import cint, get_system_timezone
+
+from phamos.api.cockpit_preferences import get_preferences
+from phamos.cockpits.settings import NEUTRAL_THEME_COLOR, cockpit_window
+from phamos.phriend.boot import app_versions, phriend_boot
 
 
 def get_spa_boot(default_route):
-	"""Boot dict for Vite SPAs (csrf, timezone, user)."""
+	"""Boot dict for Vite SPAs (csrf, timezone, user, language and its translations).
+
+	`lang` and `__messages` mirror what Desk boots with, so `__()` in the SPAs (spa_shared/utils/
+	i18n.js) translates like `__()` in Desk (#1605). English needs no table.
+	"""
+	lang = frappe.local.lang or "en"
+	phriend = phriend_boot()
 	tz = {
 		"system": get_system_timezone(),
 		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
@@ -25,9 +43,58 @@ def get_spa_boot(default_route):
 			"sysdefaults": frappe.defaults.get_defaults(),
 			"timezone": tz,
 			"time_zone": tz,
+			"lang": lang,
+			"__messages": spa_translations(lang),
 			"user": {
 				"name": frappe.session.user,
 				"full_name": frappe.utils.get_fullname(),
 			},
+			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
+			# and the app versions it adds to a report. Only for users Phriend is for.
+			"phriend": phriend,
+			"versions": app_versions() if phriend else {},
+			# The user's own cockpit preferences, e.g. the panel layout of the record pages (#1910).
+			"preferences": get_preferences(),
+			# The cockpit's window colour and edge glow from Cockpit Settings (#1933).
+			"cockpit_window": cockpit_window(default_route),
 		}
 	)
+
+
+def theme_color(boot):
+	"""The page's theme-color: the cockpit colour, so an installed cockpit's title bar has it from
+	the first paint (#1933). spa_shared/theme.js keeps it after the page has loaded."""
+	return boot.cockpit_window["color"] or NEUTRAL_THEME_COLOR
+
+
+def spa_translations(lang):
+	"""Translations the SPAs need: phamos's own table, the cockpit-only table, then the site's
+	Translation records.
+
+	Not Desk's full table (all apps, about 1.6 MB for German): the SPAs only show phamos strings,
+	so common words they need belong in phamos/translations/<lang>.csv. Site translations still
+	override, as in Desk.
+	"""
+	if not lang or lang == "en":
+		return {}
+	parent = get_parent_language(lang)
+	messages = {}
+	for code in filter(None, (parent, lang)):
+		messages.update(get_translations_from_apps(code, apps=["phamos"]))
+		messages.update(_cockpit_only(code))
+	with suppress(Exception):
+		if parent:
+			messages.update(get_user_translations(parent))
+		messages.update(get_user_translations(lang))
+	return messages
+
+
+def _cockpit_only(lang):
+	"""phamos/translations/spa/<lang>.csv: words Frappe, ERPNext or HRMS already translate, where
+	the cockpits want their own German (e.g. Task = "Aufgabe", Check-in = "Einstempeln").
+
+	Frappe reads only translations/<lang>.csv, so rows here never change Desk (#1765). Put a word
+	here instead of in de.csv whenever Desk already translates it differently.
+	"""
+	path = frappe.get_app_path("phamos", "translations", "spa", f"{lang}.csv")
+	return get_translation_dict_from_file(path, lang, "phamos")

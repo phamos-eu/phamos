@@ -355,3 +355,137 @@ class TestChecklistAssignment(FrappeTestCase):
 		description = _todo(checklist.checklist_items[0]).description
 		self.assertIn("Café &amp; tea", description)
 		self.assertNotIn("&amp;amp;", description)
+
+
+class TestMoveItemBetweenChecklists(FrappeTestCase):
+	"""An item moves to another checklist of the same record with its ToDo (#1920)."""
+
+	def setUp(self):
+		self.notify = patch("phamos.phamos.doctype.checklist.checklist_assignment._notify_assignee")
+		self.notify_mock = self.notify.start()
+		self.addCleanup(self.notify.stop)
+		frappe.set_user("Administrator")
+		_ensure_checklist_role()
+		_ensure_user(USER_A)
+		self.issue = frappe.get_doc({"doctype": "Issue", "subject": "Move item test"}).insert(ignore_permissions=True)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _on_issue(self, title, *items, issue=None):
+		return frappe.get_doc(
+			{
+				"doctype": "Checklist",
+				"title": title,
+				"checklist_owner": "Administrator",
+				"document": "Issue",
+				"reference_record": (issue or self.issue).name,
+				"checklist_items": list(items),
+			}
+		).insert()
+
+	def test_item_moves_with_its_todo_and_reopens_a_completed_target(self):
+		source = self._on_issue("Source", {"description": "Call back", "assigned_to": USER_A, "due_date": "2026-12-01"}, {"description": "Stays"})
+		target = self._on_issue("Target", {"description": "Done already", "done": 1})
+		self.assertEqual(target.status, "Completed")
+		row = source.checklist_items[0]
+		todo_name = row.todo
+		self.assertTrue(todo_name)
+		self.notify_mock.reset_mock()
+
+		result = checklist_inbox.move_spa_checklist_item_to(source.name, row.name, target.name)
+
+		source.reload()
+		target.reload()
+		self.assertEqual([r.description for r in source.checklist_items], ["Stays"])
+		moved = target.checklist_items[-1]
+		self.assertEqual((moved.description, moved.assigned_to, str(moved.due_date)), ("Call back", USER_A, "2026-12-01"))
+		self.assertEqual(moved.todo, todo_name)  # the same ToDo, not a new one
+		todo = frappe.get_doc("ToDo", todo_name)
+		self.assertEqual((todo.status, todo.reference_name), ("Open", target.name))
+		self.assertIn("Target", todo.description)
+		self.assertEqual(target.status, "In Progress")
+		self.notify_mock.assert_not_called()
+		self.assertEqual(frappe.db.count("ToDo", {"allocated_to": USER_A, "reference_type": "Checklist", "status": "Open"}), 1)
+		# shared with the assignee on the target, no longer on the source
+		self.assertIn(USER_A, _shared_users(target))
+		self.assertNotIn(USER_A, _shared_users(source))
+		self.assertEqual(result["target"]["name"], target.name)
+		comments = frappe.get_all("Comment", filters={"reference_name": ["in", [source.name, target.name]], "comment_type": "Info"}, pluck="reference_name")
+		self.assertEqual(sorted(comments), sorted([source.name, target.name]))
+
+	def test_position_in_the_target(self):
+		source = self._on_issue("Source", {"description": "Moving"})
+		target = self._on_issue("Target", {"description": "One"}, {"description": "Two"})
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name, 0)
+		target.reload()
+		self.assertEqual([r.description for r in target.checklist_items], ["Moving", "One", "Two"])
+		self.assertEqual([r.idx for r in target.checklist_items], [1, 2, 3])
+
+	def test_only_between_checklists_of_the_same_record(self):
+		other_issue = frappe.get_doc({"doctype": "Issue", "subject": "Another"}).insert(ignore_permissions=True)
+		source = self._on_issue("Source", {"description": "Stuck"})
+		elsewhere = self._on_issue("Elsewhere", issue=other_issue)
+		with self.assertRaises(frappe.ValidationError):
+			checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, elsewhere.name)
+		with self.assertRaises(frappe.ValidationError):
+			checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, source.name)
+		with self.assertRaises(frappe.ValidationError):
+			checklist_inbox.move_spa_checklist_item_to(source.name, "nope", self._on_issue("Target").name)
+		source.reload()
+		self.assertEqual(len(source.checklist_items), 1)
+
+	def test_needs_write_on_both(self):
+		source = self._on_issue("Source", {"description": "Mine"})
+		target = self._on_issue("Target")
+		frappe.set_user(USER_A)  # an Employee without access to these checklists
+		with self.assertRaises(frappe.PermissionError):
+			checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+
+	def test_write_on_only_one_side_changes_nothing(self):
+		for writable in ("source", "target"):
+			source = self._on_issue("Source", {"description": "Mine"})
+			target = self._on_issue("Target")
+			shared = source if writable == "source" else target
+			frappe.share.add_docshare("Checklist", shared.name, USER_A, read=1, write=1, flags={"ignore_share_permission": True})
+			frappe.set_user(USER_A)
+			with self.assertRaises(frappe.PermissionError):
+				checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+			frappe.set_user("Administrator")
+			source.reload()
+			target.reload()
+			self.assertEqual([r.description for r in source.checklist_items], ["Mine"], writable)
+			self.assertEqual(target.checklist_items, [], writable)
+
+	def test_refuses_a_position_outside_the_target(self):
+		source = self._on_issue("Source", {"description": "Moving"})
+		target = self._on_issue("Target", {"description": "One"})
+		for bad in (-1, 2, "x"):
+			with self.assertRaises(frappe.ValidationError):
+				checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name, bad)
+
+	def test_comment_text_is_plain_and_short(self):
+		source = self._on_issue("Source", {"description": "<b>Bold</b> " + "x" * 120})
+		target = self._on_issue("Target")
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+		comment = frappe.get_all("Comment", filters={"reference_name": target.name, "comment_type": "Info"}, pluck="content")[0]
+		self.assertNotIn("<b>", comment)
+		self.assertIn("…", comment)
+
+	def test_checklist_titles_stay_text_in_the_comments(self):
+		source = self._on_issue("Source <img src=x onerror=alert(1)>", {"description": "Call"})
+		target = self._on_issue("<b>Target</b>")
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+		comments = frappe.get_all("Comment", filters={"reference_name": ["in", [source.name, target.name]], "comment_type": "Info"}, pluck="content")
+		self.assertEqual(len(comments), 2)
+		for comment in comments:
+			self.assertNotIn("<img", comment)
+			self.assertNotIn("<b>", comment)
+
+	def test_escaped_markup_stays_text_in_the_comment(self):
+		source = self._on_issue("Source", {"description": "&lt;img src=x onerror=alert(1)&gt; call"})
+		target = self._on_issue("Target")
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+		comment = frappe.get_all("Comment", filters={"reference_name": target.name, "comment_type": "Info"}, pluck="content")[0]
+		self.assertNotIn("<img", comment)

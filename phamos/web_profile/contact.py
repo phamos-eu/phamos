@@ -87,28 +87,14 @@ def _sales_contact(lang):
 def _create_opportunity(item, person, visitor):
 	"""Same idea as ERPNext's /contact form (erpnext.templates.utils.send_message), plus phone,
 	the page the request came from and the phamos person it was addressed to."""
-	source = "Website" if frappe.db.exists("Lead Source", "Website") else None
-	customer = frappe.db.sql(
-		"""select distinct dl.link_name from `tabDynamic Link` dl
-		join `tabContact` c on dl.parent = c.name
-		where dl.parenttype = 'Contact' and dl.link_doctype = 'Customer' and c.email_id = %s""",
-		visitor.email,
-	)
-	if customer:
-		party_type, party = "Customer", customer[0][0]
-	else:
-		party_type = "Lead"
-		party = frappe.db.get_value("Lead", {"email_id": visitor.email})
-		if not party:
-			first_name, _sep, last_name = visitor.name.partition(" ")
-			lead = frappe.get_doc({
-				"doctype": "Lead", "first_name": first_name, "last_name": last_name, "lead_name": visitor.name,
-				"email_id": visitor.email, "mobile_no": visitor.phone or None, "status": "Lead", "source": source,
-			})
-			lead.insert(ignore_permissions=True)
-			party = lead.name
-		elif visitor.phone and not frappe.db.get_value("Lead", party, "mobile_no"):
-			frappe.db.set_value("Lead", party, "mobile_no", visitor.phone)
+	from phamos.marketing.crm import ensure_lead_source, match_or_create_lead
+
+	# The same CRM step as every event order (phamos/phamos#1724): Customer, else Lead, else a new Lead.
+	source = ensure_lead_source("Website")
+	first_name, _sep, last_name = visitor.name.partition(" ")
+	match = match_or_create_lead(email=visitor.email, first_name=first_name, last_name=last_name,
+		phone=visitor.phone, source=source)
+	party_type, party = ("Customer", match.customer) if match.customer else ("Lead", match.lead)
 
 	owner = frappe.db.get_value("Employee", person.data["party"], "user_id") if person else None
 	# "Website: Roque Vera" for a person, "Website: Accounting · Furqan Asghar" for a page.

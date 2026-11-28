@@ -3,4 +3,8 @@ OKR Addon
 Mailcow Integration
 Gitlab Integration
 Bookstack Integration
+Cockpits
 Marketing
+Phriend
+Ophice
+AI Agents

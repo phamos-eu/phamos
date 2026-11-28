@@ -202,6 +202,34 @@ def get_field_locks(doctype, name):
 	]
 
 
+# Field-lock lookups in one call: a record's checklist section mounts one editor per checklist.
+MAX_LOCK_DOCS_PER_CALL = 200
+
+
+@frappe.whitelist()
+def get_field_locks_for(doctype, names):
+	"""Live locks of several documents of one doctype: {name: [lock, …]} (#1796).
+
+	Documents the user cannot read are left out, like get_field_locks refuses them.
+	"""
+	names = frappe.parse_json(names) if isinstance(names, str) else names
+	names = [n for n in dict.fromkeys(names or []) if isinstance(n, str) and n]
+	if len(names) > MAX_LOCK_DOCS_PER_CALL:
+		frappe.throw(_("Too many documents in one call: {0}").format(len(names)))
+	result = {}
+	for name in names:
+		try:
+			_validate_target(doctype, name, ptype="read")
+		except frappe.PermissionError:
+			frappe.clear_messages()
+			continue
+		result[name] = [
+			_serialize_lock(doctype, name, field, lock, "locked")
+			for field, lock in _read_locks(doctype, name).items()
+		]
+	return result
+
+
 def assert_fields_unlocked(doctype, name, fieldnames):
 	"""Throw FieldLockedError if any of `fieldnames` is locked by another user."""
 	fieldnames = [f for f in (fieldnames or []) if f]

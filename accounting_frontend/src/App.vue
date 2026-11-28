@@ -20,6 +20,7 @@ import spaConfig from "./config"
 
 const route = useRoute()
 const canReadMis = ref(false)
+const canReadReceivables = ref(false)
 
 const baseNavItems = [
 	{
@@ -49,6 +50,13 @@ const baseNavItems = [
 	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
 ]
 
+const receivablesNavItem = {
+	name: "Receivables",
+	label: "Receivables",
+	icon: "dollar-sign",
+	match: ["Receivables"],
+}
+
 const misNavItem = {
 	name: "MisList",
 	label: "Monthly Implementation Summary",
@@ -56,10 +64,11 @@ const misNavItem = {
 	match: ["MisList", "MisDetail"],
 }
 
-const navItems = computed(() => {
-	if (!canReadMis.value) return baseNavItems
-	return [...baseNavItems, misNavItem]
-})
+const navItems = computed(() => [
+	...baseNavItems,
+	...(canReadReceivables.value ? [receivablesNavItem] : []),
+	...(canReadMis.value ? [misNavItem] : []),
+])
 
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
@@ -67,6 +76,7 @@ const pageTitle = computed(() => {
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
+	if (route.name === "Receivables") return "Receivables"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
 	}
@@ -86,6 +96,9 @@ const pageSubtitle = computed(() => {
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
 		return "Accounting receipts — review, decide payment, send to DATEV"
 	}
+	if (route.name === "Receivables") {
+		return "Open sales invoices by customer and age, with whom to contact and when they were last reminded"
+	}
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary records"
 	}
@@ -99,8 +112,10 @@ onMounted(async () => {
 	try {
 		const settings = await call(`${spaConfig.api}.${spaConfig.settingsMethod}`)
 		canReadMis.value = Boolean(settings?.can_read_monthly_implementation_summary)
+		canReadReceivables.value = Boolean(settings?.can_read_receivables)
 	} catch {
 		canReadMis.value = false
+		canReadReceivables.value = false
 	}
 })
 </script>

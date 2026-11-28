@@ -88,6 +88,7 @@
 import { computed, ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import { session } from "@spa/session.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -162,12 +163,17 @@ watch(
 		subject.value = ""
 		description.value = ""
 		issueType.value = ""
-		assignTo.value = []
+		// In the Personal Cockpit a new Issue starts out assigned to me, so it stays in my list.
+		assignTo.value = spaConfig.personal && session.user ? [session.user] : []
 		error.value = ""
-		department.value =
-			props.options[spaConfig.departmentField] || props.options.departments?.[0] || ""
-		project.value =
-			props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
+		// Without a department/project of its own (Personal Cockpit) the lists hold every
+		// department and project, so pre-selecting the first one would be arbitrary.
+		department.value = spaConfig.departmentField
+			? props.options[spaConfig.departmentField] || props.options.departments?.[0] || ""
+			: ""
+		project.value = spaConfig.projectField
+			? props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
+			: ""
 		const priorities = props.options.priorities || []
 		priority.value = priorities.includes("Medium") ? "Medium" : priorities[0] || ""
 	}

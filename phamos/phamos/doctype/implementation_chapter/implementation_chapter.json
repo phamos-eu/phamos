@@ -18,11 +18,24 @@
   "column_break_lnfo",
   "planned_start",
   "target_date",
+  "planning_links_section",
+  "owner_user",
+  "module",
+  "gitlab_milestone",
+  "column_break_planning_links",
+  "depends_on",
+  "features",
   "section_break_zmul",
   "chapter_title",
   "chapter_introduction",
   "full_chapter_description",
-  "current_revision"
+  "current_revision",
+  "last_meeting",
+  "last_reviewed_on",
+  "decision",
+  "decision_description",
+  "history_tab",
+  "chapter_history_html"
  ],
  "fields": [
   {
@@ -65,7 +78,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nPlanned\nCancelled",
+   "options": "Draft\nPlanned\nIn Progress\nBlocked\nCancelled",
    "reqd": 1
   },
   {
@@ -83,6 +96,49 @@
    "fieldname": "target_date",
    "fieldtype": "Date",
    "label": "Target Date"
+  },
+  {
+   "fieldname": "planning_links_section",
+   "fieldtype": "Section Break",
+   "label": "Planning"
+  },
+  {
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "label": "Responsible",
+   "options": "User",
+   "description": "The person at phamos who leads this chapter."
+  },
+  {
+   "fieldname": "module",
+   "fieldtype": "Link",
+   "label": "Module",
+   "options": "Implementation Module"
+  },
+  {
+   "fieldname": "gitlab_milestone",
+   "fieldtype": "Link",
+   "label": "GitLab Milestone",
+   "options": "GitLab Milestones",
+   "description": "Optional: the GitLab milestone that carries this chapter's work."
+  },
+  {
+   "fieldname": "column_break_planning_links",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "depends_on",
+   "fieldtype": "Table MultiSelect",
+   "label": "Depends On",
+   "options": "Implementation Chapter Dependency",
+   "description": "Chapters of the same implementation that have to be done first."
+  },
+  {
+   "fieldname": "features",
+   "fieldtype": "Table MultiSelect",
+   "label": "Features",
+   "options": "Implementation Chapter Feature",
+   "description": "The features worked on in this chapter."
   },
   {
    "fieldname": "section_break_zmul",
@@ -117,18 +173,67 @@
    "label": "Target Level"
   },
   {
-   "description": "Set automatically when this Chapter is planned. The agreed content of the corresponding revision is the immutable, authoritative snapshot.",
    "fieldname": "current_revision",
    "fieldtype": "Link",
    "label": "Current Revision",
    "options": "Implementation Chapter Revision",
    "read_only": 1
+  },
+  {
+   "fieldname": "last_meeting",
+   "fieldtype": "Link",
+   "label": "Last Meeting",
+   "options": "Stakeholder Meeting",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision",
+   "fieldtype": "Select",
+   "label": "Decision",
+   "options": "\nYes\nNo\nDeferred",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision_description",
+   "fieldtype": "Small Text",
+   "label": "Decision Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "history_tab",
+   "fieldtype": "Tab Break",
+   "label": "History"
+  },
+  {
+   "fieldname": "chapter_history_html",
+   "fieldtype": "HTML",
+   "label": "History"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-08-19 12:59:51.644282",
+ "links": [
+  {
+   "group": "Revisions",
+   "link_doctype": "Implementation Chapter Revision",
+   "link_fieldname": "implementation_chapter"
+  },
+  {
+   "group": "Meetings",
+   "is_child_table": 1,
+   "link_doctype": "Stakeholder Meeting Chapter Review",
+   "link_fieldname": "chapter",
+   "parent_doctype": "Stakeholder Meeting",
+   "table_fieldname": "chapter_reviews"
+  }
+ ],
+ "modified": "2026-11-18 20:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter",

@@ -79,6 +79,23 @@ frappe.ui.form.on("Implementation", {
             };
         });
     },
+    // Chapters and features in progress against the limits agreed with the customer (#1970)
+    render_wip_limits: function (frm) {
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation_chapter.implementation_chapter.get_wip_status",
+            args: { implementation: frm.doc.name },
+            callback: ({ message: wip }) => {
+                if (!wip) return;
+                const over = [];
+                if (wip.max_chapters && wip.chapters > wip.max_chapters)
+                    over.push(__("{0} chapters in progress, {1} agreed", [wip.chapters, wip.max_chapters]));
+                if (wip.max_features && wip.features > wip.max_features)
+                    over.push(__("{0} features in progress, {1} agreed", [wip.features, wip.max_features]));
+                if (over.length) frm.dashboard.set_headline_alert(over.join(" · "), "orange");
+            },
+        });
+    },
+
     refresh: function (frm) {
         if (!frm.is_new()) {
             add_row_to_sales_order(frm);
@@ -86,6 +103,37 @@ frappe.ui.form.on("Implementation", {
         sort_resource_planning_by_month_desc(frm);
         setup_implementation_theme_watcher(frm);
         frm.trigger("append_implementation_chapters_to_modules");
+        frm.trigger("render_review_cadence_indicator");
+
+        if (!frm.is_new() && frappe.model.can_create("Stakeholder Meeting")) {
+            frm.add_custom_button(__("Create Meeting"), () => {
+                frappe.new_doc("Stakeholder Meeting", {
+                    implementation: frm.doc.name,
+                });
+            });
+        }
+        // Features configured with the customer in sales live on the Opportunity until the
+        // deal is won; this moves them here with their history (#1968).
+        if (!frm.is_new() && frappe.model.can_write("Implementation Feature")) {
+            frm.add_custom_button(__("Take over Features from Sales"), () => {
+                frappe.call({
+                    method: "phamos.phamos.doctype.implementation_feature.implementation_feature.take_over_from_sales",
+                    args: { implementation: frm.doc.name },
+                    freeze: true,
+                    callback: ({ message }) => {
+                        const moved = message || [];
+                        frappe.show_alert({
+                            message: moved.length
+                                ? __("{0} features taken over from sales", [moved.length])
+                                : __("No features from sales to take over"),
+                            indicator: moved.length ? "green" : "blue",
+                        });
+                        if (moved.length) frm.reload_doc();
+                    },
+                });
+            }, __("Features"));
+        }
+        if (!frm.is_new()) frm.trigger("render_wip_limits");
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -1076,6 +1124,17 @@ frappe.ui.form.on("Implementation", {
                 `);
             }
         });
+    },
+    render_review_cadence_indicator(frm) {
+        if (frm.is_new() || !frm.doc.review_cadence || !frm.doc.next_review_due) return;
+
+        const is_overdue = frappe.datetime.get_diff(frappe.datetime.get_today(), frm.doc.next_review_due) > 0;
+        const due_label = frappe.datetime.str_to_user(frm.doc.next_review_due);
+
+        frm.dashboard.add_indicator(
+            is_overdue ? __("Review Overdue since {0}", [due_label]) : __("Next Review Due {0}", [due_label]),
+            is_overdue ? "red" : "blue"
+        );
     },
     render_rank_html_section(frm) {
         if (frm.is_new()) return;

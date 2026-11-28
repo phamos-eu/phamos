@@ -8,11 +8,34 @@ import re
 from frappe.model.document import Document
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Count, Sum
-from frappe.utils import cint, flt, today
+from frappe.utils import add_days, add_months, cint, flt, getdate, today
+
+REVIEW_CADENCE_INTERVALS = {
+	"Weekly": {"days": 7},
+	"Biweekly": {"days": 14},
+	"Monthly": {"months": 1},
+	"Quarterly": {"months": 3},
+}
+
+
+def compute_next_review_due(base_date, cadence):
+	"""Add a single Review Cadence interval to base_date. Deliberately just
+	this - a plain fixed-interval step, not a recurrence engine - so a later
+	calendar integration remains free to own actual event scheduling."""
+	interval = REVIEW_CADENCE_INTERVALS.get(cadence)
+	if not interval:
+		return None
+
+	base_date = getdate(base_date)
+	if "days" in interval:
+		return add_days(base_date, interval["days"])
+	return add_months(base_date, interval["months"])
 
 
 class Implementation(Document):
 	def validate(self):
+		self.set_initial_next_review_due()
+
 		if self.is_new():
 			return
 		db_status = frappe.db.get_value("Implementation", self.name, "status")
@@ -28,6 +51,14 @@ class Implementation(Document):
 					"Cannot change status from Escalated. "
 					"Please resolve or submit the linked Escalation first."
 				)
+
+	def set_initial_next_review_due(self):
+		"""Give Next Review Due a sensible starting point the first time a
+		Review Cadence is set, without overriding a date someone already
+		chose. After that, only a submitted Stakeholder Meeting (or a manual
+		edit) moves it - this never recomputes it on a later save."""
+		if self.review_cadence and not self.next_review_due:
+			self.next_review_due = compute_next_review_due(self.last_reviewed_on or today(), self.review_cadence)
 
 	def before_save(self):
 		self.sync_modules_from_implementation_chapters()
@@ -266,24 +297,11 @@ class Implementation(Document):
 		delivered_total_hrs = 0
 		if self.sales_order_status_information:
 			for row in self.sales_order_status_information:
-				total_hours = 0
-
-				delivery_notes = frappe.db.sql("""
-					SELECT dni.qty
-					FROM `tabDelivery Note Item` dni
-					JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-					WHERE
-						dni.against_sales_order = %s
-						AND dn.docstatus = 1
-						AND dn.status NOT IN ('Cancelled', 'Closed')
-				""", row.sales_order, as_dict=True)
-
-				if not delivery_notes:
-					row.delivered_total_hrs = 0
-				else:
-					for dn in delivery_notes:
-						total_hours += dn.get("qty", 0)
-					row.delivered_total_hrs = total_hours
+				row.delivered_total_hrs = flt(frappe.db.sql("""
+					SELECT SUM(delivered_qty)
+					FROM `tabSales Order Item`
+					WHERE parent = %s AND docstatus = 1
+				""", row.sales_order)[0][0])
 
 				delivered_total_hrs += flt(row.delivered_total_hrs)
 				row.remaining_hrs = flt(row.total_hrs) - flt(row.delivered_total_hrs)
@@ -356,6 +374,9 @@ class Implementation(Document):
 	
 
 	def add_status_history(self):
+		if frappe.flags.in_stakeholder_meeting_submit or frappe.flags.in_stakeholder_meeting_cancel:
+			return
+
 		date = today()
 		found_today = False
 
@@ -501,8 +522,7 @@ def get_financial_history(name, customer = None):
 
 	Project = DocType("Project")
 	SalesOrder = DocType("Sales Order")
-	DeliveryNote = DocType("Delivery Note")
-	DeliveryNoteItem = DocType("Delivery Note Item")
+	SalesOrderItem = DocType("Sales Order Item")
 	Timesheet = DocType("Timesheet")
 	TimesheetDetail = DocType("Timesheet Detail")
 	open_so_statuses = ("To Deliver and Bill", "To Deliver", "To Bill")
@@ -526,17 +546,14 @@ def get_financial_history(name, customer = None):
 	)
 
 	dn_qty = (
-		frappe.qb.from_(DeliveryNote)
-		.inner_join(DeliveryNoteItem)
-		.on(DeliveryNoteItem.parent == DeliveryNote.name)
+		frappe.qb.from_(SalesOrderItem)
 		.inner_join(SalesOrder)
-		.on(SalesOrder.name == DeliveryNoteItem.against_sales_order)
-		.select(Coalesce(Sum(DeliveryNoteItem.qty), 0))
+		.on(SalesOrder.name == SalesOrderItem.parent)
+		.select(Coalesce(Sum(SalesOrderItem.delivered_qty), 0))
 		.where(
 			(SalesOrder.custom_implementation == name)
 			& SalesOrder.status.isin(open_so_statuses)
-			& (DeliveryNote.docstatus == 1)
-			& DeliveryNote.status.notin(("Cancelled", "Closed"))
+			& (SalesOrderItem.docstatus == 1)
 		)
 	)
 
@@ -592,19 +609,14 @@ def get_financial_history(name, customer = None):
 
 
 def _delivered_hours_against_sales_order(sales_order_name):
-	rows = frappe.db.sql(
+	return flt(frappe.db.sql(
 		"""
-		SELECT dni.qty
-		FROM `tabDelivery Note Item` dni
-		INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-		WHERE dni.against_sales_order = %s
-			AND dn.docstatus = 1
-			AND IFNULL(dn.status, '') NOT IN ('Cancelled', 'Closed')
+		SELECT SUM(delivered_qty)
+		FROM `tabSales Order Item`
+		WHERE parent = %s AND docstatus = 1
 		""",
 		sales_order_name,
-		as_dict=True,
-	)
-	return flt(sum(flt(r.get("qty")) for r in rows)) if rows else 0
+	)[0][0])
 
 
 def get_sales_order_status_information(name, customer=None):

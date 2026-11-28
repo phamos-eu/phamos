@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Checklist inbox APIs for I Own My Work SPA."""
+"""Checklist APIs shared by the cockpit SPAs."""
 
 import frappe
 from frappe import _
@@ -10,7 +10,7 @@ from frappe.utils import cint, cstr, get_fullname
 
 from phamos.phamos.doctype.checklist_template.checklist_template import template_item_due_date
 
-CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
+CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer", "ToDo")
 TEMPLATE_DOCTYPE = "Checklist Template"
 
 
@@ -352,7 +352,36 @@ def get_checklist_inbox(include_completed=0):
 @frappe.whitelist()
 def get_checklist(name):
 	"""Checklist detail + items for the SPA."""
-	doc = _require_checklist_read(name)
+	return _checklist_detail(_require_checklist_read(name))
+
+
+# A record's checklist section loads at most this many (get_checklists_for_reference's limit).
+MAX_CHECKLISTS_PER_CALL = 200
+
+
+@frappe.whitelist()
+def get_checklists(names):
+	"""Detail + items of several checklists in one call: {name: detail} (#1796).
+
+	A record's checklist section opens every unfinished checklist at once; one request per
+	checklist queued up behind the browser's few connections and slowed the whole page down.
+	Checklists the user cannot read, or that no longer exist, are left out.
+	"""
+	frappe.has_permission("Checklist", "read", throw=True)
+	names = frappe.parse_json(names) if isinstance(names, str) else names
+	names = [n for n in dict.fromkeys(names or []) if isinstance(n, str) and n]
+	if len(names) > MAX_CHECKLISTS_PER_CALL:
+		frappe.throw(_("Too many checklists in one call: {0}").format(len(names)))
+	details = {}
+	for name in names:
+		try:
+			details[name] = _checklist_detail(_require_checklist_read(name))
+		except (frappe.DoesNotExistError, frappe.PermissionError):
+			frappe.clear_messages()  # check_permission queues a message for the client
+	return details
+
+
+def _checklist_detail(doc):
 	items = []
 	for row in doc.checklist_items:
 		items.append(
@@ -467,6 +496,10 @@ def _resolve_checklist_title(name, document, reference_record):
 		title = (frappe.db.get_value("Issue", reference_record, "subject") or "").strip()
 	if not title and document == "Task":
 		title = (frappe.db.get_value("Task", reference_record, "subject") or "").strip()
+	if not title and document == "ToDo":
+		from phamos.api.personal_todos import _summary
+
+		title = _summary(frappe.db.get_value("ToDo", reference_record, "description"))
 	if not title:
 		frappe.throw(_("Checklist title is required"))
 	return title
@@ -587,6 +620,84 @@ def add_spa_checklist_item(checklist_name, values=None):
 	doc.save()
 
 	return get_checklist(checklist_name)
+
+
+@frappe.whitelist(methods=["POST"])
+def move_spa_checklist_item(checklist_name, item_name, to_index):
+	"""Move a checklist item to position `to_index` (0-based) and return the SPA payload (#1919).
+
+	The other items keep their order; `idx` is renumbered and the Checklist saved once, so
+	viewers get one update and the version history one entry.
+	"""
+	doc = _require_checklist_write(checklist_name)
+	item_name = (item_name or "").strip()
+	rows = list(doc.checklist_items)
+	row = next((r for r in rows if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+	try:
+		to_index = int(to_index)
+	except (TypeError, ValueError):
+		frappe.throw(_("Invalid position"))
+	if not 0 <= to_index < len(rows):
+		frappe.throw(_("Invalid position"))
+
+	rows.remove(row)
+	rows.insert(to_index, row)
+	doc.checklist_items = rows
+	for idx, r in enumerate(rows, start=1):
+		r.idx = idx
+	doc.save()
+	return get_checklist(checklist_name)
+
+
+@frappe.whitelist(methods=["POST"])
+def move_spa_checklist_item_to(checklist_name, item_name, target_checklist, to_index=None):
+	"""Move an item to another checklist of the same record (#1920); both SPA payloads back.
+
+	Only between checklists of the same document and record, with write access on both. The item
+	keeps its text, note, assignee and due date, and its ToDo moves along. A completed target
+	becomes In Progress again (it has an open item now). Each checklist gets one comment.
+	"""
+	from phamos.phamos.doctype.checklist.checklist_assignment import move_item
+
+	if (checklist_name or "") == (target_checklist or ""):
+		frappe.throw(_("Choose another checklist"))
+	source = _require_checklist_write(checklist_name)
+	target = _require_checklist_write(target_checklist)
+	if not (source.document and source.reference_record) or (source.document, source.reference_record) != (
+		target.document,
+		target.reference_record,
+	):
+		frappe.throw(_("Items can only move between checklists of the same record"))
+
+	item_name = (item_name or "").strip()
+	row = next((r for r in source.checklist_items if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+	if to_index not in (None, ""):
+		try:
+			to_index = int(to_index)
+		except (TypeError, ValueError):
+			frappe.throw(_("Invalid position"))
+		# a position in the target after the move: 0 … its current length (the end)
+		if not 0 <= to_index <= len(target.checklist_items):
+			frappe.throw(_("Invalid position"))
+	else:
+		to_index = None
+
+	# plain, short text for the timeline comments (a description may hold escaped markup)
+	label = frappe.utils.html_utils.unescape_html(frappe.utils.strip_html_tags(row.description or "")).strip()
+	label = (label[:80] + "…") if len(label) > 80 else label
+	# escaped as plain text: unescaping above could turn "&lt;img …&gt;" back into a tag
+	label = frappe.utils.escape_html(label) or _("Checklist item")
+	move_item(source, target, row, to_index)
+	# titles are user text too; comments render as HTML
+	source_title = frappe.utils.escape_html(_checklist_title_value(source) or source.name)
+	target_title = frappe.utils.escape_html(_checklist_title_value(target) or target.name)
+	source.add_comment("Info", _("Moved \"{0}\" to checklist {1}").format(label, target_title))
+	target.add_comment("Info", _("\"{0}\" moved here from checklist {1}").format(label, source_title))
+	return {"source": get_checklist(source.name), "target": get_checklist(target.name)}
 
 
 @frappe.whitelist(methods=["POST"])

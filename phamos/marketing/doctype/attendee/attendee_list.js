@@ -42,6 +42,6 @@ frappe.listview_settings["Attendee"] = {
 };
 
 function phamos_attendee_list_colour(status) {
-	return { Paid: "green", Invoiced: "orange", Ordered: "blue", Pending: "red",
+	return { Paid: "green", Credited: "purple", Invoiced: "orange", Ordered: "blue", Pending: "red",
 		Cancelled: "gray", "Not Required": "gray" }[status] || "gray";
 }

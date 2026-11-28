@@ -1,6 +1,8 @@
 // Event pages (/de/veranstaltungen/<slug>, /en/events/<slug>): ticket order and "Keep me posted".
 // Loaded only on event pages (www/web_profile/profile.html). Prices come from the server; the order is
 // validated again by phamos.marketing.web.order_tickets.
+import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
+
 (function () {
 	function serverMessage(data) {
 		try {
@@ -81,8 +83,15 @@
 		const draftKey = `wp-ticket:${form.elements.event.value}`;
 		const locale = form.dataset.lang === "de" ? "de-DE" : "en-GB";
 		const money = new Intl.NumberFormat(locale, { style: "currency", currency: form.dataset.currency || "EUR" });
-		const newId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `h-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		// The hold id is also the order's idempotency key (phamos/phamos#1700), so it must be unguessable:
+		// randomUUID, or 32 random hex characters where it is missing (pages served without HTTPS).
+		const newId = () => (crypto.randomUUID ? crypto.randomUUID()
+			: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
 		let gross = parseFloat(form.dataset.gross || "0");
+		// The server's totals for the last reserved number of tickets, computed as the Sales Order computes
+		// them (phamos/phamos#1710): {qty, total, net_total, tax_total}. The page shows and confirms these.
+		let totals = null;
+		const totalsFor = (n) => (totals && totals.qty === n ? totals : null);
 		let current = 0;
 		let order = null; // {reference, token} after a successful order
 		let holdId = newId();
@@ -124,7 +133,7 @@
 			addButton.disabled = n >= max;
 			$("[data-wp-people-max]").hidden = n < max;
 			const total = $("[data-wp-people-total]");
-			if (total) total.textContent = money.format(gross * n);
+			if (total) total.textContent = money.format(totalsFor(n) ? totalsFor(n).total : gross * n);
 		}
 
 		function holders() {
@@ -201,8 +210,29 @@
 			tick();
 			holdTimer = setInterval(tick, 1000);
 		}
-		async function hold() {
-			if (order) return;
+		// Reservation requests: only the newest one's answer counts (phamos/phamos#1701). "Continue" and
+		// "Order" wait for it; adding, removing and toggling ticket holders ask after 300 ms of quiet.
+		const holdRequests = createLatest();
+		let holdPromise = Promise.resolve(true);
+		let holdDebounce = null;
+		function hold() {
+			clearTimeout(holdDebounce);
+			holdDebounce = null;
+			if (order) return Promise.resolve(false);
+			holdPromise = requestHold(holdRequests.next());
+			return holdPromise;
+		}
+		function scheduleHold() {
+			clearTimeout(holdDebounce);
+			holdDebounce = setTimeout(hold, 300);
+		}
+		// Before "Continue" and "Order": a fresh reservation if none runs or one is scheduled, else the answer
+		// of the request still in flight (it may bring a new price).
+		function settleHold() {
+			if (holdDebounce || !expiresAt || Date.now() > expiresAt) return hold();
+			return holdPromise;
+		}
+		async function requestHold(request) {
 			const body = new FormData();
 			body.append("event", form.elements.event.value);
 			body.append("lang", form.elements.lang.value);
@@ -210,17 +240,22 @@
 			body.append("qty", String(holders().length || count()));
 			try {
 				const result = await post({ action: form.dataset.holdAction }, body);
+				if (!holdRequests.isLatest(request)) return holdPromise; // a newer request was sent: its answer counts
 				if (!result.ok) {
 					clearInterval(holdTimer);
 					expiresAt = 0;
 					showHold(holdNote.dataset.soldout, true);
 					return false;
 				}
-				expiresAt = result.expires;
-				if (!free && result.gross && Math.abs(result.gross - gross) > 0.001) {
-					// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
-					gross = result.gross;
-					form.dataset.priceTitle = result.price_title || "";
+				// Relative to the visitor's clock: it may differ from the server's by minutes.
+				expiresAt = expiryFromNow(result.minutes || windowMs / 60000);
+				if (!free) {
+					totals = { qty: result.qty, total: result.total, net_total: result.net_total, tax_total: result.tax_total };
+					if (result.gross && Math.abs(result.gross - gross) > 0.001) {
+						// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
+						gross = result.gross;
+						form.dataset.priceTitle = result.price_title || "";
+					}
 					renderCompanions();
 				}
 				startClock(restoredNote);
@@ -234,10 +269,9 @@
 		function expire() {
 			clearInterval(holdTimer);
 			if (order) return;
-			// Time is up: the entries are thrown away, seats and prices are checked again.
+			// Time is up: only the reservation ends. The entries stay; "Continue" or "Order" reserves again and
+			// shows a new price or "sold out" there (phamos/phamos#1701).
 			expiresAt = 0;
-			storage.clear();
-			resetForm();
 			showHold(holdNote.dataset.expired, true);
 		}
 
@@ -298,10 +332,11 @@
 				return tr;
 			}));
 			if (free) return;
-			const total = gross * people.length;
-			const net = total / (1 + taxRate / 100);
+			const server = totalsFor(people.length);
+			const total = server ? server.total : gross * people.length;
+			const net = server ? server.net_total : total / (1 + taxRate / 100);
 			$("[data-wp-summary-net]").textContent = money.format(net);
-			$("[data-wp-summary-tax]").textContent = money.format(total - net);
+			$("[data-wp-summary-tax]").textContent = money.format(server ? server.tax_total : total - net);
 			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
 
@@ -322,6 +357,7 @@
 			order = null;
 			holdId = newId();
 			gross = parseFloat(form.dataset.gross || "0");
+			totals = null;
 			companionRows().forEach((row) => row.remove());
 			if (toggle) $("[data-wp-company]").hidden = true;
 			$("[data-wp-steps]").hidden = false;
@@ -338,7 +374,7 @@
 		addButton.addEventListener("click", () => {
 			const row = addRow();
 			renderCompanions();
-			hold();
+			scheduleHold();
 			saveDraft();
 			if (row) row.querySelector('[data-field="full_name"]').focus();
 		});
@@ -347,10 +383,10 @@
 			if (!remove) return;
 			remove.closest(".wp-people-row").remove();
 			renderCompanions();
-			hold();
+			scheduleHold();
 			saveDraft();
 		});
-		attends.addEventListener("change", () => { renderCompanions(); hold(); });
+		attends.addEventListener("change", () => { renderCompanions(); scheduleHold(); });
 		for (const name of ["contact_name", "contact_email"]) form.elements[name].addEventListener("input", renderCompanions);
 		form.addEventListener("input", saveDraft);
 		form.addEventListener("change", saveDraft);
@@ -368,9 +404,7 @@
 			next.disabled = true;
 			const from = current;
 			try {
-				if (!expiresAt || Date.now() > expiresAt) {
-					if (!(await hold())) return;
-				}
+				if (!(await settleHold())) return;
 				if (from === 0 && !free) {
 					// The billing step starts with the contact's name and email.
 					for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
@@ -419,13 +453,31 @@
 		$("[data-wp-ticket-success]").querySelectorAll("[data-wp-dialog-close]").forEach((button) =>
 			button.addEventListener("click", finishOrder));
 
+		// One order request at a time: set before the first await, so a double click or Enter + click while
+		// the seats are re-checked cannot send the order twice (phamos/phamos#1700).
+		let submitting = false;
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			if (current !== steps.length - 1) return next.click();
-			if (!expiresAt || Date.now() > expiresAt) {
-				if (!(await hold())) return;
-				renderSummary();
+			if (submitting || order) return;
+			submitting = true;
+			submit.disabled = true;
+			back.disabled = true;
+			try {
+				await placeOrder();
+			} finally {
+				submitting = false;
+				submit.classList.remove("wp-busy");
+				if (!order) {
+					submit.disabled = false;
+					back.disabled = false;
+				}
 			}
+		});
+
+		async function placeOrder() {
+			if (!(await settleHold())) return;
+			renderSummary();
 			const people = holders();
 			const body = new FormData();
 			for (const name of ["event", "lang", "website"]) body.append(name, form.elements[name].value);
@@ -439,13 +491,14 @@
 					is_company: toggle && toggle.checked ? 1 : 0, company: value("company"), vat_id: value("vat_id"),
 					address_line1: value("address_line1"), postcode: value("postcode"), city: value("city"), country: value("country"),
 				}));
-				body.append("expected_total", (gross * people.length).toFixed(2));
+				const server = totalsFor(people.length);
+				body.append("expected_total", (server ? server.total : gross * people.length).toFixed(2));
 			}
-			submit.disabled = true;
-			back.disabled = true;
 			submit.classList.add("wp-busy");
 			status.classList.remove("wp-error");
 			status.textContent = status.dataset.sending;
+			// The countdown pauses while the order is sent: running out mid-request must not touch the form.
+			clearInterval(holdTimer);
 			try {
 				const result = await post(form, body);
 				order = { reference: result.reference, token: result.token };
@@ -461,14 +514,12 @@
 				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
 				success.hidden = false;
 			} catch (error) {
-				submit.disabled = false;
-				back.disabled = false;
 				status.classList.add("wp-error");
 				status.textContent = error.message || status.dataset.failed;
-			} finally {
-				submit.classList.remove("wp-busy");
+				if (expiresAt > Date.now()) startClock("");
+				else expire();
 			}
-		});
+		}
 
 		const consentStatus = $("[data-wp-consents-status]");
 		$("[data-wp-consents-save]").addEventListener("click", async (event) => {
@@ -504,8 +555,16 @@
 	const interest = document.querySelector("[data-wp-interest]");
 	if (interest) {
 		const key = `wp-interest:${interest.dataset.event}`;
-		const read = () => { try { return localStorage.getItem(key); } catch (e) { return null; } };
-		const write = (v) => { try { localStorage.setItem(key, v); } catch (e) { /* private mode */ } };
+		const read = (k = key) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+		const write = (v, k = key) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
+		// An anonymous random id for this browser: the server keeps each voter's answer and only takes back
+		// that one when the answer changes (phamos/phamos#1703). Without storage every page load is a new voter.
+		let voter = read("wp-voter");
+		if (!voter) {
+			voter = crypto.randomUUID ? crypto.randomUUID()
+				: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+			write(voter, "wp-voter");
+		}
 		const mark = (choice) => interest.querySelectorAll("[data-response]").forEach((b) =>
 			b.setAttribute("aria-pressed", b.dataset.response === choice ? "true" : "false"));
 		mark(read());
@@ -519,7 +578,7 @@
 			body.append("event", interest.dataset.event);
 			body.append("lang", interest.dataset.lang);
 			body.append("response", response);
-			if (previous) body.append("previous", previous);
+			body.append("voter", voter);
 			try {
 				const result = await post({ action: interest.dataset.action }, body);
 				write(response);
@@ -644,8 +703,8 @@
 			submit.disabled = true;
 			status.textContent = status.dataset.sending;
 			try {
-				const result = await post(form, new FormData(form));
-				status.textContent = result.status === "already" ? status.dataset.already : status.dataset.sent;
+				await post(form, new FormData(form));
+				status.textContent = status.dataset.sent;
 			} catch (error) {
 				submit.disabled = false;
 				status.classList.add("wp-error");

@@ -2,7 +2,7 @@
 	<div
 		ref="root"
 		class="relative"
-		:class="$attrs.class"
+		:class="[$attrs.class, `rtf-images-${imageSize}`]"
 		@focusin="onFocusIn"
 		@focusout="onFocusOut"
 	>
@@ -29,11 +29,37 @@
 			:class="editorRootClass"
 			:content="editorContent"
 			:editable="editable && !lockedBy"
-			:fixed-menu="editable && !lockedBy ? fixedMenu : false"
+			:fixed-menu="editable && !lockedBy ? menu : false"
 			:placeholder="placeholder"
 			:editor-class="editorClass"
+			:extensions="extensions"
 			@change="onChange"
 		/>
+		<!-- Content outside the box (scrollHint): fades at the clipped edges and "More below". -->
+		<template v-if="scrollHint">
+			<div
+				v-show="overflow.above"
+				class="pointer-events-none absolute inset-x-px h-6 bg-gradient-to-b from-black/10 to-transparent dark:from-black/40"
+				:style="{ top: `${editorTop}px` }"
+				aria-hidden="true"
+			/>
+			<div
+				v-show="overflow.below"
+				class="pointer-events-none absolute inset-x-px bottom-px flex h-12 items-end justify-center rounded-b-lg bg-gradient-to-t to-transparent pb-1.5"
+				:class="hintFade"
+			>
+				<button
+					type="button"
+					class="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-outline-gray-2 bg-surface-white px-2.5 py-0.5 text-xs font-medium text-ink-gray-7 shadow-sm hover:text-ink-gray-9"
+					:title="__('Scroll to see the rest of the text')"
+					@mousedown.prevent
+					@click="scrollMore"
+				>
+					<FeatherIcon name="chevron-down" class="h-3.5 w-3.5" />
+					{{ __("More below") }}
+				</button>
+			</div>
+		</template>
 	</div>
 </template>
 
@@ -50,11 +76,17 @@
  * Give it `:key="doc.name"` so switching documents remounts it with a fresh
  * undo history.
  */
-import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { TextEditor } from "frappe-ui"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { FeatherIcon, TextEditor } from "frappe-ui"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import { normalizeHtml } from "@spa/utils/autosaveCore.js"
 import { lockExplanation, lockHeadline } from "@spa/utils/fieldLockText.js"
+import { scrollOverflow } from "@spa/utils/scrollOverflow.js"
+import { __ } from "@spa/utils/i18n.js"
+import { h, markRaw } from "vue"
+import { ResizableImage } from "@spa/editor/resizableImage.js"
+import { useImageSize } from "@spa/composables/useImageSize.js"
+import { IMAGE_SIZES } from "@spa/utils/imageSize.js"
 
 defineOptions({ inheritAttrs: false })
 
@@ -69,9 +101,33 @@ const props = defineProps({
 	lockedBy: { type: Object, default: null },
 	/** Used in the lock notice: "<name> is editing <fieldLabel>" */
 	fieldLabel: { type: String, default: "this field" },
+	/** The editor scrolls inside a fixed box: show when text is hidden above or below */
+	scrollHint: { type: Boolean, default: false },
+	/** the colour the "More below" fade starts from: the editor's background (#1922) */
+	hintFade: { type: String, default: "from-white dark:from-gray-800" },
 })
 
 const emit = defineEmits(["update:modelValue", "focus", "blur"])
+
+// Images (#1918): a stored width with a resize handle, and a per-user cap for all images of every
+// field (small / medium / large), switched from the toolbar.
+const extensions = [ResizableImage]
+const { imageSize, setImageSize } = useImageSize()
+const SIZE_LABELS = { small: "Small images", medium: "Medium images", large: "Large images" }
+// the toolbar shows the active option's "icon": a letter
+const letterIcon = (letter) => markRaw({ render: () => h("span", { class: "inline-flex h-4 w-4 items-center justify-center text-[11px] font-semibold leading-none" }, letter) })
+const sizeOptions = IMAGE_SIZES.map((size) => ({
+	label: __(SIZE_LABELS[size]),
+	icon: letterIcon(size[0].toUpperCase()), // S / M / L, like clothing sizes; the labels are translated
+	isActive: () => imageSize.value === size,
+	action: () => setImageSize(size),
+}))
+// Every cockpit field passes its toolbar as an array (a list of frappe-ui button names), and the
+// size group joins it. `false` means no toolbar at all (read-only, locked); then there is nothing
+// to add it to.
+const menu = computed(() =>
+	Array.isArray(props.fixedMenu) ? [...props.fixedMenu, "Separator", sizeOptions] : props.fixedMenu
+)
 
 const root = ref(null)
 const editorRef = ref(null)
@@ -143,7 +199,55 @@ function onFocusOut() {
 	}, 150)
 }
 
+// Scroll hint: watch the editor's own scroll box (.ProseMirror), its size and its content.
+const overflow = ref({ above: false, below: false })
+const editorTop = ref(0)
+let scrollBox = null
+let resizeObserver = null
+let findFrame = 0
+
+function measure() {
+	if (!scrollBox || !root.value) return
+	overflow.value = scrollOverflow(scrollBox)
+	editorTop.value = scrollBox.getBoundingClientRect().top - root.value.getBoundingClientRect().top
+}
+
+function attachScrollHint() {
+	findFrame = 0
+	const box = root.value?.querySelector(".ProseMirror")
+	if (!box) {
+		findFrame = requestAnimationFrame(attachScrollHint) // the editor mounts a moment later
+		return
+	}
+	if (box === scrollBox) return measure()
+	scrollBox?.removeEventListener("scroll", measure)
+	scrollBox = box
+	scrollBox.addEventListener("scroll", measure, { passive: true })
+	resizeObserver?.disconnect()
+	resizeObserver = new ResizeObserver(measure)
+	resizeObserver.observe(scrollBox)
+	resizeObserver.observe(root.value)
+	measure()
+}
+
+function scrollMore() {
+	scrollBox?.scrollBy({ top: Math.round(scrollBox.clientHeight * 0.8), behavior: "smooth" })
+}
+
+onMounted(() => {
+	if (props.scrollHint) attachScrollHint()
+})
+// New content (typing, another user's change) changes the height without resizing the box.
+watch(editorContent, () => props.scrollHint && nextTick(measure))
+watch(
+	() => props.lockedBy,
+	() => props.scrollHint && nextTick(attachScrollHint)
+)
+
 onBeforeUnmount(() => {
+	cancelAnimationFrame(findFrame)
+	scrollBox?.removeEventListener("scroll", measure)
+	resizeObserver?.disconnect()
 	clearTimeout(blurTimer)
 	clearInterval(clock)
 	if (focused.value) emit("blur")

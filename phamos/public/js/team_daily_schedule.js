@@ -1,3 +1,17 @@
+// Loaded on every desk page (app_include_js), so parent forms with an event_schedule table
+// (Team, Department) can call this from their own setup/refresh.
+function setup_daily_schedule_email_account_query(frm) {
+	const grid = frm.fields_dict.event_schedule && frm.fields_dict.event_schedule.grid;
+	if (!grid) return;
+
+	// Only mailboxes with a Mailcow DAV password can send the invites.
+	grid.get_field('email_account').get_query = function () {
+		return {
+			query: 'phamos.phamos.doctype.team_daily_schedule.team_daily_schedule.email_account_with_dav_password_query',
+		};
+	};
+}
+
 frappe.ui.form.on('Team Daily Schedule', {
 	fetch_free_slots(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -155,6 +169,7 @@ function show_free_slots_dialog_for_row(frm, row, cdt, cdn) {
 				duration_minutes: values.duration,
 				time_from,
 				time_to,
+				email_account: row.email_account,
 			},
 			freeze: true,
 			freeze_message: __('Finding free slots...'),

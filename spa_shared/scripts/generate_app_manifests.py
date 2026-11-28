@@ -31,14 +31,24 @@ OUTPUT_DIR = REPO_ROOT / "phamos" / "public" / "manifest"
 ASSET_URL = "/assets/phamos/manifest"
 FEATHER_ICONS = REPO_ROOT / "human_resources_frontend" / "node_modules" / "feather-icons" / "dist" / "icons"
 
-# Window title bar colour: the cockpit background (frappe-ui surface-gray-1), so an
-# installed cockpit's title bar blends into the page instead of adding a colour band.
-# spa_shared/theme.js switches the page's theme-color to the dark value at runtime.
+# Splash background of an installed cockpit: the cockpit background (frappe-ui surface-gray-1).
 LIGHT_BACKGROUND = "#f8f8f8"
+# The window title bar (theme_color) is the app's colour (#1933), so cockpits can be told apart
+# when switching windows. Cockpit Settings can change it per site; the page's theme-color then
+# wins once loaded (phamos/www/spa_boot.py, spa_shared/theme.js). Keep the colours in step with
+# COCKPITS in phamos/cockpits/settings.py, which uses them as defaults.
 
 # Tile colours are -700 shades so the white symbol keeps at least 4.5:1 contrast.
 # Lead Scan (#2563eb, phamos/public/manifest/scan.webmanifest) keeps its own blue.
 APPS = [
+	{
+		"slug": "ophice",
+		"name": "Ophice",
+		"description": "Go to work: meet colleagues on the map and open your cockpits",
+		"route": "/ophice",
+		"color": "#4338ca",
+		"symbol": "map",
+	},
 	{
 		"slug": "human-resources",
 		"name": "Human Resources",
@@ -78,6 +88,30 @@ APPS = [
 		"route": "/software-development-cockpit",
 		"color": "#334155",
 		"symbol": "code",
+	},
+	{
+		"slug": "general-management",
+		"name": "General Management",
+		"description": "Company targets, the departments' work and company-wide appointments",
+		"route": "/general-management-cockpit",
+		"color": "#a16207",
+		"symbol": "compass",
+	},
+	{
+		"slug": "implementation",
+		"name": "Implementation Cockpit",
+		"description": "Status, roadmap, issues and budget of an implementation with phamos",
+		"route": "/implementation-cockpit",
+		"color": "#0f766e",
+		"symbol": "layers",
+	},
+	{
+		"slug": "personal",
+		"name": "Personal Cockpit",
+		"description": "Issues, tasks and checklists assigned to me",
+		"route": "/personal-cockpit",
+		"color": "#0e7490",
+		"symbol": "user",
 	},
 ]
 
@@ -146,7 +180,7 @@ def build_manifest(app):
 		"scope": app["route"],
 		"display": "standalone",
 		"background_color": LIGHT_BACKGROUND,
-		"theme_color": LIGHT_BACKGROUND,
+		"theme_color": app["color"],
 		"icons": [
 			{"src": f"{base}-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
 			{"src": f"{base}-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},

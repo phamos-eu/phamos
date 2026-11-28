@@ -598,93 +598,88 @@ def create_and_submit_timesheet( project_name=None,
 
 @frappe.whitelist()
 def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
-    try:
-        # Retrieve the Timesheet Record document
-        doc = frappe.get_doc("Timesheet Record", name)
+    # Retrieve the Timesheet Record document
+    doc = frappe.get_doc("Timesheet Record", name)
 
-        # Close last open row if exists
-        if doc.item:
-            for idx, row in enumerate(reversed(doc.item)):
-                if row.from_time and not row.to_time:
-                    # Validate before assigning
-                    if get_datetime(to_time) < get_datetime(row.from_time):
-                        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
-                    row.to_time = to_time
-                    break
+    # Close last open row if exists
+    if doc.item:
+        for idx, row in enumerate(reversed(doc.item)):
+            if row.from_time and not row.to_time:
+                # Validate before assigning
+                if get_datetime(to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+                row.to_time = to_time
+                break
 
-        # Calculate durations & validate
-        for row in doc.item:
-            if row.from_time and row.to_time:
-                if get_datetime(row.to_time) < get_datetime(row.from_time):
-                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
-                row.duration = time_diff_in_seconds(row.to_time, row.from_time)
+    # Calculate durations & validate
+    for row in doc.item:
+        if row.from_time and row.to_time:
+            if get_datetime(row.to_time) < get_datetime(row.from_time):
+                frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
+            row.duration = time_diff_in_seconds(row.to_time, row.from_time)
 
-        # Update parent fields
-        if doc.item:
-            first_row = doc.item[0]
-            doc.from_time = first_row.from_time
-            doc.to_time = first_row.to_time
-            doc.actual_time = first_row.duration or 0
+    # Update parent fields
+    if doc.item:
+        first_row = doc.item[0]
+        doc.from_time = first_row.from_time
+        doc.to_time = first_row.to_time
+        doc.actual_time = first_row.duration or 0
 
-        doc.task = task
-        doc.activity_type = activity_type
-        doc.result = result
+    doc.task = task
+    doc.activity_type = activity_type
+    doc.result = result
 
-        if not doc.gitlab_issue:
-            child_issue, parent_issue = _find_gitlab_issues_in_text(doc.goal, result)
-            if child_issue:
-                doc.gitlab_issue = child_issue
-            if parent_issue:
-                doc.gitlab_parent_issue = parent_issue
-        if doc.gitlab_issue and not doc.gitlab_parent_issue:
-            doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
+    if not doc.gitlab_issue:
+        child_issue, parent_issue = _find_gitlab_issues_in_text(doc.goal, result)
+        if child_issue:
+            doc.gitlab_issue = child_issue
+        if parent_issue:
+            doc.gitlab_parent_issue = parent_issue
+    if doc.gitlab_issue and not doc.gitlab_parent_issue:
+        doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
-        doc.percent_billable = normalize_percent_billable(percent_billable)
-      
+    doc.percent_billable = normalize_percent_billable(percent_billable)
+  
 
-        # Final validation before any save or submit
-        if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
-            frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+    # Final validation before any save or submit
+    if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
+        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
 
-        doc.save()
-        doc.submit()
+    doc.save()
+    doc.submit()
 
-        # --- Create alternative records (3rd, 5th, etc.) ---
-        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
-            alt_row = doc.item[i]
+    # --- Create alternative records (3rd, 5th, etc.) ---
+    for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
+        alt_row = doc.item[i]
 
-            # Skip invalid alternate rows
-            if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
-                continue
+        # Skip invalid alternate rows
+        if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
+            continue
 
-            new_doc = frappe.new_doc("Timesheet Record")
-            new_doc.employee = doc.employee
+        new_doc = frappe.new_doc("Timesheet Record")
+        new_doc.employee = doc.employee
 
-            # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable"]:
-                new_doc.set(field, doc.get(field))
+        # Copy parent fields from original
+        for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable"]:
+            new_doc.set(field, doc.get(field))
 
-            # Parent times from selected row
-            new_doc.from_time = alt_row.from_time
-            new_doc.to_time = alt_row.to_time
-            new_doc.actual_time = alt_row.duration or 0
+        # Parent times from selected row
+        new_doc.from_time = alt_row.from_time
+        new_doc.to_time = alt_row.to_time
+        new_doc.actual_time = alt_row.duration or 0
 
-            # Copy all item rows
-            for original_row in doc.item:
-                new_doc.append("item", {
-                    "from_time": original_row.from_time,
-                    "to_time": original_row.to_time,
-                    "duration": original_row.duration or 0
-                })
+        # Copy all item rows
+        for original_row in doc.item:
+            new_doc.append("item", {
+                "from_time": original_row.from_time,
+                "to_time": original_row.to_time,
+                "duration": original_row.duration or 0
+            })
 
-            new_doc.insert(ignore_permissions=True)
-            new_doc.submit()
+        new_doc.insert(ignore_permissions=True)
+        new_doc.submit()
 
-        return {"timesheet_name": doc.name}
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
-        return f"Error: {str(e)}"
+    return {"timesheet_name": doc.name}
 
 @frappe.whitelist(allow_guest=True)
 def get_employee_and_project(project_name):

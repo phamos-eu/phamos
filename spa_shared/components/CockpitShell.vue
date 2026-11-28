@@ -13,19 +13,77 @@
 						</div>
 					</template>
 				</div>
+				<div v-if="$slots['header-actions']" class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
+					<slot name="header-actions" />
+				</div>
 			</header>
-			<main class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
+			<main id="cockpit-main" class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
 				<router-view />
 			</main>
+		</div>
+		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
+		<Toasts />
+		<!-- How to install this cockpit as a desktop app, on the first visits (#1998). -->
+		<InstallAppDialog />
+		<!-- The cockpit colour glowing in from the chosen window edges (#1933); never catches clicks. -->
+		<div v-if="glow" aria-hidden="true" class="cockpit-glow" :style="glow.style">
+			<div
+				v-if="glow.steady"
+				class="cockpit-glow__layer cockpit-glow__layer--steady"
+				:class="{ 'is-breathing': glow.breathing }"
+			>
+				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
+				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
+			</div>
+			<div
+				v-if="glow.pulse"
+				class="cockpit-glow__layer cockpit-glow__layer--pulse"
+				:class="{ 'is-on': glow.pulsing.value }"
+			>
+				<span v-for="edge in glow.frame.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
+				<span
+					v-for="corner in glow.frame.corners"
+					:key="corner"
+					:class="`cockpit-glow__corner cockpit-glow__corner--${corner}`"
+				/>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script setup>
+import { getCurrentInstance, onBeforeUnmount, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
+import InstallAppDialog from "@spa/components/InstallAppDialog.vue"
+import { mountPhriend } from "@spa/phriend.js"
+import { startCockpitPresence, stopCockpitPresence } from "@spa/cockpitPresence.js"
+import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
+import { onDialogSaveKey } from "@spa/utils/shortcuts.js"
 
-defineProps({
+const props = defineProps({
 	title: { type: String, default: "" },
 	subtitle: { type: String, default: "" },
 })
+
+// Phriend, the report-a-problem ball, in every cockpit (#1900). The page title the shell shows
+// becomes part of "Reported on"; on record pages the record itself is named instead.
+const router = useRouter()
+const glow = useCockpitGlow()
+// the cockpit's realtime socket, so Phriend hears its events (#2012)
+const socket = getCurrentInstance()?.appContext.config.globalProperties.$socket
+onMounted(() => mountPhriend(router, () => props.title, socket))
+
+// Which cockpit I am in, for Ophice's people list (#2065).
+onMounted(startCockpitPresence)
+onBeforeUnmount(stopCockpitPresence)
+
+// Ctrl/Cmd+S runs the open dialog's primary action, as in Frappe Desk (#2032).
+onMounted(() => document.addEventListener("keydown", onDialogSaveKey, true))
+onBeforeUnmount(() => document.removeEventListener("keydown", onDialogSaveKey, true))
 </script>

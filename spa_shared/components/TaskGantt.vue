@@ -40,11 +40,29 @@
 							:key="task.id"
 							type="button"
 							class="hr-gantt-list-row flex w-full items-center gap-2 border-b border-outline-gray-1 px-3 text-left text-xs text-ink-gray-8 hover:bg-surface-gray-2"
-							:class="{ 'hr-gantt-list-row--selected': task.id === selectedName }"
+							:class="{
+								'hr-gantt-list-row--selected': task.id === selectedName,
+								'hr-gantt-list-row--group': rowMeta(task.id).is_group,
+							}"
 							:style="{ height: `${ROW_HEIGHT}px` }"
 							@click="emit('select', task.id)"
 						>
-							<span class="min-w-0 flex-1 truncate font-medium">{{ task.name }}</span>
+							<template v-if="rowMeta(task.id).is_group">
+								<!-- Department header row of the company view (#1948): click collapses it. -->
+								<FeatherIcon
+									:name="rowMeta(task.id).collapsed ? 'chevron-right' : 'chevron-down'"
+									class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5"
+								/>
+								<span
+									class="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+									:style="{ backgroundColor: rowMeta(task.id).color }"
+								/>
+								<span class="min-w-0 flex-1 truncate font-semibold">{{ task.name }}</span>
+								<span class="flex-shrink-0 text-[10px] text-ink-gray-5">
+									{{ rowMeta(task.id).group_count }}
+								</span>
+							</template>
+							<span v-else class="min-w-0 flex-1 truncate font-medium">{{ task.name }}</span>
 							<span
 								v-if="taskStatus(task.id)"
 								class="flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] text-ink-gray-5"
@@ -76,7 +94,7 @@
 					ref="listFooter"
 					class="hr-gantt-list-footer flex-shrink-0 border-t border-outline-gray-2 bg-surface-gray-1 p-2 dark:bg-surface-gray-2"
 				>
-					<form class="flex items-center gap-1.5" @submit.prevent="submitNewTask">
+					<form class="flex items-center gap-1.5" @submit.prevent="openNewTaskDialog">
 						<FormControl
 							ref="newTaskInput"
 							v-model="newTaskSubject"
@@ -84,25 +102,21 @@
 							size="sm"
 							placeholder="New task…"
 							class="min-w-0 flex-1"
-							:disabled="creatingTask"
 						/>
-						<Button
-							type="submit"
-							variant="solid"
-							size="sm"
-							:loading="creatingTask"
-							:disabled="creatingTask || !newTaskSubject.trim()"
-						>
-							Add
-						</Button>
+						<Button type="submit" variant="solid" size="sm">Add</Button>
 					</form>
-					<ErrorMessage v-if="createError" class="mt-1" :message="createError" />
+					<NewTaskDialog
+						v-model="newTaskDialogOpen"
+						:options="options"
+						:initial-subject="newTaskSubject"
+						@created="onNewTaskCreated"
+					/>
 				</div>
 			</div>
 
 			<div
 				class="hr-gantt-right flex min-w-0 flex-1 flex-col"
-				:class="{ 'hr-gantt--link-mode': linkMode }"
+				:class="{ 'hr-gantt--linking': drag }"
 			>
 				<div
 					class="hr-gantt-timeline-controls flex flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 bg-surface-gray-1 px-3 dark:bg-surface-gray-2"
@@ -132,20 +146,8 @@
 					>
 						{{ selectionRangeLabel }}
 					</span>
-					<Button
-						type="button"
-						size="sm"
-						:variant="linkMode ? 'solid' : 'outline'"
-						:theme="linkMode ? 'blue' : 'gray'"
-						:title="
-							linkMode
-								? 'Click predecessor, then successor (Esc to cancel)'
-								: 'Link tasks'
-						"
-						@click="toggleLinkMode"
-					>
-						Link
-					</Button>
+					<!-- Extra controls of the hosting view, e.g. "Own / All departments" (#1948). -->
+					<slot name="toolbar" />
 					<label class="ml-auto flex items-center gap-2 text-[11px] text-ink-gray-5">
 						Zoom
 						<input
@@ -232,7 +234,7 @@
 					class="hr-gantt-body min-h-0 flex-1 overflow-auto bg-surface-white dark:bg-surface-gray-1"
 					@scroll="onBodyScroll"
 				>
-					<div class="hr-gantt-body-inner relative" :style="bodyInnerStyle">
+					<div ref="bodyInner" class="hr-gantt-body-inner relative" :style="bodyInnerStyle">
 						<div
 							v-if="!ganttTasks.length"
 							class="absolute inset-0 z-[3] flex items-center justify-center text-xs text-ink-gray-5"
@@ -240,6 +242,56 @@
 							Set expected dates to show tasks on the timeline
 						</div>
 						<div ref="ganttHost" class="hr-gantt-wrap" />
+
+						<!-- Drag-to-link (#2001): a dot after the hovered bar; drag it onto the task that follows. -->
+						<svg v-if="drag" class="hr-gantt-link-line" aria-hidden="true">
+							<line :x1="drag.x0" :y1="drag.y0" :x2="drag.x" :y2="drag.y" />
+						</svg>
+						<button
+							v-if="handle"
+							type="button"
+							class="hr-gantt-link-handle"
+							:class="{ 'hr-gantt-link-handle--active': drag }"
+							:style="{ left: `${handle.x}px`, top: `${handle.y}px` }"
+							:title="__('Drag onto the task that follows')"
+							:aria-label="__('Drag onto the task that follows')"
+							@pointerdown="onHandlePointerDown"
+							@pointermove="onHandlePointerMove"
+							@pointerup="onHandlePointerUp"
+							@pointercancel="endDrag"
+							@mouseenter="keepHandle"
+							@mouseleave="hideHandleSoon"
+						/>
+
+						<!-- Click on an arrow (#2001): who waits for whom, and remove. -->
+						<div
+							v-if="arrowPopover"
+							ref="popoverEl"
+							role="dialog"
+							:aria-label="__('Dependency')"
+							class="hr-gantt-dep-popover absolute z-[6] w-64 rounded-lg border border-outline-gray-2 bg-surface-white p-3 shadow-lg dark:bg-surface-gray-2"
+							:style="{ left: `${arrowPopover.x}px`, top: `${arrowPopover.y}px` }"
+						>
+							<div class="flex items-center gap-2 text-sm font-semibold text-ink-gray-9">
+								<span class="h-2 w-2 flex-shrink-0 rounded-full bg-surface-gray-5" />
+								<span class="min-w-0 truncate">{{ taskTitle(arrowPopover.from) }}</span>
+							</div>
+							<div class="my-1 pl-4 text-xs text-ink-gray-5">{{ __("must finish before") }}</div>
+							<div class="flex items-center gap-2 text-sm font-semibold text-ink-gray-9">
+								<span class="h-2 w-2 flex-shrink-0 rounded-full bg-surface-gray-5" />
+								<span class="min-w-0 truncate">{{ taskTitle(arrowPopover.to) }}</span>
+							</div>
+							<Button
+								ref="popoverRemove"
+								class="mt-3 w-full"
+								size="sm"
+								variant="outline"
+								theme="red"
+								@click="removeArrow"
+							>
+								{{ __("Remove dependency") }}
+							</Button>
+						</div>
 					</div>
 				</div>
 				<div
@@ -254,8 +306,9 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import Gantt from "frappe-gantt"
-import { call } from "frappe-ui"
+import { FeatherIcon } from "frappe-ui"
 import InboxStatusFilter from "@spa/components/InboxStatusFilter.vue"
+import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime"
 import {
 	buildTimeline,
@@ -267,12 +320,15 @@ import {
 } from "../utils/ganttTimeline"
 import { formatDateIso } from "../utils/ganttTimelineFormat"
 import { buildBarColorCss, parseDependsOn, taskColorClass } from "../utils/ganttColors"
-import { restyleDependencyArrows } from "../utils/ganttDependencyArrows"
+import { addArrowHitAreas, restyleDependencyArrows } from "../utils/ganttDependencyArrows"
+import { handlePoint, linkTargetId } from "../utils/ganttDependencyDrag"
+import { startsBeforePredecessorEnds } from "../utils/dependencyConflict"
+import { __ } from "@spa/utils/i18n.js"
 import { updateGanttTodayStrip } from "../utils/ganttTodayStrip"
 import { updateGanttSelectedRow } from "../utils/ganttSelectedRow"
+import { ganttBuildAction } from "../utils/ganttBuildAction"
 import spaConfig from "@/config"
 
-const API = spaConfig.api
 const BAR_COLOR_STYLE_ID = spaConfig.barColorStyleId || `${spaConfig.slug}-gantt-bar-colors`
 
 const props = defineProps({
@@ -280,12 +336,15 @@ const props = defineProps({
 	selectedName: { type: String, default: null },
 	search: { type: String, default: "" },
 	includeCompleted: { type: Boolean, default: false },
+	// get_form_options of the cockpit, for the "New Task" dialog (#1752).
+	options: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits([
 	"select",
 	"date-change",
 	"dependency-change",
+	"dependency-remove",
 	"created",
 	"update:search",
 	"update:includeCompleted",
@@ -321,10 +380,17 @@ const zoom = ref(38)
 const frameStart = ref("")
 const frameEnd = ref("")
 const newTaskSubject = ref("")
-const creatingTask = ref(false)
-const createError = ref("")
-const linkMode = ref(false)
-const linkFrom = ref(null)
+const newTaskDialogOpen = ref(false)
+/** Drag-to-link (#2001): the dot shown after a hovered bar, {id, x, y} in body-inner pixels. */
+const handle = ref(null)
+/** While dragging: {from, x0, y0, x, y, target}. */
+const drag = ref(null)
+/** The arrow clicked: {from, to, x, y}. */
+const arrowPopover = ref(null)
+const bodyInner = ref(null)
+const popoverEl = ref(null)
+const popoverRemove = ref(null)
+let hideHandleTimer = null
 
 const selecting = ref(false)
 const selectionStartCol = ref(null)
@@ -363,6 +429,10 @@ const ganttTasks = computed(() =>
 			const colorCls = taskColorClass(t.color)
 			if (colorCls) classes.push(colorCls)
 			if (t.name === props.selectedName) classes.push("bar-selected")
+			// Rows the hosting view marks read-only can't be dragged, resized or linked (#1948).
+			if (t.locked || t.is_group) classes.push("bar-locked")
+			if (t.is_group) classes.push("gantt-dept-header")
+			if (t.empty) classes.push("gantt-dept-header-empty")
 			return {
 				id: t.name,
 				name: t.subject || t.name,
@@ -437,20 +507,213 @@ function taskStatus(id) {
 	return taskStatusMap.value[id] || ""
 }
 
-function toggleLinkMode() {
-	linkMode.value = !linkMode.value
-	if (!linkMode.value) {
-		linkFrom.value = null
+const rowMetaMap = computed(() => Object.fromEntries(props.tasks.map((t) => [t.name, t])))
+
+/** The row as the hosting view passed it (is_group, collapsed, group_count, locked …). */
+function rowMeta(id) {
+	return rowMetaMap.value[id] || {}
+}
+
+function isLocked(id) {
+	const row = rowMeta(id)
+	return Boolean(row.locked || row.is_group)
+}
+
+/** frappe-gantt has no read-only bars: it starts a drag on a mousedown delegated from its SVG.
+ *  Stopping that mousedown on the host (capture phase) for locked bars keeps them in place,
+ *  while clicks still select them. */
+function onHostMouseDown(e) {
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (wrapper && isLocked(wrapper.getAttribute("data-id"))) e.stopPropagation()
+}
+
+const dependsOnMap = computed(() =>
+	Object.fromEntries(ganttTasks.value.map((t) => [t.id, t.dependencies || []]))
+)
+const linkRows = { isLocked, dependsOn: (id) => dependsOnMap.value[id] || [] }
+
+function taskTitle(id) {
+	return rowMeta(id).subject || id
+}
+
+function innerRect() {
+	return bodyInner.value?.getBoundingClientRect() || null
+}
+
+function barOf(id) {
+	return gantt?.bars?.find((bar) => bar.task.id === id) || null
+}
+
+// --- Drag-to-link (#2001) --------------------------------------------------------------------
+
+function onHostMouseOver(e) {
+	if (drag.value) return
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (!wrapper) return
+	const id = wrapper.getAttribute("data-id")
+	if (isLocked(id)) return
+	showHandle(id)
+}
+
+function onHostMouseOut(e) {
+	if (drag.value) return
+	const wrapper = e.target?.closest?.(".bar-wrapper")
+	if (!wrapper || wrapper.contains(e.relatedTarget)) return
+	hideHandleSoon()
+}
+
+function showHandle(id) {
+	clearTimeout(hideHandleTimer)
+	const bar = barOf(id)?.$bar
+	const origin = innerRect()
+	if (!bar || !origin) return
+	handle.value = { id, ...handlePoint(bar.getBoundingClientRect(), origin) }
+}
+
+function keepHandle() {
+	clearTimeout(hideHandleTimer)
+}
+
+function hideHandleSoon() {
+	if (drag.value) return
+	clearTimeout(hideHandleTimer)
+	hideHandleTimer = setTimeout(() => {
+		if (!drag.value) handle.value = null
+	}, 300)
+}
+
+function onHandlePointerDown(e) {
+	if (e.button !== 0 || !handle.value) return
+	e.preventDefault()
+	e.stopPropagation()
+	closeArrowPopover()
+	e.currentTarget?.setPointerCapture?.(e.pointerId)
+	const { id, x, y } = handle.value
+	drag.value = { from: id, x0: x, y0: y, x, y, target: null }
+	updateBarStateClasses()
+}
+
+/** Scroll the chart while the pointer is near its edge, so far-away bars can be reached. */
+function autoScroll(e) {
+	const body = bodyScroll.value
+	if (!body) return
+	const rect = body.getBoundingClientRect()
+	const edge = 32
+	const step = 14
+	if (e.clientY < rect.top + edge) body.scrollTop -= step
+	else if (e.clientY > rect.bottom - edge) body.scrollTop += step
+	if (e.clientX < rect.left + edge) body.scrollLeft -= step
+	else if (e.clientX > rect.right - edge) body.scrollLeft += step
+}
+
+function onHandlePointerMove(e) {
+	if (!drag.value) return
+	autoScroll(e)
+	const origin = innerRect()
+	if (!origin) return
+	drag.value.x = e.clientX - origin.left
+	drag.value.y = e.clientY - origin.top
+	const wrapper = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".bar-wrapper")
+	const target = linkTargetId(drag.value.from, wrapper?.getAttribute("data-id") || null, linkRows)
+	if (target !== drag.value.target) {
+		drag.value.target = target
 		updateBarStateClasses()
 	}
 }
 
-function onKeyDown(e) {
-	if (e.key === "Escape" && linkMode.value) {
-		linkMode.value = false
-		linkFrom.value = null
-		updateBarStateClasses()
+function onHandlePointerUp() {
+	if (!drag.value) return
+	const { from, target } = drag.value
+	endDrag()
+	if (target) emit("dependency-change", { name: target, depends_on: from })
+}
+
+function endDrag() {
+	drag.value = null
+	handle.value = null
+	updateBarStateClasses()
+}
+
+// --- Arrow popover (#2001) -------------------------------------------------------------------
+
+function onHostClick(e) {
+	const link = e.target?.closest?.(".dep-link")
+	if (!link) return
+	e.stopPropagation()
+	const origin = innerRect()
+	if (!origin) return
+	arrowPopover.value = {
+		from: link.dataset.from,
+		to: link.dataset.to,
+		...popoverPoint(e.clientX - origin.left, e.clientY - origin.top),
 	}
+	markActiveArrow()
+	nextTick(() => {
+		const el = popoverRemove.value?.$el || popoverRemove.value
+		el?.focus?.()
+	})
+}
+
+const POPOVER_WIDTH = 256
+const POPOVER_HEIGHT = 130
+
+/** Below and right of the click, flipped left or up where it would leave the visible chart. */
+function popoverPoint(x, y) {
+	const body = bodyScroll.value
+	const right = body ? body.scrollLeft + body.clientWidth : Infinity
+	const bottom = body ? body.scrollTop + body.clientHeight : Infinity
+	return {
+		x: x + 8 + POPOVER_WIDTH > right ? Math.max(0, x - 8 - POPOVER_WIDTH) : x + 8,
+		y: y + 8 + POPOVER_HEIGHT > bottom ? Math.max(0, y - 8 - POPOVER_HEIGHT) : y + 8,
+	}
+}
+
+function closeArrowPopover() {
+	if (!arrowPopover.value) return
+	arrowPopover.value = null
+	markActiveArrow()
+}
+
+function onDocumentPointerDown(e) {
+	if (!arrowPopover.value) return
+	if (popoverEl.value?.contains(e.target)) return
+	if (e.target?.closest?.(".dep-link")) return
+	closeArrowPopover()
+}
+
+function removeArrow() {
+	const popover = arrowPopover.value
+	if (!popover) return
+	closeArrowPopover()
+	emit("dependency-remove", { name: popover.to, depends_on: popover.from })
+}
+
+/** Red arrows (#2002): the successor starts before its predecessor ends. Show only, no date change. */
+function markConflictArrows() {
+	const svg = ganttHost.value
+	if (!svg) return
+	for (const link of svg.querySelectorAll(".dep-link")) {
+		const conflict = startsBeforePredecessorEnds(rowMeta(link.dataset.from), rowMeta(link.dataset.to))
+		link.classList.toggle("dep-link--conflict", conflict)
+	}
+}
+
+function markActiveArrow() {
+	const svg = ganttHost.value
+	if (!svg) return
+	const active = arrowPopover.value
+	for (const link of svg.querySelectorAll(".dep-link")) {
+		link.classList.toggle(
+			"dep-link--active",
+			Boolean(active && link.dataset.from === active.from && link.dataset.to === active.to)
+		)
+	}
+}
+
+function onKeyDown(e) {
+	if (e.key !== "Escape") return
+	if (drag.value) endDrag()
+	else closeArrowPopover()
 }
 
 function focusNewTaskInput() {
@@ -522,7 +785,7 @@ function colFromClientX(clientX) {
 }
 
 function onHeaderPointerDown(e) {
-	if (linkMode.value || e.button !== 0) return
+	if (e.button !== 0) return
 	selecting.value = true
 	selectionDragActive.value = false
 	pointerStartX.value = e.clientX
@@ -560,35 +823,21 @@ function onHeaderPointerUp() {
 	}
 }
 
-function todayIso() {
-	return todayIsoInUserTz()
-}
-
 function todayDate() {
 	const iso = todayIsoInUserTz()
 	const [y, mo, dd] = iso.split("-").map(Number)
 	return new Date(y, mo - 1, dd, 0, 0, 0, 0)
 }
 
-async function submitNewTask() {
-	const subject = newTaskSubject.value.trim()
-	if (!subject || creatingTask.value) return
+// "New task…" only takes the subject; the dialog asks for the rest (#1752).
+function openNewTaskDialog() {
+	newTaskDialogOpen.value = true
+}
 
-	creatingTask.value = true
-	createError.value = ""
-	try {
-		const task = await call(`${API}.create_task`, {
-			subject,
-			exp_start_date: todayIso(),
-		})
-		newTaskSubject.value = ""
-		emit("created", task.name)
-	} catch (e) {
-		createError.value = e?.messages?.[0] || e?.message || "Could not create task"
-	} finally {
-		creatingTask.value = false
-		nextTick(focusNewTaskInput)
-	}
+function onNewTaskCreated(task) {
+	newTaskSubject.value = ""
+	emit("created", task.name)
+	nextTick(focusNewTaskInput)
 }
 
 function parseDate(value) {
@@ -646,31 +895,25 @@ function applyGanttFrame() {
 	fixSvgHeight()
 	updateBarStateClasses()
 	restyleDependencyArrows(gantt)
+	addArrowHitAreas(gantt)
+	markConflictArrows()
+	// The bars moved or were redrawn: a dot or popover from before would point at nothing.
+	if (!drag.value) handle.value = null
+	arrowPopover.value = null
 	updateTodayStripOverlay()
-}
-
-function handleLinkClick(taskId) {
-	if (!linkFrom.value) {
-		linkFrom.value = taskId
-		updateBarStateClasses()
-		return
-	}
-	if (linkFrom.value === taskId) {
-		linkFrom.value = null
-		updateBarStateClasses()
-		return
-	}
-	emit("dependency-change", { name: taskId, depends_on: linkFrom.value })
-	linkMode.value = false
-	linkFrom.value = null
-	updateBarStateClasses()
 }
 
 function buildGantt() {
 	const tasksForGantt = ganttTasks.value
 	injectBarColors()
 
-	if (!gantt) {
+	const action = ganttBuildAction(Boolean(gantt), tasksForGantt.length)
+	if (action === "clear") {
+		destroyGantt()
+		return
+	}
+
+	if (action === "create") {
 		if (!ganttHost.value) return
 		gantt = new Gantt(ganttHost.value, tasksForGantt, {
 			view_mode: "Day",
@@ -680,14 +923,13 @@ function buildGantt() {
 			header_height: 0,
 			date_format: "YYYY-MM-DD",
 			language: "en",
-			on_click: (task) => {
-				if (linkMode.value) {
-					handleLinkClick(task.id)
+			on_click: (task) => emit("select", task.id),
+			on_date_change: (task, start, end) => {
+				// A locked bar only moves along with a predecessor it depends on: redraw, don't save.
+				if (isLocked(task.id)) {
+					applyGanttFrame()
 					return
 				}
-				emit("select", task.id)
-			},
-			on_date_change: (task, start, end) => {
 				emit("date-change", {
 					name: task.id,
 					exp_start_date: formatDateIso(start),
@@ -742,9 +984,9 @@ function updateBarStateClasses() {
 	if (!gantt?.bars) return
 	for (const bar of gantt.bars) {
 		const selected = bar.task.id === props.selectedName
-		const linkSource = bar.task.id === linkFrom.value
 		bar.group.classList.toggle("bar-selected", selected)
-		bar.group.classList.toggle("link-from", linkSource)
+		bar.group.classList.toggle("link-source", bar.task.id === drag.value?.from)
+		bar.group.classList.toggle("link-target", bar.task.id === drag.value?.target)
 	}
 	updateGanttSelectedRow(gantt, props.selectedName)
 }
@@ -864,11 +1106,15 @@ watch(
 
 watch(todayStrip, () => updateTodayStripOverlay())
 
-watch(linkFrom, () => updateBarStateClasses())
 
 onMounted(() => {
 	initFrame()
 	document.addEventListener("keydown", onKeyDown)
+	document.addEventListener("pointerdown", onDocumentPointerDown, true)
+	ganttHost.value?.addEventListener("mousedown", onHostMouseDown, true)
+	ganttHost.value?.addEventListener("mouseover", onHostMouseOver)
+	ganttHost.value?.addEventListener("mouseout", onHostMouseOut)
+	ganttHost.value?.addEventListener("click", onHostClick, true)
 	ganttTasksSignature = tasksSignature(ganttTasks.value)
 	buildGantt()
 	bodyScroll.value?.addEventListener("wheel", onWheel, { passive: false })
@@ -900,7 +1146,13 @@ onUnmounted(() => {
 	bodyResizeObserver = null
 	listFooterResizeObserver?.disconnect()
 	listFooterResizeObserver = null
+	clearTimeout(hideHandleTimer)
 	document.removeEventListener("keydown", onKeyDown)
+	document.removeEventListener("pointerdown", onDocumentPointerDown, true)
+	ganttHost.value?.removeEventListener("mousedown", onHostMouseDown, true)
+	ganttHost.value?.removeEventListener("mouseover", onHostMouseOver)
+	ganttHost.value?.removeEventListener("mouseout", onHostMouseOut)
+	ganttHost.value?.removeEventListener("click", onHostClick, true)
 	bodyScroll.value?.removeEventListener("wheel", onWheel)
 	document.getElementById(BAR_COLOR_STYLE_ID)?.remove()
 	destroyGantt()
@@ -918,10 +1170,81 @@ onUnmounted(() => {
 	filter: brightness(1.08);
 }
 
-:deep(.link-from .bar) {
+:deep(.link-source .bar),
+:deep(.link-target .bar) {
+	stroke: var(--ink-blue-3);
+	stroke-width: 2.5px;
+}
+
+:deep(.link-source .bar) {
+	stroke-dasharray: 4 2;
+}
+
+/* Drag-to-link (#2001) */
+.hr-gantt-link-handle {
+	position: absolute;
+	z-index: 5;
+	width: 12px;
+	height: 12px;
+	margin: -6px 0 0 -6px;
+	border: 2px solid var(--ink-blue-3);
+	border-radius: 9999px;
+	background: var(--surface-white);
+	cursor: crosshair;
+	touch-action: none;
+}
+
+.hr-gantt-link-handle:hover,
+.hr-gantt-link-handle--active,
+.hr-gantt-link-handle:focus-visible {
+	background: var(--ink-blue-3);
+	outline: none;
+}
+
+.hr-gantt-link-line {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.hr-gantt-link-line line {
 	stroke: var(--ink-blue-3);
 	stroke-width: 2px;
-	stroke-dasharray: 4 2;
+}
+
+/* Clickable arrows: a wide invisible stroke on top of each arrow. The selectors repeat
+   ".hr-gantt-wrap .gantt g.arrow" to outrank the global arrow style, which sets every
+   arrow path to a 1.2px stroke and left the hit area as thin as the line (#1999). */
+:deep(.hr-gantt-wrap .gantt g.arrow path.dep-hit) {
+	fill: none;
+	stroke: transparent;
+	/* 10px either side of the line. */
+	stroke-width: 20px;
+	stroke-linecap: round;
+	pointer-events: stroke;
+	cursor: pointer;
+}
+
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link:hover path:first-child),
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--active path:first-child) {
+	stroke: var(--ink-gray-9);
+	stroke-width: 2.4px;
+}
+
+/* Successor starts before its predecessor ends (#2002). */
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict path:first-child) {
+	stroke: var(--ink-red-3);
+	stroke-width: 1.8px;
+}
+
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict:hover path:first-child),
+:deep(.hr-gantt-wrap .gantt g.arrow .dep-link--conflict.dep-link--active path:first-child) {
+	stroke: var(--ink-red-4);
+	stroke-width: 2.4px;
 }
 
 :deep(.hr-gantt-wrap .gantt .bar-label) {
@@ -937,7 +1260,36 @@ onUnmounted(() => {
 	display: none;
 }
 
-.hr-gantt--link-mode .hr-gantt-body {
+.hr-gantt--linking .hr-gantt-body {
 	cursor: crosshair;
+	user-select: none;
+}
+
+/* Read-only rows of the company view (#1948): no resize or progress handles. */
+:deep(.bar-locked .handle) {
+	display: none;
+}
+
+:deep(.bar-locked) {
+	cursor: pointer;
+}
+
+/* Department header row: a thin summary bar over the department's span. */
+:deep(.gantt-dept-header .bar) {
+	transform: scaleY(0.35);
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+:deep(.gantt-dept-header .bar-progress) {
+	display: none;
+}
+
+:deep(.gantt-dept-header-empty) {
+	display: none;
+}
+
+.hr-gantt-list-row--group {
+	background-color: var(--surface-gray-1);
 }
 </style>

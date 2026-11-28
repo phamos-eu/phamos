@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-07-20 08:00:00.000000",
+ "modified": "2026-11-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bookstack Integration",
  "name": "bookstack-browser",
@@ -16,6 +16,9 @@
   },
   {
    "role": "Bookstack User"
+  },
+  {
+   "role": "Bookstack Manager"
   }
  ],
  "script": null,

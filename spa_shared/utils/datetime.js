@@ -255,6 +255,31 @@ function bootLang() {
 	return String(lang).split(/[-_]/)[0].toLowerCase()
 }
 
+/**
+ * The user's Frappe language as a BCP 47 tag for Intl and toLocale*String (#1605), e.g. "de".
+ * Not the browser's language: a German user with an English browser still reads German.
+ */
+export function userLocale() {
+	const lang = boot().lang || boot().language || "en"
+	return String(lang).replace("_", "-")
+}
+
+/** Weekday name of a date in the user's language: "Saturday" / "Samstag" (style long|short). */
+export function weekdayName(date, style = "long") {
+	const d = date instanceof Date ? date : new Date(`${String(date).slice(0, 10)}T12:00:00`)
+	return d.toLocaleDateString(userLocale(), { weekday: style })
+}
+
+/** Hours and minutes of a Date in the user's language and time zone: "17:46". */
+export function clockTime(date) {
+	const zone = timeZones().user || undefined
+	try {
+		return date.toLocaleTimeString(userLocale(), { hour: "2-digit", minute: "2-digit", timeZone: zone })
+	} catch {
+		return date.toLocaleTimeString(userLocale(), { hour: "2-digit", minute: "2-digit" })
+	}
+}
+
 function localizedDayjs(date) {
 	const d = dayjs(date)
 	if (!d.isValid()) return d
@@ -360,4 +385,17 @@ export function dayProgressFraction(moment = null) {
 	const m = moment || nowInUserTz()
 	const seconds = m.hour() * 3600 + m.minute() * 60 + m.second() + m.millisecond() / 1000
 	return Math.min(1, Math.max(0, seconds / 86400))
+}
+
+/** This moment as a system-tz API string ("YYYY-MM-DD HH:mm:ss"), whatever the browser's zone. */
+export function nowForApi() {
+	const { system } = timeZones()
+	if (system) {
+		try {
+			return dayjs().tz(system).format("YYYY-MM-DD HH:mm:ss")
+		} catch {
+			/* fall through */
+		}
+	}
+	return dayjs().format("YYYY-MM-DD HH:mm:ss")
 }

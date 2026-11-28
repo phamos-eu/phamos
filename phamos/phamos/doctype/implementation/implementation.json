@@ -71,6 +71,11 @@
   "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
+  "wip_limits_section",
+  "max_parallel_chapters",
+  "column_break_wip_limits",
+  "max_parallel_features",
+  "team_capacity_share",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -83,6 +88,12 @@
   "generate_auto_email",
   "stakeholders_tab",
   "stakeholders",
+  "section_break_review_cadence",
+  "review_cadence",
+  "next_review_due",
+  "column_break_review_cadence",
+  "last_stakeholder_meeting",
+  "last_reviewed_on",
   "gitlab_tab",
   "gitlab_projects_html",
   "column_break_amyu",
@@ -323,6 +334,43 @@
    "options": "Team"
   },
   {
+   "fieldname": "section_break_review_cadence",
+   "fieldtype": "Section Break",
+   "label": "Review Cadence"
+  },
+  {
+   "description": "How often this Implementation should be reviewed with the customer in a Stakeholder Meeting. Leave blank to not track a cadence for this Implementation.",
+   "fieldname": "review_cadence",
+   "fieldtype": "Select",
+   "label": "Review Cadence",
+   "options": "\nWeekly\nBiweekly\nMonthly\nQuarterly"
+  },
+  {
+   "description": "The next date a Stakeholder Meeting should be held. Automatically pushed forward by the Review Cadence whenever a Meeting is submitted; can also be adjusted manually.",
+   "fieldname": "next_review_due",
+   "fieldtype": "Date",
+   "label": "Next Review Due"
+  },
+  {
+   "fieldname": "column_break_review_cadence",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The most recently submitted Stakeholder Meeting for this Implementation.",
+   "fieldname": "last_stakeholder_meeting",
+   "fieldtype": "Link",
+   "label": "Last Stakeholder Meeting",
+   "options": "Stakeholder Meeting",
+   "read_only": 1
+  },
+  {
+   "description": "The date of the most recently submitted Stakeholder Meeting.",
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On",
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "graph_overview_section",
    "fieldtype": "Section Break",
@@ -543,6 +591,37 @@
    "fieldname": "rank_html",
    "fieldtype": "HTML",
    "label": "Rank"
+  },
+  {
+   "fieldname": "wip_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Agreed WIP Limits",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "max_parallel_chapters",
+   "fieldtype": "Int",
+   "label": "Max Chapters in Progress",
+   "description": "How many chapters may be In Progress at the same time, as agreed with the customer in a regular session. 0 means no limit. Exceeding it shows a warning; nothing is blocked.",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_wip_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_parallel_features",
+   "fieldtype": "Int",
+   "label": "Max Features in Progress",
+   "description": "How many features may be In Progress at the same time, as agreed with the customer. 0 means no limit.",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "team_capacity_share",
+   "fieldtype": "Percent",
+   "label": "Team Capacity Share",
+   "non_negative": 1,
+   "description": "The share of the team's capacity agreed for this implementation, because teams work for several customers. Used by the realistic check of releases."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -586,9 +665,32 @@
   {
    "link_doctype": "Implementation Chapter",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Stakeholder Meeting",
+   "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Feature",
+   "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Implementation Change",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Baseline",
+   "link_fieldname": "implementation",
+   "group": "Planning"
+  },
+  {
+   "link_doctype": "Implementation Release",
+   "link_fieldname": "implementation",
+   "group": "Planning"
   }
  ],
- "modified": "2026-08-13 09:05:58.342753",
+ "modified": "2026-11-18 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

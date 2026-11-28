@@ -11,7 +11,8 @@ from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
 from phamos.api import department_cockpit as dc
-from phamos.api.i_own_my_work import _parse_assignees, _parse_list
+from phamos.api.accounting_receivables import can_read_receivables
+from phamos.api.issue_common import _parse_assignees, _parse_list
 
 CONFIG = dc.CockpitConfig(
 	label="Accounting",
@@ -63,6 +64,7 @@ def get_accounting_settings():
 	"""Return Accounting SPA configuration for the frontend."""
 	settings = dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
 	settings["can_read_monthly_implementation_summary"] = 1 if _can_read_mis() else 0
+	settings["can_read_receivables"] = 1 if can_read_receivables() else 0
 	return settings
 
 
@@ -265,6 +267,37 @@ def set_assignees(name, users=None):
 	return dc.set_assignees(CONFIG, name, users=users)
 
 
+@frappe.whitelist()
+def get_issue_chat(name):
+	"""Return the Raven chat state of an Issue in Accounting scope."""
+	return dc.get_issue_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_issue_chat(name):
+	"""Start or join the Raven chat of an Issue in Accounting scope."""
+	return dc.ensure_issue_chat(CONFIG, name)
+
+
+@frappe.whitelist()
+def get_issue_chat_states(names):
+	"""Return the chat state per Issue for list views."""
+	return dc.get_issue_chat_states(names)
+
+
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in Accounting scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in Accounting scope."""
+	return dc.ensure_task_chat(CONFIG, name)
+
+
+
 @frappe.whitelist(methods=["POST"])
 def update_issue(name, subject=None, description=None, priority=None, issue_type=None, project=None):
 	"""Update whitelisted Issue fields within Accounting scope."""
@@ -323,6 +356,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	custom_task_owner=None,
 ):
 	"""Update whitelisted Task fields within Accounting scope."""
 	fields = {}
@@ -342,6 +376,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if custom_task_owner is not None:
+		fields["custom_task_owner"] = custom_task_owner
 	return dc.update_task(CONFIG, name, **fields)
 
 
@@ -360,6 +396,9 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
 	"""Create a Task in the Accounting department."""
 	return dc.create_task(
@@ -371,6 +410,9 @@ def create_task(
 		department=department,
 		exp_start_date=exp_start_date,
 		exp_end_date=exp_end_date,
+		expected_time=expected_time,
+		custom_task_owner=custom_task_owner,
+		task_type=task_type,
 	)
 
 
@@ -405,6 +447,18 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_task_dependency(name, depends_on):
+	"""Remove a predecessor from a Task (side panel, Gantt)."""
+	return dc.remove_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+def search_dependency_candidates(name, txt=""):
+	"""Tasks the given Task could depend on, for the side panel's search."""
+	return dc.search_dependency_candidates(CONFIG, name, txt)
 
 
 RECEIPT_KANBAN_STATUSES = (

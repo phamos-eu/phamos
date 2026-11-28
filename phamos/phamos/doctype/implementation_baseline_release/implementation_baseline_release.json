@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "creation": "2026-11-19 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "release",
+  "title",
+  "status",
+  "target_date",
+  "ranking"
+ ],
+ "fields": [
+  {
+   "fieldname": "release",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Release",
+   "options": "Implementation Release"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status"
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Target Date"
+  },
+  {
+   "fieldname": "ranking",
+   "fieldtype": "Small Text",
+   "label": "Ranking",
+   "description": "The release's features in their agreed order."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-19 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Baseline Release",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

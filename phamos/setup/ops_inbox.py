@@ -19,7 +19,7 @@ def ensure_ops_inbox_setup():
 
 
 def _ensure_issue_department_field():
-	"""Link Department on Issue for I Own My Work (stock Issue has Project only)."""
+	"""Link Department on Issue for the cockpits (stock Issue has Project only)."""
 	if frappe.db.exists("Custom Field", {"dt": "Issue", "fieldname": "custom_department"}):
 		return
 	frappe.get_doc(

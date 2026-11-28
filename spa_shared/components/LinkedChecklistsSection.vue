@@ -1,6 +1,6 @@
 <template>
-	<section class="mb-5">
-		<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+	<section v-if="!unavailable" :class="embedded ? '' : 'mb-5'">
+		<div v-if="!embedded" class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 			Checklists
 		</div>
 
@@ -54,6 +54,7 @@
 						:checklist="details[row.name]"
 						compact
 						@updated="(payload) => onChecklistUpdated(row.name, payload)"
+						@moved="onItemMoved"
 					/>
 				</div>
 			</div>
@@ -75,17 +76,24 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from "vue"
+import { computed, onMounted, reactive, ref, watch } from "vue"
 import { Badge, call } from "frappe-ui"
 import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	document: { type: String, required: true },
 	referenceRecord: { type: String, required: true },
 	referenceTitle: { type: String, default: "" },
 	allowCreate: { type: Boolean, default: true },
+	// shown as a dock panel body (spa_shared/panels): no heading, and it reports its state
+	embedded: { type: Boolean, default: false },
 })
+
+// For the dock row (#1910): a one-line summary, and `hidden` when the user may not read
+// checklists, so the dock drops the panel instead of showing an empty one.
+const emit = defineEmits(["state"])
 
 const API = "phamos.api.checklist_inbox"
 
@@ -95,6 +103,9 @@ const expanded = reactive({})
 const details = reactive({})
 const detailLoading = reactive({})
 const showCreate = ref(false)
+// The user cannot read checklists (permissions are granted per site): hide the section
+// instead of showing an empty one with a create button that would fail.
+const unavailable = ref(false)
 
 function statusTheme(status) {
 	if (status === "Completed") return "green"
@@ -124,10 +135,26 @@ async function loadSummaries() {
 			document: props.document,
 			reference_record: props.referenceRecord,
 		})
-		const toLoad = applyDefaultExpansion(summaries.value)
-		await Promise.all(toLoad.map((name) => loadDetail(name)))
+		await loadDetails(applyDefaultExpansion(summaries.value))
+	} catch (e) {
+		if (e?.exc_type === "PermissionError" || /PermissionError/.test(e?.message || "")) {
+			unavailable.value = true
+			return
+		}
+		throw e
 	} finally {
 		loading.value = false
+	}
+}
+
+// All unfinished checklists open at once: one request for all of them, not one each (#1796).
+async function loadDetails(names) {
+	if (!names.length) return
+	names.forEach((name) => (detailLoading[name] = true))
+	try {
+		Object.assign(details, await call(`${API}.get_checklists`, { names: JSON.stringify(names) }))
+	} finally {
+		names.forEach((name) => (detailLoading[name] = false))
 	}
 }
 
@@ -168,6 +195,14 @@ async function onChecklistUpdated(name, payload) {
 	}
 }
 
+// An item moved to another checklist of this record (#1920): show the target with it.
+async function onItemMoved({ target }) {
+	if (!target?.name) return
+	details[target.name] = target
+	await onChecklistUpdated(target.name, target)
+	expanded[target.name] = true
+}
+
 async function onChecklistCreated(created) {
 	await loadSummaries()
 	if (created?.name) {
@@ -175,6 +210,26 @@ async function onChecklistCreated(created) {
 		details[created.name] = created
 	}
 }
+
+// For the panel's rail icon (#1915): "2 checklists · 3/7 done", and "3/7" as its badge.
+const counts = computed(() => ({
+	lists: summaries.value.length,
+	done: summaries.value.reduce((n, r) => n + (r.done_count || 0), 0),
+	total: summaries.value.reduce((n, r) => n + (r.total_count || 0), 0),
+}))
+const summaryText = computed(() => {
+	if (loading.value && !summaries.value.length) return ""
+	if (!counts.value.lists) return __("None yet")
+	const lists = counts.value.lists === 1 ? __("1 checklist") : __("{0} checklists", [counts.value.lists])
+	return `${lists} · ${__("{0}/{1} done", [counts.value.done, counts.value.total])}`
+})
+
+watch(
+	[summaryText, unavailable, counts],
+	([summary, hidden, c]) =>
+		emit("state", { summary, hidden, badge: c.total ? `${c.done}/${c.total}` : "" }),
+	{ immediate: true }
+)
 
 watch(
 	() => props.referenceRecord,

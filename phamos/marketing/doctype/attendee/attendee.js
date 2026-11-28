@@ -8,16 +8,23 @@ frappe.ui.form.on("Attendee", {
 		if (frm.is_new()) return;
 		const group = __("Actions");
 		frm.add_custom_button(__("Link to CRM"), () => phamos_attendee.link_to_crm(frm), group);
-		if (!frm.doc.sales_order && frm.doc.payment_status !== "Not Required") {
+		// The Sales Orders and invoices of a ticket are under Connections (phamos/phamos#1727).
+		if (frm.doc.payment_status === "Pending") {
 			frm.add_custom_button(__("Create Sales Order"), () => phamos_attendee.create_sales_order(frm), group);
 		}
-		if (frm.doc.sales_order && !frm.doc.sales_invoice) {
+		if (frm.doc.payment_status === "Ordered") {
 			frm.add_custom_button(__("Create Sales Invoice"), () =>
 				phamos_attendee.call("create_sales_invoices", { names: [frm.doc.name] }, frm), group);
 		}
 		if (!frm.doc.opportunity && (frm.doc.customer || frm.doc.lead)) {
 			frm.add_custom_button(__("Create Opportunity"), () =>
 				phamos_attendee.call("create_opportunities", { names: [frm.doc.name] }, frm), group);
+		}
+		if (frm.doc.email) {
+			frm.add_custom_button(__("Send Ticket"), () =>
+				frappe.call({ method: `${ATTENDEE_API}.send_ticket`, args: { name: frm.doc.name }, freeze: true })
+					.then((r) => frappe.show_alert({ message: __("Ticket sent to {0}", [r.message.sent_to]), indicator: "green" })),
+				group);
 		}
 		for (const status of ["Attended", "No Show"]) {
 			if (frm.doc.status !== status) {
@@ -34,7 +41,7 @@ frappe.ui.form.on("Attendee", {
 
 window.phamos_attendee = {
 	payment_colour(status) {
-		return { Paid: "green", Invoiced: "orange", Ordered: "blue", Pending: "red",
+		return { Paid: "green", Credited: "purple", Invoiced: "orange", Ordered: "blue", Pending: "red",
 			Cancelled: "gray", "Not Required": "gray" }[status] || "gray";
 	},
 

@@ -21,11 +21,15 @@
 				v-model:include-completed="includeCompleted"
 				:tasks="filteredTasks"
 				:selected-name="selectedName"
+				:options="formOptions"
 				@select="openTask"
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
+				@dependency-remove="onGanttDependencyRemove"
 				@created="onTaskCreated"
-			/>
+			>
+				<template #toolbar><slot name="gantt-toolbar" /></template>
+			</TaskGantt>
 		</section>
 
 		<aside
@@ -57,6 +61,8 @@ import { call, toast } from "frappe-ui"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import spaConfig from "@/config"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { __ } from "@spa/utils/i18n.js"
 
 const API = spaConfig.api
 
@@ -94,8 +100,11 @@ const filteredTasks = computed(() => {
 async function loadOptions() {
 	try {
 		formOptions.value = await call(`${API}.get_form_options`)
-		const dept = formOptions.value[spaConfig.departmentField]
-		configError.value = dept ? "" : `Configure ${spaConfig.label} Department in phamos Settings.`
+		// Department cockpits need their department configured; the Personal Cockpit has none.
+		const needsDepartment = Boolean(spaConfig.departmentField)
+		const dept = needsDepartment ? formOptions.value[spaConfig.departmentField] : ""
+		configError.value =
+			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in Cockpit Settings.` : ""
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
@@ -149,15 +158,33 @@ async function onGanttDateChange({ name, exp_start_date, exp_end_date }) {
 	}
 }
 
-async function onGanttDependencyChange({ name, depends_on }) {
+// Drag-to-link and the arrow popover on the Gantt (#2001); the panel's "Depends on" uses the same calls.
+async function saveGanttDependency(method, { name, depends_on }, done, failed) {
 	try {
-		const updated = await call(`${API}.add_task_dependency`, { name, depends_on })
+		const updated = await call(`${API}.${method}`, { name, depends_on })
 		await loadTasks()
 		if (selectedName.value === name) selectedTask.value = updated
-		toast.success("Dependency linked")
+		toast({ title: done, icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not link tasks")
+		toast({
+			title: e?.messages?.[0] || e?.message || failed,
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	}
+}
+
+function onGanttDependencyChange(link) {
+	return saveGanttDependency("add_task_dependency", link, __("Dependency linked"), __("Could not link tasks"))
+}
+
+function onGanttDependencyRemove(link) {
+	return saveGanttDependency(
+		"remove_task_dependency",
+		link,
+		__("Dependency removed"),
+		__("Could not remove the dependency")
+	)
 }
 
 async function onTaskCreated(name) {
@@ -186,6 +213,10 @@ watch(
 		}
 	}
 )
+
+// Assignments changed elsewhere (another cockpit, Desk): Tasks may have joined or left the
+// Gantt. Only the first load shows "Loading…", so this refresh keeps the chart on screen.
+useUserRealtime("cockpit_todos_changed", loadTasks)
 
 onMounted(async () => {
 	await loadOptions()
