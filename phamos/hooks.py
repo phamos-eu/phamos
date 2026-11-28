@@ -336,6 +336,7 @@ after_migrate = [
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
 	"phamos.setup.contracts.after_migrate",  # Contract Type on Contract, AVV and NDA (#2148)
 	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
+	"phamos.setup.issue_chat_card.after_migrate",  # fields on the Issue chat's card (#2234)
 ]
 
 # Uninstallation
@@ -468,7 +469,11 @@ doc_events = {
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
 	"Issue": {
-		"on_update": "phamos.api.issue_chat.on_record_update",
+		"on_update": [
+			# a new card in the chat when a field on it changes (#2234); before the chat may be archived
+			"phamos.api.issue_chat.post_card_on_change",
+			"phamos.api.issue_chat.on_record_update",
+		],
 		# the Issue Assistant's first look at a new Issue, in the background (#2111)
 		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
 	},
@@ -672,6 +677,8 @@ scheduler_events = {
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # Team Cockpit: successes found by the daily rules (#1981)
+        "phamos.cockpits.team_successes.run_all_teams",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",

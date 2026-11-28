@@ -3074,6 +3074,7 @@ Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldun
 Zoom out,Verkleinern
 Zoom in,Vergrößern
 Show the whole grid,Ganzes Raster zeigen
+Show the whole image,Ganzes Bild zeigen
 {0} × {1} tiles,{0} × {1} Kacheln
 Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
 "Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
@@ -3178,6 +3179,21 @@ to close,zum Schließen
 Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
 "Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Unknown shape.,Unbekannte Form.
+A polygon needs its corner points.,Ein Vieleck braucht seine Eckpunkte.
+A corner point is not a number.,Ein Eckpunkt ist keine Zahl.
+A polygon needs at least 3 corners.,Ein Vieleck braucht mindestens 3 Ecken.
+A polygon can have at most {0} corners.,Ein Vieleck kann höchstens {0} Ecken haben.
+The polygon is too small.,Das Vieleck ist zu klein.
+The edges of the polygon cross each other.,Die Kanten des Vielecks kreuzen sich.
+Shape,Form
+Rectangle,Rechteck
+Ellipse,Ellipse
+Polygon,Vieleck
+"On the map: drag a corner to move it, click an edge to add a corner, double-click a corner to remove it.","Auf der Karte: Ecke ziehen, um sie zu verschieben, auf eine Kante klicken, um eine Ecke hinzuzufügen, Ecke doppelklicken, um sie zu entfernen."
+Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel,Klicken setzt Ecken · erste Ecke anklicken oder Enter schließt · Rücktaste: letzte Ecke zurück · Esc: abbrechen
+"Drag on the map to draw an area, or click corner by corner for a polygon; click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Drag on the grid to mark a meeting area, or click corner by corner for a polygon; click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten"
 Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
@@ -3522,6 +3538,7 @@ Last merge request sync; the next one fetches what changed since then (#1977).,"
 "A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
 Added,Hinzugefügt
 Merged,Gemergt
+{0} changed:,{0} hat geändert:
 {0} of {1} checked in · updated {2},{0} von {1} eingecheckt · aktualisiert {2}
 Loading team mates…,Teammitglieder werden geladen…
 Nobody is in this team today.,Heute ist niemand in diesem Team.
@@ -3545,3 +3562,99 @@ Open the team chat in Raven,Teamchat in Raven öffnen
 Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
 Team chat of {0},Teamchat von {0}
 Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
+(hidden),(verborgen)
+{0} absent (half day),{0} abwesend (halber Tag)
+{0} absent,{0} abwesend
+"The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"
+Pick a shorter period.,Wählen Sie einen kürzeren Zeitraum.
+Invites go out from the team mailbox. Set one on the Team in Desk first.,Einladungen gehen vom Team-Postfach aus. Legen Sie es zuerst im Team in Desk fest.
+Set a team mailbox with a Mailcow calendar on team {0} first.,Legen Sie zuerst ein Team-Postfach mit Mailcow-Kalender für Team {0} fest.
+Team Mailbox,Team-Postfach
+The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979).,"Das gemeinsame Postfach, von dem die Termine des Teams versendet werden (braucht ein Mailcow-DAV-Passwort). Teammitglieder können Einladungen nur von diesem Postfach senden (#1979)."
+"Ideas shared with {0}: the same vote as the company's, read by the team only.","Mit {0} geteilte Ideen: dieselbe Abstimmung wie im Unternehmen, nur vom Team gelesen."
+the team,dem Team
+New team idea,Neue Team-Idee
+Loading ideas…,Ideen werden geladen…
+"No idea is shared with the team yet. Share one of yours from your Personal Cockpit, or start a new one here.",Noch keine Idee mit dem Team geteilt. Teilen Sie eine Ihrer Ideen im Personal Cockpit oder beginnen Sie hier eine neue.
+Voted,Abgestimmt
+Edit in my Personal Cockpit,Im Personal Cockpit bearbeiten
+"It is your idea: you write it out in your Personal Cockpit. Your team can read it, vote and chat right away.","Es ist Ihre Idee: Sie schreiben sie im Personal Cockpit aus. Ihr Team kann sie sofort lesen, abstimmen und darüber chatten."
+Share with team,Mit dem Team teilen
+Could not open the idea,Die Idee konnte nicht geöffnet werden
+Could not vote,Die Stimme konnte nicht abgegeben werden
+Could not load the ideas.,Die Ideen konnten nicht geladen werden.
+Ideas shared with the team,Mit dem Team geteilte Ideen
+Shared with {0},Geteilt mit {0}
+Open to the company,Für das Unternehmen öffnen
+"Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.","Diese Idee mit Ihrem Team teilen? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten. Ihre Schreibsitzungen und der Verlauf bleiben privat."
+Idea shared with your team,Idee mit Ihrem Team geteilt
+Could not share the idea,Die Idee konnte nicht geteilt werden
+Team {0} only,Nur Team {0}
+A composted idea cannot be shared. Take it up again first.,Eine kompostierte Idee kann nicht geteilt werden. Nehmen Sie sie zuerst wieder auf.
+You are not in a team to share it with.,"Sie sind in keinem Team, mit dem Sie sie teilen können."
+Only the people of the idea's team can join its chat.,Nur die Personen des Teams der Idee können ihrem Chat beitreten.
+Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company.,"Mit diesem Team geteilt: nur seine Personen lesen die Idee und stimmen ab (#1980). Leer, solange sie für das ganze Unternehmen offen ist."
+Move to my team,In mein Team verschieben
+"Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.","Diese Idee in Ihr Team verschieben? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten; die Stimmen bleiben."
+"A success of a team: found by a daily rule, or kudos and customer praise (#1981).","Ein Erfolg eines Teams: von einer täglichen Regel gefunden, oder Kudos und Kundenlob (#1981)."
+About (name),Über (Name)
+About (optional),Über (optional)
+Add praise,Lob hinzufügen
+An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981).,"Ein Issue ohne Team gilt als aufgegriffen, wenn es so viele Tage ohne Aktivität war, bevor ein Team es übernahm (#1981)."
+Could not load the successes.,Die Erfolge konnten nicht geladen werden.
+Could not save.,Konnte nicht gespeichert werden.
+Customer praise,Kundenlob
+Each of the {0} members with working hours booked at least {1} %.,Jedes der {0} Mitglieder mit Arbeitszeit hat mindestens {1} % gebucht.
+Everyone booked their hours in {0},Alle haben im {0} ihre Stunden gebucht
+Fastest month: items closed in {0} days (median),Schnellster Monat: Einträge in {0} Tagen geschlossen (Median)
+For what,Wofür
+Give kudos,Kudos geben
+Given By,Gegeben von
+Idea harvested: {0},Idee geerntet: {0}
+Idle for {0} days before the team took it on.,"{0} Tage ohne Aktivität, bevor das Team es übernahm."
+Kudos,Kudos
+Kudos and customer praise: who entered it,Kudos und Kundenlob: wer es eingetragen hat
+Kudos go to someone else.,Kudos gehen an jemand anderen.
+Kudos go to someone in team {0}.,Kudos gehen an jemanden im Team {0}.
+Loading successes…,Erfolge werden geladen…
+Milestone on time: {0},Meilenstein pünktlich: {0}
+More than in any of the {0} months before.,Mehr als in jedem der {0} Monate davor.
+No open item older than {0} days,Kein offener Eintrag älter als {0} Tage
+No successes yet. The daily rules add them as the team delivers; kudos and praise you can add now.,"Noch keine Erfolge. Die täglichen Regeln fügen sie hinzu, wenn das Team liefert; Kudos und Lob können Sie jetzt hinzufügen."
+Nobody in particular,Niemand Bestimmtes
+"One success per team, rule and period (#1981)","Ein Erfolg je Team, Regel und Zeitraum (#1981)"
+Pick a customer…,Kunden wählen…
+Pick a team mate…,Teammitglied wählen…
+Pick the customer who praised.,"Wählen Sie den Kunden, der gelobt hat."
+Picked up,Aufgegriffen
+Picked up: idle days,Aufgegriffen: Tage ohne Aktivität
+Picked up: {0},Aufgegriffen: {0}
+Praise from {0},Lob von {0}
+Quick responses: {0} Issues answered within their SLA time last week,Schnelle Antworten: {0} Issues letzte Woche innerhalb ihrer SLA-Zeit beantwortet
+Record month: {0} items closed,Rekordmonat: {0} Einträge geschlossen
+Resolved in time: {0} Issues within their SLA last week,Rechtzeitig gelöst: {0} Issues letzte Woche innerhalb ihrer SLA
+a module,ein Modul
+SLA,SLA
+Say what the kudos are for.,"Sagen Sie, wofür die Kudos sind."
+Shipped: {0},Ausgeliefert: {0}
+Successes,Erfolge
+Team Success,Teamerfolg
+Team ideas,Team-Ideen
+The parent item and all {0} of its items are closed.,Der übergeordnete Eintrag und alle {0} seiner Einträge sind geschlossen.
+The praise goes to someone in team {0}.,Das Lob geht an jemanden im Team {0}.
+"The rule that found it, or Kudos / Customer praise","Die Regel, die ihn gefunden hat, oder Kudos / Kundenlob"
+The team booked at least {0} % of its available hours every week.,Das Team hat jede Woche mindestens {0} % seiner verfügbaren Stunden gebucht.
+The team sees the kudos and that they are from you; they are also posted in the team chat.,Das Team sieht die Kudos und dass sie von Ihnen sind; sie werden auch im Teamchat gepostet.
+What did the customer say?,Was hat der Kunde gesagt?
+What the team achieved,Was das Team erreicht hat
+What they said,Was gesagt wurde
+"Who the success is about, if one person","Um wen es beim Erfolg geht, falls um eine Person"
+entered by {0},eingetragen von {0}
+{0} complete weeks in a row,{0} vollständige Wochen in Folge
+"{0} items open, the oldest {1} days.","{0} Einträge offen, der älteste {1} Tage."
+{0} reached maturity level {1},{0} hat Reifegrad {1} erreicht
+{0} → {1},{0} → {1}
+{0}: hours budget kept three months in a row,{0}: Stundenbudget drei Monate in Folge eingehalten
+{0}: the forecast improved,{0}: die Prognose hat sich verbessert
+"{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
+{0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht

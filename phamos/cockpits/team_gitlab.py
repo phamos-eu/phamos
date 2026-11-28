@@ -299,6 +299,9 @@ def team_gitlab_statistics(team, today=None):
 				lines_added=mr_window.lines_added,
 				lines_removed=mr_window.lines_removed,
 				merged_total=mr_window.merged_total,
+				# for the record rules of the successes (#1981)
+				work_item_median=window.work_item_days["median"],
+				closed_total=window.closed_total,
 				mtd=end < getdate(get_last_day(start)),
 			)
 		)
