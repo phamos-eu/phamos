@@ -3677,3 +3677,21 @@ Needs attention: SLA due within hours,Braucht Aufmerksamkeit: SLA fällig innerh
 Only the first {0} are shown.,Nur die ersten {0} werden gezeigt.
 Needs attention: morning summary in the team chat,Braucht Aufmerksamkeit: Morgenübersicht im Team-Chat
 Team Attention Notice,Team-Aufmerksamkeitshinweis
+Who is here today,Wer ist heute da
+{0} of {1} checked in,{0} von {1} eingecheckt
+Next appointment,Nächster Termin
+{0} is absent,{0} ist abwesend
+{0} is absent (half day),{0} ist abwesend (halber Tag)
+Nobody is absent,Niemand ist abwesend
+of {0} available,von {0} verfügbar
+GitLab this month,GitLab in diesem Monat
+Items closed,Items geschlossen
+Items opened,Items eröffnet
+Merge requests merged,Merge Requests gemergt
+Latest successes,Neueste Erfolge
+No successes yet,Noch keine Erfolge
+{0} records,{0} Datensätze
+Could not load the overview.,Die Übersicht konnte nicht geladen werden.
+Not available,Nicht verfügbar
+The team today and this month,Das Team heute und in diesem Monat
+Nothing needs attention.,Nichts braucht Aufmerksamkeit.
