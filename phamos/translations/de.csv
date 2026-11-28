@@ -3200,11 +3200,6 @@ Slack is how many days a chapter can slip before it delays the end date. Late me
 "The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
 "Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
 Target level reached,Ziellevel erreicht
-Calls: ask for mic and camera,Anrufe: nach Mikrofon und Kamera fragen
-Calls: mic and camera off,Anrufe: Mikrofon und Kamera aus
-Calls: mic and camera on,Anrufe: Mikrofon und Kamera an
-Click to change.,Zum Ändern klicken.
-Join,Beitreten
 "Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
 Idea saved,Idee gespeichert
 Does it belong to an existing idea?,Gehört sie zu einer bestehenden Idee?
@@ -3265,13 +3260,3 @@ Take back my vote,Meine Stimme zurücknehmen
 This idea was changed elsewhere. Reload it to see the latest version.,"Diese Idee wurde anderswo geändert. Laden Sie sie neu, um die aktuelle Fassung zu sehen."
 Title is required,Titel ist erforderlich
 Up for vote,Zur Abstimmung
-Team Assignment,Teamzuordnung
-Co-Lead,Co-Lead
-Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
-Change membership through Team Assignment.,Die Mitgliedschaft wird über die Teamzuordnung geändert.
-"Change membership through Team Assignment. Weekly capacity comes from Weekly Working Hours, or the Employment Contract.","Die Mitgliedschaft wird über die Teamzuordnung geändert. Die Wochenkapazität kommt aus den Wochenarbeitszeiten oder dem Arbeitsvertrag."
-"Who is in which team, and when. The Team's lead, co-lead and member table follow the assignments open today.","Wer wann in welchem Team ist. Teamleitung, Co-Leitung und Mitgliedertabelle des Teams folgen den heute offenen Zuordnungen."
-The end date of a team assignment cannot be before its start date.,Das Enddatum einer Teamzuordnung darf nicht vor ihrem Startdatum liegen.
-{0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.,"{0} ist in diesem Zeitraum bereits Team {1} zugeordnet ({2}). Immer nur ein Team: Beenden Sie zuerst diese Zuordnung."
-Team {0} already has a {1} in this period ({2}).,Team {0} hat in diesem Zeitraum bereits eine Rolle {1} ({2}).
-"The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.","Die Zuordnung ist gespeichert, aber Team {0} konnte nicht aktualisiert werden. Der tägliche Job versucht es erneut; siehe Fehlerprotokoll."
