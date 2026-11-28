@@ -8,7 +8,7 @@
 // carry html2canvas.
 
 import { create_phriend } from "./phriend/index";
-import { text_of } from "./phriend/request";
+import { call, text_of } from "./phriend/request";
 
 const REPORT_DOCTYPE = "Issue";
 const CLOSED_STATUSES = ["Resolved", "Closed"];
@@ -74,6 +74,16 @@ function badge_filters() {
 		filters.phriend_route = r.join("/");
 	}
 	return filters;
+}
+
+// The same scope as badge_filters, as the server's arguments (route, ref_doctype, ref_docname).
+function badge_args() {
+	const filters = badge_filters();
+	return {
+		route: filters.phriend_route || null,
+		ref_doctype: filters.phriend_ref_doctype || null,
+		ref_docname: filters.phriend_ref_docname || null,
+	};
 }
 
 function server_message(xhr) {
@@ -145,6 +155,9 @@ const desk = {
 		frappe.model.can_read(REPORT_DOCTYPE) && !(frappe.boot.phriend && frappe.boot.phriend.has_target)
 			? frappe.db.count(REPORT_DOCTYPE, { filters: badge_filters() })
 			: Promise.resolve(0),
+	// quiet on failure (no message box), like the cockpits
+	testing_tickets: () =>
+		call("phamos.phriend.api.get_testing_on_production", badge_args(), frappe.csrf_token),
 	// in a new tab, like the cockpits, so a report in progress isn't lost
 	open_reports: () => {
 		const filters = badge_filters();
@@ -174,8 +187,16 @@ const desk = {
 	open_settings: () => frappe.set_route("Form", "Phriend Settings"),
 	// one voice (#2011)
 	voice: (frappe.boot.phriend && frappe.boot.phriend.voice) || null,
-	// events (#2012): the user's own realtime room
-	on_event: (cb) => frappe.realtime && frappe.realtime.on("phriend_event", cb),
+	// events (#2012): the user's own realtime room. Phriend mounts before Desk creates its
+	// socket, and frappe.realtime.on() does nothing without one: wait for it (found in #2014).
+	on_event: (cb) => {
+		let tries = 0;
+		const attach = () => {
+			if (frappe.realtime && frappe.realtime.socket) frappe.realtime.on("phriend_event", cb);
+			else if (++tries < 120) setTimeout(attach, 500);
+		};
+		attach();
+	},
 };
 
 frappe.provide("phriend");

@@ -1,0 +1,124 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-21 18:00:00.000000",
+ "description": "A Ophice encounter (#2053, #2056, #2057): two users whose chips met, and the temporary private Raven channel they chat in. Written only by phamos.api.ophice. When the two part, a burn notice runs; if both save, the messages move into their Raven DM, otherwise they are burned. Either way this record is deleted (no Deleted Document, no Version): no history of who met whom is kept.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user_a",
+  "user_b",
+  "status",
+  "burn_at",
+  "column_break_main",
+  "raven_channel",
+  "jitsi_room",
+  "opened_at",
+  "saved_by_a",
+  "saved_by_b",
+  "pair_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "user_a",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User A",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "user_b",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User B",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nParting",
+   "read_only": 1,
+   "description": "Open while the two stand together; Parting while the burn notice runs."
+  },
+  {
+   "fieldname": "burn_at",
+   "fieldtype": "Datetime",
+   "label": "Burn At",
+   "read_only": 1,
+   "description": "While parting: when the chat is burned unless both saved it."
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "raven_channel",
+   "fieldtype": "Link",
+   "label": "Raven Channel",
+   "options": "Raven Channel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jitsi_room",
+   "fieldtype": "Data",
+   "label": "Jitsi Room",
+   "read_only": 1,
+   "description": "The video call room of this encounter (#2059): random, so only these two find it."
+  },
+  {
+   "fieldname": "opened_at",
+   "fieldtype": "Datetime",
+   "label": "Opened At",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saved_by_a",
+   "fieldtype": "Check",
+   "label": "Saved by User A",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saved_by_b",
+   "fieldtype": "Check",
+   "label": "Saved by User B",
+   "read_only": 1
+  },
+  {
+   "description": "\"user_a|user_b\" (sorted) while the encounter is open, empty afterwards: at most one open encounter per pair, guarded by the unique index.",
+   "fieldname": "pair_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Pair Key",
+   "read_only": 1,
+   "unique": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-21 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Ophice",
+ "name": "Ophice Encounter",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "user_a"
+}

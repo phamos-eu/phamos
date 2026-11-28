@@ -25,7 +25,6 @@
   "last_synced",
   "column_break_4",
   "sync_error_count",
-  "website_link_hash",
   "section_sync_selection",
   "sync_exclusions"
  ],
@@ -139,15 +138,6 @@
    "fieldtype": "Int",
    "label": "Sync Errors (last full sync)",
    "read_only": 1
-  },
-  {
-   "fieldname": "website_link_hash",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "read_only": 1,
-   "label": "Website Link Hash",
-   "no_copy": 1,
-   "description": "Fingerprint of what is published; when it changes, the website copies are fetched again so their links are right."
   },
   {
    "fieldname": "section_sync_selection",

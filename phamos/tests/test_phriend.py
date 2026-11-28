@@ -13,6 +13,7 @@ from PIL import Image
 
 from phamos.phriend import api, setup, shortcut
 from phamos.phriend import events as phriend_events
+from phamos.phriend import feedback as phriend_feedback
 from phamos.phriend import quiet as phriend_quiet
 from phamos.phriend import voice as phriend_voice
 from phamos.phriend.boot import boot_session, phriend_boot
@@ -25,6 +26,9 @@ PNG = "data:image/png;base64," + base64.b64encode(
 		"1f15c4890000000d49444154789c6360000002000100e221bc330000000049454e44ae426082"
 	)
 ).decode()
+
+
+GITLAB_IMPLEMENTATION = "PHRIEND-TEST-2167"
 
 
 def response(status=200, json=None):
@@ -47,6 +51,7 @@ class TestPhriend(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("phriend_test")
 		self.set_settings(enabled=1, allowed_role="System Manager", assign_to=None, default_project=None, quiet_mode=0, one_voice=0, bubbles_per_day=1, events=0, easter_eggs=0,
+			rate_fixes=0, battle_tested_weeks=6, anonymous_feedback=0,
 			warning_role="System Manager", warn_ai_run_failed=1, warn_email_failed=1, warn_gitlab_sync_failed=1,
 			gitlab_url="https://git.example.com", gitlab_project="phamos/phamos", gitlab_labels="phriend")
 
@@ -78,10 +83,12 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual((first.fieldname, first.label), (setup.IMPLEMENTATION_SECTION, "Implementation Specific"))
 		# the section and the team come from phamos/cockpits/setup.py, which setup.ensure_issue_fields
 		# runs first; the section shows on every Issue and starts with the team (#1955); Phriend's fields follow
-		# and carry the condition themselves
+		# and carry the condition themselves; the Implementation shows on every Issue, after the team (#2112)
 		self.assertFalse(first.depends_on)
 		self.assertEqual(meta.fields[1].fieldname, setup.TEAM_FIELD)
-		self.assertEqual(meta.fields[2].fieldname, "phriend_reported_by")
+		self.assertEqual(meta.fields[2].fieldname, "custom_implementation")
+		self.assertFalse(meta.fields[2].depends_on)
+		self.assertEqual(meta.fields[3].fieldname, "phriend_reported_by")
 		self.assertEqual(meta.get_field("phriend_reported_by").depends_on, setup.PHRIEND_OR_GITLAB)
 		self.assertEqual(meta.get_field("phriend_type").depends_on, setup.ONLY_PHRIEND)
 		self.assertEqual(frappe.db.get_value("Custom Field", {"dt": "Issue", "fieldname": "phriend_type"}, "module"),
@@ -237,6 +244,36 @@ class TestPhriend(FrappeTestCase):
 		self.assertIsNone(boot.phriend)
 		self.assertEqual(boot.versions, {})  # only Phriend needs them
 
+	def test_website_boots_phriend_for_desk_users_only(self, _enqueue):
+		# the website has no Desk boot: get_web_boot carries the flag and the versions (#2104)
+		boot = api.get_web_boot()
+		self.assertEqual(boot["enabled"], 1)
+		self.assertTrue(boot["versions"].get("phamos"))
+		# Phriend's words in the user's language, as the cockpits have them
+		frappe.local.lang = "de"
+		try:
+			self.assertEqual(api.get_web_boot()["messages_key"], f"de:{boot['versions']['phamos']}")
+			self.assertEqual(api.get_web_translations().get("Something else"), "Etwas anderes")
+		finally:
+			frappe.local.lang = "en"
+		self.assertEqual(api.get_web_boot()["messages_key"], "")
+		# the Allowed role and the switch count as in Desk
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertIsNone(api.get_web_boot())
+		self.set_settings(allowed_role=None, enabled=0)
+		self.assertIsNone(api.get_web_boot())
+		# a portal login never gets it, even with no Allowed role (PM, 2026-11-23)
+		self.set_settings(enabled=1)
+		portal = frappe.get_doc(
+			{"doctype": "User", "email": "phriend-portal@example.com", "first_name": "Portal", "send_welcome_email": 0}
+		).insert(ignore_permissions=True)
+		self.assertEqual(portal.user_type, "Website User")
+		frappe.set_user(portal.name)
+		self.assertIsNone(api.get_web_boot())
+		self.assertEqual(api.get_web_translations(), {})
+		frappe.set_user("Guest")
+		self.assertIsNone(api.get_web_boot())
+
 	def test_badge_counts_open_reports_by_record_doctype_or_page(self, _enqueue):
 		on_record = self.report()  # about User Administrator
 		self.report(ref_docname="Guest")  # another User
@@ -330,8 +367,8 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(
 			phriend_boot(),
 			{"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0, "implementation_cockpit": 1,
-				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0, "easter_eggs": 0}, "quiet": None,
-				"can_configure": 1,
+				"features": {"reactions": 1, "quiet_mode": 0, "one_voice": 0, "events": 0, "easter_eggs": 0,
+				"rate_fixes": 0}, "quiet": None, "can_configure": 1,
 				"voice": None},
 		)
 
@@ -519,6 +556,88 @@ class TestPhriend(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			api.send_test_event("nonsense")
 
+	# ---- rating a fix (#2014)
+
+	def live_report(self, report_type="Bug", days_ago=2, **dates):
+		"""A Phriend report of Administrator with one GitLab issue on production since `days_ago`."""
+		report = self.report(report_type=report_type)
+		frappe.db.set_value("Issue", report.name, "phriend_reported_by", "Administrator")
+		when = dates.get("when") or frappe.utils.add_days(frappe.utils.now_datetime(), -days_ago)
+		frappe.get_doc({"doctype": "GitLab Issue", "issue": report.name, "testing_on_production_at": when}).insert(
+			ignore_permissions=True)
+		return report
+
+	@patch("frappe.publish_realtime")
+	def test_a_live_report_is_rated_twice_by_its_reporter(self, publish, _enqueue):
+		self.assertEqual(phriend_feedback.create_due_requests(), [])  # off by default
+		self.set_settings(rate_fixes=1, battle_tested_weeks=6)
+		bug = self.live_report("Bug", days_ago=2)
+		improvement = self.live_report("Improvement", days_ago=6 * 7 + 3)
+		question = self.live_report("Question", days_ago=1)
+		created = phriend_feedback.create_due_requests()
+		rows = {r.subject_name: r for r in frappe.get_all(phriend_feedback.DOCTYPE, filters={"name": ["in", created]},
+			fields=["subject_name", "round", "kind", "user", "status"])}
+		self.assertEqual((rows[bug.name].round, rows[bug.name].kind), ("First impression", "Thumbs"))
+		self.assertEqual((rows[improvement.name].round, rows[improvement.name].kind), ("Battle tested", "Stars"))
+		self.assertNotIn(question.name, rows)  # questions aren't rated
+		self.assertTrue(all(r.user == "Administrator" and r.status == "Open" for r in rows.values()))
+		# the reporter's Phriend hears it at once, and nothing is asked twice
+		self.assertTrue(any(c.args[1].get("kind") == "rate_fix" for c in publish.call_args_list))
+		self.assertEqual(phriend_feedback.create_due_requests(), [])
+		# the user's open questions come fresh from the API (Desk caches the boot)
+		self.assertLessEqual(set(created), {r["name"] for r in api.get_my_feedback_requests()})
+
+	def test_not_live_until_every_gitlab_issue_is_on_production(self, _enqueue):
+		self.set_settings(rate_fixes=1)
+		report = self.live_report("Bug", days_ago=1)
+		self.assertIsNotNone(phriend_feedback.live_since(report.name))
+		frappe.get_doc({"doctype": "GitLab Issue", "issue": report.name}).insert(ignore_permissions=True)
+		self.assertIsNone(phriend_feedback.live_since(report.name))
+		now = frappe.utils.now_datetime()
+		self.assertEqual(phriend_feedback.due_round(frappe.utils.add_days(now, -13), now), "First impression")
+		self.assertIsNone(phriend_feedback.due_round(frappe.utils.add_days(now, -14), now))
+		self.assertEqual(phriend_feedback.due_round(frappe.utils.add_days(now, -42), now), "Battle tested")
+		self.assertIsNone(phriend_feedback.due_round(frappe.utils.add_days(now, -56), now))
+
+	@patch("frappe.publish_realtime")
+	def test_answers_are_checked_and_closing_puts_it_off_three_times(self, publish, _enqueue):
+		self.set_settings(rate_fixes=1)
+		bug = self.live_report("Bug", days_ago=1)
+		name = api.ask_feedback_now(bug.name, "First impression")
+		with self.assertRaises(frappe.ValidationError):
+			api.answer_feedback(name, 4)  # thumbs only
+		self.set_settings(anonymous_feedback=1)
+		api.answer_feedback(name, -1, "  still wrong on page 2 ")
+		doc = frappe.get_doc(phriend_feedback.DOCTYPE, name)
+		self.assertEqual((doc.status, doc.rating, doc.comment, doc.anonymous), ("Answered", -1, "still wrong on page 2", 1))
+		with self.assertRaises(frappe.ValidationError):
+			api.answer_feedback(name, 1)  # once
+
+		later = api.ask_feedback_now(bug.name, "Battle tested")
+		for _ in range(2):
+			self.assertEqual(api.defer_feedback(later)["status"], "Open")
+		self.assertEqual(api.defer_feedback(later)["status"], "Declined")  # the third time it rests
+
+		improvement = self.live_report("Improvement", days_ago=1)
+		third = api.ask_feedback_now(improvement.name, "First impression")
+		self.assertEqual(api.decline_feedback(third)["status"], "Declined")
+
+	@patch("frappe.publish_realtime")
+	def test_only_the_asked_person_may_answer(self, publish, _enqueue):
+		self.set_settings(rate_fixes=1)
+		name = api.ask_feedback_now(self.live_report("Bug").name, "First impression")
+		other = "phriend-other@example.com"
+		if not frappe.db.exists("User", other):
+			frappe.get_doc({"doctype": "User", "email": other, "first_name": "Other", "send_welcome_email": 0,
+				"roles": [{"role": "System Manager"}]}).insert(ignore_permissions=True)
+		frappe.set_user(other)
+		with self.assertRaises(frappe.PermissionError):
+			api.answer_feedback(name, 1)
+		frappe.set_user("Administrator")
+		self.set_settings(rate_fixes=0)
+		with self.assertRaises(frappe.PermissionError):
+			api.answer_feedback(name, 1)  # switched off
+
 	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
 		doc = frappe.get_doc("Phriend Settings")
 		doc.shortcut = "command+shift+k"
@@ -527,10 +646,18 @@ class TestPhriend(FrappeTestCase):
 
 	# ---- Issue -> GitLab
 
-	def gitlab_project(self, project_id="4242", namespace="phamos/phamos"):
+	def implementation(self, name=GITLAB_IMPLEMENTATION):
+		if not frappe.db.exists("Implementation", name):
+			frappe.get_doc({"doctype": "Implementation", "name": name, "customer": "_Test Customer", "status": "Open"}).db_insert()
+		return name
+
+	def gitlab_project(self, project_id="4242", namespace="phamos/phamos", implementation=GITLAB_IMPLEMENTATION):
+		"""A GitLab Project of `implementation`, which reports made from now on belong to (#2167)."""
+		self.set_settings(system_implementation=self.implementation(implementation))
 		if not frappe.db.exists("GitLab Project", project_id):
 			frappe.get_doc({"doctype": "GitLab Project", "project_id": project_id, "namespace": namespace,
 				"web_url": f"https://git.example.com/{namespace}", "title": "phamos"}).insert(ignore_permissions=True)
+		frappe.db.set_value("GitLab Project", project_id, "implementation", implementation)
 		return project_id
 
 	def created(self, iid, project_id="4242", **extra):
@@ -541,7 +668,7 @@ class TestPhriend(FrappeTestCase):
 			"assignees": [{"name": "Dev One", "username": "dev1"}], **extra}
 
 	@patch("phamos.phriend.api.requests.post")
-	def test_gitlab_issue_goes_to_the_configured_project_and_is_linked(self, post, _enqueue):
+	def test_gitlab_issue_goes_to_its_implementations_project_and_is_linked(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")
 		self.gitlab_project()
 		issue = self.report(screenshot=PNG)
@@ -554,8 +681,8 @@ class TestPhriend(FrappeTestCase):
 
 		self.assertEqual(result["iid"], 7)
 		upload, create = post.call_args_list
-		self.assertEqual(upload.args[0], "https://git.example.com/api/v4/projects/phamos%2Fphamos/uploads")
-		self.assertEqual(create.args[0], "https://git.example.com/api/v4/projects/phamos%2Fphamos/issues")
+		self.assertEqual(upload.args[0], "https://git.example.com/api/v4/projects/4242/uploads")
+		self.assertEqual(create.args[0], "https://git.example.com/api/v4/projects/4242/issues")
 		self.assertEqual(create.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-test"})
 		payload = create.kwargs["data"]
 		self.assertEqual(payload["labels"], "phriend,bug")
@@ -612,6 +739,7 @@ class TestPhriend(FrappeTestCase):
 	@patch("phamos.phriend.api.requests.post")
 	def test_unknown_gitlab_project_keeps_the_url_and_logs(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
 		issue = self.report()
 		post.return_value = response(json=self.created(5, project_id="999999"))
 		logs = frappe.db.count("Error Log", {"method": "Phriend: GitLab project not synced"})
@@ -627,6 +755,7 @@ class TestPhriend(FrappeTestCase):
 	@patch("phamos.phriend.api.requests.post")
 	def test_a_failed_link_keeps_the_gitlab_issue_so_no_retry_makes_a_second(self, post, _link, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
 		issue = self.report()
 		post.return_value = response(json=self.created(12))
 		logs = frappe.db.count("Error Log", {"method": "Phriend: linking the GitLab issue failed"})
@@ -642,7 +771,7 @@ class TestPhriend(FrappeTestCase):
 	def test_issue_not_from_phriend_sends_its_description(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")
 		self.gitlab_project()
-		issue = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue",
+		issue = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue", "custom_implementation": GITLAB_IMPLEMENTATION,
 			"description": "<p>Totals are <b>wrong</b></p>"}).insert(ignore_permissions=True)
 		post.return_value = response(json=self.created(11))
 
@@ -654,6 +783,79 @@ class TestPhriend(FrappeTestCase):
 		self.assertNotIn("Reported via Phriend", description)
 		self.assertIn(f"From ERPNext Issue [{issue.name}]", description)
 		self.assertEqual(frappe.db.get_value("GitLab Issue", "4242-11", "issue"), issue.name)
+
+	# ---- the GitLab project comes from the Issue's Implementation; none found: no GitLab issue (#2167)
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_gitlab_issue_ignores_the_settings_project(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test", gitlab_project="phamos/phamos")
+		self.gitlab_project("5151", namespace="customer/erp")
+		issue = self.report()
+		post.return_value = response(json=self.created(3, project_id="5151"))
+
+		result = api.create_gitlab_issue(issue.name)
+
+		self.assertEqual(post.call_args.args[0], "https://git.example.com/api/v4/projects/5151/issues")
+		self.assertEqual(result["gitlab_issue"], "5151-3")
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_no_gitlab_issue_without_an_implementation(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()
+		issue.db_set("custom_implementation", None)
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("Implementation", str(raised.exception))
+		post.assert_not_called()
+		self.assertFalse(api.get_gitlab_defaults(issue.name)["implementation"])
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_no_gitlab_issue_when_the_implementation_has_no_gitlab_project(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()
+		issue.db_set("custom_implementation", self.implementation("PHRIEND-TEST-2167-B"))
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("No GitLab Project is linked to Implementation PHRIEND-TEST-2167-B", str(raised.exception))
+		post.assert_not_called()
+		self.assertEqual(api.get_gitlab_defaults(issue.name)["gitlab_projects"], [])
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_a_project_of_another_implementation_is_refused(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project("6161", namespace="other/erp", implementation="PHRIEND-TEST-2167-B")
+		self.gitlab_project()
+		issue = self.report()
+
+		with self.assertRaises(frappe.ValidationError):
+			api.create_gitlab_issue(issue.name, gitlab_project="6161")
+
+		post.assert_not_called()
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_several_projects_need_a_choice(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project("7171", namespace="customer/web")
+		self.gitlab_project()
+		issue = self.report()
+
+		defaults = api.get_gitlab_defaults(issue.name)
+		self.assertEqual(defaults["implementation"], GITLAB_IMPLEMENTATION)
+		self.assertEqual(defaults["gitlab_projects"],
+			[{"name": "7171", "label": "customer/web"}, {"name": "4242", "label": "phamos/phamos"}])
+		with self.assertRaises(frappe.ValidationError):
+			api.create_gitlab_issue(issue.name)
+		post.assert_not_called()
+
+		post.return_value = response(json=self.created(4, project_id="7171"))
+		api.create_gitlab_issue(issue.name, gitlab_project="7171")
+		self.assertEqual(post.call_args.args[0], "https://git.example.com/api/v4/projects/7171/issues")
 
 	def test_patch_links_existing_gitlab_urls(self, _enqueue):
 		from phamos.patches.v1_0 import link_gitlab_issues_to_issues
@@ -704,6 +906,7 @@ class TestPhriend(FrappeTestCase):
 	@patch("phamos.phriend.api.get_decrypted_password", return_value="glpat-from-gitlab-settings")
 	def test_gitlab_token_falls_back_to_gitlab_settings(self, _password, post, _enqueue):
 		self.set_settings(gitlab_token=None)
+		self.gitlab_project()
 		issue = self.report()
 		post.return_value = response(json={"web_url": "https://git.example.com/x", "iid": 1})
 
@@ -714,6 +917,7 @@ class TestPhriend(FrappeTestCase):
 	@patch("phamos.phriend.api.requests.post")
 	def test_token_without_api_scope_gets_a_clear_message(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-read-only")
+		self.gitlab_project()
 		issue = self.report()
 		post.return_value = response(status=403, json={"error": "insufficient_scope"})
 
@@ -722,6 +926,104 @@ class TestPhriend(FrappeTestCase):
 
 		self.assertIn("api", str(raised.exception))
 		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
+
+	# ---- the GitLab issue's author is the reporter, not the token's owner (Sudo)
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_gitlab_issue_is_created_as_the_reporter(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-admin")
+		self.gitlab_project()
+		issue = self.report(screenshot=PNG)
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "Dev.One@example.com")
+		get.return_value = response(json=[{"username": "devone2", "email": "devone2@example.com"},
+			{"username": "devone", "email": "dev.one@example.com"}])
+		post.side_effect = [response(json={"markdown": "![shot](/uploads/x/shot.png)"}), response(json=self.created(7))]
+
+		api.create_gitlab_issue(issue.name)
+
+		self.assertEqual(get.call_args.args[0], "https://git.example.com/api/v4/users")
+		self.assertEqual(get.call_args.kwargs["params"], {"search": "dev.one@example.com"})
+		upload, create = post.call_args_list
+		self.assertEqual(upload.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-admin", "Sudo": "devone"})
+		self.assertEqual(create.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-admin", "Sudo": "devone"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_reporter_without_a_gitlab_user_falls_back_to_the_token_owner(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "nobody@example.com")
+		post.return_value = response(json=self.created(8))
+
+		for answer in (response(json=[]), response(status=403), ConnectionError("down")):
+			get.reset_mock()
+			get.return_value, get.side_effect = (None, answer) if isinstance(answer, Exception) else (answer, None)
+			api.create_gitlab_issue(issue.name)
+			get.assert_called_once()
+			self.assertEqual(post.call_args.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-test"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_administrator_reports_skip_the_user_lookup(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()  # reported by Administrator
+		post.return_value = response(json=self.created(9))
+
+		api.create_gitlab_issue(issue.name)
+
+		get.assert_not_called()
+		self.assertEqual(post.call_args.kwargs["headers"], {"PRIVATE-TOKEN": "glpat-test"})
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_token_without_sudo_gets_a_clear_message(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-not-admin")
+		self.gitlab_project()
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=403, json={"message": "403 Forbidden - Must be admin to use sudo"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("admin", str(raised.exception))
+		self.assertIn("devone", str(raised.exception))
+		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_missing_scope_with_sudo_names_both_scopes(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-no-sudo")
+		self.gitlab_project()
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=403, json={"error": "insufficient_scope"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("<b>api</b> or <b>sudo</b>", str(raised.exception))
+
+	@patch("phamos.phriend.api.requests.get")
+	@patch("phamos.phriend.api.requests.post")
+	def test_expired_token_with_sudo_gets_the_plain_message(self, post, get, _enqueue):
+		self.set_settings(gitlab_token="glpat-expired")
+		self.gitlab_project()
+		issue = self.report()
+		frappe.db.set_value("Issue", issue.name, "phriend_reported_by", "dev.one@example.com")
+		get.return_value = response(json=[{"username": "devone", "email": "dev.one@example.com"}])
+		post.return_value = response(status=401, json={"message": "401 Unauthorized"})
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_gitlab_issue(issue.name)
+
+		self.assertIn("(401): 401 Unauthorized", str(raised.exception))
+		self.assertNotIn("sudo", str(raised.exception))
 
 
 # ---- the report on the cockpit Issue page (#1901)
@@ -735,6 +1037,7 @@ class TestPhriendIssuePage(FrappeTestCase):
 	tearDown = TestPhriend.tearDown
 	set_settings = TestPhriend.set_settings
 	report = TestPhriend.report
+	implementation = TestPhriend.implementation
 
 	def test_cockpit_issue_carries_the_report(self, _enqueue):
 		from phamos.api import personal_cockpit

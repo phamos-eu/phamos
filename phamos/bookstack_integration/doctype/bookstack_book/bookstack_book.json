@@ -76,7 +76,7 @@
   },
   {
    "default": "0",
-   "description": "Show this book, its chapters and pages on phamos.eu under /de/doku. The page content is copied at the next sync.",
+   "description": "Show this book, its chapters and pages on phamos.eu under /de/dokumentation and /en/documentation. The page content is copied at the next sync.",
    "fieldname": "publish_on_website",
    "fieldtype": "Check",
    "in_standard_filter": 1,

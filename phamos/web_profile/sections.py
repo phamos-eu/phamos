@@ -1119,7 +1119,7 @@ def documentation_tiles(book_names, lang):
 
 	if not book_names:
 		return []
-	books = {b.name: b for b in published_books()}
+	books = {b.name: b for b in published_books(lang)}
 	return [
 		frappe._dict(section="docs", name=n, url=books[n].url, title=books[n].title, subtitle=books[n].summary,
 			icon=module_icon("file"), initials=books[n].title[:1], chips=[] if lang == "de" else [_("in German")])
