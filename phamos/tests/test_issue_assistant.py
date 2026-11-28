@@ -935,9 +935,71 @@ class TestChat(IssueAssistantTestCase):
 		self.assertIn("raven down", run.error)
 		self.assertIn("project", run.fields_set)
 
+	def test_any_writable_field_is_set_as_the_asker(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "resolution_details",
+			"value": "Reprinted with the new template."}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "note the resolution: reprinted"))
+		self.assertEqual(run.status, "Completed", run.error)
+		self.assertIn("Reprinted", frappe.db.get_value("Issue", doc.name, "resolution_details") or "")
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "modified_by"), self.CHAT_USER)
+
+	def test_read_only_or_wrong_values_are_refused(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		read_only = next(df.fieldname for df in frappe.get_meta("Issue").fields
+			if df.read_only and df.fieldtype in ("Data", "Datetime", "Date"))
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": read_only, "value": "x"},
+			{"type": "set", "field": "status", "value": "Bogus"}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "change those"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "status"), "Open")
+		self.assertEqual(reply.count(frappe._("I can't do that here: {0}").split(":")[0]), 2, reply)
+
+	def test_closing_asks_back_and_closes_on_yes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "OK.", "actions": [{"type": "set", "field": "status", "value": "Closed"}]},
+			"mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "close it"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "status"), "Open")
+		self.assertIn(doc.name, reply)
+		self.llm.reset_mock()
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "yes"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "status"), "Closed")
+		self.llm.assert_not_called()  # the yes is handled in code
+
+	def test_a_typo_in_the_customer_counts_when_it_is_clear(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.set_value("Issue", doc.name, "customer", None)
+		typo = CUSTOMER.replace("Customer", "Custmer")  # "Issue Assistant Test Custmer"
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": "customer", "value": CUSTOMER}]},
+			"mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, f"customer is {typo}"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "customer"), CUSTOMER)
+		self.assertIn("custmer", reply.lower())  # it says what you wrote
+
+	def test_two_close_customers_become_a_question(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		twin = CUSTOMER + "s"
+		if not frappe.db.exists("Customer", twin):
+			frappe.get_doc({"doctype": "Customer", "customer_name": twin,
+				"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}),
+				"territory": frappe.db.get_value("Territory", {"is_group": 0})}).insert(ignore_permissions=True)
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.set_value("Issue", doc.name, "customer", None)
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": "customer", "value": CUSTOMER}]},
+			"mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "customer is Issue Assistant Test Custmer"))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "customer"))
+		self.assertIn(twin, reply)
+
 	def test_named_means_a_whole_word(self):
-		self.assertTrue(self.chat.named_in_message("custom_implementation", "AG", "die ag soll es sein"))
-		self.assertFalse(self.chat.named_in_message("custom_implementation", "AG", "guten tag, bitte"))
+		from phamos.ai_agents.agents import issue_chat_fields as fields
+
+		self.assertTrue(fields._exact("AG", "die ag soll es sein"))
+		self.assertFalse(fields._exact("AG", "guten tag, bitte"))
 
 	def test_actions_outside_the_list_or_when_asking_back_are_not_applied(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used

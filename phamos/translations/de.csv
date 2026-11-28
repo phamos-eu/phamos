@@ -3658,3 +3658,12 @@ entered by {0},eingetragen von {0}
 {0}: the forecast improved,{0}: die Prognose hat sich verbessert
 "{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
 {0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht
+"changing {0}: you may not change it, or it can't be changed here","{0} ändern: Sie dürfen es nicht ändern, oder es lässt sich hier nicht ändern"
+{0} must be one of: {1},{0} muss eines davon sein: {1}
+{0} must be yes or no,{0} muss ja oder nein sein
+{0} is not a valid {1},{0} ist kein gültiger Wert für {1}
+{0} can't be changed here,{0} lässt sich hier nicht ändern
+Which {0} do you mean: {1}?,Welche/n {0} meinen Sie: {1}?
+Whom do you mean: {0}?,Wen meinen Sie: {0}?
+Shall I set {0} to {1}? Answer yes and I will.,"Soll ich {0} auf {1} setzen? Antworten Sie mit ja, dann mache ich es."
+"you wrote ""{0}""",Sie schrieben „{0}“
