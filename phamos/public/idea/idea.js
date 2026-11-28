@@ -579,7 +579,25 @@
 		backBtn.hidden = name !== "detail" && name !== "vote-detail"
 	}
 
+	// Every load bumps this; an answer that arrives after a newer load (another tab, Back, a new
+	// search) is dropped, so it never renders into the view now shown.
+	var loadSeq = 0
+	function newLoad() {
+		loadSeq += 1
+		var seq = loadSeq
+		return function stale() {
+			return seq !== loadSeq
+		}
+	}
+
+	// A dropped answer leaves the busy mark to the newer load of the same view, if that view is
+	// still shown; otherwise nobody would clear it.
+	function dropBusy(view, name) {
+		if (currentView !== name) view.removeAttribute("aria-busy")
+	}
+
 	function route() {
+		newLoad() // whatever was loading for the previous view is now stale
 		var hash = location.hash.replace(/^#\/?/, "")
 		var parts = hash.split("/")
 		if (parts[0] === "ideas") {
@@ -621,9 +639,33 @@
 		ul.appendChild(li)
 	}
 
-	// Ideas from other people are shown as HTML: keep only plain formatting tags, no attributes
-	// except a safe href, so nothing in a text can run.
-	var ALLOWED = /^(P|BR|B|STRONG|I|EM|U|S|UL|OL|LI|H1|H2|H3|H4|BLOCKQUOTE|CODE|PRE|A|SPAN|DIV)$/
+	// Ideas are shown as HTML: keep only plain formatting tags and a few safe attributes, so nothing
+	// in a text can run. The list covers what the cockpit and Desk editors write (images, tables,
+	// highlights), so an own idea edited here loses as little as possible.
+	var ALLOWED =
+		/^(P|BR|HR|B|STRONG|I|EM|U|S|DEL|STRIKE|MARK|SUB|SUP|UL|OL|LI|H1|H2|H3|H4|H5|H6|BLOCKQUOTE|CODE|PRE|A|SPAN|DIV|IMG|TABLE|THEAD|TBODY|TR|TH|TD)$/
+	// The URL as the browser reads it: it drops tabs and line breaks anywhere and control characters
+	// and spaces at the ends, so "/&#9;/host" would load from "//host". Check that, not the raw text.
+	function plainUrl(value) {
+		return value.replace(/[\t\n\r]/g, "").replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+	}
+	// A path or URL on this site ("/files/…"); "//host" and "/\host" resolve to another host.
+	function sameSite(value) {
+		try {
+			var url = new URL(plainUrl(value), location.href)
+			return url.origin === location.origin && /^https?:$/.test(url.protocol)
+		} catch (e) {
+			return false
+		}
+	}
+	function keepAttribute(tag, name, value) {
+		if (tag === "A" && name === "href") return /^(https?:|mailto:)/i.test(plainUrl(value)) || sameSite(value)
+		// Images only from this site: one from another host would tell it who read the idea.
+		if (tag === "IMG" && name === "src") return sameSite(value)
+		if (tag === "IMG" && name === "alt") return true
+		if ((tag === "TD" || tag === "TH") && (name === "colspan" || name === "rowspan")) return /^\d{1,2}$/.test(value)
+		return false
+	}
 	function safeHtml(html) {
 		var doc = new DOMParser().parseFromString("<div>" + (html || "") + "</div>", "text/html")
 		var root = doc.body.firstChild
@@ -635,8 +677,7 @@
 					return
 				}
 				Array.prototype.slice.call(child.attributes).forEach(function (attr) {
-					var keep = child.tagName === "A" && attr.name === "href" && /^(https?:|mailto:)/i.test(attr.value)
-					if (!keep) child.removeAttribute(attr.name)
+					if (!keepAttribute(child.tagName, attr.name, attr.value)) child.removeAttribute(attr.name)
 				})
 				if (child.tagName === "A") child.setAttribute("rel", "noopener noreferrer")
 				clean(child)
@@ -658,8 +699,10 @@
 	function loadIdeas() {
 		var ul = $("ideas-list")
 		var query = $("ideas-search").value.trim().toLowerCase()
+		var stale = newLoad()
 		call(PC + "get_ideas", { include_closed: $("ideas-closed").checked ? 1 : 0 })
 			.then(function (ideas) {
+				if (stale()) return
 				ul.innerHTML = ""
 				ideas
 					.filter(function (idea) {
@@ -671,6 +714,7 @@
 				if (!ul.children.length) emptyRow(ul, query ? __("No idea matches.") : __("No ideas yet."))
 			})
 			.catch(function (error) {
+				if (stale()) return
 				ul.innerHTML = ""
 				emptyRow(ul, error.message || __("No connection. Your ideas show when you are online."))
 			})
@@ -715,9 +759,13 @@
 	var editor = $("d-content")
 	var stageSelect = $("d-stage-select")
 	var detailDirty = false
+	// The text is shown cleaned (safeHtml); it is only sent back when it was edited here, so
+	// saving a title or a stage never rewrites formatting this page can't show.
+	var contentDirty = false
 
 	function setDirty(dirty) {
 		detailDirty = dirty
+		if (!dirty) contentDirty = false
 		$("d-save").disabled = !dirty
 	}
 	// The title wraps instead of being cut off; Enter does not add a line to it.
@@ -736,6 +784,7 @@
 		}
 	})
 	editor.addEventListener("input", function () {
+		contentDirty = true
 		setDirty(true)
 	})
 
@@ -749,6 +798,7 @@
 		editor.focus()
 		if (cmd === "h3") document.execCommand("formatBlock", false, "h3")
 		else document.execCommand(cmd)
+		contentDirty = true
 		setDirty(true)
 	})
 
@@ -759,12 +809,16 @@
 			view.setAttribute("aria-busy", "true") // nothing of another idea flashes up
 		}
 		setDirty(false)
+		var stale = newLoad()
 		Promise.all([call(PC + "get_idea", { name: name }), getOptions()])
 			.then(function (results) {
+				if (stale()) return dropBusy(view, "detail")
 				renderDetail(results[0])
 				view.removeAttribute("aria-busy")
 			})
 			.catch(function (error) {
+				if (stale()) return dropBusy(view, "detail")
+				view.removeAttribute("aria-busy")
 				toast(error.message || __("No connection. Your ideas show when you are online."))
 			})
 	}
@@ -823,22 +877,29 @@
 			toast(__("Title is required"))
 			return
 		}
-		saveDetail({ title: title, content: editor.innerHTML }).then(function () {
-			toast(__("Saved"))
-		})
+		var changes = { title: title }
+		if (contentDirty) changes.content = editor.innerHTML
+		saveDetail(changes)
+			.then(function () {
+				toast(__("Saved"))
+			})
+			.catch(function () {}) // saveDetail has shown the reason
 	})
 
 	function changeStage(stage) {
 		if (!detail || stage === detail.stage) return
 		// Unsaved text goes along, so a stage change never drops an edit.
 		var changes = { stage: stage }
-		if (detailDirty) {
-			changes.title = titleInput.value.trim() || detail.title
-			changes.content = editor.innerHTML
-		}
-		saveDetail(changes).then(function (idea) {
-			toast(__("Now {0}", [__(idea.stage)]))
-		})
+		if (detailDirty) changes.title = titleInput.value.trim() || detail.title
+		if (contentDirty) changes.content = editor.innerHTML
+		saveDetail(changes)
+			.then(function (idea) {
+				toast(__("Now {0}", [__(idea.stage)]))
+			})
+			.catch(function () {
+				// Refused or offline: the picker shows the stage the idea really has again.
+				stageSelect.value = detail.stage
+			})
 	}
 	$("d-grow").addEventListener("click", function () {
 		changeStage(nextStage(detail.stage))
@@ -904,8 +965,10 @@
 
 	function loadVotes() {
 		var ul = $("vote-list")
+		var stale = newLoad()
 		call(PC + "get_ideas_for_vote")
 			.then(function (rows) {
+				if (stale()) return
 				ul.innerHTML = ""
 				rows.forEach(function (row) {
 					var li = ideaRow(
@@ -920,6 +983,7 @@
 				if (!rows.length) emptyRow(ul, __("No idea is up for vote right now."))
 			})
 			.catch(function (error) {
+				if (stale()) return
 				ul.innerHTML = ""
 				emptyRow(ul, error.message || __("No connection. Try again when you are online."))
 			})
@@ -930,12 +994,16 @@
 	function loadVoteDetail(name) {
 		var view = $("view-vote-detail")
 		if (!voting || voting.name !== name) view.setAttribute("aria-busy", "true")
+		var stale = newLoad()
 		call(PC + "get_idea_for_vote", { name: name })
 			.then(function (row) {
+				if (stale()) return dropBusy(view, "vote-detail")
 				renderVoteDetail(row)
 				view.removeAttribute("aria-busy")
 			})
 			.catch(function (error) {
+				if (stale()) return dropBusy(view, "vote-detail")
+				view.removeAttribute("aria-busy")
 				toast(error.message || __("No connection. Try again when you are online."))
 			})
 	}
