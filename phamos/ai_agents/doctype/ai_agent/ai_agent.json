@@ -55,7 +55,8 @@
    "label": "Works As User",
    "options": "User",
    "reqd": 1,
-   "description": "Runs execute as this user, so the document history separates the agent's changes from human corrections."
+   "description": "Runs execute as this user, so the document history separates the agent's changes from human corrections.",
+   "permlevel": 1
   },
   {
    "fieldname": "raven_bot",
@@ -81,7 +82,8 @@
    "fieldtype": "Data",
    "label": "Handler Module",
    "reqd": 1,
-   "description": "Python module with the agent's skill handlers (developer setting), e.g. phamos.ai_agents.agents.accounting."
+   "description": "Python module with the agent's skill handlers (developer setting), e.g. phamos.ai_agents.agents.accounting.",
+   "permlevel": 1
   },
   {
    "fieldname": "llm_model",
@@ -145,6 +147,22 @@
   },
   {
    "role": "Accounts User",
+   "read": 1
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "permlevel": 1,
+   "read": 1
+  },
+  {
+   "role": "Accounts User",
+   "permlevel": 1,
    "read": 1
   }
  ],
