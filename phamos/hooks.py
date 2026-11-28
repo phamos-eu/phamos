@@ -10,6 +10,18 @@ app_license = "AGPL-3.0"
 required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
+	# Ophice (#2069, #2070): where people "go to work"; the cockpits open inside it. Frappe's
+	# "Default App" opens an app's first tile it shows. So Ophice is listed twice, and exactly one
+	# of the two shows: here, first, while the start-page switch (#2077, Cockpit Settings) is on;
+	# otherwise further down, so a site whose default app is already "phamos" keeps landing in the
+	# Personal Cockpit after this release (review of the release).
+	{
+		"name": "ophice",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_start_tile_permission",
+	},
 	{
 		"name": "personal_cockpit",
 		"logo": "/assets/phamos/manifest/personal-icon-192.png",
@@ -80,6 +92,14 @@ add_to_apps_screen = [
 		"route": "/implementation-cockpit",
 		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
 	},
+	# Ophice while it is not the start page (see the first tile).
+	{
+		"name": "ophice_tile",
+		"logo": "/assets/phamos/manifest/ophice-icon-192.png",
+		"title": "Ophice",
+		"route": "/ophice",
+		"has_permission": "phamos.api.ophice.check_tile_permission",
+	},
 	# Not a cockpit: opens the Desk workspace (#2028). The cockpit switcher only offers routes in
 	# spa_boot.COCKPITS; "Open in Cockpit" only takes tiles whose phamos.api.<name> module has a
 	# CockpitConfig. Neither applies to this tile.
@@ -123,7 +143,12 @@ app_include_js = [
 # Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
 # `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
 web_include_css = ["web_profile.bundle.css"]
-web_include_js = ["web_profile.bundle.js"]
+web_include_js = [
+	"web_profile.bundle.js",
+	# Phriend for Desk users on the website pages (#2104): a small loader; the ball loads only
+	# when the server says Phriend is for the user
+	"phriend_web.bundle.js",
+]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
@@ -178,6 +203,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/ophice", "to_route": "ophice"},
+    {"from_route": "/ophice/<path:app_path>", "to_route": "ophice"},
     {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
     {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
@@ -221,12 +248,18 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
-# Documentation from BookStack (phamos/phamos#2005), German only: the content is German.
-website_route_rules += [
-    {"from_route": "/de/doku", "to_route": "doku/index", "defaults": {"lang": "de"}},
-    {"from_route": "/de/doku/<book_slug>", "to_route": "doku/book", "defaults": {"lang": "de"}},
-    {"from_route": "/de/doku/<book_slug>/<page_slug>", "to_route": "doku/page", "defaults": {"lang": "de"}},
-]
+# Documentation from BookStack (phamos/phamos#2005, #2044). The text is German; the English pages
+# show it with English navigation until it is translated. Keep in sync with web_profile/docs.py.
+for _lang, _slug in {"de": "dokumentation", "en": "documentation"}.items():
+    website_route_rules += [
+        {"from_route": f"/{_lang}/{_slug}", "to_route": "documentation/index", "defaults": {"lang": _lang}},
+        # before <book_slug>, which would catch it (#2046)
+        {"from_route": f"/{_lang}/{_slug}/" + {"de": "suche", "en": "search"}[_lang], "to_route": "documentation/search",
+         "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>", "to_route": "documentation/book", "defaults": {"lang": _lang}},
+        {"from_route": f"/{_lang}/{_slug}/<book_slug>/<page_slug>", "to_route": "documentation/page",
+         "defaults": {"lang": _lang}},
+    ]
 # Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
 SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
 for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
@@ -296,6 +329,7 @@ after_migrate = [
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751), Team on Issue and Task (#1955)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
+	"phamos.setup.issue_assistant.after_migrate",  # Issue Assistant role, user, bot, agent, Customer switch (#2111)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
@@ -427,7 +461,11 @@ doc_events = {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Issue": {
+		"on_update": "phamos.api.issue_chat.on_record_update",
+		# the Issue Assistant's first look at a new Issue, in the background (#2111)
+		"after_insert": "phamos.ai_agents.agents.issue.on_issue_insert",
+	},
 	"Task": {
 		"after_insert": "phamos.api.issue_chat.on_task_insert",
 		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
@@ -581,6 +619,7 @@ fixtures = [
             "name", "in", [
                 "Bookstack User",
                 "Bookstack Manager",
+                "Ophice Map Editor",
             ]
         ]
     ]},
@@ -619,6 +658,8 @@ scheduler_events = {
         "phamos.bookstack_integration.sync.sync_all_instances",
     ],
     "daily": [
+        # Phriend: rating questions for reports that went live (#2014)
+        "phamos.phriend.feedback.create_due_requests",
         # Implementation Release: capacity shrinks every day, leave changes (#1986)
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
@@ -655,6 +696,10 @@ scheduler_events = {
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
         ],
+        # Ophice: burn encounter chats whose burn notice ran out, also for closed tabs (#2057).
+        "* * * * *": [
+            "phamos.api.ophice.burn_due_encounters",
+        ],
         # Personal Cockpit: fix today's day plans that were never started (#1559).
         "0 10 * * *": [
             "phamos.api.personal_day_plan.freeze_day_plans",
@@ -688,6 +733,7 @@ override_doctype_dashboards = {
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
     "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
+    "Lead": "phamos.custom_scripts.custom_python.lead_dashboard.get_lead_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
@@ -745,6 +791,8 @@ user_data_fields = [
 	},
 	{"doctype": "Idea Writing Session", "filter_by": "user"},
 	{"doctype": "Idea Vote", "filter_by": "user"},
+	# Phriend's rating questions and answers (#2014)
+	{"doctype": "Phriend Feedback", "filter_by": "user", "redact_fields": ["comment"]},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

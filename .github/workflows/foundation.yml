@@ -219,6 +219,9 @@ jobs:
           bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
         done
 
+        echo "Running Ophice tests..."
+        bench --site test.localhost run-tests --app phamos --module phamos.tests.test_ophice
+
         echo "All tests completed successfully!"
       env:
         CI: true

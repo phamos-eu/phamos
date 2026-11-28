@@ -8,6 +8,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { badgeArgs, pageContext } from "@spa/utils/phriendPage.js"
 
 const COUNT_METHOD = "phamos.phriend.api.count_open_reports"
+const TESTING_METHOD = "phamos.phriend.api.get_testing_on_production"
 // Desk's Issue list, filtered to open Phriend reports (the cockpit Issue lists have no
 // filter for that yet). "Open" means what the badge counts: not Resolved or Closed.
 const REPORTS_URL =
@@ -31,9 +32,9 @@ function boot() {
  * @param {() => string} heading  the page heading the shell shows, for "Reported on"
  * @param {object} [socket]  the cockpit's realtime socket (frappe-ui), for Phriend's events (#2012)
  */
-export function mountPhriend(router, heading, socket) {
+export function mountPhriend(router, heading, socket, extra = {}) {
 	watchFailedRequests()
-	if (instance || !boot().phriend?.enabled) return
+	if (instance || !boot().phriend?.enabled) return instance
 	const current = () =>
 		pageContext(
 			router.currentRoute.value,
@@ -66,6 +67,7 @@ export function mountPhriend(router, heading, socket) {
 		open_reports: () => window.open(reportsUrl(current()), "_blank", "noopener"),
 		// where the reports about this place stand, for users who may open the Implementation Cockpit (#1671)
 		open_status: boot().phriend.implementation_cockpit ? (ctx) => openStatus(router, ctx) : null,
+		testing_tickets: () => call(TESTING_METHOD, badgeArgs(current()), window.csrf_token),
 		on_route_change: (callback) => router.afterEach(() => callback()),
 		// the user's own shortcut, else the site's (Phriend Settings); "" when off
 		shortcut: boot().phriend.shortcut || "",
@@ -83,9 +85,12 @@ export function mountPhriend(router, heading, socket) {
 		on_event: socket?.on ? (cb) => socket.on("phriend_event", cb) : null,
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
+		// Ophice (#2053) pins the ball onto its map: { pinned: true }
+		...extra,
 	})
 	early.splice(0).forEach((item) => instance.log.record_failed_request(item))
 	instance.mount()
+	return instance
 }
 
 function openStatus(router, ctx) {

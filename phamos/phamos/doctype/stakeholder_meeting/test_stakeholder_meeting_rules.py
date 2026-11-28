@@ -6,6 +6,12 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from phamos.patches.v1_0 import backfill_reviewed_revision_on_meeting_reviews
+from phamos.phamos.doctype.implementation_chapter.implementation_chapter import (
+	get_chapter_history,
+	set_as_planned,
+)
+from phamos.phamos.doctype.stakeholder_meeting.stakeholder_meeting import get_chapter_review_row
 from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import (
 	make_chapter,
 	make_implementation,
@@ -39,6 +45,86 @@ class TestStakeholderMeetingSubmitRules(FrappeTestCase):
 		meeting = make_meeting(self.implementation.name)
 		meeting.append("chapter_reviews", {"chapter": self.chapter.name})
 		self.assertRaises(frappe.ValidationError, meeting.save)
+
+	def test_decision_is_recorded_without_a_scope_change(self):
+		revision_before = self.chapter.current_revision
+
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting, decision="Yes", decision_description="Chapter complete")
+		meeting.submit()
+
+		self.chapter.reload()
+		self.assertEqual(self.chapter.decision, "Yes")
+		self.assertEqual(self.chapter.decision_description, "Chapter complete")
+		self.assertEqual(self.chapter.current_revision, revision_before)
+
+		history = get_chapter_history(self.chapter.name)["revisions"]
+		self.assertEqual(history[0]["decision"], "Yes")
+
+		meeting.reload()
+		meeting.cancel()
+		self.chapter.reload()
+		self.assertFalse(self.chapter.decision)
+		self.assertFalse(self.chapter.decision_description)
+
+	def test_complete_progress_is_recorded_in_history(self):
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting, progress="Complete")
+		meeting.submit()
+
+		revisions = get_chapter_history(self.chapter.name)["revisions"]
+		self.assertEqual(revisions[0]["progress"], "Complete")
+
+	def test_meeting_can_mark_a_chapter_completed(self):
+		revision_before = self.chapter.current_revision
+
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting, progress="Complete", chapter_status_after="Completed")
+		meeting.submit()
+
+		self.chapter.reload()
+		self.assertEqual(self.chapter.status, "Completed")
+		self.assertEqual(frappe.db.get_value(REVISION, revision_before, "status"), "Completed")
+
+		# A Completed Chapter is not seeded into the next meeting.
+		self.assertFalse(make_meeting(self.implementation.name, meeting_date="2026-03-01").chapter_reviews)
+
+		meeting.cancel()
+		self.chapter.reload()
+		self.assertEqual(self.chapter.status, "Planned")
+
+	def test_a_draft_chapter_cannot_be_completed_directly(self):
+		draft = make_chapter(self.implementation.name, title="Draft", plan=False)
+		draft.status = "Completed"
+		self.assertRaises(frappe.ValidationError, draft.save)
+
+	def test_history_shows_a_chapter_added_while_still_draft(self):
+		draft = make_chapter(self.implementation.name, title="Draft Chapter", plan=False)
+		meeting = make_meeting(self.implementation.name)
+		meeting.append("chapter_reviews", {"chapter": draft.name})
+		meeting.save()
+
+		set_as_planned(draft.name)
+		meeting.reload()
+		set_progress(meeting, decision="Yes")
+		meeting.submit()
+
+		revisions = get_chapter_history(draft.name)["revisions"]
+		self.assertEqual(revisions[0]["progress"], "On Track")
+		self.assertEqual(revisions[0]["decision"], "Yes")
+
+	def test_patch_fills_the_reviewed_revision_on_old_meetings(self):
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting)
+		meeting.submit()
+		row = meeting.chapter_reviews[0]
+		frappe.db.set_value(REVIEW_ROW, row.name, "current_revision", None)
+
+		backfill_reviewed_revision_on_meeting_reviews.execute()
+
+		self.assertEqual(
+			frappe.db.get_value(REVIEW_ROW, row.name, "current_revision"), self.chapter.current_revision
+		)
 
 	def test_status_only_change_updates_the_current_revision_in_place(self):
 		revision_before = self.chapter.current_revision
@@ -127,6 +213,60 @@ class TestStakeholderMeetingSeeding(FrappeTestCase):
 		self.assertEqual(
 			{row.chapter for row in meeting.chapter_reviews},
 			{planned.name, in_progress.name, blocked.name},
+		)
+
+	def test_picking_an_implementation_fills_rows_before_save(self):
+		self.implementation.reload()
+		for organisation in ("Internal", "Customer", "Third Party"):
+			self.implementation.append(
+				"stakeholders",
+				{
+					"full_name": f"{organisation} Person",
+					"email": f"{organisation.replace(' ', '').lower()}@example.com",
+					"stakeholder_organisation": organisation,
+				},
+			)
+		self.implementation.save()
+		chapter = make_chapter(self.implementation.name)
+
+		meeting = frappe.get_doc(
+			{"doctype": "Stakeholder Meeting", "implementation": self.implementation.name}
+		)
+		meeting.fetch_from_implementation()
+
+		self.assertEqual(
+			sorted(row.stakeholder_organisation for row in meeting.attendees), ["Customer", "Internal"]
+		)
+		row = meeting.chapter_reviews[0]
+		self.assertEqual(row.chapter, chapter.name)
+		self.assertEqual(str(row.planned_start), "2026-01-01")
+		self.assertEqual(str(row.target_date), "2026-06-30")
+
+		# Picking another Implementation replaces the rows.
+		other = make_implementation()
+		other_chapter = make_chapter(other.name, title="Other")
+		meeting.implementation = other.name
+		meeting.fetch_from_implementation()
+		self.assertFalse(meeting.attendees)
+		self.assertEqual([row.chapter for row in meeting.chapter_reviews], [other_chapter.name])
+
+	def test_rows_are_not_refilled_after_the_first_save(self):
+		make_chapter(self.implementation.name)
+		meeting = make_meeting(self.implementation.name)
+		self.assertRaises(frappe.ValidationError, meeting.fetch_from_implementation)
+
+	def test_a_row_added_by_hand_gets_the_chapter_dates(self):
+		chapter = make_chapter(self.implementation.name)
+
+		values = get_chapter_review_row(self.implementation.name, chapter.name)
+		self.assertEqual(str(values["planned_start"]), "2026-01-01")
+		self.assertEqual(str(values["target_date"]), "2026-06-30")
+		self.assertEqual(values["current_revision"], chapter.current_revision)
+		self.assertEqual(values["chapter_status_before"], "Planned")
+
+		other_chapter = make_chapter(make_implementation().name)
+		self.assertRaises(
+			frappe.ValidationError, get_chapter_review_row, self.implementation.name, other_chapter.name
 		)
 
 	def test_change_since_the_last_submitted_meeting_is_flagged_as_drift(self):

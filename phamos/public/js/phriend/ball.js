@@ -218,12 +218,15 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 @keyframes hand-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 @keyframes hand-flex { from { transform: rotate(0) scale(1); } to { transform: rotate(-12deg) scale(1.2); } }
 @keyframes hand-launch { 0% { transform: none; } 30% { transform: translate(-2px, 2px); } 100% { transform: translate(14px, -26px); opacity: 0; } }
-.badge {
+.badge, .badge-testing {
 	position: absolute; top: -2px; right: -2px; border: 0; font-family: inherit; min-width: 20px; height: 20px; padding: 0 5px;
 	border-radius: 10px; background: #e03636; color: #fff; font-size: 11px; font-weight: 600;
 	line-height: 20px; text-align: center; cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg);
 }
-.badge:empty { display: none; }
+.badge:empty, .badge-testing:empty { display: none; }
+/* Tickets from this page Testing on Production, under the red badge; GitLab's label colour.
+   Its own class, not .badge, so the red badge's lookup can never pick it up (AI review of !1322). */
+.badge-testing { top: 20px; background: #5b2a86; }
 /* The shortcut, small and light under the feet: an invitation to try it (PM, 2026-11-15). */
 .keys { position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
 	padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none;
@@ -244,7 +247,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
    (bubble.js), so border and shadow run round the tail too. Each one lands a little off (--jx,
    --jy, --jr: the jitter), tilting round its tail. Half up, half to the side (PM, 2026-11-21):
    the tail's tip just over Phriend's scalp, above the eyes, leaning in; always in front of
-   Phriend, never behind it. */
+   Phriend, never behind it. The tilt is only on the way in: a shown bubble always rests
+   horizontal, so it is easy to read (PM, 2026-11-23, #2095). */
 .bubble {
 	position: absolute; z-index: 3; bottom: 76px; right: 36px; width: max-content; max-width: 260px;
 	padding: 8px 12px; color: var(--ph-text); font-size: 13px; line-height: 1.4;
@@ -252,12 +256,29 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	opacity: 0; transform: translate(var(--jx), calc(var(--jy) + 6px)) rotate(var(--jr));
 	transition: opacity 0.2s, transform 0.2s; pointer-events: none; cursor: auto;
 }
-.bubble.show { opacity: 1; transform: translate(var(--jx), var(--jy)) rotate(var(--jr)); pointer-events: auto; }
+.bubble.show { opacity: 1; transform: translate(var(--jx), var(--jy)) rotate(0deg); pointer-events: auto; }
 .bubble .shape { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none;
 	filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.15)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.08)); }
 :host([data-theme="dark"]) .bubble .shape { filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55)); }
 .bubble .shape path { fill: var(--ph-bg); stroke: var(--ph-border-strong); stroke-width: 1; }
 .bubble .content { position: relative; }
+/* Rating a fix (#2014): thumbs or stars, then an optional comment, inside the bubble. */
+.rate-q { margin-bottom: 6px; }
+.rate-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rate-row button.pick { min-width: 36px; height: 32px; padding: 0 8px; border: 1px solid var(--ph-border-strong); border-radius: 8px;
+	background: var(--ph-surface); color: var(--ph-text); font-size: 18px; line-height: 1; cursor: pointer;
+	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--ph-font); }
+.rate-row button.pick:hover, .rate-row button.pick:focus-visible { border-color: var(--ph-focus); outline: none; }
+.rate-row.stars button.pick { min-width: 0; width: 30px; padding: 0; font-size: 17px; color: #e0a800; }
+.rate-row.stars button.pick.on { background: #fff6d6; }
+:host([data-theme="dark"]) .rate-row.stars button.pick.on { background: #3a3215; }
+.rate-foot { margin-top: 6px; font-size: 12px; color: var(--ph-muted); }
+.rate-comment { display: block; width: 100%; min-width: 220px; margin: 6px 0; padding: 6px 8px; resize: vertical;
+	border: 1px solid var(--ph-border-strong); border-radius: 8px; background: var(--ph-bg); color: var(--ph-text);
+	font: inherit; font-size: 13px; }
+.rate-comment:focus { outline: 2px solid var(--ph-focus); outline-offset: 0; }
+.rate-send { padding: 4px 12px; border: 0; border-radius: 8px; background: var(--ph-accent); color: var(--ph-on-accent);
+	font: inherit; font-size: 13px; cursor: pointer; }
 .bubble.sticky { padding-right: 28px; }
 .bubble-close { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px;
 	background: transparent; color: var(--ph-muted); font: inherit; font-size: 15px; line-height: 20px; cursor: pointer; }
@@ -308,6 +329,7 @@ export class Ball {
 				<button type="button" class="waiting" hidden></button>
 				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
+				<button type="button" class="badge-testing"></button>
 			</div>
 			<div class="layer"></div>`;
 		document.body.appendChild(this.host);
@@ -318,9 +340,21 @@ export class Ball {
 		this.menu = this.shadow.querySelector(".menu");
 		this.bubble_content = this.bubble.querySelector(".content");
 		this.bubble_shape = this.bubble.querySelector(".shape");
+		// The outline follows the bubble's size (#2095): a bubble that came up while Phriend was
+		// hidden (pinned off screen on Ophice) measured 0 × 0 and stayed without its background.
+		if (typeof ResizeObserver !== "undefined") {
+			this._bubble_size = "";
+			new ResizeObserver(() => {
+				const size = `${this.bubble.offsetWidth}x${this.bubble.offsetHeight}`;
+				if (size === this._bubble_size) return;
+				this._bubble_size = size;
+				if (this.bubble_showing()) this.draw_bubble(false);
+			}).observe(this.bubble);
+		}
 		this.badge = this.shadow.querySelector(".badge");
 		this.waiting = this.shadow.querySelector(".waiting");
 		this.keys = this.shadow.querySelector(".keys");
+		this.testing_badge = this.shadow.querySelector(".badge-testing");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
@@ -329,7 +363,9 @@ export class Ball {
 			this.root.style.right = `${options.start.right}px`;
 			this.root.style.bottom = `${options.start.bottom}px`;
 		}
-		this.restore_position();
+		// Pinned (Ophice's map, #2053): the host places the ball; it is not dragged and does not
+		// remember a position (that one belongs to the floating ball of Desk and the cockpits).
+		if (!options.pinned) this.restore_position();
 		this.setup_drag();
 		this.setup_eyes();
 		this.setup_interest();
@@ -340,6 +376,11 @@ export class Ball {
 		this.badge.addEventListener("click", (e) => {
 			e.stopPropagation();
 			options.on_badge_click && options.on_badge_click();
+		});
+		this.testing_badge.addEventListener("pointerdown", (e) => e.stopPropagation());
+		this.testing_badge.addEventListener("click", (e) => {
+			e.stopPropagation();
+			options.on_testing_badge_click && options.on_testing_badge_click();
 		});
 		this.bubble.addEventListener("pointerdown", (e) => e.stopPropagation());
 		this.waiting.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -404,6 +445,30 @@ export class Ball {
 		this.root.classList.toggle("flip", left < 260); // keep the speech bubble on screen
 	}
 
+	/**
+	 * Pinned mode: stand on a spot of the host's page, `size` px wide (the height follows the
+	 * ball's 64:76 shape), or hide while the spot is not on screen.
+	 * @param {{left: number, top: number, size: number} | null} spot
+	 */
+	pin(spot) {
+		this.host.style.display = spot ? "" : "none";
+		if (!spot) return;
+		const width = Math.round(spot.size);
+		Object.assign(this.root.style, {
+			width: `${width}px`,
+			height: `${Math.round((width * 76) / 64)}px`,
+			left: `${Math.round(spot.left)}px`,
+			top: `${Math.round(spot.top)}px`,
+			right: "auto",
+			bottom: "auto",
+		});
+		const flip = spot.left < 260; // keep the speech bubble on screen
+		if (flip !== this.root.classList.contains("flip")) {
+			this.root.classList.toggle("flip", flip);
+			if (this.bubble_showing()) this.draw_bubble(false); // the tail moves to the other side
+		}
+	}
+
 	clamp_into_view() {
 		if (!this.root.style.left) return;
 		this.set_position(parseFloat(this.root.style.left), parseFloat(this.root.style.top));
@@ -437,7 +502,7 @@ export class Ball {
 
 		this.hit.addEventListener("pointermove", (e) => {
 			if (!start) return;
-			if (!dragging && !pressed && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
+			if (!dragging && !pressed && !this.options.pinned && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) {
 				dragging = true;
 				clearTimeout(press_timer);
 				this.root.classList.add("dragging");
@@ -658,10 +723,19 @@ export class Ball {
 	// html: trusted markup built by Phriend itself (user text is escaped by the caller).
 	// ms = 0 keeps the bubble until the next say() or hide_bubble().
 	// gesture: a key of GESTURES; its emoji shows inside the bubble, in front of the text.
-	say(html, ms = 4000, gesture = null) {
+	// on_close: called when the user closes a bubble that stays (ms = 0) with ×, not when it is
+	// replaced or hidden by code (#2014: a rating question put off to another day)
+	say(html, ms = 4000, gesture = null, { on_close = null } = {}) {
 		clearTimeout(this._react_timer);
 		this._bubble_gesture = gesture;
-		this.show_bubble(`${this.emoji_html(gesture)}${html}`, ms, false);
+		this.show_bubble(`${this.emoji_html(gesture)}${html}`, ms, false, on_close);
+		return this.bubble;
+	}
+
+	// New content in the bubble that is showing (a next step), redrawn to its size, same place.
+	refill_bubble(html) {
+		this.bubble_content.innerHTML = html;
+		this.draw_bubble(false);
 		return this.bubble;
 	}
 
@@ -671,7 +745,7 @@ export class Ball {
 		return g ? `<span class="emoji" data-motion="${g.motion}" aria-hidden="true">${g.hand}</span>` : "";
 	}
 
-	show_bubble(html, ms, only_emoji) {
+	show_bubble(html, ms, only_emoji, on_close = null) {
 		this.close_menu(false); // the bubble sits where the menu is
 		clearTimeout(this._bubble_timer);
 		const old_close = this.bubble.querySelector(".bubble-close");
@@ -686,7 +760,10 @@ export class Ball {
 			close.className = "bubble-close";
 			close.textContent = "×";
 			close.setAttribute("aria-label", this.options.close_label || "Close");
-			close.addEventListener("click", () => this.hide_bubble());
+			close.addEventListener("click", () => {
+				this.hide_bubble();
+				if (on_close) on_close();
+			});
 			this.bubble.appendChild(close);
 		}
 		this.draw_bubble();
@@ -694,9 +771,10 @@ export class Ball {
 		if (ms) this._bubble_timer = setTimeout(() => this.hide_bubble(), ms);
 	}
 
-	// The outline to the bubble's size, landing a little off each time.
-	draw_bubble() {
-		const j = jitter();
+	// The outline to the bubble's size, landing a little off each time (again: a new place).
+	draw_bubble(again = true) {
+		const j = again || !this._jitter ? jitter() : this._jitter;
+		this._jitter = j;
 		this.bubble.style.setProperty("--jx", `${j.x}px`);
 		this.bubble.style.setProperty("--jy", `${j.y}px`);
 		this.bubble.style.setProperty("--jr", `${j.rot}deg`);
@@ -760,5 +838,13 @@ export class Ball {
 		this.badge.textContent = count ? String(count) : "";
 		this.badge.title = title || "";
 		this.badge.setAttribute("aria-label", title || "");
+	}
+
+	// color: the label's colour as GitLab has it ("#rrggbb"); empty keeps the CSS purple
+	set_testing_badge(count, title, color) {
+		this.testing_badge.textContent = count ? String(count) : "";
+		this.testing_badge.title = title || "";
+		this.testing_badge.setAttribute("aria-label", title || "");
+		this.testing_badge.style.background = color || "";
 	}
 }

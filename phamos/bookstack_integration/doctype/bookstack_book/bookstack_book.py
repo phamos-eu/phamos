@@ -13,14 +13,19 @@ class BookstackBook(Document):
 		self.validate_unique_web_address()
 
 	def validate_unique_web_address(self):
-		"""Two published books with one slug would share /de/doku/<slug>; only one could be shown,
+		"""Two published books with one slug would share /de/dokumentation/<slug>; only one could be shown,
 		and links of the other instance would lead to the wrong book (review S9)."""
 		# Only when someone publishes: the sync saves published books too, and a slug BookStack renamed
 		# into a clash must not make every sync fail (the website shows one of the two anyway).
 		if not (self.publish_on_website and self.slug and self.has_value_changed("publish_on_website")):
 			return
+		from phamos.web_profile.docs import SEARCH_SLUGS
+
+		if self.slug in SEARCH_SLUGS.values():
+			# /de/dokumentation/suche and /en/documentation/search are the search pages (#2046)
+			frappe.throw(frappe._("The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.").format(self.slug))
 		if frappe.db.exists("Bookstack Book", {"publish_on_website": 1, "slug": self.slug, "name": ["!=", self.name]}):
-			frappe.throw(frappe._("Another published book already uses the web address /de/doku/{0}.").format(self.slug))
+			frappe.throw(frappe._("Another published book already uses the web address /de/dokumentation/{0}.").format(self.slug))
 
 	def on_update(self):
 		# A new book has no earlier version; unpublished, it changes no links. (is_new() is already
@@ -40,29 +45,18 @@ class BookstackBook(Document):
 		frappe.db.after_commit.add(clear_docs_cache)
 
 	def refresh_website_copies(self):
-		"""Make the next content sync pick up a changed "Publish on website" (#2004).
+		"""An unpublished book's pages lose their website copy at once (#2004).
 
-		An unpublished book's pages lose their copy at once. Pages of the other published
-		books are fetched again, because their links to this book change: they point to
-		phamos.eu while it is published, and back to BookStack once it is not.
+		Links in the other books need nothing: the website points them at its pages when it shows
+		them (#2044), so they follow this book without fetching anything again.
 		"""
+		if self.publish_on_website:
+			return
 		page = frappe.qb.DocType("Bookstack Page")
-		if not self.publish_on_website:
-			(
-				frappe.qb.update(page)
-				.set(page.html, None)
-				.set(page.content_updated_at, None)
-				.where(page.book == self.name)
-			).run()
-
-		others = frappe.get_all(
-			"Bookstack Book",
-			filters={"instance": self.instance, "publish_on_website": 1, "name": ["!=", self.name]},
-			pluck="name",
-		)
-		if others:
-			(
-				frappe.qb.update(page)
-				.set(page.content_updated_at, None)
-				.where(page.book.isin(others))
-			).run()
+		(
+			frappe.qb.update(page)
+			.set(page.html, None)
+			.set(page.search_text, None)
+			.set(page.content_updated_at, None)
+			.where(page.book == self.name)
+		).run()

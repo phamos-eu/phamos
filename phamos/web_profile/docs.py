@@ -1,24 +1,31 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Public documentation under /de/doku, built from BookStack books (phamos/phamos#2005).
+"""Public documentation under /de/dokumentation and /en/documentation, from BookStack books.
 
 Only books with "Publish on website" are shown, and only their pages whose content the sync has
 copied (Bookstack Page.html, phamos/phamos#2004). Nothing is fetched from BookStack per visit.
-URLs use BookStack's slugs: /de/doku/<book>/<page>.
+URLs use BookStack's slugs: /de/dokumentation/<book>/<page> (phamos/phamos#2005, #2044).
+
+The content is German. The English pages show it with English navigation and point search
+engines to the German page (canonical) until a translation exists (#2044).
+
+Links inside the copied pages still point to BookStack; render_html points them at the website
+when the page is shown, so publishing a book changes links at once, without a sync.
 """
 
 from __future__ import annotations
 
-from urllib.parse import urlsplit
+import re
+from urllib.parse import unquote, urlsplit
 
 import frappe
 from bs4 import BeautifulSoup
 
-from phamos.bookstack_integration.content import DOCS_ROUTE
-
 CACHE_KEY = "web_docs"
 CACHE_SECONDS = 600
+DOCS_ROUTES = {"de": "/de/dokumentation", "en": "/en/documentation"}
+DEFAULT_LANGUAGE = "de"
 
 
 def clear_cache():
@@ -35,20 +42,42 @@ def _cached(field, build):
 	return value
 
 
-def book_url(book_slug):
-	return f"{DOCS_ROUTE}/{book_slug}"
+def _lang(lang):
+	return lang if lang in DOCS_ROUTES else DEFAULT_LANGUAGE
 
 
-def page_url(book_slug, page_slug):
-	return f"{DOCS_ROUTE}/{book_slug}/{page_slug}"
+def docs_url(lang, book_slug=None, page_slug=None, anchor=None):
+	"""/de/dokumentation[/<book>[/<page>]][#anchor] in ``lang``."""
+	url = DOCS_ROUTES[_lang(lang)]
+	if book_slug:
+		url += f"/{book_slug}"
+		if page_slug:
+			url += f"/{page_slug}"
+	return f"{url}#{anchor}" if anchor else url
+
+
+SEARCH_SLUGS = {"de": "suche", "en": "search"}
+
+
+def search_path(lang):
+	"""/de/dokumentation/suche, /en/documentation/search (#2046)."""
+	return f"{docs_url(lang)}/{SEARCH_SLUGS[_lang(lang)]}"
+
+
+def book_url(book_slug, lang=DEFAULT_LANGUAGE):
+	return docs_url(lang, book_slug)
+
+
+def page_url(book_slug, page_slug, lang=DEFAULT_LANGUAGE):
+	return docs_url(lang, book_slug, page_slug)
 
 
 # --- books ----------------------------------------------------------------------------------------
 
 
-def published_books() -> list[dict]:
-	"""Every published book with at least one page to show, grouped later by shelf."""
-	return [frappe._dict(b) for b in _cached("books", _load_books)]
+def published_books(lang=DEFAULT_LANGUAGE) -> list[dict]:
+	"""Every published book with at least one page to show, with its URL in ``lang``."""
+	return [frappe._dict(b, url=book_url(b["slug"], lang)) for b in _cached("books", _load_books)]
 
 
 def _load_books():
@@ -66,8 +95,8 @@ def _load_books():
 	rows = (
 		frappe.qb.from_(book)
 		.left_join(shelf).on(shelf.name == book.shelf)
-		.select(book.name, book.slug, book.title, book.website_summary, book.description, book.url,
-			shelf.title.as_("shelf"))
+		.select(book.name, book.instance, book.slug, book.title, book.website_summary, book.description,
+			book.url, shelf.title.as_("shelf"))
 		.where(book.publish_on_website == 1)
 		.orderby(book.title)
 	).run(as_dict=True)
@@ -80,26 +109,26 @@ def _load_books():
 		seen.add(r.slug)
 		books.append({
 			"name": r.name,
+			"instance": r.instance,
 			"slug": r.slug,
 			"title": r.title or r.slug,
 			"summary": (r.website_summary or r.description or "").strip(),
 			"shelf": r.shelf,
 			"source_url": r.url,
 			"source_host": urlsplit(r.url).netloc if r.url else "",
-			"url": book_url(r.slug),
 			"page_count": page_count[r.name],
 		})
 	return books
 
 
-def find_book(slug) -> frappe._dict | None:
-	return next((b for b in published_books() if b.slug == slug), None)
+def find_book(slug, lang=DEFAULT_LANGUAGE) -> frappe._dict | None:
+	return next((b for b in published_books(lang) if b.slug == slug), None)
 
 
-def books_by_shelf() -> list[dict]:
+def books_by_shelf(lang=DEFAULT_LANGUAGE) -> list[dict]:
 	"""[{shelf, books}] in shelf order; books without a shelf come last."""
 	groups: dict = {}
-	for b in published_books():
+	for b in published_books(lang):
 		groups.setdefault(b.shelf or "", []).append(b)
 	ordered = sorted(groups.items(), key=lambda g: (not g[0], g[0].lower()))
 	return [{"shelf": shelf or None, "books": books} for shelf, books in ordered]
@@ -108,12 +137,22 @@ def books_by_shelf() -> list[dict]:
 # --- contents of one book -------------------------------------------------------------------------
 
 
-def book_contents(book: frappe._dict) -> list[dict]:
+def book_contents(book: frappe._dict, lang=DEFAULT_LANGUAGE) -> list[dict]:
 	"""Chapters and loose pages in BookStack's order; chapters keep only pages that are shown.
 
-	[{"type": "chapter", "title", "slug", "description", "pages": [...]}, {"type": "page", ...}]
+	[{"type": "chapter", "title", "slug", "description", "pages": [...]}, {"type": "page", ...}],
+	each page with its URL in ``lang``.
 	"""
-	return _cached(f"contents:{book.name}", lambda: _load_contents(book))
+	def with_url(entry):
+		return {**entry, "url": page_url(book.slug, entry["slug"], lang)}
+
+	out = []
+	for entry in _cached(f"contents:{book.name}", lambda: _load_contents(book)):
+		if entry["type"] == "chapter":
+			out.append({**entry, "pages": [with_url(p) for p in entry["pages"]]})
+		else:
+			out.append(with_url(entry))
+	return out
 
 
 def _load_contents(book):
@@ -130,7 +169,7 @@ def _load_contents(book):
 	)
 
 	def entry(p):
-		return {"type": "page", "slug": p.slug, "title": p.title or p.slug, "url": page_url(book.slug, p.slug)}
+		return {"type": "page", "slug": p.slug, "title": p.title or p.slug}
 
 	by_chapter: dict = {}
 	entries = []
@@ -163,53 +202,250 @@ def reading_order(contents) -> list[dict]:
 # --- one page -------------------------------------------------------------------------------------
 
 
-def find_page(book: frappe._dict, page_slug) -> frappe._dict | None:
+def find_page(book: frappe._dict, page_slug, lang=DEFAULT_LANGUAGE) -> frappe._dict | None:
 	page = frappe.db.get_value(
 		"Bookstack Page",
 		{"book": book.name, "slug": page_slug, "html": ["is", "set"]},
-		["name", "slug", "title", "html", "url", "chapter", "updated_at"],
+		["name", "slug", "title", "html", "url", "chapter", "updated_at", "content_updated_at"],
 		as_dict=True,
 	)
 	if not page:
 		return None
 	page.title = page.title or page.slug
+	rendered = render_html(page, lang)
+	page.html, page.headings = rendered["html"], rendered["headings"]
 	page.chapter_title = page.chapter and frappe.db.get_value("Bookstack Chapter", page.chapter, "title")
-	order = reading_order(book_contents(book))
+	order = reading_order(book_contents(book, lang))
 	index = next((i for i, p in enumerate(order) if p["slug"] == page.slug), None)
 	page.previous = order[index - 1] if index else None
 	page.next = order[index + 1] if index is not None and index + 1 < len(order) else None
 	return page
 
 
+# --- links from the copied pages to the website ---------------------------------------------------
+
+_PAGE_PATH = re.compile(r"^/books/(?P<book>[^/]+)(?:/(?P<kind>page|chapter)/(?P<slug>[^/]+))?/?$")
+_PERMALINK_PATH = re.compile(r"^/link/(?P<id>\d+)/?$")
+# "erpnext-benutzerhandbuch-v13", "-v13-v15", "-v14" all belong to "erpnext-benutzerhandbuch".
+_VERSION_SUFFIX = re.compile(r"(-v\d+)+$")
+
+
+def _family(book_slug):
+	return _VERSION_SUFFIX.sub("", book_slug or "")
+
+
+def _title_key(title):
+	"""Titles compared without case and punctuation: "Kunde (Customer)" == "kunde customer"."""
+	return " ".join(re.findall(r"\w+", (title or "").lower()))
+
+
+def link_index() -> dict:
+	"""What the website can show, to point BookStack links at it.
+
+	- hosts: BookStack hosts of the published books
+	- books: published book slugs, in title order
+	- pages / chapters: {slug: [book slugs]} of what the published books show
+	- page_ids: {(BookStack host, page id): (book slug, page slug)} of every page, published or not,
+	  so a permalink to an unpublished copy can still be matched by its slug. Ids are per instance,
+	  hence the host.
+	- titles: {title key: [(book slug, page slug)]} of the shown pages, and page_titles:
+	  {(book slug, page slug): title key} of every page, for copies whose page has another slug
+	"""
+	return _cached("links", _load_link_index)
+
+
+def _load_link_index():
+	books = _cached("books", _load_books)
+	by_name = {b["name"]: b["slug"] for b in books}
+	pages: dict = {}
+	chapters: dict = {}
+	shown = frappe.get_all(
+		"Bookstack Page",
+		filters={"book": ["in", list(by_name) or [""]], "html": ["is", "set"]},
+		fields=["book", "slug", "chapter", "title"],
+	)
+	titles: dict = {}
+	chapter_slugs = dict(frappe.get_all("Bookstack Chapter", filters={"book": ["in", list(by_name) or [""]]},
+		fields=["name", "slug"], as_list=True))
+	for p in shown:
+		book_slug = by_name[p.book]
+		if p.slug:
+			pages.setdefault(p.slug, []).append(book_slug)
+			titles.setdefault(_title_key(p.title), []).append((book_slug, p.slug))
+		chapter_slug = chapter_slugs.get(p.chapter)
+		if chapter_slug and book_slug not in chapters.get(chapter_slug, []):
+			chapters.setdefault(chapter_slug, []).append(book_slug)
+	order = {b["slug"]: i for i, b in enumerate(books)}
+	for targets in (*pages.values(), *chapters.values()):
+		targets.sort(key=order.get)
+
+	all_books = dict(frappe.get_all("Bookstack Book", fields=["name", "slug"], as_list=True))
+	all_pages = [
+		p for p in frappe.get_all("Bookstack Page", fields=["instance", "bookstack_id", "book", "slug", "title"])
+		if p.slug and all_books.get(p.book)
+	]
+	host_of = {
+		c.name: urlsplit(c.instance_url or "").netloc
+		for c in frappe.get_all("Bookstack Configuration", fields=["name", "instance_url"])
+	}
+	page_ids = {(host_of.get(p.instance), p.bookstack_id): (all_books[p.book], p.slug) for p in all_pages}
+	page_titles = {(all_books[p.book], p.slug): _title_key(p.title) for p in all_pages}
+	return {
+		"hosts": sorted({b["source_host"] for b in books if b["source_host"]}),
+		"books": [b["slug"] for b in books],
+		"pages": pages,
+		"chapters": chapters,
+		"page_ids": page_ids,
+		"titles": titles,
+		"page_titles": page_titles,
+	}
+
+
+def _pick(candidates, origin_book):
+	"""The published book to link: the link's own book, else one of its family, else the first."""
+	if not candidates:
+		return None
+	if origin_book in candidates:
+		return origin_book
+	family = [c for c in candidates if _family(c) == _family(origin_book)]
+	return (family or candidates)[0]
+
+
+def _page_target(book_slug, page_slug, index):
+	"""(published book, page slug) for a BookStack page, or None: its own book first, then the same
+	slug in a published book, then a shown page with the same title (a copy renamed the slug)."""
+	book = _pick(index["pages"].get(page_slug), book_slug)
+	if book:
+		return book, page_slug
+	key = index["page_titles"].get((book_slug, page_slug))
+	matches = index["titles"].get(key) if key else None
+	if not matches:
+		return None
+	book = _pick([b for b, _ in matches], book_slug)
+	return next(m for m in matches if m[0] == book)
+
+
+def website_href(href, index, lang=DEFAULT_LANGUAGE):
+	"""The website URL for a BookStack link, or None when the website doesn't show its target.
+
+	A page or chapter is found in its own book first, then by slug or title in another published
+	book (the published "ERPNext Benutzerhandbuch" links to its older copies v13, v14, v15, #2044).
+	A chapter that can't be found opens its book, when the website shows that book or its family.
+	"""
+	parts = urlsplit(href)
+	if parts.netloc not in index["hosts"]:
+		return None
+	fragment = parts.fragment or None
+
+	permalink = _PERMALINK_PATH.match(parts.path)
+	if permalink:
+		book_slug, page_slug = index["page_ids"].get((parts.netloc, int(permalink["id"])), (None, None))
+		target = page_slug and _page_target(book_slug, page_slug, index)
+		return docs_url(lang, *target, fragment) if target else None
+
+	match = _PAGE_PATH.match(parts.path)
+	if not match:
+		return None
+	origin = match["book"]
+	if match["kind"] == "page":
+		target = _page_target(origin, unquote(match["slug"]), index)
+		return docs_url(lang, *target, fragment) if target else None
+	family_book = _pick([b for b in index["books"] if b == origin or _family(b) == _family(origin)], origin)
+	if match["kind"] == "chapter":
+		book = _pick(index["chapters"].get(unquote(match["slug"])), origin)
+		if book:
+			return docs_url(lang, book, anchor=unquote(match["slug"]))
+		return docs_url(lang, family_book) if family_book else None  # e.g. a pasted ":~:text=" link
+	return docs_url(lang, family_book, anchor=fragment) if family_book else None
+
+
+def render_html(page, lang=DEFAULT_LANGUAGE) -> dict:
+	"""{"html", "headings"} of a page, cached: the stored HTML with links to shown pages pointing at
+	the website, every h2 / h3 with an id, and those headings for "On this page" (#2045)."""
+	lang = _lang(lang)  # runs before init_page checks the route's language: no cache entry for "?lang=xx" (review)
+	stamp = page.get("content_updated_at") or page.get("updated_at") or ""
+	# "html2": the value became {"html", "headings"} (#2045); an entry of the older shape must never be read
+	return _cached(f"html2:{lang}:{page.name}:{stamp}", lambda: _render(page.html or "", lang))
+
+
+def _render(html, lang):
+	index = link_index()
+	soup = BeautifulSoup(html, "html.parser")
+	for a in soup.find_all("a", href=True):
+		target = website_href(a["href"], index, lang)
+		if target:
+			a["href"] = target
+			if a.get("rel"):
+				del a["rel"]  # noopener is for other sites
+
+	# Wide tables scroll sideways in a box of their own; web_docs.bundle.js marks a clipped edge
+	# the way the cockpits do (ScrollHint, #1922).
+	for table in soup.find_all("table"):
+		if table.parent and "wp-docs-table-scroll" in (table.parent.get("class") or []):
+			continue
+		box = soup.new_tag("div", attrs={"class": "wp-docs-table", "data-wp-docs-table": ""})
+		scroller = soup.new_tag("div", attrs={"class": "wp-docs-table-scroll"})
+		table.wrap(scroller)
+		scroller.wrap(box)
+
+	headings, used = [], {tag["id"] for tag in soup.find_all(id=True)}
+	for n, tag in enumerate(soup.find_all(["h2", "h3"]), 1):
+		text = " ".join(tag.get_text(" ").split())
+		if not text:
+			continue
+		if not tag.get("id"):
+			# BookStack gives most headings a "bkmrk-" id; the rest get one so they can be jumped to.
+			candidate = f"wp-h-{n}"
+			while candidate in used:
+				candidate += "-x"
+			tag["id"] = candidate
+			used.add(candidate)
+		headings.append({"id": tag["id"], "text": text, "level": int(tag.name[1])})
+	return {"html": str(soup), "headings": headings}
+
+
 # --- www pages ------------------------------------------------------------------------------------
 
 
 def init_page(context, crumbs=()):
-	"""Common setup of the three /de/doku pages; only reachable through the route rules in hooks.py."""
+	"""Common setup of the documentation pages; only reachable through the route rules in hooks.py.
+
+	Returns the page language.
+	"""
 	from phamos.web_profile.i18n import set_request_language
 	from phamos.web_profile.page import home_crumb
 
-	# Frappe would also serve www/doku/* at /doku/... with ?lang=de: duplicate pages for search engines.
+	lang = frappe.form_dict.get("lang")
+	# Frappe would also serve www/documentation/* at /documentation/... with ?lang=de: duplicate
+	# pages for search engines.
 	request = getattr(frappe.local, "request", None)
 	path = "/" + (request.path if request else "").lstrip("/")
-	if frappe.form_dict.get("lang") != "de" or not path.startswith(DOCS_ROUTE):
+	if lang not in DOCS_ROUTES or not (path == DOCS_ROUTES[lang] or path.startswith(DOCS_ROUTES[lang] + "/")):
 		raise frappe.PageDoesNotExistError
-	context.lang = set_request_language("de", context)
+	context.lang = set_request_language(lang, context)
 	context.wp_docs = 1  # chrome.py: page language for navbar and footer
 	context.no_cache = 1
 	context.no_breadcrumbs = 1
-	context.crumbs = [home_crumb(), {"label": frappe._("Documentation"), "url": DOCS_ROUTE}, *crumbs]
+	context.docs_home = docs_url(lang)
+	context.search_action = search_path(lang)
+	context.content_in_other_language = lang != DEFAULT_LANGUAGE
+	context.crumbs = [home_crumb(), {"label": frappe._("Documentation"), "url": docs_url(lang)}, *crumbs]
+	return lang
 
 
-def set_page_seo(context, *, title, description, path):
+def set_page_seo(context, *, title, description, path_for):
+	"""``path_for(lang)`` gives the page's path in each language. The German page is canonical:
+	the English one shows the same German text until it is translated (#2044)."""
 	from phamos.web_profile.page import breadcrumb_schema, set_seo
 
+	alternates = {lang: path_for(lang) for lang in DOCS_ROUTES}
 	set_seo(
 		context,
 		title=f"{title} · phamos",
 		description=description,
-		path=path,
-		alternates={"de": path},
+		path=alternates[context.lang],
+		canonical_path=alternates[DEFAULT_LANGUAGE],
+		alternates=alternates,
 		schema=[breadcrumb_schema(context.crumbs)],
 	)
 

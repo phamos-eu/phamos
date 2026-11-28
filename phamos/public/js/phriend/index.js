@@ -9,6 +9,9 @@
 //   count_reports()           optional: Promise of the open reports for this page (the badge)
 //   open_reports()            optional: show those reports
 //   open_status(ctx)          optional: where the reports about this place (or ctx.issue) stand, in the Implementation Cockpit
+//   testing_tickets()         optional: Promise of { count, url, about, color }: the open GitLab
+//                             issues labelled Testing on Production that mention this page's
+//                             DocType or page (about); a click opens url, that list in GitLab
 //   on_route_change(cb)       optional
 //   shortcut                  the user's shortcut ("Mod+P"; "" when off)
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"
@@ -27,6 +30,7 @@ import * as nudge from "./nudge";
 import * as play from "./play";
 import * as quiet from "./quiet";
 import { call } from "./request";
+import { rating_item } from "./rating";
 import { Voice } from "./voice";
 import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
@@ -210,6 +214,9 @@ class Phriend {
 		// easter eggs (#2013): a move by name, or a random one
 		api.play = (name) => (name ? this.play_move(name) : this.play_from("debug", play.HOVER_MOVES, true));
 		api.moves = Object.keys(play.MOVES);
+		// rating a fix (#2014): ask the question for a report now, live or not
+		api.ask_rating = (issue, round) =>
+			call("phamos.phriend.api.ask_feedback_now", { issue, round }, this.host.csrf_token()).catch((e) => console.warn(e));
 	}
 
 	// ---- easter eggs (#2013)
@@ -237,10 +244,13 @@ class Phriend {
 		};
 		for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"])
 			document.addEventListener(event, active, { passive: true, capture: true });
+		// coming back to the tab counts as activity: time in a hidden tab is not idle time (AI review of !1285)
+		document.addEventListener("visibilitychange", () => !document.hidden && active());
 		setInterval(() => {
 			if (played_this_spell || document.hidden || Date.now() - last_active < play.IDLE_MS) return;
-			played_this_spell = true;
-			this.play_from("idle", play.IDLE_MOVES);
+			// the spell is used up only by a move that really played, not by one quiet mode or the
+			// open menu held back (AI review of !1285)
+			if (this.play_from("idle", play.IDLE_MOVES)) played_this_spell = true;
 		}, 30 * 1000);
 	}
 
@@ -275,6 +285,7 @@ class Phriend {
 
 	on_event(payload) {
 		if (!payload || !this.ball) return;
+		if (payload.kind === "rate_fix") return this.ask_rating(payload.feedback); // #2014
 		if (payload.kind === "quiet") {
 			// leave me in peace changed in another tab
 			this.set_quiet_state(payload.state || null);
@@ -288,6 +299,29 @@ class Phriend {
 			this.voice.note({ ...item, gesture: null });
 		} else if (payload.level === "question") this.voice.ask(item);
 		else if (payload.level === "warning") this.voice.warn(item);
+	}
+
+	// ---- rating a fix (#2014)
+
+	// The open questions, fresh from the server shortly after the page loads (Desk caches the boot).
+	load_ratings() {
+		const features = this.host.features || {};
+		if (!features.rate_fixes) return;
+		setTimeout(() => {
+			call("phamos.phriend.api.get_my_feedback_requests", {}, this.host.csrf_token())
+				.then((requests) => (requests || []).forEach((req) => this.ask_rating(req)))
+				.catch(() => {});
+		}, 1500);
+	}
+
+	// A rating question through the voice: a question, so it uses the day's bubble or waits
+	// behind the dot. Each question once per page (the boot and a live event can both bring it).
+	ask_rating(req) {
+		if (!req || !req.name || !this.ball) return;
+		this._asked_ratings = this._asked_ratings || new Set();
+		if (this._asked_ratings.has(req.name)) return;
+		this._asked_ratings.add(req.name);
+		this.voice.ask(rating_item(this, req));
 	}
 
 	// plain text from the server, escaped; a link on this site or https only (events.py checks too)
@@ -349,8 +383,10 @@ class Phriend {
 				this.host.open_status
 					? this.host.open_status(this.host.page_context() || {})
 					: this.host.open_reports && this.host.open_reports(),
+			on_testing_badge_click: () => this.open_testing(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
+			pinned: !!this.host.pinned,
 			close_label: __("Close"),
 			hands: this.feature("reactions"),
 			menu: this.has_menu() ? () => this.menu_entries() : null,
@@ -362,6 +398,7 @@ class Phriend {
 		this.voice = new Voice(this); // one voice (#2011)
 		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
 		this.setup_play(); // easter eggs (#2013)
+		this.load_ratings(); // open rating questions (#2014)
 		this.ball.set_keys(format(this.shortcut));
 		this.apply_quiet();
 		this.expose_debug();
@@ -548,6 +585,33 @@ class Phriend {
 					)
 				)
 				.catch(() => {});
+			this.refresh_testing();
 		}, 400);
+	}
+
+	// ---- the second badge: open GitLab issues labelled Testing on Production; a click opens
+	// GitLab's issue list filtered by that label
+
+	refresh_testing() {
+		if (!this.host.testing_tickets) return;
+		Promise.resolve(this.host.testing_tickets())
+			.then((data) => {
+				const url = data && /^https?:\/\//.test(data.url || "") ? data.url : null;
+				const count = url ? Number(data.count) || 0 : 0;
+				this.testing_url = url;
+				this.ball.set_testing_badge(
+					count,
+					this.__("{0} GitLab issues about {1} are Testing on Production (opens the list in GitLab)", [
+						count,
+						data.about || "",
+					]),
+					data && data.color
+				);
+			})
+			.catch(() => {});
+	}
+
+	open_testing() {
+		if (this.testing_url) window.open(this.testing_url, "_blank", "noopener");
 	}
 }

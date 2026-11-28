@@ -21,7 +21,8 @@ import getIonicConfig from "./utils/ionicConfig"
 setConfig("resourceFetcher", frappeRequest)
 
 const app = createApp(App)
-app.use(FrappeUI)
+// Realtime on the bench's socket.io port, not frappe-ui's default 9000 (spa_shared/utils/socketio.js).
+app.use(FrappeUI, { socketio: { port: window.frappe?.boot?.socketio_port } })
 app.use(router)
 app.use(IonicVue, getIonicConfig())
 
