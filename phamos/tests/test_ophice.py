@@ -135,6 +135,53 @@ class OphicePresenceTestCase(FrappeTestCase):
 		self.assertTrue(all(results[: ophice.MOVE_LIMIT]))
 		self.assertEqual(results[ophice.MOVE_LIMIT :], [None, None, None])
 
+	def test_throttled_move_still_keeps_the_spot(self):
+		# #2161: the server checks a chat's distance against this spot; a dropped one said "Move closer".
+		ophice.heartbeat(1, 1)
+		frappe.cache.delete_value(f"phamos_ophice_moves:{frappe.session.user}")
+		with patch.object(ophice.frappe, "publish_realtime") as publish:
+			for _ in range(ophice.MOVE_LIMIT):
+				ophice.move(2, 2)
+			publish.reset_mock()
+			self.assertIsNone(ophice.move(7, 8))
+		publish.assert_not_called()
+		self.assertEqual(ophice._position_of("Administrator"), (7.0, 8.0))
+
+	def test_reload_onto_someone_lands_next_to_them(self):
+		# #2160: someone walked onto my spot while I reloaded; on top of each other we got stuck.
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
+		ophice.save_my_position(10, 10)
+		self._put("someone@example.com", 10.2, 10)
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+			me = ophice.get_space()["me"]
+		self.assertGreaterEqual(ophice.math.hypot(me["x"] - 10.2, me["y"] - 10), ophice.START_SPOT_GAP)
+		self.assertLessEqual(ophice.math.hypot(me["x"] - 10, me["y"] - 10), 2)
+		# Saved, so the next reload keeps it.
+		self.assertEqual(ophice._stored_position(), {"x": me["x"], "y": me["y"]})
+
+	def test_reload_spot_stays_out_of_spaces(self):
+		# Review of !1349: the free spot must not put me into a meeting space I did not walk into.
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		frappe.get_doc(
+			{"doctype": ophice.AREA_DOCTYPE, "title": "Room", "kind": "Meeting", "x": 9, "y": 7, "width": 6, "height": 3}
+		).insert(ignore_permissions=True)
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
+		ophice.save_my_position(10, 10)
+		self._put("someone@example.com", 10, 10)
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+			me = ophice.get_space()["me"]
+		# The tile right above (10, 9) is free but inside the room.
+		self.assertGreaterEqual(me["y"], 10)
+		self.assertGreaterEqual(ophice.math.hypot(me["x"] - 10, me["y"] - 10), ophice.START_SPOT_GAP)
+
+	def test_reload_next_to_someone_stays(self):
+		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, frappe.session.user, ophice.time.time())
+		ophice.save_my_position(10, 10)
+		self._put("someone@example.com", 11, 10)
+		with patch.dict(frappe.conf, {ophice.DUMMIES_CONF_KEY: None}):
+			me = ophice.get_space()["me"]
+		self.assertEqual((me["x"], me["y"]), (10.0, 10.0))
+
 	def test_leave_removes_and_publishes(self):
 		ophice.heartbeat(1, 1)
 		with patch.object(ophice.frappe, "publish_realtime") as publish:
@@ -173,6 +220,8 @@ class OphiceEncounterTestCase(FrappeTestCase):
 				ignore_permissions=True
 			)
 		frappe.cache.delete_value(ophice.PRESENCE_CACHE_KEY)
+		# Independent of the site's map: no encounters inside its spaces with a call (rolled back).
+		frappe.db.delete(ophice.AREA_DOCTYPE)
 		self._put(self.A, 5, 5)
 		self._put(self.B, 6, 5)
 		self._put(self.C, 30, 20)
@@ -217,6 +266,35 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "evil.example/x?y", "ophice_video": None}):
 			self.assertIsNone(self._open(self.A, self.B)["video"])
 
+	def test_no_encounter_in_a_space_with_a_call(self):
+		"""A meeting space with a Jitsi link has its own call and chat: no encounter there."""
+		ophice.save_area("Call room", "https://meet.systemli.org/CallRoom", 4, 4, 2, 2)
+		# Checked by its message: "Move closer to chat." is a ValidationError too.
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
+			self._open(self.A, self.B)
+		# One of the two outside is not enough: the other one is still in the meeting.
+		self._put(self.B, 6.5, 5)
+		with self.assertRaisesRegex(frappe.ValidationError, "its own meeting"):
+			self._open(self.B, self.A)
+		frappe.set_user("Administrator")
+		self._put(self.A, 7, 5)
+		self._put(self.B, 8, 5)
+		self.assertTrue(self._open(self.A, self.B)["encounter"])
+
+	def test_no_encounter_unless_both_are_available(self):
+		"""Away or be right back (#2168): nobody starts a chat or call with me, nor I with anyone."""
+		for kind, until in (("away", (ophice.datetime.now(ophice.timezone.utc) + ophice.timedelta(hours=1)).isoformat()), ("brb", "")):
+			frappe.set_user(self.B)
+			ophice.set_status(kind, "", until)
+			with self.assertRaisesRegex(frappe.ValidationError, "^Not available right now.$"):
+				self._open(self.A, self.B)
+			with self.assertRaisesRegex(frappe.ValidationError, "^Set yourself to Available first.$"):
+				self._open(self.B, self.A)
+			self.assertFalse(frappe.db.exists("Ophice Encounter", {"pair_key": ophice._pair_key(self.A, self.B)}))
+			frappe.set_user(self.B)
+			ophice.set_status("")
+		self.assertTrue(self._open(self.A, self.B)["encounter"])
+
 	def test_both_pages_opening_at_once_get_the_same_encounter(self):
 		"""The page that loses the race to insert takes the winner's encounter (Pair Key unique)."""
 		first = self._open(self.A, self.B)
@@ -253,6 +331,13 @@ class OphiceEncounterTestCase(FrappeTestCase):
 	def test_too_far_apart(self):
 		with self.assertRaises(frappe.ValidationError):
 			self._open(self.A, self.C)
+
+	def test_other_not_on_the_map_is_said_so(self):
+		# #2161: they were reloading; "Move closer to chat" sent me looking for a problem that wasn't there.
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.B)
+		with self.assertRaises(frappe.ValidationError) as raised:
+			self._open(self.A, self.B)
+		self.assertEqual(str(raised.exception), "Not on the map right now.")
 
 	def test_messages_reach_both_and_stay_private(self):
 		encounter = self._open(self.A, self.B)["encounter"]
@@ -330,6 +415,24 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		self.assertIsNone(ophice.part_encounter(doc.name))
 		self._no_trace(doc, [])
 
+	def test_parting_waits_for_the_other_page(self):
+		# #2161: both pages part at the same moment. The other one burns the empty chat while this
+		# one waits for the pair's lock; this one then finds it gone instead of failing the delete.
+		encounter = self._open(self.A, self.B)["encounter"]
+		doc = frappe.db.get_value("Ophice Encounter", encounter, ophice.ENCOUNTER_FIELDS, as_dict=True)
+		lock = ophice._lock_pair
+		locked = []
+
+		def other_page_first(pair_key):
+			locked.append(pair_key)
+			ophice._burn(doc, silent=True)
+			lock(pair_key)
+
+		with patch.object(ophice, "_lock_pair", side_effect=other_page_first):
+			self.assertIsNone(ophice.part_encounter(encounter))
+		self.assertEqual(locked, [ophice._pair_key(self.A, self.B)])
+		self._no_trace(doc, [])
+
 	def test_meeting_again_cancels_the_burn(self):
 		doc = self._chat()
 		ophice.part_encounter(doc.name)
@@ -380,6 +483,25 @@ class OphiceEncounterTestCase(FrappeTestCase):
 				ophice.burn_due_encounters()
 		self.assertFalse(frappe.db.exists("Ophice Encounter", overdue.name))
 		self.assertEqual(frappe.db.get_value("Ophice Encounter", open_one, "status"), "Parting")
+
+	def test_leaving_locks_pairs_in_one_order(self):
+		# Review of !1349: a request locking several pairs takes them sorted by pair key, so two
+		# such requests never wait for each other in a circle. A–C is the newer chat, so the
+		# list comes newest first (A–C before A–B) unless it is sorted.
+		self._put(self.C, 5, 6)
+		self._open(self.A, self.B)
+		frappe.db.sql("UPDATE `tabOphice Encounter` SET modified = modified - INTERVAL 1 MINUTE")
+		self._open(self.A, self.C)
+		lock = ophice._lock_pair
+		locked = []
+
+		def record(pair_key):
+			locked.append(pair_key)
+			lock(pair_key)
+
+		with patch.object(ophice, "_lock_pair", side_effect=record), patch.object(ophice.frappe, "publish_realtime"):
+			ophice._part_all_mine(self.A)
+		self.assertEqual(locked, [ophice._pair_key(self.A, self.B), ophice._pair_key(self.A, self.C)])
 
 	def test_leaving_the_page_parts(self):
 		doc = self._chat()
@@ -1022,11 +1144,22 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 			if c.args and c.args[0] == ophice.EVENT_PRESENCE and c.args[1].get("user") == self.A
 		]
 		self.assertEqual(beams, [True, None])
-		# Moved away, then reloaded right after: no beam-in, the chip stays where it was.
+		# Moved away, a second tab while the chip is on the map: no beam-in, same spot.
 		ophice.save_my_position(5, 5)
 		again = ophice.get_space()
 		self.assertFalse(again["beam_in"])
 		self.assertEqual((again["me"]["x"], again["me"]["y"]), (5.0, 5.0))
+		# Reloaded right after a step (the page left first, with its spot; the delayed save had not
+		# gone out yet): beamed in again, at the spot it stood on (PM, 2026-11-22, 2026-11-23).
+		ophice.leave(6, 5)
+		reload = ophice.get_space()
+		self.assertTrue(reload["beam_in"])
+		self.assertEqual((reload["me"]["x"], reload["me"]["y"]), (6.0, 5.0))
+		self.assertTrue(ophice.heartbeat(5, 5).get("beam"))
+		# The chip dropped off the map (laptop asleep): the next heartbeat beams it in.
+		frappe.cache.hdel(ophice.PRESENCE_CACHE_KEY, self.A)
+		self.assertTrue(ophice.heartbeat(5, 5).get("beam"))
+		self.assertFalse(ophice.heartbeat(5, 5).get("beam"))
 		# Back after more than five minutes: beamed in again.
 		frappe.cache.hset(ophice.LAST_SEEN_CACHE_KEY, self.A, ophice.time.time() - ophice.ARRIVAL_GAP_SECONDS - 5)
 		self.assertTrue(ophice.get_space()["beam_in"])
@@ -1037,6 +1170,48 @@ class OphiceStartSpaceTestCase(_OphiceRoomBase):
 			frappe.cache.hdel(ophice.LAST_SEEN_CACHE_KEY, self.A)
 			me = ophice.get_space()["me"]
 			self.assertGreaterEqual(ophice.math.hypot(me["x"] - 20, me["y"] - 10), ophice.START_SPOT_GAP)
+
+
+class OphiceMeetingPinTestCase(_OphiceRoomBase):
+	"""Meeting points (PM, 2026-11-22): a pin for me and the people I chose, one per setter."""
+
+	def tearDown(self):
+		frappe.cache.delete_value(ophice.PIN_CACHE_KEY)
+		for user in (self.A, self.B):
+			frappe.cache.delete_value(ophice._pin_wait_key(user))
+		super().tearDown()
+
+	def _sent_to(self, event):
+		return [c.kwargs.get("user") for c in self.sent.call_args_list if c.args and c.args[0] == event]
+
+	def test_pin_reaches_the_chosen_people_and_replaces_my_last(self):
+		frappe.set_user(self.A)
+		pin = ophice.set_meeting_pin([self.B, "Guest", "nobody@example.com"], 7, 8)
+		self.assertEqual(pin["users"], [self.A, self.B])
+		self.assertEqual((pin["x"], pin["y"]), (7.0, 8.0))
+		self.assertEqual(sorted(self._sent_to(ophice.EVENT_PIN)), sorted([self.A, self.B]))
+		frappe.set_user(self.B)
+		self.assertEqual([p["by"] for p in ophice.get_space()["pins"]], [self.A])
+		# Right away again: wait a moment (each pin notifies everyone in it; AI review of !1303).
+		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_meeting_pin([self.B], 3, 3)
+		# A new one replaces the old one; removing it tells everyone.
+		frappe.cache.delete_value(ophice._pin_wait_key(self.A))
+		ophice.set_meeting_pin([self.B], 3, 3)
+		self.assertEqual(len(ophice._pins()), 1)
+		ophice.remove_meeting_pin()
+		self.assertEqual(ophice._pins(), {})
+		self.assertIn(self.B, self._sent_to(ophice.EVENT_PIN_REMOVED))
+
+	def test_pin_needs_someone_and_expires(self):
+		frappe.set_user(self.A)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_meeting_pin([self.A], 1, 1)
+		ophice.set_meeting_pin([self.B], 1, 1)
+		frappe.cache.hset(ophice.PIN_CACHE_KEY, self.A, {**frappe.cache.hget(ophice.PIN_CACHE_KEY, self.A), "until": 1})
+		frappe.set_user(self.B)
+		self.assertEqual(ophice.get_space()["pins"], [])
 
 
 class OphiceCockpitBarTestCase(FrappeTestCase):

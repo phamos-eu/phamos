@@ -58,6 +58,9 @@ const navItems = [
 			},
 		],
 	},
+	// Hours only, no currency (#1975)
+	{ name: "TeamStatistics", label: "Statistics", icon: "bar-chart-2", match: ["TeamStatistics"] },
+	{ name: "TeamImplementations", label: "Implementations", icon: "layers", match: ["TeamImplementations"] },
 ]
 
 const teamGroups = computed(() => [
@@ -109,6 +112,8 @@ const pageTitle = computed(() => {
 		return "Tasks"
 	}
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
+	if (route.name === "TeamStatistics") return "Statistics"
+	if (route.name === "TeamImplementations") return "Implementations"
 	return "Issues"
 })
 
@@ -128,6 +133,8 @@ const pageSubtitle = computed(() => {
 	if (route.name === "IssuesList" || route.name === "IssueDetail") {
 		return "Team issues"
 	}
+	if (route.name === "TeamStatistics") return "Logged against available hours"
+	if (route.name === "TeamImplementations") return "The team's implementations, in hours"
 	return "Team issues overview"
 })
 </script>

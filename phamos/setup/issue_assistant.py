@@ -18,6 +18,8 @@ ASSISTANT_EMAIL = "issue-assistant@phamos.eu"
 SETTINGS = "Issue Assistant Settings"
 HANDLERS = "phamos.ai_agents.agents.issue"
 GATE_SKILL_NAME = "Check AI gate"
+IDENTIFY_SKILL_NAME = "Identify sender and links"
+CLASSIFY_SKILL_NAME = "Classify with AI model"
 CUSTOMER_SECTION = "custom_implementation_specific"
 AI_ALLOWED_FIELD = "custom_ai_processing_allowed"
 
@@ -75,7 +77,10 @@ def after_migrate():
 	bot = ensure_raven_bot()
 	ensure_settings(user)
 	ensure_agent(user, bot)
+	ensure_identify_skill()
+	ensure_classify_skill()
 	ensure_customer_fields()
+	switch_on_own_implementation(user)
 
 
 def ensure_role():
@@ -182,8 +187,77 @@ def ensure_agent(user, bot):
 		).insert(ignore_permissions=True)
 
 
+def ensure_identify_skill():
+	"""Sender, Customer, Contact, Implementation and Project in code (#2112), before Classify."""
+	if frappe.db.exists("AI Skill", {"agent": ASSISTANT_NAME, "handler": "identify"}):
+		return
+	frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": IDENTIFY_SKILL_NAME,
+			"agent": ASSISTANT_NAME,
+			"enabled": 1,
+			"phase": "Identify",
+			"order": 10,
+			"handler": "identify",
+			"on_fail": "Continue",
+			"description": "Finds the sender's Employee, Contact and Customer, then the Implementation and the open "
+			"Project, in code. Fills only empty fields on a strong match (Phriend's default project counts as "
+			"empty); asks in the brief when there are several candidates; checks the AI gate again afterwards.",
+		}
+	).insert(ignore_permissions=True)
+
+
+def ensure_classify_skill():
+	"""The model's step (#2113). Runs only when the gate allowed it (checked in the handler too)."""
+	if frappe.db.exists("AI Skill", {"agent": ASSISTANT_NAME, "handler": "classify"}):
+		return
+	frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": CLASSIFY_SKILL_NAME,
+			"agent": ASSISTANT_NAME,
+			"enabled": 1,
+			"phase": "Classify",
+			"order": 10,
+			"handler": "classify",
+			"gate_on_previous": 1,
+			"on_fail": "Continue",
+			"description": "The AI model reads the Issue (text and Phriend screenshot) and picks Issue Type, Priority "
+			"and a person from lists built in code; writes only empty fields on strong confidence, never the "
+			"reporter's priority; assigns the person itself only on strong confidence and priority High.",
+		}
+	).insert(ignore_permissions=True)
+
+
 def ensure_customer_fields():
 	if frappe.get_meta("Customer").has_field(AI_ALLOWED_FIELD):
 		return
 	create_custom_fields({"Customer": [{**f, "module": "AI Agents"} for f in CUSTOMER_FIELDS]}, update=False)
 
+
+OWN_IMPLEMENTATION_SEEDED = "issue_assistant_own_implementation_switched_on"
+
+
+def switch_on_implementation(implementation, user):
+	"""Let the assistant work on Issues of this Implementation (#2114): a User Permission of its user,
+	limited to reading Implementations, so it hides no Issue or Project from the assistant."""
+	filters = {"user": user, "allow": "Implementation", "for_value": implementation}
+	if frappe.db.exists("User Permission", filters):
+		return
+	frappe.get_doc({"doctype": "User Permission", **filters, "apply_to_all_doctypes": 0,
+		"applicable_for": "Implementation"}).insert(ignore_permissions=True)
+
+
+def switch_on_own_implementation(user):
+	"""Once per site: switch the assistant on for phamos' own Implementation (Phriend Settings "System
+	Implementation"). A flag, not the presence of entries, says it was done, so switching it off again
+	stays off after the next migrate."""
+	if frappe.db.get_global(OWN_IMPLEMENTATION_SEEDED):
+		return
+	implementation = frappe.db.get_single_value("Phriend Settings", "system_implementation") \
+		if frappe.db.exists("DocType", "Phriend Settings") else None
+	if not implementation or not frappe.db.exists("Implementation", implementation):
+		return
+	switch_on_implementation(implementation, user)
+	frappe.db.set_global(OWN_IMPLEMENTATION_SEEDED, 1)

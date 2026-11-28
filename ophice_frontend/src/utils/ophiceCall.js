@@ -4,51 +4,91 @@
  * Address of the call page: the room on its Jitsi host, with my name filled in.
  * @param {{ domain: string, room: string }} video  the call: an encounter's (open_encounter) or an area's
  * @param {string} displayName  my name in the call
+ * @param {{ startOff?: boolean }} options  startOff: I was approached (#2165), see jitsiStartConfig
  * @returns {string} the URL, or "" without a call
  */
-export function jitsiCallUrl(video, displayName = "") {
+export function jitsiCallUrl(video, displayName = "", { startOff = false } = {}) {
 	const domain = String(video?.domain || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")
 	const room = String(video?.room || "").trim()
 	if (!domain || !room || /[/\\?#@\s]/.test(domain)) return ""
 	// Jitsi reads settings from the fragment as JSON values; the fragment never reaches a server.
-	// Whoever opens the call wants to talk: mic and camera on, straight in without the pre-join
-	// screen (#2108). The browser still asks once for the permission to use them.
+	// The same start as the embedded call (jitsiStartConfig).
 	const settings = [
-		"config.startWithAudioMuted=false",
-		"config.startWithVideoMuted=false",
+		`config.startWithAudioMuted=${startOff}`,
+		`config.startWithVideoMuted=${startOff}`,
 		"config.prejoinConfig.enabled=false",
 		// The legacy name of the same switch, for older self-hosted Jitsi: keep both.
 		"config.prejoinPageEnabled=false",
 	]
+	if (startOff) settings.push("config.disableInitialGUM=true")
 	if (displayName) settings.push(`userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName))}`)
 	return `https://${domain}/${encodeURIComponent(room)}#${settings.join("&")}`
 }
+
+/**
+ * Start settings of the embedded call. Whoever walks up starts with mic and camera on, straight in
+ * without the pre-join screen (#2108); the browser still asks once for the permission. The person
+ * being approached (#2165) joins at once too and hears the other, but with both off, and Jitsi
+ * touches no device yet (disableInitialGUM: no camera light, no mic indicator). They turn them on
+ * themselves, with the call's buttons (PM, 2026-11-27).
+ * @param {{ startOff?: boolean }} options
+ */
+export function jitsiStartConfig({ startOff = false } = {}) {
+	return {
+		startWithAudioMuted: startOff,
+		startWithVideoMuted: startOff,
+		...(startOff ? { disableInitialGUM: true } : {}),
+		prejoinPageEnabled: false,
+		prejoinConfig: { enabled: false },
+	}
+}
+
+/**
+ * How a chat with someone opens (#2165, #2168).
+ * - fromPeer: the other person walked up and started it; my page only follows.
+ * - answer: I answer someone who came over (a walk-up ping), by my own action.
+ * @returns {{ callOff: boolean, backToAvailable: boolean }} callOff: my call starts with mic and
+ *   camera off (I was approached); backToAvailable: my Away / Be right back status goes first,
+ *   because I start or answer it myself (the server only lets Available people meet).
+ */
+export function encounterOpening({ fromPeer = false, answer = false } = {}) {
+	return { callOff: fromPeer || answer, backToAvailable: !fromPeer }
+}
+
+// Buttons of the embedded call's Jitsi toolbar; Jitsi hides every button not listed. "desktop" is
+// screen sharing: always there, for everyone (#2136). No "videoquality" (Jitsi's performance
+// settings): our own quality button in the call's bar does that.
+export const JITSI_TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "tileview", "hangup"]
 
 /** Window name of the call: opening it again brings the same window back. */
 export function encounterCallWindowName(video) {
 	return `ophice-call-${String(video?.room || "").replace(/[^A-Za-z0-9_-]/g, "")}`
 }
 
-// --- The bubble with the embedded call (#2108): no title bar; chat (with both chips) on the left,
-// video in the middle, a slim bar of buttons on the right. It is moved and resized freely within
-// these rules:
+// --- The bubble with the embedded call (#2108): a slim top bar (own window, "Esc to close", #2135);
+// below it the chat (with both chips) on the left and the video on the right. It is moved and
+// resized freely within these rules:
 // - the video between 16:9 (widest) and 1:1 (tallest); the chat takes the rest of the width
 // - the chat at least 144px (half its old fixed width)
+// - the line between chat and video can be dragged (#2135): a wider chat narrows the video down
+//   to 1:1, not further
 export const CALL_PAD = 16 // the video's inset, 8px on each side
 export const CALL_BORDER = 1 // between chat and video
-export const CALL_SIDEBAR = 41 // the button bar on the right, with its border
+export const CALL_HEADER = 36 // the top bar (h-9), its border inside
 export const CALL_CHAT_MIN = 144
 // The chat column needs room for the two chips, a message and the text field.
 export const CALL_MIN_H = 240
-const SIDES = CALL_BORDER + CALL_PAD + CALL_SIDEBAR
+const SIDES = CALL_BORDER + CALL_PAD
+const TOP = CALL_HEADER + CALL_PAD
 // Tallest bubble for a width: a square video next to the smallest chat.
-export const callMaxHeight = (w) => w - SIDES - CALL_CHAT_MIN + CALL_PAD
+export const callMaxHeight = (w) => w - SIDES - CALL_CHAT_MIN + TOP
 export const CALL_MIN_W = CALL_MIN_H - callMaxHeight(0)
 // The old size: chat 288 and a 768 x 432 video.
-export const CALL_DEFAULT = { w: 288 + SIDES + 768, h: CALL_PAD + 432 }
+export const CALL_DEFAULT = { w: 288 + SIDES + 768, h: TOP + 432 }
 
 /**
- * The size shown for a wanted size, inside a stage of view.width x view.height.
+ * The size shown for a wanted size, inside a stage of view.width x view.height. `size.chat` is the
+ * chat width the user dragged to (#2135); without it the video takes all it may (16:9).
  * @returns {{ w: number, h: number, videoW: number, videoH: number, chatW: number }}
  */
 export function callBox(size, view) {
@@ -56,9 +96,20 @@ export function callBox(size, view) {
 	const vh = view?.height || Infinity
 	const w = Math.max(CALL_MIN_W, Math.min(vw, size?.w || CALL_DEFAULT.w))
 	const h = Math.max(CALL_MIN_H, Math.min(vh, callMaxHeight(w), size?.h || CALL_DEFAULT.h))
-	const videoH = h - CALL_PAD
-	const videoW = Math.max(videoH, Math.min(Math.round((videoH * 16) / 9), w - SIDES - CALL_CHAT_MIN))
+	const videoH = h - TOP
+	const room = w - SIDES - CALL_CHAT_MIN
+	const wanted = Number.isFinite(size?.chat) ? w - SIDES - size.chat : Infinity
+	// The wanted chat narrows the video, down to square (PM, 2026-11-25).
+	const videoW = Math.max(videoH, Math.min(Math.round((videoH * 16) / 9), room, wanted))
 	return { w, h, videoW, videoH, chatW: w - SIDES - videoW }
+}
+
+/**
+ * Drag the line between chat and video (#2135): the chat width as shown after moving it by dx.
+ * Stored as shown, so a drag past the 1:1 limit doesn't jump back later.
+ */
+export function splitCall(size, chatW, dx, view) {
+	return callBox({ ...size, chat: Math.max(CALL_CHAT_MIN, chatW + dx) }, view).chatW
 }
 
 /**
