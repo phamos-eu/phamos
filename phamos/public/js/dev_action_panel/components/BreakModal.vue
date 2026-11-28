@@ -1,19 +1,19 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
+  projects: { type: Array, required: true }, // get_dev_all_projects rows, last used first
 });
 const emit = defineEmits(["confirm", "skip", "close"]);
 
 const project = ref("");
 const projectLabel = ref("");
-const projectResults = ref([]);
 const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
-const percentBillable = ref(100);
+const percentBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const valueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
   valueAdd: __("Value Add (%)"),
@@ -25,57 +25,45 @@ const goalRef = ref(null);
 const liveNow = ref(new Date());
 
 let liveInterval = null;
-let searchTimer = null;
 
 const ACTIVITY_TYPES = ["Working Alone", "Working with Customer", "Working With Team"];
 
 const billableOptions = RATING_OPTIONS.map((value) => ({ value, label: `${value}%` }));
 
-onMounted(async () => {
+onMounted(() => {
   goalRef.value?.focus();
   liveInterval = setInterval(() => { liveNow.value = new Date(); }, 1000);
-  await fetchProjects("");
 });
 
-onUnmounted(() => { clearInterval(liveInterval); clearTimeout(searchTimer); });
+onUnmounted(() => clearInterval(liveInterval));
 
-async function fetchProjects(term) {
-  const filters = [["status", "=", "Open"]];
-  if (term) filters.push(["project_name", "like", `%${term}%`]);
-  const r = await frappe.call({
-    method: "frappe.client.get_list",
-    args: { doctype: "Project", filters, fields: ["name", "project_name"], limit: 50, order_by: "project_name asc" },
-  });
-  projectResults.value = r.message || [];
-}
+const projectResults = computed(() => {
+  const q = projectLabel.value.trim().toLowerCase();
+  return props.projects
+    .filter((p) => p.status === "Open")
+    .filter((p) => !q || `${p.project_name || ""} ${p.name}`.toLowerCase().includes(q))
+    .slice(0, 50);
+});
 
 function onSearchInput() {
   project.value = "";
   showDropdown.value = true;
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => fetchProjects(projectLabel.value), 300);
 }
 
 function onSearchFocus() {
   showDropdown.value = true;
-  if (!projectResults.value.length) fetchProjects(projectLabel.value);
 }
 
 function onSearchBlur() {
   setTimeout(() => { showDropdown.value = false; }, 150);
 }
 
-async function selectProject(p) {
+function selectProject(p) {
   project.value = p.name;
   projectLabel.value = p.project_name || p.name;
   showDropdown.value = false;
-  const r = await frappe.call({
-    method: "phamos.phamos.timesheet_utils.get_billing_context",
-    args: { project: p.name },
-  });
-  if (project.value !== p.name) return; // another project was picked meanwhile
-  // Preset Percent Billable from the picked project, 100 when it has none (#1744).
-  percentBillable.value = billablePreset(r.message);
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  percentBillable.value = percentBillablePreset(p.percent_billable);
 }
 
 const breakDuration = computed(() => {

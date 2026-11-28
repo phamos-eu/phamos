@@ -7,7 +7,7 @@
 	"scope": "/project-management-cockpit",
 	"display": "standalone",
 	"background_color": "#f8f8f8",
-	"theme_color": "#f8f8f8",
+	"theme_color": "#6d28d9",
 	"icons": [
 		{
 			"src": "/assets/phamos/manifest/project-management-icon-192.png",

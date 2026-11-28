@@ -1,0 +1,157 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 22:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "implementation",
+  "chapter",
+  "column_break_head",
+  "status",
+  "target_date",
+  "gitlab_release",
+  "section_break_check",
+  "fit",
+  "column_break_check",
+  "effort_hours",
+  "column_break_check2",
+  "capacity_hours",
+  "section_break_features",
+  "features",
+  "milestones"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "description": "What this release brings, e.g. \"Warehouse go-live\"."
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "chapter",
+   "fieldtype": "Link",
+   "label": "Chapter",
+   "options": "Implementation Chapter",
+   "description": "Optional. A chapter can have several releases; a maintenance release stands alone."
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Planned\nIn Progress\nReleased\nCancelled",
+   "default": "Planned"
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Target Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "gitlab_release",
+   "fieldtype": "Link",
+   "label": "GitLab Release",
+   "options": "GitLab Release",
+   "description": "Linked automatically when GitLab publishes a release with this release's milestones."
+  },
+  {
+   "fieldname": "section_break_check",
+   "fieldtype": "Section Break",
+   "label": "Realistic Check"
+  },
+  {
+   "fieldname": "fit",
+   "fieldtype": "Select",
+   "label": "Traffic Light",
+   "options": "\nGreen\nAmber\nRed",
+   "read_only": 1,
+   "description": "Green: everything fits. Amber: everything fits, but with less than 20% buffer. Red: some ranked features do not fit before the target date."
+  },
+  {
+   "fieldname": "column_break_check",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "effort_hours",
+   "fieldtype": "Float",
+   "label": "Open Effort (Hours)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_check2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "capacity_hours",
+   "fieldtype": "Float",
+   "label": "Available Capacity (Hours)",
+   "read_only": 1,
+   "description": "Team capacity from today to the target date, minus leave and holidays, times the agreed share, minus the effort of earlier releases."
+  },
+  {
+   "fieldname": "section_break_features",
+   "fieldtype": "Section Break",
+   "label": "Contents"
+  },
+  {
+   "fieldname": "features",
+   "fieldtype": "Table",
+   "label": "Features (ranked)",
+   "options": "Implementation Release Feature",
+   "description": "The order is the priority. Features below the cut line do not fit before the target date."
+  },
+  {
+   "fieldname": "milestones",
+   "fieldtype": "Table MultiSelect",
+   "label": "GitLab Milestones",
+   "options": "Implementation Release Milestone"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Release",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "REL-.#####",
+ "title_field": "title",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}

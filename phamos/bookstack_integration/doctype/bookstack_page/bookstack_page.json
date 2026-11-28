@@ -22,6 +22,9 @@
   "revision_count",
   "section_content",
   "url",
+  "content_updated_at",
+  "html",
+  "search_text",
   "section_meta",
   "owned_by",
   "created_at",
@@ -130,6 +133,28 @@
    "read_only": 1,
    "options": "URL",
    "length": 500
+  },
+  {
+   "description": "Updated At of the copied content. Filled by the sync for pages of books published on the website.",
+   "fieldname": "content_updated_at",
+   "fieldtype": "Datetime",
+   "label": "Content Updated At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "html",
+   "fieldtype": "Long Text",
+   "label": "Content (HTML)",
+   "read_only": 1
+  },
+  {
+   "description": "Plain text of the website copy, for the documentation search (#2046).",
+   "fieldname": "search_text",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Search Text",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "section_meta",

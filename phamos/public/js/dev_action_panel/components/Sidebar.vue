@@ -11,14 +11,12 @@ const props = defineProps({
   myIssuesCount: Number,
   mineOnly: Boolean,
   syncing: Boolean,
-  projectsFilter: String,
-  myProjectsCount: Number,
   allProjectsCount: Number,
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects", "open-session", "pause-session", "resume-session", "stop-session"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -73,7 +71,16 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     </div>
 
     <!-- Active session widget -->
-    <div v-if="displaySession" class="sb__session" :class="isRunning ? 'sb__session--running' : 'sb__session--paused'">
+    <div
+      v-if="displaySession"
+      class="sb__session sb__session--clickable"
+      :class="isRunning ? 'sb__session--running' : 'sb__session--paused'"
+      role="button"
+      tabindex="0"
+      title="Open the running timesheet"
+      @click="emit('open-session')"
+      @keydown.enter="emit('open-session')"
+    >
       <div class="sb__session-head">
         <span class="sb__dot" :class="isRunning ? 'dot--green' : 'dot--amber'"></span>
         <span class="sb__session-state">{{ isRunning ? "Running" : "Paused" }}</span>
@@ -81,6 +88,21 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
         <span class="sb__session-timer">{{ fmtElapsed(displayElapsed) }}</span>
       </div>
       <div class="sb__session-goal">{{ displaySession.goal }}</div>
+      <!-- Pause / Resume / Stop right here, without opening the card (.stop keeps the widget click off) -->
+      <div class="sb__session-actions" @click.stop @keydown.enter.stop>
+        <button v-if="isRunning" class="sb__sess-btn sb__sess-btn--pause" title="Pause" @click="emit('pause-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          Pause
+        </button>
+        <button v-else class="sb__sess-btn sb__sess-btn--resume" title="Resume" @click="emit('resume-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Resume
+        </button>
+        <button class="sb__sess-btn sb__sess-btn--stop" title="Stop and submit this timesheet" @click="emit('stop-session')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+          Stop
+        </button>
+      </div>
     </div>
 
     <!-- Issues filter: Mine / All -->
@@ -88,7 +110,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     <nav class="sb__nav">
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && mineOnly }"
         @click="selectIssueView(true)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -99,7 +121,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       </button>
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': !mineOnly }"
+        :class="{ 'sb__nav-item--active': currentView === 'issues' && !mineOnly }"
         @click="selectIssueView(false)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -135,20 +157,10 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     <!-- Projects -->
     <div class="sb__section-label">Projects</div>
     <nav class="sb__nav">
+      <!-- One project list (last used first, then assigned to me); "My Projects" was merged into it -->
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'my' }"
-        @click="emit('navigate-projects', 'my')"
-      >
-        <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
-        <span class="sb__nav-label">My Projects</span>
-        <span class="sb__nav-count">{{ myProjectsCount }}</span>
-      </button>
-      <button
-        class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'all' }"
+        :class="{ 'sb__nav-item--active': currentView === 'projects' }"
         @click="emit('navigate-projects', 'all')"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -223,6 +235,8 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 
 /* Active session */
 .sb__session { margin: 10px 10px 0; padding: 10px 12px; border-radius: 8px; flex-shrink: 0; }
+.sb__session--clickable { cursor: pointer; transition: box-shadow 0.12s; }
+.sb__session--clickable:hover, .sb__session--clickable:focus-visible { box-shadow: 0 0 0 2px var(--primary); outline: none; }
 .sb__session--running { background: var(--green-50, #f0fdf4); border: 1px solid var(--green-200, #bbf7d0); }
 .sb__session--paused  { background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fef08a); }
 .sb__session-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -234,6 +248,16 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 .sb__session-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: var(--blue-50, #eff6ff); color: var(--primary); border-radius: 3px; padding: 1px 5px; flex-shrink: 0; }
 .sb__session-timer { font-family: var(--font-monospace, monospace); font-size: 12.5px; font-weight: 700; color: var(--text-color); }
 .sb__session-goal { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb__session-actions { display: flex; gap: 6px; margin-top: 8px; cursor: default; }
+.sb__sess-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 4px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color);
+}
+.sb__sess-btn--pause  { color: var(--yellow-700, #a16207); border-color: var(--yellow-300, #fde047); }
+.sb__sess-btn--resume { color: var(--green-700, #15803d); border-color: var(--green-300, #86efac); }
+.sb__sess-btn--stop   { color: var(--red-600, #dc2626); border-color: var(--red-300, #fca5a5); }
+.sb__sess-btn:hover   { background: var(--control-bg); }
 
 /* Section label */
 .sb__section-label { padding: 14px 14px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); flex-shrink: 0; }

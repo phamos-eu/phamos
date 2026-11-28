@@ -13,6 +13,7 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from phamos.marketing.crm import ensure_lead_source
+from phamos.marketing.defaults import LEAD_DIRECTION_FIELD, LEAD_SOURCE_DIRECTIONS
 
 TICKETING_ROLE = "Event Ticketing"
 TICKETING_USER = "event-ticketing@phamos.invalid"
@@ -57,9 +58,31 @@ SALES_DOCUMENT_FIELDS = {
 }
 
 
+# Inbound / Outbound (phamos/phamos#574). On Lead in the existing first section, next to the follow-up date;
+# required on new leads only, which ``crm.lead_set_direction`` enforces (``mandatory_depends_on`` marks it in Desk).
+_DIRECTION = {"fieldname": LEAD_DIRECTION_FIELD, "fieldtype": "Select", "label": "Inbound / Outbound",
+	"options": "\nInbound\nOutbound", "module": "Marketing"}
+LEAD_DIRECTION_FIELDS = {
+	"Lead": [{**_DIRECTION, "insert_after": "custom_next_followup", "in_list_view": 1, "in_standard_filter": 1,
+		"mandatory_depends_on": "eval:doc.__islocal", "search_index": 1,
+		"description": "Inbound: they came to us (website, email, event). Outbound: we went to them."}],
+	"Lead Source": [{**_DIRECTION, "insert_after": "source_name", "in_list_view": 1,
+		"description": "Filled into a Lead when this source is chosen."}],
+}
+
+
 def after_migrate():
 	ensure_lead_source()
 	ensure_sales_document_fields()
+	ensure_lead_direction()
+
+
+def ensure_lead_direction():
+	"""Fields, and the default direction of the standard Lead Sources where none is set yet."""
+	create_custom_fields(LEAD_DIRECTION_FIELDS, update=True)
+	for source, direction in LEAD_SOURCE_DIRECTIONS.items():
+		if frappe.db.exists("Lead Source", source) and not frappe.db.get_value("Lead Source", source, LEAD_DIRECTION_FIELD):
+			frappe.db.set_value("Lead Source", source, LEAD_DIRECTION_FIELD, direction, update_modified=False)
 
 
 def ensure_sales_document_fields():

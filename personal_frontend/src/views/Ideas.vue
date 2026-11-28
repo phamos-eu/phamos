@@ -64,6 +64,9 @@
 										{{ row.children_count === 1 ? __("1 idea came out of it") : __("{0} ideas came out of it", [row.children_count]) }}
 									</span>
 									<span v-if="row.spawned_from_title">{{ __("from {0}", [row.spawned_from_title]) }}</span>
+									<span v-if="row.vote_status" class="inline-flex items-center gap-1 text-ink-green-3">
+										<FeatherIcon name="thumbs-up" class="h-3 w-3" />{{ voteLabel(row.vote_count) }}
+									</span>
 									<span class="ml-auto whitespace-nowrap text-ink-gray-6">{{ __(row.stage) }}</span>
 								</div>
 							</router-link>
@@ -84,7 +87,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import { summaryWithoutTitle } from "@spa/utils/ideaSummary.js"
 import { notify } from "@spa/utils/notify.js"
-import { ageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas } from "../ideasStore.js"
+import { ageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas, voteLabel } from "../ideasStore.js"
 
 const route = useRoute()
 const router = useRouter()

@@ -18,7 +18,8 @@
 					/>
 				</div>
 
-				<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+				<!-- Privacy mode (#1839): figures blur until "Show data"; names stay readable. -->
+				<Sensitive tag="section" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					<StatCard
 						label="Active FTE"
 						:value="formatNumber(data.active_fte)"
@@ -42,9 +43,11 @@
 						hint="Active employees with no contract"
 						:lines="data.drafts ? [`${data.drafts} draft contracts waiting`] : []"
 					/>
-				</section>
+				</Sensitive>
 
-				<ContractTrendChart v-if="data.trend?.months?.length" :trend="data.trend" />
+				<Sensitive v-if="data.trend?.months?.length" tag="div">
+					<ContractTrendChart :trend="data.trend" />
+				</Sensitive>
 
 				<div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
@@ -59,7 +62,7 @@
 							@click="openContract(row.name)"
 						>
 							<span class="truncate font-medium text-ink-gray-9">{{ row.employee_name }}</span>
-							<span class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.valid_until) }}</span>
+							<Sensitive class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.valid_until) }}</Sensitive>
 						</button>
 					</section>
 
@@ -76,9 +79,9 @@
 						>
 							<span class="min-w-0">
 								<span class="block truncate font-medium text-ink-gray-9">{{ row.employee_name }}</span>
-								<span class="block text-xs text-ink-gray-5">{{ formatPercent(row.fte_percentage) }} · {{ formatHours(row.weekly_hours) }}</span>
+								<Sensitive class="block text-xs text-ink-gray-5">{{ formatPercent(row.fte_percentage) }} · {{ formatHours(row.weekly_hours) }}</Sensitive>
 							</span>
-							<span class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.effective_from) }}</span>
+							<Sensitive class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.effective_from) }}</Sensitive>
 						</button>
 					</section>
 
@@ -111,6 +114,7 @@ import { onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,

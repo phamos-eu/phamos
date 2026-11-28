@@ -25,7 +25,7 @@
 			<dl class="grid grid-cols-2 gap-4 text-sm lg:grid-cols-3">
 				<div v-for="item in facts" :key="item.label">
 					<dt class="text-xs text-ink-gray-5">{{ item.label }}</dt>
-					<dd class="mt-1 font-medium tabular-nums text-ink-gray-9">{{ item.value }}</dd>
+					<dd class="mt-1 font-medium tabular-nums text-ink-gray-9"><Sensitive>{{ item.value }}</Sensitive></dd>
 				</div>
 			</dl>
 			<p v-if="contract.superseded_by" class="mt-4 text-sm text-ink-gray-6">
@@ -73,6 +73,7 @@ import { call, Dialog } from "frappe-ui"
 import { notifySuccess } from "@spa/utils/notify.js"
 import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,

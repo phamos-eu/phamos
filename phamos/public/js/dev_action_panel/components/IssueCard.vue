@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
-import DateTimePicker from "./DateTimePicker.vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
+import FrappeDatetime from "./FrappeDatetime.vue";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, percentBillablePreset } from "../timesheetRating.js";
 
 function labelNames(labels) {
   if (!labels) return [];
@@ -32,12 +32,13 @@ const loadingSessions = ref(false);
 // Start form
 const expectedHours = ref(1);
 const startGoal = ref("");
-const startTimeDate = ref(new Date());
+// System time zone string from the Frappe Datetime control (shown in the user's time zone)
+const startTime = ref("");
 const startTimeModified = ref(false);
 
 // Stop form
 const stopResult = ref("");
-const stopBillable = ref(100);
+const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopValueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
   valueAdd: __("Value Add (%)"),
@@ -45,7 +46,7 @@ const labels = {
   percentBillable: __("Percent Billable"),
 };
 const stopActivityType = ref("");
-const stopEndTimeDate = ref(new Date());
+const stopEndTime = ref("");
 const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
 
@@ -54,21 +55,10 @@ const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
 const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
 const systemTz = frappe.boot?.time_zone?.system || "";
 
-// Format a Date whose local h/m values are the user's intended user-tz time → system-tz string for backend
-function formatForApi(date) {
-  if (!date) return null;
-  const pad = n => String(n).padStart(2, "0");
-  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
-  const uTz = frappe.boot?.time_zone?.user;
-  const sTz = frappe.boot?.time_zone?.system;
-  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
-    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
-  }
-  return localStr;
-}
+const systemNow = () => frappe.datetime.system_datetime();
 
-function onStartTimeChange(date) { startTimeDate.value = date; startTimeModified.value = true; }
-function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+function onStartTimeChange(value) { startTime.value = value; startTimeModified.value = true; }
+function onStopEndTimeChange(value) { stopEndTime.value = value; stopEndTimeModified.value = true; }
 
 function parseSystemDatetimeToUserDate(dtStr) {
   if (!dtStr || typeof dtStr !== "string") return null;
@@ -152,22 +142,23 @@ const due = computed(() => {
 function openStart() {
   panel.value = panel.value === "start" ? null : "start";
   stopResult.value = "";
-  startTimeDate.value = new Date();
+  startTime.value = systemNow();
   startTimeModified.value = false;
 }
 function openStop() {
   panel.value = panel.value === "stop" ? null : "stop";
   stopValueAdd.value = VALUE_ADD_DEFAULT;
-  stopBillable.value = billablePreset(props.activeSession);
+  // The project's preset: 100 for a customer project, 0 for phamos' own (#1896).
+  stopBillable.value = percentBillablePreset(props.activeSession?.project_percent_billable);
   const now = new Date();
   const fromDate = parseSystemDatetimeToUserDate(props.activeSession?.from_time);
 
   // Keep existing "now" behavior for today's sessions, but preserve retroactive dates.
   if (fromDate && !isNaN(fromDate) && !isSameCalendarDate(fromDate, now)) {
-    stopEndTimeDate.value = new Date(fromDate);
+    stopEndTime.value = props.activeSession.from_time;
     stopEndTimeModified.value = true;
   } else {
-    stopEndTimeDate.value = now;
+    stopEndTime.value = systemNow();
     stopEndTimeModified.value = false;
   }
 }
@@ -176,7 +167,7 @@ function closePanel() { panel.value = null; }
 function confirmStart() {
   if (!expectedHours.value || expectedHours.value < 0.25) { frappe.msgprint(__("Minimum 0.25h")); return; }
   const payload = { issue: props.issue, expectedTime: Math.round(parseFloat(expectedHours.value) * 3600), goal: startGoal.value.trim() || null };
-  if (startTimeModified.value) payload.manualStartTime = formatForApi(startTimeDate.value);
+  if (startTimeModified.value && startTime.value) payload.manualStartTime = startTime.value;
   emit("start", payload);
   panel.value = null; startGoal.value = "";
 }
@@ -189,7 +180,7 @@ function confirmStop() {
     percentBillable: stopBillable.value,
     activityType: stopActivityType.value,
   };
-  if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
+  if (stopEndTimeModified.value && stopEndTime.value) payload.manualEndTime = stopEndTime.value;
   emit("stop", payload);
   panel.value = null; stopResult.value = ""; stopActivityType.value = "";
 }
@@ -332,7 +323,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
             </div>
             <div class="ic__panel-field ic__panel-field--grow">
               <label class="ic__panel-label">Start time <span class="ic__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="startTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!startTimeModified" @update:model-value="onStartTimeChange" />
+              <FrappeDatetime :model-value="startTime" @update:model-value="onStartTimeChange" />
             </div>
           </div>
           <div class="ic__panel-field ic__panel-field--full">
@@ -406,7 +397,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
             </div>
             <div class="ic__panel-field ic__panel-field--grow">
               <label class="ic__panel-label">End time <span class="ic__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
+              <FrappeDatetime :model-value="stopEndTime" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="ic__panel-actions ic__panel-actions--end">
               <button class="ic__panel-btn ic__panel-btn--ghost" @click="closePanel">

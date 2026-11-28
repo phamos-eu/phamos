@@ -1,6 +1,6 @@
 <template>
-	<!-- Wide screens: a permanent column of the Issue view (#issue-chat-host in IssuesInbox).
-	     Below lg, or where the view has no such column, it covers the page from the right. -->
+	<!-- On the Issue view: the chat panel's tile (#issue-chat-host, panels/ChatDockHost) while it is
+	     open. Elsewhere (Task, Idea) it covers the page from the right. -->
 	<Teleport :to="inColumn ? '#issue-chat-host' : 'body'">
 		<Transition
 			:enter-active-class="inColumn ? '' : 'transition-transform duration-200 ease-out'"
@@ -15,7 +15,14 @@
 				:aria-label="__('Chat about {0}', [title])"
 				@keydown.escape="close"
 			>
-				<header class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
+				<!-- In a tile the tile's title bar says "Chat" and holds "Open in Raven" (below), so the
+				     chat needs no header row of its own (#1917). -->
+				<!-- In a tile without a title-bar slot (should not happen), keep the header so "Open in
+				     Raven" never disappears. -->
+				<header
+					v-if="!inColumn || (url && slotMissing)"
+					class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3"
+				>
 					<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 					<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
 					<Button
@@ -37,6 +44,17 @@
 						<FeatherIcon name="x" class="h-4 w-4" />
 					</Button>
 				</header>
+				<Teleport v-if="inColumn && url && titleSlot" :to="titleSlot">
+					<button
+						type="button"
+						class="flex h-5 min-w-0 items-center gap-1 rounded px-1.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+						:title="__('Open this chat in Raven, in a new window')"
+						@click="openInRaven"
+					>
+						<FeatherIcon name="external-link" class="h-3.5 w-3.5 flex-shrink-0" />
+						<span class="truncate">{{ __("Open in Raven") }}</span>
+					</button>
+				</Teleport>
 				<p
 					v-if="skippedUsers.length"
 					class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-amber-1 px-3 py-1.5 text-xs text-ink-amber-3"
@@ -93,10 +111,10 @@
 
 <script setup>
 // The chat of one record (#1615): its Raven channel in a frame, kept to that channel by
-// utils/ravenEmbed.js. From lg on it is a permanent 768px column of the Issue view, the narrowest
-// width at which Raven keeps its desktop layout with mouse actions (#1613); IssuesInbox makes room
-// by stacking the checklists under the description. Without a chat (or before joining it) the
-// column shows the `placeholder` slot. Below lg it is an overlay the chat button toggles.
+// utils/ravenEmbed.js. On the Issue view it is a panel of the tiling layout (#1911, #1915), at
+// least 768px wide: the narrowest width at which Raven keeps its desktop layout with mouse
+// actions (#1613). Without a chat (or before joining it) the panel shows the `placeholder` slot.
+// Elsewhere it is an overlay the chat button toggles.
 // No side border: it would take a pixel from the frame and tip Raven into its mobile layout.
 //
 // Raven boots once per page: the frame belongs to utils/ravenFrame.js and is laid over this panel
@@ -109,6 +127,7 @@ import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { classifyPath, injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { panelTitleSlots } from "@spa/panels/hosts.js"
 import { acquireRavenFrame, ravenFrameWindow, releaseRavenFrame, setRavenFrameLayer } from "@spa/utils/ravenFrame.js"
 
 const props = defineProps({
@@ -134,21 +153,31 @@ let heldSlot = null
 let removeGuard = null
 let frameReady = false
 
-// Column on lg screens when the view offers one (Tailwind's lg breakpoint).
-const wide = typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)") : null
-const inColumn = ref(false)
-function updatePlacement() {
-	inColumn.value = Boolean(wide?.matches && document.getElementById("issue-chat-host"))
-}
-updatePlacement()
-onMounted(() => {
-	updatePlacement()
-	wide?.addEventListener("change", updatePlacement)
+// In this record's chat panel while it shows in a tile (#1915); a panel too narrow for Raven
+// steps back to the rail (panels/tiling.js fit) instead of shrinking the chat.
+const inColumn = computed(() => {
+	const host = issueChatStore.dockHost
+	return Boolean(host?.record === props.recordName && host.available && host.expanded)
 })
 
 const shown = computed(() => inColumn.value || props.open)
+// The chat tile's title-bar slot (PanelLayout), where "Open in Raven" goes while in a tile.
+const titleSlot = computed(() => panelTitleSlots.chat || null)
+// Only when a tile still has no slot after a moment does the chat show its own header (with
+// "Open in Raven"), so it never flashes while the tile is mounting.
+const slotMissing = ref(false)
+let slotTimer = null
+watch(
+	[inColumn, titleSlot],
+	([isInColumn, slot]) => {
+		clearTimeout(slotTimer)
+		if (!isInColumn || slot) return (slotMissing.value = false)
+		slotTimer = setTimeout(() => (slotMissing.value = !panelTitleSlots.chat), 200)
+	},
+	{ immediate: true }
+)
 
-// IssuesInbox shows the chat column (and stacks Description and Checklists) for this record.
+// Which record's chat shows in the page (kept for views that follow it).
 watch(
 	[() => shown.value && inColumn.value, () => props.recordName],
 	([inUse, record], previous) => {
@@ -376,8 +405,8 @@ function focusTarget(target) {
 defineExpose({ focusTarget, inColumn })
 
 onBeforeUnmount(() => {
+	clearTimeout(slotTimer)
 	detachFrame()
-	wide?.removeEventListener("change", updatePlacement)
 	if (issueChatStore.openFor === props.recordName) issueChatStore.openFor = null
 })
 </script>

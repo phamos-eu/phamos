@@ -644,6 +644,84 @@ def add_spa_checklist_item(checklist_name, values=None):
 
 
 @frappe.whitelist(methods=["POST"])
+def move_spa_checklist_item(checklist_name, item_name, to_index):
+	"""Move a checklist item to position `to_index` (0-based) and return the SPA payload (#1919).
+
+	The other items keep their order; `idx` is renumbered and the Checklist saved once, so
+	viewers get one update and the version history one entry.
+	"""
+	doc = _require_checklist_write(checklist_name)
+	item_name = (item_name or "").strip()
+	rows = list(doc.checklist_items)
+	row = next((r for r in rows if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+	try:
+		to_index = int(to_index)
+	except (TypeError, ValueError):
+		frappe.throw(_("Invalid position"))
+	if not 0 <= to_index < len(rows):
+		frappe.throw(_("Invalid position"))
+
+	rows.remove(row)
+	rows.insert(to_index, row)
+	doc.checklist_items = rows
+	for idx, r in enumerate(rows, start=1):
+		r.idx = idx
+	doc.save()
+	return get_checklist(checklist_name)
+
+
+@frappe.whitelist(methods=["POST"])
+def move_spa_checklist_item_to(checklist_name, item_name, target_checklist, to_index=None):
+	"""Move an item to another checklist of the same record (#1920); both SPA payloads back.
+
+	Only between checklists of the same document and record, with write access on both. The item
+	keeps its text, note, assignee and due date, and its ToDo moves along. A completed target
+	becomes In Progress again (it has an open item now). Each checklist gets one comment.
+	"""
+	from phamos.phamos.doctype.checklist.checklist_assignment import move_item
+
+	if (checklist_name or "") == (target_checklist or ""):
+		frappe.throw(_("Choose another checklist"))
+	source = _require_checklist_write(checklist_name)
+	target = _require_checklist_write(target_checklist)
+	if not (source.document and source.reference_record) or (source.document, source.reference_record) != (
+		target.document,
+		target.reference_record,
+	):
+		frappe.throw(_("Items can only move between checklists of the same record"))
+
+	item_name = (item_name or "").strip()
+	row = next((r for r in source.checklist_items if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+	if to_index not in (None, ""):
+		try:
+			to_index = int(to_index)
+		except (TypeError, ValueError):
+			frappe.throw(_("Invalid position"))
+		# a position in the target after the move: 0 … its current length (the end)
+		if not 0 <= to_index <= len(target.checklist_items):
+			frappe.throw(_("Invalid position"))
+	else:
+		to_index = None
+
+	# plain, short text for the timeline comments (a description may hold escaped markup)
+	label = frappe.utils.html_utils.unescape_html(frappe.utils.strip_html_tags(row.description or "")).strip()
+	label = (label[:80] + "…") if len(label) > 80 else label
+	# escaped as plain text: unescaping above could turn "&lt;img …&gt;" back into a tag
+	label = frappe.utils.escape_html(label) or _("Checklist item")
+	move_item(source, target, row, to_index)
+	# titles are user text too; comments render as HTML
+	source_title = frappe.utils.escape_html(_checklist_title_value(source) or source.name)
+	target_title = frappe.utils.escape_html(_checklist_title_value(target) or target.name)
+	source.add_comment("Info", _("Moved \"{0}\" to checklist {1}").format(label, target_title))
+	target.add_comment("Info", _("\"{0}\" moved here from checklist {1}").format(label, source_title))
+	return {"source": get_checklist(source.name), "target": get_checklist(target.name)}
+
+
+@frappe.whitelist(methods=["POST"])
 def delete_spa_checklist_item(checklist_name, item_name):
 	"""Remove a checklist item and return full SPA checklist payload."""
 	doc = _require_checklist_write(checklist_name)

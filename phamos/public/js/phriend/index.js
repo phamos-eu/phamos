@@ -1,0 +1,617 @@
+// Phriend's controller, shared by Desk (phriend.bundle.js) and the cockpits (spa_shared).
+// The host supplies what differs between them:
+//
+//   __(text, args)            translate
+//   csrf_token()              for the server calls
+//   page_context()            { route, page_url, page_title, where, ref_doctype, ref_docname, context }
+//   load_flow()               Promise of the report flow module (flow.js), loaded on demand
+//   issue_url(name)           where "Saved as ISS-…" links to
+//   count_reports()           optional: Promise of the open reports for this page (the badge)
+//   open_reports()            optional: show those reports
+//   open_status(ctx)          optional: where the reports about this place (or ctx.issue) stand, in the Implementation Cockpit
+//   testing_tickets()         optional: Promise of { count, url, about, color }: the open GitLab
+//                             issues labelled Testing on Production that mention this page's
+//                             DocType or page (about); a click opens url, that list in GitLab
+//   on_route_change(cb)       optional
+//   shortcut                  the user's shortcut ("Mod+P"; "" when off)
+//   default_shortcut          the site's (Phriend Settings), for "Back to the default"
+//   start                     optional: { right, bottom } where the ball sits until it is dragged
+//   user                      the logged-in user, so an unsent draft is offered only to them
+//   features                  optional: the switches of Phriend Settings → Features, { reactions: 1, … } (#2009)
+//   quiet                     optional: the user's quiet state from the boot, see quiet.js (#2010)
+//   can_configure             optional: the user may change Phriend Settings (the menu links there)
+//   open_settings()           optional: open Phriend Settings
+//   voice                     optional: today's unprompted bubbles from the boot, see voice.js (#2011)
+//   on_event(cb)              optional: call cb(payload) for every "phriend_event" of this user (#2012)
+
+import { Ball, GESTURES } from "./ball";
+import { ErrorLog } from "./errors";
+import * as nudge from "./nudge";
+import * as play from "./play";
+import * as quiet from "./quiet";
+import { call } from "./request";
+import { rating_item } from "./rating";
+import { Voice } from "./voice";
+import { format, matches, parse } from "./shortcut";
+import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
+
+export { DRAFT_KEY };
+const GREETED_KEY = "phriend:greeted";
+const NUDGE_DELAY = 4000; // after the page (or the tab) shows
+const NUDGE_CHECK = 30 * 60 * 1000; // Desk tabs stay open all day
+const NUDGE_MS = 8000;
+const DEBUG_KEY = "phriend:debug"; // localStorage.setItem("phriend:debug", 1): window.phriend.react() and demo()
+const DEMO_STEP = 1800;
+
+export function create_phriend(host) {
+	return new Phriend(host);
+}
+
+class Phriend {
+	constructor(host) {
+		this.host = host;
+		this.__ = host.__;
+		this.open = false;
+		this.log = new ErrorLog(); // start recording errors as early as possible
+		this.log.on_failed_request((item) => this.on_failed_request(item));
+		this.recording = false; // the flow is taking a new shortcut: keys are for it
+		this.set_quiet_state(host.quiet || null); // leave me in peace (#2010)
+		this.set_shortcut(host.shortcut || "");
+	}
+
+	// ---- leave me in peace (#2010)
+
+	// The quiet times are on the server's clock; server_now tells how far this browser's clock is off.
+	set_quiet_state(state) {
+		this.quiet = state;
+		this.clock_offset = state && state.server_now ? state.server_now - Date.now() : 0;
+	}
+
+	now() {
+		return Date.now() + (this.clock_offset || 0);
+	}
+
+	has_menu() {
+		return this.feature("quiet_mode") && "quiet_mode" in (this.host.features || {});
+	}
+
+	is_quiet() {
+		return this.has_menu() && quiet.is_quiet(this.quiet, this.now());
+	}
+
+	warnings_muted() {
+		return this.has_menu() && quiet.warnings_muted(this.quiet, this.now());
+	}
+
+	time_label(ms) {
+		return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	}
+
+	menu_entries() {
+		const __ = this.__;
+		const now = this.now();
+		const entries = [];
+		if (quiet.is_quiet(this.quiet, now)) {
+			const until = this.quiet.quiet_until;
+			entries.push(
+				{ heading: __("Leave me in peace") },
+				{ note: until === quiet.FOREVER ? __("Quiet until you call me back") : __("Quiet until {0}", [this.time_label(until)]) },
+				{ label: __("Come back"), action: () => this.set_quiet({ until: "" }) }
+			);
+		} else {
+			entries.push(
+				{ heading: __("Leave me in peace") },
+				// an hour is counted on the server; "today" ends at this browser's midnight, on the server's clock
+				{ label: __("For 1 hour"), action: () => this.set_quiet({ minutes: 60 }) },
+				{
+					label: __("For today"),
+					action: () => this.set_quiet({ until: quiet.end_of_today(Date.now()) + (this.clock_offset || 0) }),
+				},
+				{ label: __("Until I call you back"), action: () => this.set_quiet({ until: quiet.FOREVER }) }
+			);
+		}
+		entries.push({ heading: __("Mute warnings") });
+		if (quiet.warnings_muted(this.quiet, now)) {
+			entries.push(
+				{ note: __("Muted until {0}", [this.time_label(this.quiet.warnings_muted_until)]) },
+				{ label: __("Hear warnings again"), action: () => this.set_warning_mute(0) }
+			);
+		} else {
+			entries.push({
+				row: quiet.MUTE_MINUTES.map((m) => ({
+					label: __("{0} min", [m]),
+					title: __("Mute warnings for {0} minutes", [m]),
+					action: () => this.set_warning_mute(m),
+				})),
+			});
+		}
+		entries.push({ separator: true }, { label: __("Report a problem"), action: () => this.report() });
+		if (this.host.can_configure && this.host.open_settings)
+			entries.push({ label: __("Phriend Settings"), action: () => this.host.open_settings() });
+		return entries;
+	}
+
+	// args: { minutes } or { until: ms | "forever" | "" }
+	async set_quiet(args) {
+		if (!(await this.save_quiet("phamos.phriend.api.set_my_quiet", args))) return;
+		if (this.is_quiet()) this.ball.hide_bubble();
+	}
+
+	async set_warning_mute(minutes) {
+		await this.save_quiet("phamos.phriend.api.set_my_warning_mute", { minutes });
+	}
+
+	async save_quiet(method, args) {
+		try {
+			this.set_quiet_state(await call(method, args, this.host.csrf_token()));
+			this.apply_quiet();
+			return true;
+		} catch (e) {
+			// a RequestError without a server message carries only its kind ("network"…)
+			const text = e.message && e.message !== e.kind ? e.message : this.__("That didn't work. Please try again.");
+			this.ball.say(escape_html(text), 6000, "point_up");
+			return false;
+		}
+	}
+
+	// Step back while quiet (smaller, faded, still there), and come back when the time is up.
+	apply_quiet() {
+		if (!this.ball) return;
+		const was_resting = this.ball.root.classList.contains("resting");
+		const resting = this.is_quiet();
+		this.ball.set_resting(resting);
+		if (was_resting && !resting) {
+			// back: called back or the time is up; a different gesture each time
+			this._last_back = quiet.pick_back(this._last_back);
+			this.ball.react(this._last_back);
+		}
+		clearTimeout(this._back_timer);
+		const back = quiet.back_in(this.quiet, this.now());
+		// a quiet time is at most a day; setTimeout can't wait much longer than 24 days anyway
+		if (back !== null) this._back_timer = setTimeout(() => this.apply_quiet(), back + 500);
+	}
+
+	// A switch of Phriend Settings → Features. Missing means on: a host that doesn't send the
+	// switches yet (an older cockpit build) keeps today's behaviour.
+	feature(name) {
+		const features = this.host.features || {};
+		return !(name in features) || !!features[name];
+	}
+
+	// A reaction without words (#2009): react("thanks"), react("high_five"), react("alert")…
+	react(name) {
+		if (!this.ball) return false;
+		// while quiet only the red warning gets through, and not while warnings are muted (#2010)
+		if (this.has_menu() && !quiet.may_react(name, this.quiet, this.now())) return false;
+		return this.ball.react(name);
+	}
+
+	// Every reaction once, one after another: for looking at them (debug only).
+	demo() {
+		Object.keys(GESTURES).forEach((name, i) =>
+			setTimeout(() => {
+				console.log(`Phriend: ${name}`);
+				this.react(name);
+			}, i * DEMO_STEP)
+		);
+		return Object.keys(GESTURES);
+	}
+
+	expose_debug() {
+		if (!storage_get(DEBUG_KEY)) return;
+		const api = (window.phriend = window.phriend || {});
+		api.react = (name) => this.react(name);
+		api.demo = () => this.demo();
+		api.reactions = Object.keys(GESTURES);
+		// one voice (#2011): try the queue
+		const item = (text) => ({ html: escape_html(text || "Hello from the queue") });
+		api.note = (text) => this.voice.note(item(text));
+		api.ask = (text) => this.voice.ask(item(text));
+		api.warn = (text) => this.voice.warn(item(text));
+		// events (#2012): a sample event from the server to yourself
+		api.emit = (kind) =>
+			call("phamos.phriend.api.send_test_event", { kind }, this.host.csrf_token()).catch((e) => console.warn(e));
+		// easter eggs (#2013): a move by name, or a random one
+		api.play = (name) => (name ? this.play_move(name) : this.play_from("debug", play.HOVER_MOVES, true));
+		api.moves = Object.keys(play.MOVES);
+		// rating a fix (#2014): ask the question for a report now, live or not
+		api.ask_rating = (issue, round) =>
+			call("phamos.phriend.api.ask_feedback_now", { issue, round }, this.host.csrf_token()).catch((e) => console.warn(e));
+	}
+
+	// ---- easter eggs (#2013)
+
+	setup_play() {
+		const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		this.play_on = this.feature("easter_eggs") && "easter_eggs" in (this.host.features || {}) && !reduced;
+		if (!this.play_on) return;
+		this._play_last = {};
+		// the pointer rests on Phriend for 10 s
+		let hover_timer = null;
+		const stop_hover = () => clearTimeout(hover_timer);
+		this.ball.hit.addEventListener("pointerenter", () => {
+			stop_hover();
+			hover_timer = setTimeout(() => this.play_from("hover", play.HOVER_MOVES), play.HOVER_MS);
+		});
+		this.ball.hit.addEventListener("pointerleave", stop_hover);
+		this.ball.hit.addEventListener("pointerdown", stop_hover);
+		// no mouse or keyboard for 5 minutes: one sign of life, then nothing until active again
+		let last_active = Date.now();
+		let played_this_spell = false;
+		const active = () => {
+			last_active = Date.now();
+			played_this_spell = false;
+		};
+		for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"])
+			document.addEventListener(event, active, { passive: true, capture: true });
+		// coming back to the tab counts as activity: time in a hidden tab is not idle time (AI review of !1285)
+		document.addEventListener("visibilitychange", () => !document.hidden && active());
+		setInterval(() => {
+			if (played_this_spell || document.hidden || Date.now() - last_active < play.IDLE_MS) return;
+			// the spell is used up only by a move that really played, not by one quiet mode or the
+			// open menu held back (AI review of !1285)
+			if (this.play_from("idle", play.IDLE_MOVES)) played_this_spell = true;
+		}, 30 * 1000);
+	}
+
+	// dragged fast: dizzy
+	on_drag_end(samples) {
+		if (this.play_on && play.top_speed(samples) >= play.FAST_DRAG) this.play_from("drag", ["dizzy"]);
+	}
+
+	may_play() {
+		return !!this.ball && !this.is_quiet() && !this.open && !this.ball.menu_open() && !document.hidden;
+	}
+
+	// a move from `moves`, if this trigger hasn't played for a while (force: the debug call)
+	play_from(trigger, moves, force = false) {
+		const now = Date.now();
+		if (!force && (!this.may_play() || !play.cooled_down(this._play_last && this._play_last[trigger], now))) return false;
+		const move = play.pick(moves, this._last_move);
+		if (!this.play_move(move)) return false;
+		if (this._play_last) this._play_last[trigger] = now;
+		this._last_move = move;
+		return true;
+	}
+
+	play_move(name) {
+		const move = play.MOVES[name];
+		if (!move || !this.ball || !this.ball.play(name, move.ms)) return false;
+		if (move.emoji) this.react(move.emoji); // alone in a small bubble, never counted
+		return true;
+	}
+
+	// ---- events (#2012)
+
+	on_event(payload) {
+		if (!payload || !this.ball) return;
+		if (payload.kind === "rate_fix") return this.ask_rating(payload.feedback); // #2014
+		if (payload.kind === "quiet") {
+			// leave me in peace changed in another tab
+			this.set_quiet_state(payload.state || null);
+			this.apply_quiet();
+			return;
+		}
+		const item = { html: this.event_html(payload), gesture: payload.gesture };
+		if (payload.level === "reaction") this.react(payload.gesture);
+		else if (payload.level === "note") {
+			this.react(payload.gesture);
+			this.voice.note({ ...item, gesture: null });
+		} else if (payload.level === "question") this.voice.ask(item);
+		else if (payload.level === "warning") this.voice.warn(item);
+	}
+
+	// ---- rating a fix (#2014)
+
+	// The open questions, fresh from the server shortly after the page loads (Desk caches the boot).
+	load_ratings() {
+		const features = this.host.features || {};
+		if (!features.rate_fixes) return;
+		setTimeout(() => {
+			call("phamos.phriend.api.get_my_feedback_requests", {}, this.host.csrf_token())
+				.then((requests) => (requests || []).forEach((req) => this.ask_rating(req)))
+				.catch(() => {});
+		}, 1500);
+	}
+
+	// A rating question through the voice: a question, so it uses the day's bubble or waits
+	// behind the dot. Each question once per page (the boot and a live event can both bring it).
+	ask_rating(req) {
+		if (!req || !req.name || !this.ball) return;
+		this._asked_ratings = this._asked_ratings || new Set();
+		if (this._asked_ratings.has(req.name)) return;
+		this._asked_ratings.add(req.name);
+		this.voice.ask(rating_item(this, req));
+	}
+
+	// plain text from the server, escaped; a link on this site or https only (events.py checks too)
+	event_html(payload) {
+		const text = escape_html(payload.text || "");
+		const link = String(payload.link || "");
+		// this site ("/app/…", not "//host" or "/\\host") or https only (AI review of !1279);
+		// the same rule as phamos/phriend/events.py safe_link(): change both together
+		const local = link.startsWith("/") && !link.startsWith("//") && !link.startsWith("/\\");
+		if (!link || !(local || link.startsWith("https://"))) return text;
+		const external = link.startsWith("https://");
+		return `${text} <a href="${escape_html(link)}"${external ? ' target="_blank" rel="noopener"' : ""}>${escape_html(this.__("Open"))}</a>`;
+	}
+
+	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
+	set_shortcut(text) {
+		this.shortcut = text || "";
+		this.shortcut_spec = parse(this.shortcut);
+		if (this.ball) {
+			this.ball.set_label(this.label());
+			this.ball.set_keys(format(this.shortcut));
+		}
+	}
+
+	label() {
+		const keys = format(this.shortcut);
+		const label = keys ? this.__("Phriend: report a problem ({0})", [keys]) : this.__("Phriend: report a problem");
+		// the hint that there is more (#2010, PM: right-click plus a hint)
+		return this.has_menu() ? `${label} · ${this.__("right-click for options")}` : label;
+	}
+
+	// Before the page and the browser see the key (capture on window): the default, Cmd/Ctrl+P,
+	// would otherwise open the print dialog, and Desk prints the form on Ctrl+P.
+	listen_for_shortcut() {
+		window.addEventListener(
+			"keydown",
+			(e) => {
+				// not while an input method composes a character (Japanese, Chinese…)
+				if (this.recording || e.repeat || e.isComposing || e.keyCode === 229) return;
+				if (!matches(e, this.shortcut_spec)) return;
+				e.preventDefault();
+				if (this.open) return; // already open; just don't print
+				e.stopPropagation();
+				this.report();
+			},
+			true
+		);
+	}
+
+	mount() {
+		if (this.ball || document.getElementById("phriend-root")) return;
+		const __ = this.__;
+		this.ball = new Ball({
+			label: this.label(),
+			on_click: () => this.report(),
+			// the number on the ball answers "where do the reports here stand?": the Implementation
+			// Cockpit for users who may open it (#1671), else the host's list of those reports
+			on_badge_click: () =>
+				this.host.open_status
+					? this.host.open_status(this.host.page_context() || {})
+					: this.host.open_reports && this.host.open_reports(),
+			on_testing_badge_click: () => this.open_testing(),
+			on_first_interest: () => this.load_flow().catch(() => {}),
+			start: this.host.start,
+			pinned: !!this.host.pinned,
+			close_label: __("Close"),
+			hands: this.feature("reactions"),
+			menu: this.has_menu() ? () => this.menu_entries() : null,
+			on_waiting_click: () => this.voice.open_next(),
+			on_drag_end: (samples) => this.on_drag_end(samples),
+			waiting_label: (count) =>
+				count > 1 ? __("Phriend has {0} things for you", [count]) : __("Phriend has something for you"),
+		});
+		this.voice = new Voice(this); // one voice (#2011)
+		if (this.host.on_event) this.host.on_event((payload) => this.on_event(payload)); // events (#2012)
+		this.setup_play(); // easter eggs (#2013)
+		this.load_ratings(); // open rating questions (#2014)
+		this.ball.set_keys(format(this.shortcut));
+		this.apply_quiet();
+		this.expose_debug();
+
+		this.listen_for_shortcut();
+		if (this.host.on_route_change) this.host.on_route_change(() => this.refresh_badge());
+
+		if (this.saved_draft()) {
+			this.ball.set_pending(true);
+			this.ball.say(
+				`${escape_html(__("You have a report that wasn't sent."))} <button type="button" class="link" data-open>${escape_html(__("Open it"))}</button>`,
+				10000,
+				"point_up"
+			);
+			this.bind_bubble_link("[data-open]", () => this.report(this.saved_draft()));
+		} else if (!storage_get(GREETED_KEY) && !this.is_quiet()) {
+			// a question to the voice (#2011): only if one of today's bubbles is left, else another day
+			this._asking = true;
+			this.voice
+				.ask(
+					{ html: escape_html(__("Hi, I'm Phriend! Click me when something looks wrong.")), ms: NUDGE_MS, gesture: "wave" },
+					{ drop: true }
+				)
+				.then((shown) => {
+					if (!shown) return;
+					storage_set(GREETED_KEY, "1");
+					nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())); // the first nudge
+				})
+				.finally(() => (this._asking = false));
+		}
+		this.refresh_badge();
+		this.start_nudging();
+	}
+
+	// "Click me!" now and then, to users who never opened Phriend or not for a while (nudge.js).
+	start_nudging() {
+		// one pending check: clicking through pages quickly doesn't pile up timers
+		const later = () => {
+			clearTimeout(this._nudge_timer);
+			this._nudge_timer = setTimeout(() => this.maybe_nudge(), NUDGE_DELAY);
+		};
+		later();
+		setInterval(() => this.maybe_nudge(), NUDGE_CHECK);
+		document.addEventListener("visibilitychange", () => !document.hidden && later());
+		if (this.host.on_route_change) this.host.on_route_change(later);
+	}
+
+	maybe_nudge() {
+		// never in the way: not over another bubble, an open flow or a report still to send
+		if (!this.ball || this.open || document.hidden || this.ball.bubble_showing()) return;
+		if ((this.sender && this.sender.busy()) || this.saved_draft()) return;
+		if (this.is_quiet() || this.ball.menu_open() || this._asking) return; // leave me in peace (#2010)
+		const state = nudge.read(this.host.user);
+		if (!nudge.is_due(state, Date.now())) return;
+		// a question to the voice (#2011): once today's bubbles are used, "Click me!" waits for another day
+		this._asking = true;
+		this.voice
+			.ask(
+				{
+					html: `<button type="button" class="link" data-nudge>${escape_html(this.__("Click me!"))}</button>`,
+					ms: NUDGE_MS,
+					gesture: "wave",
+					bind: (bubble) => {
+						const link = bubble.querySelector("[data-nudge]");
+						if (link) link.addEventListener("click", () => this.report());
+					},
+				},
+				{ drop: true }
+			)
+			.then((shown) => shown && nudge.write(nudge.after_nudge(nudge.read(this.host.user), Date.now())))
+			.finally(() => (this._asking = false));
+	}
+
+	bind_bubble_link(selector, callback) {
+		const link = this.ball.bubble.querySelector(selector);
+		if (link) link.addEventListener("click", callback);
+	}
+
+	saved_draft() {
+		try {
+			const draft = JSON.parse(storage_get(DRAFT_KEY, "session") || "null");
+			// only for the user who wrote it: someone else may log in in the same tab
+			if (draft && draft.user !== this.host.user) {
+				storage_set(DRAFT_KEY, null, "session");
+				return null;
+			}
+			return draft;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	load_flow() {
+		if (!this._flow) {
+			this._flow = Promise.resolve(this.host.load_flow()).catch((e) => {
+				this._flow = null; // try again next time
+				throw e;
+			});
+		}
+		return this._flow;
+	}
+
+	// Everything we know about the page right now: what the host adds plus the browser.
+	context() {
+		const page = this.host.page_context() || {};
+		return {
+			...page,
+			page_url: page.page_url || window.location.href,
+			page_title: page.page_title || document.title,
+			context: {
+				captured_at: new Date().toISOString(),
+				...(page.context || {}),
+				viewport: `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}x`,
+				// browser and system, not the full user agent (GDPR review of !1162)
+				browser: browser_name(navigator.userAgent),
+				...this.log.snapshot(),
+			},
+		};
+	}
+
+	async report(draft = null) {
+		if (this.open || !this.ball) return;
+		this.ball.close_menu(false);
+		const sender = this.sender;
+		if (sender && sender.sending) {
+			this.ball.say(escape_html(this.__("Still sending your last report…")), 3000, "fingers_crossed");
+			return;
+		}
+		if (sender && sender.failed && !draft) {
+			// the ball reopens the report that didn't go out, with its own screenshot
+			const failed = sender.failed.report;
+			draft = { ...failed.draft, canvas: failed.canvas, from_failed: true };
+		}
+		this.open = true;
+		// opened: no "Click me!" for the next 10 to 20 days
+		nudge.write(nudge.after_click(nudge.read(this.host.user), Date.now()));
+		this.ball.hop();
+		const ctx = this.context(); // before anything changes on the page
+		const slow = setTimeout(() => this.ball.say(escape_html(this.__("One moment…")), 0, "wait"), 150);
+		let flow;
+		try {
+			flow = await this.load_flow();
+		} catch (e) {
+			console.warn("Phriend: could not load the report flow", e);
+			this.open = false;
+			this.ball.say(escape_html(this.__("Phriend couldn't start. Reload the page and try again.")), 6000);
+			return;
+		} finally {
+			clearTimeout(slow);
+		}
+		this.ball.hide_bubble();
+		try {
+			flow.open_report({ phriend: this, ctx, draft, on_close: () => (this.open = false) });
+		} catch (e) {
+			console.error("Phriend: the report flow failed to open", e);
+			this.open = false;
+			this.ball.set_away(false);
+		}
+	}
+
+	on_failed_request(item) {
+		if (!this.ball || this.open || !(item.status >= 500)) return;
+		if (this.sender && this.sender.busy()) return; // keep "Sending…" / "Try again" in the bubble
+		if (this.is_quiet()) return; // leave me in peace (#2010); the call stays in the error log
+		this.ball.say(
+			`${escape_html(this.__("Whoops, that call failed."))} <button type="button" class="link" data-report>${escape_html(this.__("Report it?"))}</button>`,
+			6000,
+			"point"
+		);
+		this.bind_bubble_link("[data-report]", () => this.report());
+	}
+
+	refresh_badge() {
+		if (!this.host.count_reports || !this.ball) return;
+		clearTimeout(this._badge_timer);
+		this._badge_timer = setTimeout(() => {
+			Promise.resolve(this.host.count_reports())
+				.then((count) =>
+					this.ball.set_badge(
+						count,
+						this.host.open_status
+							? this.__("{0} open reports here. Click to see where they stand", [count || 0])
+							: this.__("{0} open Phriend reports for this page", [count || 0])
+					)
+				)
+				.catch(() => {});
+			this.refresh_testing();
+		}, 400);
+	}
+
+	// ---- the second badge: open GitLab issues labelled Testing on Production; a click opens
+	// GitLab's issue list filtered by that label
+
+	refresh_testing() {
+		if (!this.host.testing_tickets) return;
+		Promise.resolve(this.host.testing_tickets())
+			.then((data) => {
+				const url = data && /^https?:\/\//.test(data.url || "") ? data.url : null;
+				const count = url ? Number(data.count) || 0 : 0;
+				this.testing_url = url;
+				this.ball.set_testing_badge(
+					count,
+					this.__("{0} GitLab issues about {1} are Testing on Production (opens the list in GitLab)", [
+						count,
+						data.about || "",
+					]),
+					data && data.color
+				);
+			})
+			.catch(() => {});
+	}
+
+	open_testing() {
+		if (this.testing_url) window.open(this.testing_url, "_blank", "noopener");
+	}
+}

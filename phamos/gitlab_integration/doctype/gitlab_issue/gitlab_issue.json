@@ -17,9 +17,13 @@
   "assignee_email",
   "gitlab_username",
   "issue_url",
+  "issue",
   "parent_issue",
   "gitlab_project",
   "gitlab_milestone",
+  "implementation_feature",
+  "time_estimate_hours",
+  "time_spent_hours",
   "labels",
   "merged_to_production_at",
   "testing_on_production_at",
@@ -75,6 +79,16 @@
    "label": "Issue Url"
   },
   {
+   "description": "The ERPNext Issue this GitLab issue belongs to. Set when the GitLab issue is created from the Issue; can be set by hand.",
+   "fieldname": "issue",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Issue",
+   "no_copy": 1,
+   "options": "Issue",
+   "search_index": 1
+  },
+  {
    "fieldname": "parent_issue",
    "fieldtype": "Link",
    "label": "Parent Issue",
@@ -116,6 +130,28 @@
    "fieldtype": "Link",
    "label": "GitLab Milestone",
    "options": "GitLab Milestones"
+  },
+  {
+   "fieldname": "implementation_feature",
+   "fieldtype": "Link",
+   "label": "Implementation Feature",
+   "options": "Implementation Feature",
+   "in_standard_filter": 1,
+   "description": "The feature this issue is part of. One issue belongs to one feature; the feature's suggested progress counts it."
+  },
+  {
+   "fieldname": "time_estimate_hours",
+   "fieldtype": "Float",
+   "label": "Time Estimate (Hours)",
+   "read_only": 1,
+   "description": "From GitLab's time estimate on the issue. Used by release planning."
+  },
+  {
+   "fieldname": "time_spent_hours",
+   "fieldtype": "Float",
+   "label": "Time Spent (Hours)",
+   "read_only": 1,
+   "description": "Time logged on the issue in GitLab."
   },
   {
    "fieldname": "labels",
@@ -191,7 +227,7 @@
    "link_fieldname": "gitlab_issue"
   }
  ],
- "modified": "2026-09-29 10:00:00.000000",
+ "modified": "2026-11-18 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Issue",

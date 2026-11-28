@@ -120,9 +120,41 @@ TASK_FIELDS = [
 		"description": "Who is responsible for this task. Separate from assignment.",
 	},
 	{
+		"fieldname": "custom_team",
+		"label": "Team",
+		"fieldtype": "Link",
+		"options": "Team",
+		"insert_after": "custom_task_owner",
+		"description": "The team this task belongs to. It shows in that team's Team Cockpit.",
+	},
+	{
 		"fieldname": "custom_implementation_specific_end",
 		"fieldtype": "Section Break",
-		"insert_after": "custom_task_owner",
+		"insert_after": "custom_team",
+	},
+]
+
+# On Issue the section shows on every Issue and starts with the team (#1955). Phriend's fields
+# follow the team inside it and carry their own conditions (phamos/phriend/setup.py), so they
+# stay hidden on Issues that are no Phriend report and have no GitLab issue. Issue starts with
+# the Section Break `subject_section`, so the section swallows no standard field.
+ISSUE_FIELDS = [
+	{
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
+		"fieldtype": "Section Break",
+		"insert_after": "",
+		"collapsible": 0,
+		# the section used to show only on Phriend and GitLab issues; clear that condition
+		"depends_on": "",
+	},
+	{
+		"fieldname": "custom_team",
+		"label": "Team",
+		"fieldtype": "Link",
+		"options": "Team",
+		"insert_after": IMPLEMENTATION_SECTION,
+		"description": "The team this issue belongs to. It shows in that team's Team Cockpit.",
 	},
 ]
 
@@ -153,6 +185,81 @@ def ensure_task_fields():
 	create_custom_fields({"Task": [{**field, "module": MODULE} for field in TASK_FIELDS]}, update=True)
 
 
+def ensure_issue_fields():
+	ensure_module()
+	create_custom_fields({"Issue": [{**field, "module": MODULE} for field in ISSUE_FIELDS]}, update=True)
+	expand_issue_sections()
+
+
+def expand_issue_sections():
+	"""Every section on the Issue form open, never collapsible (#2157).
+
+	A Property Setter for each standard Section Break that ERPNext makes collapsible, read from
+	the DocFields, so a section ERPNext makes collapsible later is covered on the next migrate.
+	Our own sections are not collapsible at their source (custom fields). With collapsible off,
+	Frappe ignores `collapsible_depends_on` (ERPNext opens "Details" only on closed issues).
+	"""
+	sections = frappe.get_all(
+		"DocField",
+		filters={"parent": "Issue", "parenttype": "DocType", "fieldtype": "Section Break", "collapsible": 1},
+		pluck="fieldname",
+	)
+	for fieldname in sections:
+		existing = frappe.db.get_value(
+			"Property Setter",
+			{"doc_type": "Issue", "field_name": fieldname, "property": "collapsible"},
+			["name", "value"],
+			as_dict=True,
+		)
+		if existing and existing.value == "0":
+			continue
+		setter = make_property_setter("Issue", fieldname, "collapsible", "0", "Check")
+		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
+
+
+INTERNAL_PROJECT_FIELD = "custom_is_internal_project"
+PROJECT_FIELDS = [
+	{
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
+		"fieldtype": "Section Break",
+		"insert_after": "",
+		"collapsible": 0,
+	},
+	{
+		"fieldname": INTERNAL_PROJECT_FIELD,
+		"label": "Is Internal Project",
+		"fieldtype": "Check",
+		"insert_after": IMPLEMENTATION_SECTION,
+		"description": "Hours on this project count as internal in the Team Cockpit's statistics.",
+	},
+]
+
+
+def ensure_project_fields():
+	""""Is Internal Project" on Project (#1975). Most sites have it already as a site customization
+	in the "phamos" section; it is left where it is. Only a site without it gets it, in the
+	Implementation Specific section."""
+	if frappe.get_meta("Project").has_field(INTERNAL_PROJECT_FIELD):
+		return
+	create_custom_fields({"Project": [{**field, "module": MODULE} for field in PROJECT_FIELDS]}, update=True)
+
+
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
+	ensure_issue_fields()
+	ensure_project_fields()
+
+
+def after_install():
+	"""Store the Cockpit Settings defaults on a new site (#1933).
+
+	Patches don't run on a fresh install, and a Single stores no defaults until it is saved: every
+	cockpit would start grey with no glow and "show author" off. Both patches only fill in fields
+	that have no stored value, so they are safe here.
+	"""
+	from phamos.patches.v1_0 import move_cockpit_settings, set_cockpit_window_defaults
+
+	move_cockpit_settings.execute()
+	set_cockpit_window_defaults.execute()

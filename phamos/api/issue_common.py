@@ -34,6 +34,7 @@ LIST_FIELDS = [
 	"opening_date",
 	"description",
 	"_assign",
+	"phriend_type",  # list rows mark Phriend reports (#1901)
 ]
 
 
@@ -87,6 +88,7 @@ def _serialize_issue_row(row):
 		"opening_date": row.get("opening_date"),
 		"description": row.get("description") or "",
 		"checklist_search": row.get("checklist_search") or "",
+		"phriend_type": row.get("phriend_type") or None,
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
 	}
@@ -221,8 +223,10 @@ def create_issue(
 	assign_to=None,
 	project=None,
 	department=None,
+	team=None,
 ):
-	"""Create an internal Issue and optionally assign users."""
+	"""Create an internal Issue and optionally assign users. `team` names the Team the Issue
+	belongs to (Team Cockpit, #1955)."""
 	frappe.has_permission("Issue", "create", throw=True)
 
 	subject = (subject or "").strip()
@@ -246,6 +250,8 @@ def create_issue(
 	)
 	if department and frappe.get_meta("Issue").has_field("custom_department"):
 		doc.custom_department = department
+	if team:
+		doc.custom_team = team
 
 	doc.insert()
 

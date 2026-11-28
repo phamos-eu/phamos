@@ -17,14 +17,48 @@ def normalize_percent_billable(value):
     return cstr(value).strip()
 
 
-def billing_context(project):
-    """Preset for Percent Billable: the Project's own value, 100 when it has none.
+# Presets when the Project has no Percent Billable of its own (#1896): phamos' own projects bill
+# nothing, customer projects (a Customer, not Is Internal Project) bill everything.
+DEFAULT_PERCENT_BILLABLE = "0"
+CUSTOMER_PERCENT_BILLABLE = "100"
+PROJECT_BILLING_FIELDS = ("percent_billable", "customer", "custom_is_internal_project")
 
-    Percent Billable is set on every project, internal ones included, because external people
+
+def percent_billable_preset(project_value, customer=None, is_internal=0):
+    """The Project's own Percent Billable; when it has none, 100 for a customer project and 0 for
+    an internal one or one without a Customer (#1896)."""
+    value = cstr(project_value).strip()
+    if value:
+        return value
+    if customer and not cint(is_internal):
+        return CUSTOMER_PERCENT_BILLABLE
+    return DEFAULT_PERCENT_BILLABLE
+
+
+def project_percent_billable_preset(project_row):
+    """percent_billable_preset for a Project row holding PROJECT_BILLING_FIELDS."""
+    row = project_row or {}
+    return percent_billable_preset(
+        row.get("percent_billable"), row.get("customer"), row.get("custom_is_internal_project")
+    )
+
+
+def percent_billable_or_preset(percent_billable, project):
+    """The Percent Billable that was entered, or the project's preset when none was sent."""
+    if percent_billable in (None, ""):
+        percent_billable = billing_context(project)["percent_billable"]
+    return normalize_percent_billable(percent_billable)
+
+
+def billing_context(project):
+    """Preset for Percent Billable: the Project's own value; when it has none, 100 for a customer
+    project and 0 for phamos' own (percent_billable_preset).
+
+    Percent Billable can be set on every project, internal ones included, because external people
     may bill there too (#1031, revised decision 2).
     """
-    preset = frappe.db.get_value("Project", project, "percent_billable") if project else None
-    return {"percent_billable": preset or "100"}
+    row = frappe.db.get_value("Project", project, PROJECT_BILLING_FIELDS, as_dict=True) if project else None
+    return {"percent_billable": project_percent_billable_preset(row)}
 
 
 @frappe.whitelist()

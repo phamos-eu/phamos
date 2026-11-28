@@ -29,6 +29,8 @@ class ImplementationChapter(Document):
 		self.validate_status_transition()
 		self.validate_agreed_content_locked()
 		self.validate_target_date_after_planned_start()
+		self.validate_planning_links()
+		self.warn_when_over_wip_limit()
 
 	def on_update(self):
 		self.sync_execution_state_to_revision()
@@ -78,6 +80,40 @@ class ImplementationChapter(Document):
 			return
 
 		frappe.get_doc("Implementation", self.implementation).save(ignore_permissions=True)
+
+	def validate_planning_links(self):
+		"""Dependencies and features belong to the same Implementation; no chapter waits for itself (#1970)."""
+		chapters = [row.chapter for row in self.get("depends_on", [])]
+		if self.name in chapters:
+			frappe.throw(frappe._("A chapter cannot depend on itself."))
+		_check_links(self, "Implementation Chapter", chapters, frappe._("Chapter"))
+		if not self.is_new() and _dependencies_reach(self.name, chapters):
+			frappe.throw(frappe._("These dependencies form a loop: a chapter would wait for itself."))
+		_check_links(self, "Implementation Feature", [row.feature for row in self.get("features", [])], frappe._("Feature"))
+
+	def warn_when_over_wip_limit(self):
+		"""Chapters may run in parallel, up to the limit agreed with the customer (#1970).
+
+		Exceeding it is a warning, never a block: the limit is something both sides revisit.
+		"""
+		if self.status != "In Progress" or not self.implementation:
+			return
+		before = self.get_doc_before_save()
+		if before and before.status == "In Progress":
+			return
+		limit = frappe.db.get_value("Implementation", self.implementation, "max_parallel_chapters") or 0
+		running = frappe.db.count(
+			"Implementation Chapter",
+			{"implementation": self.implementation, "status": "In Progress", "name": ["!=", self.name or ""]},
+		) + 1
+		if limit and running > limit:
+			frappe.msgprint(
+				frappe._("{0} chapters are now in progress, more than the {1} agreed with the customer.").format(
+					running, limit
+				),
+				title=frappe._("Over the agreed limit"),
+				indicator="orange",
+			)
 
 	def validate_duplicate_chapter_title(self):
 		if not self.implementation or not self.chapter_title:
@@ -143,12 +179,16 @@ class ImplementationChapter(Document):
 
 	def validate_agreed_content_locked(self):
 		"""Once a Chapter leaves Draft, its agreed content is frozen against a direct
-		edit on the Chapter. A submitted Stakeholder Meeting is the only exception:
-		a Scope Change there pushes its new Revision's content back onto the Chapter,
-		which it does under frappe.flags.in_stakeholder_meeting_submit (and undoes
-		under frappe.flags.in_stakeholder_meeting_cancel)."""
+		edit on the Chapter. Two exceptions:
+		- a submitted Stakeholder Meeting: a Scope Change there pushes its new Revision's
+		  content back onto the Chapter, under frappe.flags.in_stakeholder_meeting_submit
+		  (and undoes it under frappe.flags.in_stakeholder_meeting_cancel);
+		- an Implementation Change both sides agreed to, applied outside a meeting
+		  (#2050). Its apply() sets self.flags.from_implementation_change, which a
+		  Desk save cannot set (flags is a reserved key)."""
 		if (
 			self.is_new()
+			or self.flags.from_implementation_change
 			or frappe.flags.in_stakeholder_meeting_submit
 			or frappe.flags.in_stakeholder_meeting_cancel
 		):
@@ -323,4 +363,61 @@ def get_chapter_history(chapter):
 	return {
 		"current_revision": doc.current_revision,
 		"revisions": revisions,
+	}
+
+
+def _check_links(chapter, doctype, names, label):
+	"""Each linked record is listed once, exists, and belongs to the chapter's Implementation.
+
+	One query for all rows; a missing record gets its own message instead of "another implementation".
+	"""
+	seen = set()
+	for name in names:
+		if name in seen:
+			frappe.throw(frappe._("{0} {1} is listed twice.").format(label, name))
+		seen.add(name)
+	if not names:
+		return
+	implementation_of = dict(
+		frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", "implementation"], as_list=True)
+	)
+	for name in names:
+		if name not in implementation_of:
+			frappe.throw(frappe._("{0} {1} does not exist.").format(label, name))
+		if implementation_of[name] != chapter.implementation:
+			frappe.throw(frappe._("{0} {1} belongs to another implementation.").format(label, name))
+
+
+def _dependencies_reach(start_name, chapters):
+	"""Whether following Depends On from `chapters` leads back to `start_name`."""
+	queue, visited = list(chapters), set()
+	while queue:
+		name = queue.pop()
+		if name == start_name:
+			return True
+		if name in visited:
+			continue
+		visited.add(name)
+		queue.extend(
+			frappe.get_all(
+				"Implementation Chapter Dependency",
+				filters={"parent": name, "parenttype": "Implementation Chapter"},
+				pluck="chapter",
+			)
+		)
+	return False
+
+
+@frappe.whitelist()
+def get_wip_status(implementation):
+	"""Chapters and features in progress against the agreed limits, for the Implementation form (#1970)."""
+	frappe.has_permission("Implementation", "read", doc=implementation, throw=True)
+	limits = frappe.db.get_value(
+		"Implementation", implementation, ["max_parallel_chapters", "max_parallel_features"], as_dict=True
+	) or {}
+	return {
+		"chapters": frappe.db.count("Implementation Chapter", {"implementation": implementation, "status": "In Progress"}),
+		"max_chapters": limits.get("max_parallel_chapters") or 0,
+		"features": frappe.db.count("Implementation Feature", {"implementation": implementation, "status": "In Progress"}),
+		"max_features": limits.get("max_parallel_features") or 0,
 	}

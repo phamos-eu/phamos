@@ -8,13 +8,9 @@ const employeeName = ref("");
 const hasMore = ref(false);
 const currentOffset = ref(0);
 
-function getTodayDate() {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
-}
-
-const fromDate = ref(getTodayDate());
-const toDate = ref(getTodayDate());
+// Default range: the current month (first to last day), in the user's time zone.
+const fromDate = ref(frappe.datetime.month_start());
+const toDate = ref(frappe.datetime.month_end());
 const search = ref("");
 const sortBy = ref("creation:desc");
 

@@ -72,7 +72,7 @@ def update_gitlab_avatar_on_customer(doc, method=None):
     try:
         group = frappe.db.get_value(
             "GitLab Group",
-            {"title": doc.name},
+            {"customer": doc.name},
             ["name", "group_id"],
             as_dict=True
         )
@@ -280,15 +280,22 @@ def create_gitlab_project_for_implementation(implementation_name, gitlab_project
 
         customer_doc = frappe.get_doc("Customer", customer_name)
 
+        # The group title can be edited on creation, so find the group by its customer link.
         gitlab_group = frappe.db.get_value(
             "GitLab Group",
-            {"title": customer_name},
-            ["group_id"],
+            {"customer": customer_name},
+            ["name", "group_id"],
             as_dict=True
         )
 
         if not gitlab_group:
             frappe.throw(f"No GitLab Group found for customer '{customer_name}'. Please create the group first.")
+
+        if not gitlab_group.group_id:
+            frappe.throw(
+                f"GitLab Group '{gitlab_group.name}' has no GitLab group ID. "
+                "Please sync or recreate the group."
+            )
 
         # ✅ Check: implementation already has a project linked
         existing_project = frappe.db.get_value(
@@ -313,14 +320,7 @@ def create_gitlab_project_for_implementation(implementation_name, gitlab_project
         )
 
         if not frappe.db.exists("GitLab Project", {"title": gitlab_project_name}):
-            group_link = None
-            namespace = project.get("namespace", {})
-            if namespace.get("kind") == "group":
-                group_link = frappe.db.get_value(
-                    "GitLab Group",
-                    {"group_id": namespace["id"]},
-                    "name"
-                )
+            group_link = gitlab_group.name
 
             gitlab_project_doc = frappe.get_doc({
                 "doctype": "GitLab Project",

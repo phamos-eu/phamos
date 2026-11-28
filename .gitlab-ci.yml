@@ -29,15 +29,62 @@
 #   pipeline to skip it. Set TESTS_REQUIRED_ENABLED=false to turn it off.
 #
 # ai_code_review
-#   Reviews MRs targeting version-15 with Claude and posts findings as an MR
-#   comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
-#   AI_REVIEW_ENABLED=false to disable.
+#   Reviews MRs into develop / version-15 / release/* with Claude: one
+#   resolvable thread per finding on its diff line, plus a new summary note
+#   with the verdict on every run (old notes are never edited). After the
+#   first review only new commits are reviewed; add the label
+#   "ai-review-full" to review the whole MR again on the next pipeline.
+#   Review rules: .gitlab/ai_review_guidelines.md.
+#   Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
+#   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
+#   to the MR and run a new pipeline to skip it for that MR.
+#
+# ai_issue_analysis
+#   Reads an issue's text and images and posts an analysis comment. Uses the
+#   same CI/CD variables as ai_code_review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+#   A pipeline schedule on develop with AI_ISSUE_POLL=true checks open issues
+#   labelled bug or question, reads the matching code in this checkout, and
+#   comments on those that have no analysis yet, then replaces the bug or
+#   question label with analysed so the next run skips them
+#   (AI_ISSUE_POLL_LIMIT per run, default 5). Set AI_ISSUE_PROJECT (for example
+#   phamos/developer) to read issues from that project; the code still comes
+#   from this checkout. The phamos site can still start
+#   one issue by calling the pipeline API with AI_ISSUE_IID and AI_ISSUE_LABEL.
+#   Set AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off. The poll schedule
+#   must set AI_ISSUE_POLL=true so the unit-test jobs do not run with it.
+#
+# ai_issue_plan
+#   For an open issue labelled "implementation plan", posts one planning step
+#   from the same checkout: what the code shows and one question, or a summary
+#   once the answers are enough. The label stays until a reply of "approved"
+#   on that summary, which posts the draft and replaces the label with
+#   plan-drafted. A comment on the issue starts the same job again. This does
+#   not write code. The job image already holds Frappe, ERPNext and HRMS on
+#   version-15. The script reads this app's major version and uses only the
+#   standard apps on that same version. Set AI_ISSUE_PLAN_ENABLED=false to
+#   turn the job off.
+#
+# ai_issue_implement
+#   For an open issue labelled plan-drafted, reads the draft plan and opens
+#   one merge request. The branch is the issue reference plus the target, for
+#   example phamos/phamos#1952_develop. The merge request targets the pipeline
+#   ref (develop on the schedule). The job comments the link and
+#   replaces plan-drafted with mr-opened. When the plan states that no code
+#   change is required, it comments that finding and uses no-change instead.
+#   A reply the job cannot apply uses implement-failed. It does not merge.
+#   Adding plan-drafted again retries a failed attempt. GITLAB_API_TOKEN reads
+#   the issue and posts the comment. GITLAB_AI_DEVELOPER pushes the branch and
+#   opens the merge request.
+#   Set AI_ISSUE_IMPLEMENT_ENABLED=false to turn the job off.
 
 workflow:
   rules:
     # One pipeline per change: an MR pipeline when the branch has an open MR,
-    # a branch pipeline otherwise.
+    # a branch pipeline otherwise. An issue-analysis run is an API pipeline
+    # and must be created even when that branch has an open MR.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question|implementation plan|plan-drafted)$/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH
@@ -60,6 +107,9 @@ variables:
   # redundant pipelines"), so the runner is not kept busy with outdated code.
   interruptible: true
   rules:
+    # The issue-analysis schedule must not run the test suite.
+    - if: '$AI_ISSUE_POLL == "true"'
+      when: never
     - if: '$UNIT_TESTS_ENABLED == "false"'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
@@ -165,12 +215,19 @@ unit_tests_1:
   extends: .unit_tests
   variables:
     SHARD_MODULES: >-
+      phamos.tests.test_dotted_paths
       phamos.tests.test_api
       phamos.okr_addon.doctype.okr.test_okr
       phamos.okr_addon.doctype.kr.test_kr
       phamos.okr_addon.doctype.okr_team.test_okr_team
       phamos.tests.test_web_profile_events
       phamos.tests.test_accounting_stats
+      phamos.phamos.page.extract_pdf.test_extract_pdf
+      phamos.gitlab_integration.test_issue_analysis
+      phamos.tests.test_set_timesheet_record_billable_hours
+      phamos.tests.test_party_account
+      phamos.tests.test_party_account_settings
+      phamos.tests.test_gitlab_issue_dashboard
 
 unit_tests_2:
   extends: .unit_tests
@@ -192,6 +249,8 @@ unit_tests_2:
       phamos.tests.test_accounting_receivables
       phamos.tests.test_personal_ideas
       phamos.tests.test_idea_import
+      phamos.tests.test_idea_votes
+      phamos.tests.test_ophice
 
 tests_required:
   stage: test
@@ -214,6 +273,19 @@ tests_required:
     - |
       changed="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)"
       code="$(printf '%s\n' "$changed" | grep -E '^phamos/.+\.py$' | grep -vE '(^|/)test_[^/]*\.py$' || true)"
+      # Every release MR bumps __version__ in phamos/__init__.py. That bump
+      # alone needs no test; any other line changed there still does, and so
+      # does deleting the file. Lines before the first @@ are the diff header;
+      # skipping to it keeps a content line like "++x" from looking like one.
+      # No grep -q here: under pipefail its early exit can fail the pipe and
+      # wave real code through.
+      init_lines="$(git diff -U0 "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD -- phamos/__init__.py | sed -n '/^@@/,$p' | grep -E '^[+-]' || true)"
+      version_re="^[+-]__version__ = ('[0-9][0-9A-Za-z.]*'|\"[0-9][0-9A-Za-z.]*\")$"
+      init_other="$(printf '%s\n' "$init_lines" | grep -vE "$version_re" || true)"
+      init_added="$(printf '%s\n' "$init_lines" | grep -E '^[+]' || true)"
+      if [ -z "$init_other" ] && [ -n "$init_added" ]; then
+        code="$(printf '%s\n' "$code" | grep -vxF 'phamos/__init__.py' || true)"
+      fi
       tests="$(printf '%s\n' "$changed" | grep -E '(^|/)test_[^/]*\.py$' || true)"
       if [ -n "$code" ] && [ -z "$tests" ]; then
         echo "This MR changes Python code but no test_*.py file:"
@@ -225,13 +297,81 @@ tests_required:
 
 ai_code_review:
   stage: ai-review
-  image: python:3.10-slim
+  # Not -slim: the review reads its diff with git.
+  image: python:3.10
+  tags: [hetzner]
+  # A failed review (API error, expired token) must not fail the MR pipeline.
+  allow_failure: true
   needs: []
   # A newer push gets its own review.
   interruptible: true
+  variables:
+    # The diff needs the MR's merge base and the last reviewed commit.
+    GIT_DEPTH: "0"
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "version-15"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(^|,)skip-ai-code-review(,|$)/'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
   script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
     - python .gitlab/ai_code_review.py
+
+ai_issue_analysis:
+  stage: ai-review
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
+  # A failed analysis must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_ANALYSIS_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
+  script:
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_analysis.py
+
+ai_issue_plan:
+  stage: ai-review
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
+  # A failed plan must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_PLAN_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL == "implementation plan"'
+  script:
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_plan.py
+
+ai_issue_implement:
+  stage: ai-review
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
+  # A failed implementation must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_IMPLEMENT_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL == "plan-drafted"'
+  script:
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_implement.py

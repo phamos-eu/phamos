@@ -14,6 +14,10 @@ from frappe.translate import (
 )
 from frappe.utils import cint, get_system_timezone
 
+from phamos.api.cockpit_preferences import get_preferences
+from phamos.cockpits.settings import COCKPITS, NEUTRAL_THEME_COLOR, cockpit_window
+from phamos.phriend.boot import app_versions, phriend_boot
+
 
 def get_spa_boot(default_route):
 	"""Boot dict for Vite SPAs (csrf, timezone, user, language and its translations).
@@ -22,6 +26,7 @@ def get_spa_boot(default_route):
 	i18n.js) translates like `__()` in Desk (#1605). English needs no table.
 	"""
 	lang = frappe.local.lang or "en"
+	phriend = phriend_boot()
 	tz = {
 		"system": get_system_timezone(),
 		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
@@ -44,8 +49,49 @@ def get_spa_boot(default_route):
 				"name": frappe.session.user,
 				"full_name": frappe.utils.get_fullname(),
 			},
+			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
+			# and the app versions it adds to a report. Only for users Phriend is for.
+			"phriend": phriend,
+			"versions": app_versions() if phriend else {},
+			# The user's own cockpit preferences, e.g. the panel layout of the record pages (#1910).
+			"preferences": get_preferences(),
+			# The cockpit's window colour and edge glow from Cockpit Settings (#1933).
+			"cockpit_window": cockpit_window(default_route),
+			# The cockpits this user may open, for the switcher in the sidebar (#1955).
+			"cockpits": user_cockpits(),
 		}
 	)
+
+
+def user_cockpits():
+	"""The cockpits the session user may open, in the order of the Apps screen.
+
+	Taken from this app's `add_to_apps_screen` tiles and their permission checks, so the switcher
+	offers exactly what the Apps screen offers.
+
+	Returns:
+		list[dict]: route and title of each cockpit.
+	"""
+	cockpits = []
+	for tile in frappe.get_hooks("add_to_apps_screen", app_name="phamos"):
+		route = tile.get("route")
+		if route not in COCKPITS:
+			continue
+		check = tile.get("has_permission")
+		try:
+			allowed = not check or frappe.get_attr(check)()
+		except Exception:
+			# a broken check must not take every cockpit's page down; that cockpit is just not offered
+			allowed = False
+		if allowed:
+			cockpits.append({"route": route, "title": tile.get("title") or route})
+	return cockpits
+
+
+def theme_color(boot):
+	"""The page's theme-color: the cockpit colour, so an installed cockpit's title bar has it from
+	the first paint (#1933). spa_shared/theme.js keeps it after the page has loaded."""
+	return boot.cockpit_window["color"] or NEUTRAL_THEME_COLOR
 
 
 def spa_translations(lang):

@@ -1,0 +1,95 @@
+# Copyright (c) 2026, phamos.eu and contributors
+# For license information, please see license.txt
+
+"""Which cockpits can show an Issue: the "Open in Cockpit" group on the Desk form (#1957).
+
+A cockpit fits when the session user can open it and the Issue is in its scope, by the
+same rules the cockpit's own Issue detail page uses (department_cockpit._issue_in_scope).
+"""
+
+from urllib.parse import quote
+
+import frappe
+from frappe import _
+
+from phamos.api import department_cockpit as dc
+from phamos.cockpits import teams
+
+# Best fit first: the Personal Cockpit, then the Issue's own department or team, then its project's.
+RANK_PERSONAL = 0
+RANK_ISSUE_DEPARTMENT = 1
+RANK_PROJECT_DEPARTMENT = 2
+
+
+def _cockpit_modules():
+	"""(module, route) of every cockpit on the Apps screen with a CockpitConfig, in hooks order."""
+	cockpits = []
+	for app in frappe.get_hooks("add_to_apps_screen", app_name="phamos"):
+		module_name = f"phamos.api.{app['name']}"
+		try:
+			module = frappe.get_module(module_name)
+		except ModuleNotFoundError as error:
+			# An Apps-screen entry without an API module (Bookstack, #2028) is no cockpit; a cockpit
+			# module that fails to import must still raise, not vanish from the menu.
+			if error.name != module_name:
+				raise
+			continue
+		if isinstance(getattr(module, "CONFIG", None), dc.CockpitConfig):
+			cockpits.append((module, app["route"]))
+	return cockpits
+
+
+def _rank(config, doc):
+	if config.is_personal:
+		return RANK_PERSONAL
+	if config.is_team:
+		# The Team Cockpit ranks like a department: the Issue's own team before its project's.
+		own = doc.get("custom_team") and doc.custom_team == teams.active_team()
+	else:
+		own = doc.get("custom_department") and doc.custom_department == dc._get_department(config)
+	return RANK_ISSUE_DEPARTMENT if own else RANK_PROJECT_DEPARTMENT
+
+
+def _in_scope(config, doc):
+	"""dc._issue_in_scope, except that the Team Cockpit does not fit a user in no team.
+
+	Administrator passes every check_app_permission but may be in no team; asking first keeps
+	teams.require_active_team from throwing, which would also queue a Desk popup
+	("You are not a member of any team.") through frappe.throw's message log.
+	"""
+	if config.is_team and not teams.active_team():
+		return False
+	return dc._issue_in_scope(config, doc)
+
+
+def _short_label(config):
+	# "Personal Cockpit" → "Personal": the group label already says "Cockpit".
+	return config.label.removesuffix(" Cockpit")
+
+
+def cockpits_for_issue(doc):
+	"""Fitting cockpits for an Issue doc as [{label, url}], best fit first."""
+	found = []
+	for position, (module, route) in enumerate(_cockpit_modules()):
+		config = module.CONFIG
+		if not module.check_app_permission() or not _in_scope(config, doc):
+			continue
+		found.append(
+			(
+				_rank(config, doc),
+				position,
+				{
+					"label": _(_short_label(config)),
+					"url": f"{route}/issues/list/{quote(doc.name, safe='')}",
+				},
+			)
+		)
+	return [entry for _rank_, _position, entry in sorted(found, key=lambda row: row[:2])]
+
+
+@frappe.whitelist()
+def get_issue_cockpits(name):
+	"""Cockpits that can show this Issue, for the Desk form's "Open in Cockpit" group."""
+	doc = frappe.get_doc("Issue", name)
+	doc.check_permission("read")
+	return cockpits_for_issue(doc)

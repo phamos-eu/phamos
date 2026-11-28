@@ -6,7 +6,8 @@
   page every link to a Web Profile section or to a translated Web Page is swapped for its English
   counterpart (and the other way round).
 - The footer groups "Modules" and "Industries" are filled with the published Module / Industry
-  Web Profiles (kept as empty headings in Website Settings).
+  Web Profiles, "Documentation" with the published BookStack books (kept as empty headings in
+  Website Settings).
 - The footer's bottom area shows the company data like a DIN 5008 letter footer, taken from the
   ERPNext Company, its Address and its default Bank Account (IBAN masked).
 """
@@ -21,6 +22,8 @@ from phamos.web_profile.i18n import DEFAULT_LANGUAGE, LANGUAGES
 # Footer headings (English source label or the German label already in Website Settings) that are
 # generated from a Web Profile section.
 GENERATED_GROUPS = {"Modules": "modules", "Module": "modules", "Industries": "industries", "Branchen": "industries"}
+# Footer heading filled with the published documentation books (phamos/phamos#2005).
+DOCS_GROUPS = {"Documentation", "Dokumentation"}
 
 
 def update_website_context(context):
@@ -56,8 +59,8 @@ def _edit_link_meta(page):
 
 
 def _page_language(context):
-	if context.get("section_config") and context.get("lang") in LANGUAGES:  # Web Profile pages
-		return context.lang
+	if (context.get("section_config") or context.get("wp_docs")) and context.get("lang") in LANGUAGES:
+		return context.lang  # Web Profile and documentation pages
 	doc = context.get("doc")
 	if doc is not None and getattr(doc, "doctype", None) == "Web Page" and doc.get("language") in LANGUAGES:
 		return doc.language
@@ -90,8 +93,11 @@ def translate_url(url, lang):
 	parts = url.strip("/").split("/")
 	if len(parts) < 2 or parts[0] not in LANGUAGES or parts[0] == lang:
 		return url
+	from phamos.web_profile.docs import DOCS_ROUTES
 	from phamos.web_profile.sections import SECTIONS
 
+	if f"/{parts[0]}/{parts[1]}" == DOCS_ROUTES.get(parts[0]):  # documentation (#2044)
+		return DOCS_ROUTES[lang] + "".join(f"/{p}" for p in parts[2:])
 	for config in SECTIONS.values():
 		if config["slugs"].get(parts[0]) == parts[1]:
 			return "/" + "/".join([lang, config["slugs"][lang], *parts[2:]])
@@ -127,7 +133,15 @@ def _footer_items(items, lang):
 		copy = _translate_item(item, lang)
 		label, parent = (item.get("label"), item.get("parent_label"))
 		section = GENERATED_GROUPS.get(label)
-		if section and not parent:
+		if label in DOCS_GROUPS and not parent:
+			from phamos.web_profile.docs import published_books
+
+			# Frappe's footer template prints labels unescaped; book titles come from BookStack (review B1).
+			copy.child_items = [
+				frappe._dict(label=frappe.utils.escape_html(b.title), url=b.url, parent_label=label)
+				for b in published_books(lang)
+			]
+		elif section and not parent:
 			profiles = sorted(get_items(section, lang), key=lambda i: i.sort["manual"])
 			copy.child_items = [frappe._dict(label=p.title, url=p.url, parent_label=label) for p in profiles]
 		out.append(copy)

@@ -73,7 +73,7 @@ Ongoing,Laufend
 1 module,1 Modul
 Languages,Sprachen
 Teammates,Teamkolleginnen und -kollegen
-Lead,Leitung
+Lead,Interessent
 People in this department,Personen in dieser Abteilung
 View open roles,Offene Stellen ansehen
 Team lead,Teamleitung
@@ -972,6 +972,7 @@ Could not load the project,Das Projekt konnte nicht geladen werden
 Please pick a project.,Bitte wählen Sie ein Projekt.
 This project needs a task.,Für dieses Projekt ist eine Aufgabe erforderlich.
 Minimum expected time is 15 minutes.,Die geplante Zeit beträgt mindestens 15 Minuten.
+Please complete the start time.,Bitte vervollständigen Sie die Startzeit.
 Please describe the goal.,Bitte beschreiben Sie das Ziel.
 Could not start the timer,Der Timer konnte nicht gestartet werden
 Stop timer,Timer stoppen
@@ -1662,3 +1663,1664 @@ Could not build the DATEV PDF.,Das DATEV-PDF konnte nicht erstellt werden.
 {0} is not a valid email address.,{0} ist keine gültige E-Mail-Adresse.
 Test send to DATEV: sent to {0} by {1}.,Testversand an DATEV: von {1} an {0} gesendet.
 Test send queued to {0}. The receipt is not marked as sent to DATEV.,Testversand an {0} eingereiht. Der Beleg wird nicht als an DATEV gesendet markiert.
+Sick Leave Types,Krankheitsarten
+Sick days this year,Krankheitstage dieses Jahr
+Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
+"Approved, since 1 January","Genehmigt, seit 1. Januar"
+My leave days {0},Meine Abwesenheitstage {0}
+"Click a leave day to see its application.","Klicken Sie auf einen Abwesenheitstag, um den Antrag zu sehen."
+Requested,Beantragt
+Working day,Arbeitstag
+Weekend or holiday,Wochenende oder Feiertag
+Team Calendar,Teamkalender
+Birthday,Geburtstag
+Holiday,Feiertag
+Month,Monat
+Timeline,Zeitleiste
+Employee,Mitarbeiter
+View,Ansicht
+All companies,Alle Unternehmen
+No active employees.,Keine aktiven Mitarbeiter.
+Birthday: {0},Geburtstag: {0}
+The team calendar could not be loaded.,Der Teamkalender konnte nicht geladen werden.
+The end date must not be before the start date.,Das Enddatum darf nicht vor dem Startdatum liegen.
+The calendar shows at most {0} days at once.,Der Kalender zeigt höchstens {0} Tage auf einmal.
+Only HR users can see this page.,Nur HR-Benutzer können diese Seite sehen.
+Some absences show without their type and can't be opened.,Manche Abwesenheiten erscheinen ohne Art und lassen sich nicht öffnen.
+Four weeks back,Vier Wochen zurück
+Four weeks ahead,Vier Wochen vor
+Calendar,Kalender
+Ø coverage,Ø Besetzung
+Last 12 months,Letzte 12 Monate
+"Working days since {0}, approved leave only","Arbeitstage seit {0}, nur genehmigte Abwesenheit"
+"{0} of {1} person-days available, open requests counted as away","{0} von {1} Personentagen verfügbar, offene Anträge als abwesend gezählt"
+Next week,Nächste Woche
+In {0} weeks,In {0} Wochen
+pts,Pkt.
+Show data,Daten anzeigen
+Hide now,Jetzt ausblenden
+Click to extend,Klicken zum Verlängern
+Hidden for screen sharing,Für die Bildschirmfreigabe ausgeblendet
+Figures are hidden for screen sharing. Show them for {0}.,Zahlen sind für die Bildschirmfreigabe ausgeblendet. {0} lang anzeigen.
+Data visible for {0}. Click to extend.,Daten sichtbar für {0}. Klicken zum Verlängern.
+Privacy mode must show data for at least {0} seconds.,Der Datenschutzmodus muss Daten mindestens {0} Sekunden anzeigen.
+Privacy Mode: Seconds Data Stays Visible,Datenschutzmodus: Sekunden sichtbar
+"Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until ""Show data"" is clicked, then show for this many seconds. At least 10.","Datenschutzmodus für die Bildschirmfreigabe: Zahlen im HR-Cockpit bleiben ausgeblendet, bis „Daten anzeigen“ geklickt wird, und sind dann so viele Sekunden sichtbar. Mindestens 10."
+Hand in for Vote,Zur Abstimmung einreichen
+Open for vote,Zur Abstimmung
+Withdraw from vote,Von der Abstimmung zurückziehen
+For vote,Zur Abstimmung
+Ideas for vote,Ideen zur Abstimmung
+Your idea,Deine Idee
+1 vote,1 Stimme
+{0} votes,{0} Stimmen
+Idea handed in for vote,Idee zur Abstimmung eingereicht
+Idea withdrawn from vote,Idee von der Abstimmung zurückgezogen
+Could not hand in the idea,Die Idee konnte nicht eingereicht werden
+Could not withdraw the idea,Die Idee konnte nicht zurückgezogen werden
+Could not save your vote,Deine Stimme konnte nicht gespeichert werden
+Could not load the ideas up for vote,Die Ideen zur Abstimmung konnten nicht geladen werden
+Hand in this idea for a vote? Every cockpit user can then read it and vote for it. Your writing sessions and history stay private.,Diese Idee zur Abstimmung einreichen? Dann kann jede Person im Cockpit sie lesen und für sie stimmen. Deine Schreibsitzungen und der Verlauf bleiben privat.
+Withdraw this idea from the vote? The votes so far are removed.,Diese Idee von der Abstimmung zurückziehen? Die bisherigen Stimmen werden entfernt.
+It is also withdrawn from the vote.,Sie wird auch von der Abstimmung zurückgezogen.
+Ideas your colleagues handed in. Vote for the ones you want to see happen.,"Ideen, die deine Kolleginnen und Kollegen eingereicht haben. Stimm für die, die du umgesetzt sehen willst."
+Loading the ideas up for vote…,Die Ideen zur Abstimmung werden geladen…
+No idea is up for vote right now. Hand one of yours in from its page.,Gerade steht keine Idee zur Abstimmung. Reiche eine deiner Ideen auf ihrer Seite ein.
+Handed in {0},Eingereicht {0}
+Vote for this idea,Für diese Idee stimmen
+Take back your vote,Deine Stimme zurücknehmen
+All ideas up for vote,Alle Ideen zur Abstimmung
+Open in My Ideas,In Meine Ideen öffnen
+This idea has no text yet.,Diese Idee hat noch keinen Text.
+This idea is not open for a vote.,Diese Idee steht nicht zur Abstimmung.
+This idea is no longer up for vote.,Diese Idee steht nicht mehr zur Abstimmung.
+You cannot vote for your own idea.,Für deine eigene Idee kannst du nicht stimmen.
+A composted idea cannot be handed in. Take it up again first.,Eine kompostierte Idee kann nicht eingereicht werden. Nimm sie zuerst wieder auf.
+Unknown vote status: {0},Unbekannter Abstimmungsstatus: {0}
+Idea Vote,Ideen-Stimme
+Vote Status,Abstimmungsstatus
+Handed In On,Eingereicht am
+Votes,Stimmen
+Vote,Abstimmung
+Personal Cockpit Settings,Einstellungen Persönliches Cockpit
+Show Author of Ideas Handed in for Vote,Autor von zur Abstimmung eingereichten Ideen anzeigen
+"Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.","Abstimmende sehen, wer eine Idee eingereicht hat. Aus: Ideen zur Abstimmung erscheinen ohne Autor, und der Autor tritt dem Chat der Idee nicht von selbst bei."
+Open for vote: every Personal Cockpit user can read this idea and vote for it (#1842).,Zur Abstimmung: Jede Person im Persönlichen Cockpit kann diese Idee lesen und für sie stimmen (#1842).
+Only colleagues can see ideas up for vote.,Nur Kolleginnen und Kollegen sehen Ideen zur Abstimmung.
+No chat about this idea yet.,Zu dieser Idee gibt es noch keinen Chat.
+"Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea.","Starte einen, um die Idee mit Kolleginnen und Kollegen zu besprechen. Nachrichten erscheinen auch in Raven, verknüpft mit der Idee."
+Start a Raven chat about this idea,Einen Raven-Chat zu dieser Idee starten
+Join the Raven chat about this idea,Dem Raven-Chat zu dieser Idee beitreten
+"Read the chat of this idea, which is no longer up for vote","Den Chat dieser Idee lesen, die nicht mehr zur Abstimmung steht"
+Open the Raven chat about this idea,Den Raven-Chat zu dieser Idee öffnen
+"When you send, every colleague you mention joins the chat.",Beim Senden tritt jede erwähnte Kollegin und jeder erwähnte Kollege dem Chat bei.
+Chat about the idea {0},Chat zur Idee {0}
+The chat opens once the idea is handed in for a vote.,"Der Chat öffnet sich, sobald die Idee zur Abstimmung eingereicht ist."
+{0} handed the idea in for a vote again.,{0} hat die Idee wieder zur Abstimmung eingereicht.
+{0} withdrew the idea from the vote.,{0} hat die Idee von der Abstimmung zurückgezogen.
+Open the idea,Idee öffnen
+Next idea,Nächste Idee
+Last idea up for vote,Letzte Idee zur Abstimmung
+Sales,Vertrieb
+Leads,Interessenten
+"All leads, sorted for follow-up","Alle Interessenten, sortiert zum Nachfassen"
+Sales department tasks,Aufgaben des Vertriebs
+Sales department tasks overview,Übersicht der Aufgaben des Vertriebs
+Checklists linked to Sales issues and tasks,Checklisten zu Anfragen und Aufgaben des Vertriebs
+Sales department issues,Anfragen des Vertriebs
+Sales department issues overview,Übersicht der Anfragen des Vertriebs
+1 lead,1 Interessent
+{0} leads,{0} Interessenten
+Search…,Suchen …
+Filter by lead owner,Nach Verantwortlichem filtern
+No leads found. Try clearing search or status filters.,Keine Interessenten gefunden. Leeren Sie die Suche oder die Statusfilter.
+Next Follow Up,Nächstes Nachfassen
+Last Updated,Zuletzt geändert
+Could not load leads,Interessenten konnten nicht geladen werden
+Edit note,Notiz bearbeiten
+Saving…,Wird gespeichert …
+Note,Notiz
+Added by {0},Hinzugefügt von {0}
+A note can't be empty.,Eine Notiz darf nicht leer sein.
+Could not save note,Notiz konnte nicht gespeichert werden
+What did you discuss?,Was haben Sie besprochen?
+Next Follow Up On,Nächstes Nachfassen am
+Enter a note or set a next follow-up date.,Geben Sie eine Notiz ein oder legen Sie ein Datum für das nächste Nachfassen fest.
+Search this lead…,In diesem Interessenten suchen …
+Back to list,Zurück zur Liste
+Open website,Website öffnen
+Territory,Gebiet
+Source,Quelle
+No. of Employees,Anzahl Mitarbeiter
+Market Segment,Marktsegment
+Annual Revenue,Jährlicher Umsatz
+Request Type,Anfragetyp
+Write an email,E-Mail schreiben
+Status Comment,Statuskommentar
+required,Pflichtfeld
+Reason and comments for this lead's status,Grund und Kommentare zum Status dieses Interessenten
+"Select Communication, Notes, or Activities to view.","Wählen Sie Kommunikation, Notizen oder Aktivitäten zur Anzeige."
+Nothing here matches that search.,Nichts entspricht dieser Suche.
+Nothing recorded yet.,Noch nichts erfasst.
+{0} messages,{0} Nachrichten
+(no subject),(kein Betreff)
+to {0},an {0}
+Show 1 earlier message,1 frühere Nachricht anzeigen
+Show {0} earlier messages,{0} frühere Nachrichten anzeigen
+Sent,Gesendet
+Received,Empfangen
+Status,Status
+Lead Owner,Eigentümer des Leads
+Qualification Status,Qualifikationsstatus
+Added: {0},Hinzugefügt: {0}
+Removed: {0},Entfernt: {0}
+"This site blocks embedding, so it opened in a new tab.",Diese Website lässt keine Einbettung zu und wurde in einem neuen Tab geöffnet.
+"Could not reach this site to preview it, so it opened in a new tab.",Die Website war für eine Vorschau nicht erreichbar und wurde in einem neuen Tab geöffnet.
+Could not open website,Website konnte nicht geöffnet werden
+Could not load lead,Interessent konnte nicht geladen werden
+Could not load activity,Aktivitäten konnten nicht geladen werden
+"Saved, but someone else changed this lead just now. Check for lost edits.","Gespeichert, aber jemand anderes hat diesen Interessenten gerade geändert. Prüfen Sie, ob Änderungen verloren gingen."
+Could not save lead,Interessent konnte nicht gespeichert werden
+No date,Kein Datum
+No leads found,Keine Interessenten gefunden
+Opportunity,Chance
+Quotation,Angebot
+Lost Quotation,Angebot verloren
+Interested,Interessiert
+Converted,umgewandelt
+Do Not Contact,Nicht Kontakt aufnehmen
+Unqualified,Nicht qualifiziert
+In Process,In Bearbeitung
+Qualified,Qualifiziert
+Product Enquiry,Produktanfrage
+Request for Information,Informationsanfrage
+Suggestions,Vorschläge
+Other,Andere
+Communication,Kommunikation
+Notes,Notizen
+Activities,Aktivitäten
+Follow Ups,Nachfassen
+Gantt,Gantt-Diagramm
+Record updated,Datensatz geändert
+State/Province,Staat / Provinz
+Show less,Weniger anzeigen
+Show full message,Ganze Nachricht anzeigen
+"ERPNext kept the status at {0}: it follows linked opportunities, quotations and customers.","ERPNext hat den Status {0} beibehalten: Er richtet sich nach verknüpften Chancen, Angeboten und Kunden."
+You need a Sales role to use the Leads cockpit.,"Sie benötigen eine Vertriebsrolle, um die Interessenten im Vertriebs-Cockpit zu nutzen."
+Invalid Lead field(s): {0},Ungültige Felder des Interessenten: {0}
+No fields to update,Keine Felder zu aktualisieren
+That note is no longer on this lead.,Diese Notiz gehört nicht mehr zu diesem Interessenten.
+Filter by status,Nach Status filtern
+Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.,Die ersten {0} Interessenten nach Nachfass-Datum werden angezeigt. Interessenten mit späterem Nachfassen fehlen.
+Issues,Anfragen
+Inbound,Eingehend
+Outbound,Ausgehend
+Inbound / Outbound,Eingehend / Ausgehend
+"Inbound: they came to us (website, email, event). Outbound: we went to them.","Eingehend: Der Kontakt kam zu uns (Website, E-Mail, Veranstaltung). Ausgehend: Wir sind auf ihn zugegangen."
+Filled into a Lead when this source is chosen.,"Wird in den Interessenten übernommen, wenn diese Quelle gewählt wird."
+As of {0}. Counted by the date a lead was created.,"Stand {0}. Gezählt nach dem Datum, an dem ein Interessent angelegt wurde."
+Lead list in Desk,Interessentenliste im Desk
+"1 lead is not marked Inbound or Outbound yet, so the split below is incomplete.","1 Interessent ist noch nicht als Eingehend oder Ausgehend markiert, die Aufteilung unten ist daher unvollständig."
+"{0} leads are not marked Inbound or Outbound yet, so the split below is incomplete.","{0} Interessenten sind noch nicht als Eingehend oder Ausgehend markiert, die Aufteilung unten ist daher unvollständig."
+Show them,Anzeigen
+New leads per month,Neue Interessenten pro Monat
+Click a month to see its leads. The current month runs up to today.,"Klicken Sie auf einen Monat, um seine Interessenten zu sehen. Der laufende Monat reicht bis heute."
+Where leads come from,Woher Interessenten kommen
+No leads in this period.,Keine Interessenten in diesem Zeitraum.
+This month's leads by status today,Interessenten dieses Monats nach heutigem Status
+No leads this month yet.,Diesen Monat noch keine Interessenten.
+All leads,Alle Interessenten
+Last 3 months,Letzte 3 Monate
+Could not load the lead overview,Die Interessenten-Übersicht konnte nicht geladen werden
+On par,Im Rahmen
+{0} more,{0} mehr
+{0} fewer,{0} weniger
+New leads this month,Neue Interessenten diesen Monat
+Same period last year,Gleicher Zeitraum im Vorjahr
+No leads recorded that far back.,So weit zurück sind keine Interessenten erfasst.
+This month: {0},Dieser Monat: {0}
+Compared with the 12-month average,Im Vergleich zum 12-Monats-Durchschnitt
+"Expected by today: Ø {0} a month over {1} months, for {2} of {3} days","Erwartet bis heute: Ø {0} pro Monat über {1} Monate, für {2} von {3} Tagen"
+Needs at least one complete month.,Braucht mindestens einen vollständigen Monat.
+Compared with this month in earlier years,Im Vergleich zu diesem Monat in früheren Jahren
+Ø of the same days in {0},Ø der gleichen Tage in {0}
+Not enough history yet: the first lead is from {0}.,Noch zu wenig Verlauf: Der erste Interessent ist von {0}.
+Last month vs the month before,Letzter Monat gegenüber dem Monat davor
+Last {0} months vs the {0} before,Letzte {0} Monate gegenüber den {0} davor
+{0} against {1} · {2},{0} gegenüber {1} · {2}
+Not enough history yet.,Noch zu wenig Verlauf.
+Steady,Gleichbleibend
+Improved,Verbessert
+Declined,Gesunken
+Same month a year earlier,Gleicher Monat im Vorjahr
+Lighter bar: the same month a year earlier,Hellerer Balken: gleicher Monat im Vorjahr
+No source,Ohne Quelle
+12-month average,12-Monats-Durchschnitt
+There is no complete month of leads yet.,Es gibt noch keinen vollständigen Monat mit Interessenten.
+The last {0} months,Die letzten {0} Monate
+"Ø {0} leads a month. Green months were above it, red ones below. Click a month to see its leads.","Ø {0} Interessenten pro Monat. Grüne Monate lagen darüber, rote darunter. Klicken Sie auf einen Monat, um seine Interessenten zu sehen."
+vs Ø,ggü. Ø
+"This month so far: {0}, where Ø {1} would be expected by today.","Dieser Monat bisher: {0}, erwartet wären bis heute Ø {1}."
+This month in earlier years,Dieser Monat in früheren Jahren
+Not enough history yet: the first lead is from {0}. This comparison appears once a full year is recorded.,"Noch zu wenig Verlauf: Der erste Interessent ist von {0}. Dieser Vergleich erscheint, sobald ein volles Jahr erfasst ist."
+{0} in earlier years,{0} in früheren Jahren
+"The same days as this month so far, and the whole month for context. Click a number to see those leads.","Die gleichen Tage wie dieser Monat bisher, dazu der ganze Monat zur Einordnung. Klicken Sie auf eine Zahl, um diese Interessenten zu sehen."
+Up to day {0},Bis Tag {0}
+Whole month,Ganzer Monat
+What changed,Was sich geändert hat
+Not enough history yet to compare these months.,"Noch zu wenig Verlauf, um diese Monate zu vergleichen."
+"{0} against {1}. Biggest drop first, so you see where leads went missing. Click a number to see those leads.","{0} gegenüber {1}. Größter Rückgang zuerst, damit Sie sehen, wo Interessenten fehlen. Klicken Sie auf eine Zahl, um diese Interessenten zu sehen."
+Edit in Desk,Im Desk bearbeiten
+Showing the newest {0} leads. Narrow the filters to see the rest.,"Die neuesten {0} Interessenten werden angezeigt. Grenzen Sie die Filter ein, um den Rest zu sehen."
+"These leads are not marked Inbound or Outbound yet. Open each one and choose, or set them in bulk via Edit in Desk.","Diese Interessenten sind noch nicht als Eingehend oder Ausgehend markiert. Öffnen Sie jeden und wählen Sie, oder setzen Sie es gesammelt über „Im Desk bearbeiten“."
+These leads have no source. Add one so the overview can tell where leads come from.,"Diese Interessenten haben keine Quelle. Ergänzen Sie eine, damit die Übersicht zeigt, woher Interessenten kommen."
+"How many new leads, compared with what","Wie viele neue Interessenten, im Vergleich wozu"
+until {0},bis {0}
+Created: {0},Angelegt: {0}
+Inbound / Outbound: not set,Eingehend / Ausgehend: nicht gesetzt
+Source: {0},Quelle: {0}
+Unknown Inbound / Outbound filter: {0},Unbekannter Filter Eingehend / Ausgehend: {0}
+Unknown Lead status: {0},Unbekannter Interessenten-Status: {0}
+Overview,Übersicht
+This month,Diesen Monat
+Year,Jahr
+Jan,Jan.
+Feb,Feb.
+Mar,Mrz.
+Apr,Apr.
+May,Mai
+Jun,Jun.
+Jul,Jul.
+Aug,Aug.
+Sep,Sep.
+Oct,Okt.
+Nov,Nov.
+Dec,Dez.
+Address,Adresse
+Arrow,Pfeil
+Box,Rahmen
+Browser,Browser
+Check and send,Prüfen und senden
+Describe what you see in the next step instead.,"Beschreiben Sie im nächsten Schritt, was Sie sehen."
+Discard,Verwerfen
+Discard this report? What you wrote and drew is lost.,"Diese Meldung verwerfen? Was Sie geschrieben und gezeichnet haben, geht verloren."
+"Draw an arrow to the problem, box it, write on it, or black out private data.","Zeichnen Sie einen Pfeil zum Problem, rahmen Sie es ein, schreiben Sie darauf oder schwärzen Sie private Daten."
+Drawing tools,Zeichenwerkzeuge
+Everything that is sent,"Alles, was gesendet wird"
+Got it! Saved as,Danke! Gespeichert als
+"Hi, I'm Phriend! Click me when something looks wrong.","Hallo, ich bin Phriend! Klicken Sie mich an, wenn etwas nicht stimmt."
+Click me!,Klicken Sie mich an!
+How urgent is it?,Wie dringend ist es?
+In a few words,In wenigen Worten
+It goes out when you're back online.,"Sie wird gesendet, sobald Sie wieder online sind."
+Keep editing,Weiter bearbeiten
+Leave out the screenshot,Screenshot weglassen
+Log in,Anmelden
+No screenshot this time.,Diesmal gibt es keinen Screenshot.
+None,Keine
+One moment…,Einen Moment…
+Open it,Öffnen
+Page,Seite
+Phriend adds this for you,Das fügt Phriend für Sie hinzu
+Phriend couldn't start. Reload the page and try again.,Phriend konnte nicht starten. Laden Sie die Seite neu und versuchen Sie es noch einmal.
+Problems on the page,Probleme auf der Seite
+Report it?,Melden?
+Screenshot,Screenshot
+Send now,Jetzt senden
+Send to Phriend,An Phriend senden
+Sending didn't work:,Senden hat nicht geklappt:
+Show what you mean,"Zeigen Sie, was Sie meinen"
+Skip,Überspringen
+Step {0} of 4,Schritt {0} von 4
+Taking a screenshot of the page…,Screenshot der Seite wird erstellt…
+Text,Text
+The report goes out without a screenshot.,Die Meldung wird ohne Screenshot gesendet.
+The server can't be reached.,Der Server ist nicht erreichbar.
+Try again,Erneut versuchen
+Type here…,Hier tippen…
+Undo,Rückgängig
+Use the screenshot,Screenshot wieder verwenden
+Version,Version
+"What did you do, and what did you expect?","Was haben Sie getan, und was haben Sie erwartet?"
+What kind of report?,Welche Art von Meldung?
+"Whoops, that call failed.","Hoppla, da ist etwas schiefgegangen."
+Window,Fenster
+You have a report that wasn't sent.,"Sie haben eine Meldung, die nicht gesendet wurde."
+You're not allowed to send Phriend reports.,Sie dürfen keine Phriend-Meldungen senden.
+You're offline.,Sie sind offline.
+Your report is kept.,Ihre Meldung bleibt erhalten.
+Your session has expired.,Ihre Sitzung ist abgelaufen.
+no screenshot,ohne Screenshot
+unknown error,unbekannter Fehler
+with screenshot,mit Screenshot
+{0} open Phriend reports for this page,{0} offene Phriend-Meldungen zu dieser Seite
+Bug,Fehler
+Improvement,Verbesserung
+Question,Frage
+Something is broken,Etwas funktioniert nicht
+It could be better,Es könnte besser sein
+I'm not sure how,"Ich weiß nicht, wie es geht"
+a page,eine Seite
+"Log in again in a new tab, then try again.",Melden Sie sich in einem neuen Tab neu an und versuchen Sie es dann erneut.
+Still sending your last report…,Ihre letzte Meldung wird noch gesendet…
+unexpected answer from the server,unerwartete Antwort vom Server
+This page is out of date.,Diese Seite ist nicht mehr aktuell.
+"Reload it to send your report; the text is kept, the screenshot is not.","Laden Sie sie neu, um Ihre Meldung zu senden; der Text bleibt erhalten, der Screenshot nicht."
+Reload,Neu laden
+Next,Weiter
+Black out private data,Private Daten schwärzen
+Redacted,Geschwärzt
+Delete,Löschen
+Del,Entf
+"The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
+not a PNG or JPEG image,kein PNG- oder JPEG-Bild
+larger than {0} MB,größer als {0} MB
+Something else,Etwas anderes
+None of these,Nichts davon
+Phriend: report a problem ({0}),Phriend: ein Problem melden ({0})
+Phriend: report a problem,Phriend: ein Problem melden
+Press the new keys…,Drücken Sie die neuen Tasten…
+Turn off,Ausschalten
+Use the default ({0}),Standard verwenden ({0})
+That didn't work. Try again.,Das hat nicht geklappt. Versuchen Sie es noch einmal.
+Keyboard shortcut,Tastenkürzel
+Keyboard Shortcut,Tastenkürzel
+"Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Mod+Shift+K. Empty: no shortcut. Each user can change or switch off their own in Phriend.","Öffnet Phriend. Mod ist Cmd auf dem Mac und sonst Strg, z. B. Mod+P oder Mod+Shift+K. Leer: kein Tastenkürzel. Jede Person kann ihr eigenes in Phriend ändern oder ausschalten."
+Free drawing,Freihand zeichnen
+Looking for earlier reports…,Frühere Meldungen werden gesucht…
+No open reports about this page yet.,Zu dieser Seite gibt es noch keine offenen Meldungen.
+Already reported here,Hier schon gemeldet
+Show all {0},Alle {0} anzeigen
+About: {0},Betrifft: {0}
+Step {0} of 4: {1},Schritt {0} von 4: {1}
+e.g. Save does nothing on a new lead,z. B. Speichern tut nichts bei einem neuen Lead
+e.g. I filled in the company name and clicked Save. Nothing happened.,z. B. Ich habe den Firmennamen eingetragen und auf Speichern geklickt. Nichts ist passiert.
+{0} sends,{0} sendet
+{0} next,{0} weiter
+Shortcut: {0} · Change,Tastenkürzel: {0} · Ändern
+Shortcut: off · Change,Tastenkürzel: aus · Ändern
+1 error,1 Fehler
+{0} errors,{0} Fehler
+1 failed call,1 fehlgeschlagener Serveraufruf
+{0} failed calls,{0} fehlgeschlagene Serveraufrufe
+screenshot still being taken…,Screenshot wird noch erstellt…
+"Use Cmd/Ctrl together with a letter, a digit or F1 to F12.","Verwenden Sie Cmd/Strg zusammen mit einem Buchstaben, einer Ziffer oder F1 bis F12."
+Alt/Option is not possible: it types characters such as @ or € on many keyboards.,Alt/Option geht nicht: Damit tippen viele Tastaturen Zeichen wie @ oder €.
+"{0} belongs to the browser or the system (copy, paste, undo, tabs…).","{0} gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+"This combination belongs to the browser or the system (copy, paste, undo, tabs…).","Diese Kombination gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+{0} can't be Phriend's shortcut. {1},{0} kann nicht das Tastenkürzel von Phriend sein. {1}
+Phriend report,Phriend-Meldung
+Phriend report: {0},Phriend-Meldung: {0}
+Enlarge the screenshot,Screenshot vergrößern
+Screenshot of the reported page,Screenshot der gemeldeten Seite
+The screenshot can't be shown.,Der Screenshot kann nicht angezeigt werden.
+Sent without a screenshot.,Ohne Screenshot gesendet.
+Reported by {0},Gemeldet von {0}
+Open the page,Seite öffnen
+Technical details,Technische Details
+Screen,Bildschirm
+Reported from,Gemeldet aus
+Versions,Versionen
+Recent errors,Letzte Fehler
+Failed requests,Fehlgeschlagene Serveraufrufe
+1 failed request,1 fehlgeschlagener Serveraufruf
+{0} failed requests,{0} fehlgeschlagene Serveraufrufe
+no errors,keine Fehler
+Panels,Bereiche
+Resize the panels,Größe der Bereiche ändern
+"Drag to resize, double-click to even out","Ziehen ändert die Größe, Doppelklick teilt gleichmäßig"
+Panel settings,Einstellungen der Bereiche
+Reset panel layout,Anordnung der Bereiche zurücksetzen
+Properties,Eigenschaften
+1 checklist,1 Checkliste
+{0} checklists,{0} Checklisten
+1 message,1 Nachricht
+{0} unread,{0} ungelesen
+Close {0},{0} schließen
+Open a panel from the bar on the right.,Öffnen Sie einen Bereich über die Leiste rechts.
+No room in the window,Kein Platz im Fenster
+None yet,Noch keine
+{0}/{1} done,{0}/{1} erledigt
+No chat yet,Noch kein Chat
+Drag to move,Ziehen zum Verschieben
+Move to…,Verschieben nach…
+Whole page,Ganze Seite
+Full width at the top,Volle Breite oben
+Full width at the bottom,Volle Breite unten
+Full height on the left,Volle Höhe links
+Full height on the right,Volle Höhe rechts
+Left of {0},Links von {0}
+Right of {0},Rechts von {0}
+Above {0},Über {0}
+Below {0},Unter {0}
+Swap with {0},Mit {0} tauschen
+"Drag to move, or Alt+↑/↓","Ziehen zum Verschieben, oder Alt+↑/↓"
+Could not move the item,Der Eintrag konnte nicht verschoben werden
+Move to checklist…,In Checkliste verschieben…
+Moved to {0},Nach {0} verschoben
+Items can only move between checklists of the same record,Einträge können nur zwischen Checklisten desselben Datensatzes verschoben werden
+Choose another checklist,Bitte eine andere Checkliste wählen
+"Moved ""{0}"" to checklist {1}","„{0}“ in die Checkliste {1} verschoben"
+"""{0}"" moved here from checklist {1}","„{0}“ aus der Checkliste {1} hierher verschoben"
+Scroll to see the rest,"Scrollen, um den Rest zu sehen"
+Small images,Kleine Bilder
+Medium images,Mittlere Bilder
+Large images,Große Bilder
+"Drag to resize, or use the arrow keys","Ziehen ändert die Größe, oder die Pfeiltasten"
+Unknown image size: {0},Unbekannte Bildgröße: {0}
+Conversation,Gespräch
+Add note,Notiz hinzufügen
+1 note,1 Notiz
+{0} notes,{0} Notizen
+last {0},zuletzt {0}
+Cockpit Settings,Cockpit-Einstellungen
+{0} Department is not configured in Cockpit Settings.,Die Abteilung für {0} ist in den Cockpit-Einstellungen nicht festgelegt.
+Task department must match {0} department in Cockpit Settings.,Die Abteilung der Aufgabe muss der Abteilung für {0} in den Cockpit-Einstellungen entsprechen.
+Colour,Farbe
+Edge Glow,Randleuchten
+Off,Aus
+Always,Immer
+On focus,Beim Wechseln
+Always + on focus,Immer + beim Wechseln
+"Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.","Farbe der Titelleiste und des Randleuchtens im Cockpit-Fenster, damit sich die Cockpits beim Fensterwechsel unterscheiden lassen. Leer: neutrale Titelleiste, kein Leuchten."
+"A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.","Ein sanftes Leuchten in der Cockpit-Farbe an den Fensterrändern. Beim Wechseln: leuchtet auf, wenn Sie zum Fenster wechseln, und verblasst dann."
+Open Cockpit,Cockpit öffnen
+Glow from Top,Leuchten von oben
+Glow from Left,Leuchten von links
+Glow from Bottom,Leuchten von unten
+Glow from Right,Leuchten von rechts
+Breathe like Phriend,Atmen wie Phriend
+"The glow fades in and out ever so slightly, in Phriend's breathing rhythm.","Das Leuchten wird kaum merklich stärker und schwächer, im Atemrhythmus von Phriend."
+Target System,Zielsystem
+Target URL,Ziel-URL
+This System's Name,Name dieses Systems
+Target API Key,API-Schlüssel des Zielsystems
+Target API Secret,API-Geheimnis des Zielsystems
+"Set this on a develop or test system: its Phriend reports become Issues on the target system, not here. Empty: reports stay on this system.","Auf einem Entwicklungs- oder Testsystem setzen: Seine Phriend-Meldungen werden Anfragen auf dem Zielsystem, nicht hier. Leer: Meldungen bleiben auf diesem System."
+"The main system, e.g. https://erp.example.com","Das Hauptsystem, z. B. https://erp.example.com"
+How the target's Issues name this system. Empty: the site name.,So nennen die Anfragen im Zielsystem dieses System. Leer: der Site-Name.
+API key of a user with the role Phriend Remote on the target system,API-Schlüssel eines Benutzers mit der Rolle Phriend Remote im Zielsystem
+Reported On System,Gemeldet auf System
+Reported On System URL,URL des meldenden Systems
+Set when the report came from another system (a develop or test system with this one as its target),"Gesetzt, wenn die Meldung von einem anderen System kam (ein Entwicklungs- oder Testsystem mit diesem als Ziel)"
+"Target URL: only the address of the system, like https://erp.example.com","Ziel-URL: nur die Adresse des Systems, z. B. https://erp.example.com"
+Target URL must start with https://,Die Ziel-URL muss mit https:// beginnen
+The target system sent an unexpected answer,Das Zielsystem hat unerwartet geantwortet
+Phriend is switched off on the target system,Phriend ist im Zielsystem ausgeschaltet
+"Set the target system's URL, API key and API secret in Phriend Settings","Bitte URL, API-Schlüssel und API-Geheimnis des Zielsystems in den Phriend-Einstellungen eintragen"
+The target system {0} can't be reached,Das Zielsystem {0} ist nicht erreichbar
+The target system refused the API key: check the key and secret in Phriend Settings and that the user on the target system has the role {0},Das Zielsystem hat den API-Schlüssel abgelehnt: Bitte Schlüssel und Geheimnis in den Phriend-Einstellungen prüfen und ob der Benutzer im Zielsystem die Rolle {0} hat
+The target system answered with an error ({0}): {1},Das Zielsystem hat mit einem Fehler geantwortet ({0}): {1}
+another system,ein anderes System
+The sending system did not say its address,Das sendende System hat seine Adresse nicht mitgeschickt
+Only for the role {0},Nur für die Rolle {0}
+Reported via Phriend by {0} on {1},Über Phriend gemeldet von {0} auf {1}
+Test Target Connection,Verbindung zum Zielsystem testen
+Asking the target system...,Frage das Zielsystem...
+Target connection works,Verbindung zum Zielsystem funktioniert
+"Reports go to {0}, as {1}.","Meldungen gehen an {0}, als {1}."
+Reported on {0},Gemeldet auf {0}
+The target system redirects to {0}: set that address as the Target URL in Phriend Settings,Das Zielsystem leitet nach {0} weiter: Bitte diese Adresse als Ziel-URL in den Phriend-Einstellungen eintragen
+GitLab Issues,GitLab-Issues
+GitLab issues,GitLab-Issues
+Create GitLab Issue,GitLab-Issue anlegen
+Open in GitLab,In GitLab öffnen
+Open {0} in GitLab,{0} in GitLab öffnen
+Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
+GitLab issue {0} created,GitLab-Issue {0} angelegt
+GitLab issue not linked,GitLab-Issue nicht verknüpft
+"The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.","Das GitLab-Issue wurde angelegt, ist aber nicht mit dieser Anfrage verknüpft. Meist ist sein Projekt noch nicht in ERPNext: Bitte vor dem nächsten „Sync Projects“ in {0} ausführen. Sonst siehe {1}."
+General Management,Geschäftsführung
+General Management Cockpit,Geschäftsführung-Cockpit
+General Management Department,Abteilung Geschäftsführung
+General Management Timesheet Project,Zeiterfassungsprojekt Geschäftsführung
+You do not have permission to access the General Management Cockpit,Sie haben keine Berechtigung für das Geschäftsführung-Cockpit
+Own department,Eigene Abteilung
+All departments,Alle Abteilungen
+Open in {0} Cockpit,Im {0}-Cockpit öffnen
+Dates,Zeitraum
+This task is not in a department with a cockpit.,Diese Aufgabe gehört zu keiner Abteilung mit Cockpit.
+Appointments,Termine
+New appointment,Neuer Termin
+Edit appointment,Termin bearbeiten
+Cancel appointment,Termin absagen
+This cancels the invite for all attendees,Damit wird die Einladung für alle Teilnehmenden abgesagt
+Keep it,Behalten
+Show past,Vergangene anzeigen
+No upcoming appointments,Keine anstehenden Termine
+{0} attendees,{0} Teilnehmende
+Not sent,Nicht gesendet
+Sent from,Gesendet von
+Pick a mailbox…,Postfach wählen…
+Save and send,Speichern und senden
+Attendees,Teilnehmende
+Required,Pflicht
+Nobody yet,Noch niemand
+Drag people here,Personen hierher ziehen
+Search people…,Personen suchen…
+Add everyone in {0},Alle aus {0} hinzufügen
+No people found,Keine Personen gefunden
+Remove {0},{0} entfernen
+Until,Bis
+No department,Keine Abteilung
+Pick a mailbox with a Mailcow calendar to send the invite.,"Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden."
+Party Accounts,Personenkonten
+Party Account Settings,Personenkonten-Einstellungen
+Party Account Setting,Personenkonten-Einstellung
+"Per company: under which parent account and with which number range a customer's or supplier's own ledger account is created, by the ""Create Debtor Account"" / ""Create Creditor Account"" buttons or automatically on save. The next free number in the range is assigned.","Je Unternehmen: unter welchem übergeordneten Konto und mit welchem Nummernkreis das eigene Konto eines Kunden oder Lieferanten angelegt wird, über die Schaltflächen ""Debitorenkonto anlegen"" / ""Kreditorenkonto anlegen"" oder automatisch beim Speichern. Vergeben wird die nächste freie Nummer im Nummernkreis."
+Debtor Accounts (Customers),Debitorenkonten (Kunden)
+Creditor Accounts (Suppliers),Kreditorenkonten (Lieferanten)
+Debtor Parent Account,Übergeordnetes Debitorenkonto
+Creditor Parent Account,Übergeordnetes Kreditorenkonto
+"Group account under which a receivable account is created for each customer, e.g. ""Debitoren"". Leave empty if this company does not need these accounts.","Gruppenkonto, unter dem für jeden Kunden ein Debitorenkonto angelegt wird, z. B. ""Debitoren"". Leer lassen, wenn dieses Unternehmen keine Debitorenkonten benötigt."
+"Group account under which a payable account is created for each supplier, e.g. ""Kreditoren"". Leave empty if this company does not need these accounts.","Gruppenkonto, unter dem für jeden Lieferanten ein Kreditorenkonto angelegt wird, z. B. ""Kreditoren"". Leer lassen, wenn dieses Unternehmen keine Kreditorenkonten benötigt."
+Create Automatically and Require,Automatisch anlegen und verpflichtend
+Every save of a customer creates its account for this company if it is missing. A customer cannot be saved without one.,"Beim Speichern eines Kunden wird sein Konto für dieses Unternehmen angelegt, falls es fehlt. Ein Kunde kann nicht ohne Konto gespeichert werden."
+Every save of a supplier creates its account for this company if it is missing. A supplier cannot be saved without one.,"Beim Speichern eines Lieferanten wird sein Konto für dieses Unternehmen angelegt, falls es fehlt. Ein Lieferant kann nicht ohne Konto gespeichert werden."
+First Debtor Number,Erste Debitorennummer
+Last Debtor Number,Letzte Debitorennummer
+First Creditor Number,Erste Kreditorennummer
+Last Creditor Number,Letzte Kreditorennummer
+Create Debtor Account,Debitorenkonto anlegen
+Create Creditor Account,Kreditorenkonto anlegen
+Creating account...,Konto wird angelegt...
+Account {0} created,Konto {0} angelegt
+All configured companies already have an account.,Für alle eingerichteten Unternehmen ist bereits ein Konto vorhanden.
+{0} {1} already has the account {2} for company {3}.,{0} {1} hat bereits das Konto {2} für das Unternehmen {3}.
+Party Type must be Customer or Supplier.,Der Typ muss Kunde oder Lieferant sein.
+Company {0} has no {1}. Please set it in {2}.,Für das Unternehmen {0} ist kein {1} hinterlegt. Bitte in {2} einrichten.
+Missing Configuration,Fehlende Einrichtung
+The number range {0} to {1} of company {2} is used up.,Der Nummernkreis {0} bis {1} des Unternehmens {2} ist ausgeschöpft.
+No Free Account Number,Keine freie Kontonummer
+Row #{0}: Company {1} is configured more than once.,Zeile #{0}: Das Unternehmen {1} ist mehrfach eingerichtet.
+Row #{0}: Please set a debtor or a creditor parent account.,Zeile #{0}: Bitte ein übergeordnetes Debitoren- oder Kreditorenkonto angeben.
+Row #{0}: Account {1} does not belong to company {2}.,Zeile #{0}: Das Konto {1} gehört nicht zum Unternehmen {2}.
+Row #{0}: Account {1} must be a group account.,Zeile #{0}: Das Konto {1} muss ein Gruppenkonto sein.
+Row #{0}: Account {1} must have root type {2}.,Zeile #{0}: Das Konto {1} muss den Stammtyp {2} haben.
+Row #{0}: {1} and {2} are required.,Zeile #{0}: {1} und {2} sind erforderlich.
+Row #{0}: The first number ({1}) must not be greater than the last number ({2}).,Zeile #{0}: Die erste Nummer ({1}) darf nicht größer sein als die letzte Nummer ({2}).
+Row #{0}: The debtor and creditor number ranges overlap.,Zeile #{0}: Die Nummernkreise für Debitoren und Kreditoren überschneiden sich.
+Row #{0}: Account {1} does not exist.,Zeile #{0}: Das Konto {1} existiert nicht.
+Configure {0} Department in Cockpit Settings.,Bitte die Abteilung {0} in den Cockpit-Einstellungen festlegen.
+Remove everyone in {0},Alle aus {0} entfernen
+The invite was not sent: {0},Die Einladung wurde nicht gesendet: {0}
+Choose how often the appointment repeats,"Bitte wählen, wie oft sich der Termin wiederholt"
+Repeat until cannot be before the start,„Wiederholen bis“ darf nicht vor dem Beginn liegen
+"The start is the first appointment. After it, the appointment repeats on the ticked days.","Der Start ist der erste Termin. Danach wiederholt sich der Termin an den ausgewählten Tagen."
+Attendees must be a list of email addresses,Teilnehmende müssen eine Liste von E-Mail-Adressen sein
+Open in Cockpit,Im Cockpit öffnen
+Project Management,Projektmanagement
+Software Development,Softwareentwicklung
+Team Cockpit,Team-Cockpit
+Cockpits,Cockpits
+Switch cockpit,Cockpit wechseln
+Could not switch the team,Das Team konnte nicht gewechselt werden
+You are not a member of any team.,Sie gehören keinem Team an.
+You are not a member of team {0}.,Sie gehören dem Team {0} nicht an.
+This issue does not belong to your team.,Diese Anfrage gehört nicht zu Ihrem Team.
+This task does not belong to your team.,Diese Aufgabe gehört nicht zu Ihrem Team.
+Select an Issue or Task of your team.,Bitte eine Anfrage oder Aufgabe Ihres Teams wählen.
+You do not have permission to access the Team Cockpit,Sie haben keine Berechtigung für das Team-Cockpit
+The team this task belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Aufgabe gehört. Sie erscheint im Team-Cockpit dieses Teams."
+The team this issue belongs to. It shows in that team's Team Cockpit.,"Das Team, zu dem diese Anfrage gehört. Sie erscheint im Team-Cockpit dieses Teams."
+The team is changed outside the Team Cockpit.,Das Team wird außerhalb des Team-Cockpits geändert.
+You can only move records into or out of your own team.,Sie können Einträge nur in Ihr eigenes Team aufnehmen oder aus ihm entfernen.
+Fetch e-mails,E-Mails abrufen
+Fetching e-mails…,E-Mails werden abgerufen…
+{0} new receipts from e-mail,{0} neue Belege aus E-Mails
+No new e-mails,Keine neuen E-Mails
+E-mails are already being fetched,E-Mails werden bereits abgerufen
+No e-mail account,Kein E-Mail-Konto
+No e-mail account delivers to Accounting Receipt. Ask your administrator to set one up.,"Kein E-Mail-Konto liefert Belege. Bitten Sie Ihre Administration, eines einzurichten."
+Some e-mails from {0} could not be read. See the Error Log.,Einige E-Mails von {0} konnten nicht gelesen werden. Siehe Fehlerprotokoll.
+The invite is still being sent. With many attendees Mailcow can take a few minutes. You can change the appointment once it shows Sent.,"Die Einladung wird noch gesendet. Bei vielen Teilnehmenden kann Mailcow einige Minuten brauchen. Sobald „Gesendet“ angezeigt wird, können Sie den Termin ändern."
+"The invite of this appointment is still being sent. Wait until it shows Sent or an error, then change it.","Die Einladung dieses Termins wird noch gesendet. Warten Sie, bis „Gesendet“ oder ein Fehler angezeigt wird, und ändern Sie ihn dann."
+Implementation Feature,Implementierungsfeature
+Implementation Features,Implementierungsfeatures
+Implementation Feature Dependency,Abhängigkeit des Implementierungsfeatures
+Implementation Feature Progress,Fortschritt des Implementierungsfeatures
+Definition of Done,Abnahmekriterien
+Agreed On,Vereinbart am
+Agreed By (Customer),Vereinbart von (Kunde)
+Target Level,Ziel-Level
+Current Level,Aktuelles Level
+Suggested Progress,Vorgeschlagener Fortschritt
+Target and Progress,Ziel und Fortschritt
+Progress History,Fortschrittsverlauf
+Estimated Hours,Geschätzte Stunden
+Responsible,Verantwortlich
+Depends On,Hängt ab von
+In Testing,Im Test
+Take over Features from Sales,Features aus dem Vertrieb übernehmen
+{0} features taken over from sales,{0} Features aus dem Vertrieb übernommen
+No features from sales to take over,Keine Features aus dem Vertrieb zu übernehmen
+"A feature belongs to an Implementation or, while in sales, to an Opportunity.","Ein Feature gehört zu einer Implementierung oder, solange es im Vertrieb ist, zu einer Opportunity."
+{0} must be between 1 and 6.,{0} muss zwischen 1 und 6 liegen.
+"The current level is above the target level. Raise the target, or set the feature live.",Das aktuelle Level liegt über dem Ziel-Level. Erhöhe das Ziel oder setze das Feature live.
+The target date is before the planned start.,Das Zieldatum liegt vor dem geplanten Start.
+A feature cannot depend on itself.,Ein Feature kann nicht von sich selbst abhängen.
+Feature {0} is listed twice under Depends On.,Feature {0} steht zweimal unter „Hängt ab von“.
+Feature {0} belongs to another implementation.,Feature {0} gehört zu einer anderen Implementierung.
+These dependencies form a loop: a feature would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Feature würde auf sich selbst warten.
+Implementation Chapter Dependency,Abhängigkeit des Implementierungskapitels
+Implementation Chapter Feature,Feature des Implementierungskapitels
+Agreed WIP Limits,Vereinbarte WIP-Limits
+Max Chapters in Progress,Max. Kapitel in Arbeit
+Max Features in Progress,Max. Features in Arbeit
+A chapter cannot depend on itself.,Ein Kapitel kann nicht von sich selbst abhängen.
+These dependencies form a loop: a chapter would wait for itself.,Diese Abhängigkeiten bilden eine Schleife: Ein Kapitel würde auf sich selbst warten.
+"{0} chapters are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Kapitel in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+"{0} features are now in progress, more than the {1} agreed with the customer.","Jetzt sind {0} Features in Arbeit, mehr als die {1} mit dem Kunden vereinbarten."
+Over the agreed limit,Über dem vereinbarten Limit
+"{0} chapters in progress, {1} agreed","{0} Kapitel in Arbeit, {1} vereinbart"
+"{0} features in progress, {1} agreed","{0} Features in Arbeit, {1} vereinbart"
+Feature {0} does not exist.,Feature {0} existiert nicht.
+Feature {0} belongs to another opportunity.,Feature {0} gehört zu einer anderen Opportunity.
+Agreed,Vereinbart
+{0} {1} is listed twice.,{0} {1} ist doppelt aufgeführt.
+{0} {1} does not exist.,{0} {1} existiert nicht.
+{0} {1} belongs to another implementation.,{0} {1} gehört zu einer anderen Implementierung.
+Chapter,Kapitel
+GitLab Release,GitLab-Release
+GitLab Release Milestone,GitLab-Release-Meilenstein
+Release Notes,Versionshinweise
+Released At,Veröffentlicht am
+Tag Name,Tag-Name
+Last Synced,Zuletzt synchronisiert
+Time Estimate (Hours),Zeitschätzung (Stunden)
+Time Spent (Hours),Aufgewendete Zeit (Stunden)
+GitLab's upcoming release: its date lies in the future.,Anstehendes Release in GitLab: Sein Datum liegt in der Zukunft.
+From GitLab's time estimate on the issue. Used by release planning.,Aus der Zeitschätzung des Issues in GitLab. Wird für die Release-Planung verwendet.
+Time logged on the issue in GitLab.,In GitLab auf dem Issue erfasste Zeit.
+Releases synced successfully,Releases erfolgreich synchronisiert
+Implementation Release,Implementierungs-Release
+Implementation Release Feature,Implementierungs-Release Feature
+Implementation Release Milestone,Implementierungs-Release Meilenstein
+Realistic Check,Realitätscheck
+Amber,Gelb
+Open Effort (Hours),Offener Aufwand (Stunden)
+Available Capacity (Hours),Verfügbare Kapazität (Stunden)
+Contents,Inhalt
+Features (ranked),Features (nach Rang)
+Fits,Passt
+Team Capacity Share,Anteil der Teamkapazität
+Released,Veröffentlicht
+"What this release brings, e.g. ""Warehouse go-live"".","Was dieses Release bringt, z. B. „Go-live Lager“."
+Optional. A chapter can have several releases; a maintenance release stands alone.,Optional. Ein Kapitel kann mehrere Releases haben; ein Wartungsrelease steht für sich.
+Linked automatically when GitLab publishes a release with this release's milestones.,"Wird automatisch verknüpft, sobald GitLab ein Release mit den Meilensteinen dieses Releases veröffentlicht."
+"Green: everything fits. Amber: everything fits, but with less than 20% buffer. Red: some ranked features do not fit before the target date.","Grün: Alles passt. Gelb: Alles passt, aber mit weniger als 20 % Puffer. Rot: Einige Features passen nicht vor das Zieldatum."
+"Team capacity from today to the target date, minus leave and holidays, times the agreed share, minus the effort of earlier releases.","Teamkapazität von heute bis zum Zieldatum, abzüglich Urlaub und Feiertagen, mal dem vereinbarten Anteil, abzüglich des Aufwands früherer Releases."
+The order is the priority. Features below the cut line do not fit before the target date.,Die Reihenfolge ist die Priorität. Features unter der Schnittlinie passen nicht vor das Zieldatum.
+The order of the rows; 1 is the most important.,Die Reihenfolge der Zeilen; 1 ist am wichtigsten.
+"Fits into the team capacity before the target date, counting the features ranked above it and earlier releases.","Passt vor dem Zieldatum in die Teamkapazität, gezählt mit den höher eingestuften Features und früheren Releases."
+"The share of the team's capacity agreed for this implementation, because teams work for several customers. Used by the realistic check of releases.","Der für diese Implementierung vereinbarte Anteil der Teamkapazität, weil Teams für mehrere Kunden arbeiten. Wird für den Realitätscheck der Releases verwendet."
+Chapter {0} belongs to another implementation.,Kapitel {0} gehört zu einer anderen Implementierung.
+Feature {0} is listed twice.,Feature {0} ist doppelt aufgeführt.
+Feature {0} is already planned in release {1}. Move it from there.,Feature {0} ist bereits in Release {1} geplant. Verschieben Sie es von dort.
+These milestones of its features are not in the release: {0},Diese Meilensteine seiner Features fehlen im Release: {0}
+Implementation Change,Planänderung
+Implementation Baseline,Baseline
+Implementation Baseline Chapter,Baseline-Kapitel
+Implementation Baseline Feature,Baseline-Feature
+Change Type,Änderungsart
+Target Type,Zieltyp
+Old Values,Alte Werte
+New Values,Neue Werte
+Consent,Zustimmung
+Proposed By,Vorgeschlagen von
+Agreed by phamos,Zugestimmt von phamos
+Agreed by Customer,Zugestimmt vom Kunden
+Decided On,Entschieden am
+Applied On,Angewendet am
+Dispute Reason,Grund des Widerspruchs
+Baseline Date,Baseline-Datum
+Snapshot,Momentaufnahme
+Proposed,Vorgeschlagen
+Applied – awaiting customer,Angewendet – wartet auf Kunden
+Disputed,Widersprochen
+Target level,Ziel-Level
+Scope add,Umfang hinzugefügt
+Scope drop,Umfang gestrichen
+Scope change,Umfang geändert
+Definition of done,Definition of Done
+WIP limit,WIP-Limit
+Capacity share,Kapazitätsanteil
+"Proposed: one side asked. Agreed: both sides agreed, applied at the planning session. Applied – awaiting customer: a PM changed it directly; the customer confirms or disputes it.","Vorgeschlagen: Eine Seite hat angefragt. Vereinbart: Beide Seiten haben zugestimmt, wird in der Planungssitzung angewendet. Angewendet – wartet auf Kunden: Ein PM hat es direkt geändert; der Kunde bestätigt oder widerspricht."
+Empty for a proposed new feature until it is applied.,"Leer bei einem vorgeschlagenen neuen Feature, bis es angewendet ist."
+The planning session that decides on this change. Agreed changes are applied when that meeting is submitted.,"Die Planungssitzung, die über diese Änderung entscheidet. Vereinbarte Änderungen werden beim Buchen dieser Sitzung angewendet."
+The plan both sides agreed most recently. Variance on the roadmap and the PM triangle is measured against it.,"Der zuletzt von beiden Seiten vereinbarte Plan. Abweichungen in der Roadmap und im PM-Dreieck werden daran gemessen."
+"Changes can be recorded for features, releases, chapters and implementations only.","Änderungen können nur für Features, Releases, Kapitel und Implementierungen erfasst werden."
+An applied or rejected change cannot be edited. Propose a new change instead.,Eine angewendete oder abgelehnte Änderung kann nicht bearbeitet werden. Schlagen Sie stattdessen eine neue Änderung vor.
+You cannot take part in plan changes of this implementation.,Sie können an Planänderungen dieser Implementierung nicht teilnehmen.
+Agreed in Stakeholder Meeting {0},Vereinbart im Stakeholder-Meeting {0}
+Name the values to change.,Nennen Sie die zu ändernden Werte.
+The meeting belongs to another implementation.,Das Meeting gehört zu einer anderen Implementierung.
+A new feature needs a title and may set only: {0},Ein neues Feature braucht einen Titel und darf nur Folgendes setzen: {0}
+Changes can be proposed for features and the implementation.,Änderungen können für Features und die Implementierung vorgeschlagen werden.
+Choose the record to change.,Wählen Sie den zu ändernden Datensatz.
+The record belongs to another implementation.,Der Datensatz gehört zu einer anderen Implementierung.
+Dropping a feature sets its status to Dropped and nothing else.,Das Streichen eines Features setzt nur seinen Status auf Gestrichen.
+A change of type {0} may set only: {1},Eine Änderung der Art {0} darf nur Folgendes setzen: {1}
+This change is {0} and cannot be changed that way.,Diese Änderung ist {0} und kann so nicht geändert werden.
+Your side has agreed already. The other side decides now.,Ihre Seite hat bereits zugestimmt. Jetzt entscheidet die andere Seite.
+Say why you dispute the change.,"Sagen Sie, warum Sie der Änderung widersprechen."
+Name the customer contact who decided.,"Nennen Sie den Kundenkontakt, der entschieden hat."
+{0} is not a customer stakeholder of this implementation.,{0} ist kein Kunden-Stakeholder dieser Implementierung.
+Agree,Zustimmen
+Reject change,Änderung ablehnen
+Customer confirmed,Kunde hat bestätigt
+Customer disputed,Kunde hat widersprochen
+Customer contact,Kundenkontakt
+Record the customer's confirmation,Bestätigung des Kunden erfassen
+Record the customer's dispute,Widerspruch des Kunden erfassen
+Implementation Baseline Release,Baseline-Release
+Ranking,Rangfolge
+The release's features in their agreed order.,Die Features des Releases in ihrer vereinbarten Reihenfolge.
+"A new ranking lists the same features as the release, in the new order.","Eine neue Rangfolge enthält dieselben Features wie das Release, in der neuen Reihenfolge."
+"Name the new ranking, or the feature and the release to move it to.","Nennen Sie die neue Rangfolge oder das Feature und das Release, in das es verschoben wird."
+Feature {0} is not in this release.,Feature {0} ist nicht in diesem Release.
+Move the feature to another planned release of this implementation.,Verschieben Sie das Feature in ein anderes geplantes Release dieser Implementierung.
+"Changes can be proposed for features, releases and the implementation.","Änderungen können für Features, Releases und die Implementierung vorgeschlagen werden."
+Deliveries & Invoices,Lieferungen & Rechnungen
+No Delivery Notes yet.,Noch keine Lieferscheine.
+Delivered {0} h of {1} h billable,Geliefert {0} h von {1} h abrechenbar
+Not yet invoiced {0} h,Noch nicht abgerechnet {0} h
+Only planned releases can be changed.,Nur geplante Releases können geändert werden.
+Taken over from sales into Implementation {0},Aus dem Vertrieb in Implementierung {0} übernommen
+Choose a Planning meeting that is not yet submitted.,"Wählen Sie ein Planungsmeeting aus, das noch nicht gebucht ist."
+These agreed changes could not be applied and stay Agreed:,Diese vereinbarten Änderungen konnten nicht angewendet werden und bleiben vereinbart:
+Customer agreed,Kunde hat zugestimmt
+Record the customer's agreement,Zustimmung des Kunden erfassen
+Traffic Light,Ampel
+"These values are not valid for {0}.","Diese Werte sind für {0} nicht gültig."
+Implementation Doctype,Implementierungs-Doctype
+Implementation Doctype Screenshot,Screenshot des Implementierungs-Doctypes
+Implementation Feature Doctype,Doctype des Implementierungsfeatures
+Doctype Name,Doctype-Name
+Kind,Art
+New DocType,Neuer DocType
+Customization,Anpassung
+Reusable,Wiederverwendbar
+Showcase,Referenz zeigen
+Showcase Reviewed By,Referenz geprüft von
+Screenshots,Screenshots
+Used In,Verwendet in
+Work Done,Erledigte Arbeit
+Doctypes,Doctypes
+Report,Bericht
+Print Format,Druckformat
+Script,Skript
+Caption,Bildunterschrift
+"The description or screenshots changed, so the entry is no longer a showcase. Review it and set Showcase again.","Beschreibung oder Screenshots wurden geändert, daher ist der Eintrag keine Referenz mehr. Prüfe ihn und setze „Referenz zeigen“ erneut."
+Features,Features
+Feature,Feature
+"What we build for you, how far each part is, and what it takes.","Was wir für Sie bauen, wie weit jeder Teil ist und was er braucht."
+All statuses,Alle Status
+All modules,Alle Module
+All chapters,Alle Kapitel
+Effort,Aufwand
+No features here yet.,Hier gibt es noch keine Features.
+{0} of {1} agreed,{0} von {1} vereinbart
+Group issues by GitLab milestone,Issues nach GitLab-Meilenstein gruppieren
+Weighted by estimated hours ({0} h in total).,Gewichtet nach geschätzten Stunden ({0} h insgesamt).
+"No hours estimated yet, so every feature counts the same.","Noch keine Stunden geschätzt, daher zählt jedes Feature gleich."
+Without module,Ohne Modul
+Work breakdown,Projektstrukturplan
+"Every feature with its module, chapter, release, level and effort. Open one to see its definition of done.","Jedes Feature mit Modul, Kapitel, Release, Stufe und Aufwand. Öffnen Sie eines, um seine Definition of Done zu sehen."
+"A feature is a piece of your system that we build and you use, from the first idea in sales to live use.","Ein Feature ist ein Teil Ihres Systems, den wir bauen und Sie nutzen, von der ersten Idee im Vertrieb bis zum Live-Betrieb."
+"The level shows how far it has come (1 to 6, like the modules), next to the level agreed as the target.","Die Stufe zeigt, wie weit es ist (1 bis 6, wie bei den Modulen), neben der als Ziel vereinbarten Stufe."
+"Effort is the work still open in hours: our estimate, refined by the estimates of its GitLab issues.","Der Aufwand ist die noch offene Arbeit in Stunden: unsere Schätzung, verfeinert durch die Schätzungen der GitLab-Issues."
+Features move from left to right. The agreed limit keeps only a few in progress at the same time.,Features wandern von links nach rechts. Das vereinbarte Limit hält nur wenige gleichzeitig in Arbeit.
+"Kanban makes work visible: each card is a feature, each column a step on its way to live use.","Kanban macht Arbeit sichtbar: Jede Karte ist ein Feature, jede Spalte ein Schritt auf dem Weg zum Live-Betrieb."
+The WIP limit (work in progress) is agreed with you. Fewer things at the same time means each one is finished sooner and waits less.,Das WIP-Limit (Work in Progress) ist mit Ihnen vereinbart. Weniger gleichzeitig heißt: Jedes wird früher fertig und wartet weniger.
+"When the column turns amber, more features are in progress than agreed: finish one before starting the next.","Wird die Spalte gelb, sind mehr Features in Arbeit als vereinbart: Erst eines abschließen, dann das nächste beginnen."
+"The work breakdown structure splits the implementation into modules, features and GitLab issues.","Der Projektstrukturplan teilt die Implementierung in Module, Features und GitLab-Issues."
+"Breaking the work down shows what the whole consists of, so nothing is forgotten and each part can be estimated.","Das Aufteilen zeigt, woraus das Ganze besteht, damit nichts vergessen wird und jeder Teil geschätzt werden kann."
+"Progress adds up from the bottom: a feature counts with its estimated hours, so a big feature moves the total more than a small one.","Der Fortschritt summiert sich von unten: Ein Feature zählt mit seinen geschätzten Stunden, ein großes bewegt die Summe also mehr als ein kleines."
+A feature is done when its agreed definition of done is met. Until then its progress comes from its closed GitLab issues or its level.,"Ein Feature ist fertig, wenn seine vereinbarte Definition of Done erfüllt ist. Bis dahin ergibt sich sein Fortschritt aus den geschlossenen GitLab-Issues oder seiner Stufe."
+Could not load the features,Die Features konnten nicht geladen werden
+Could not load the work breakdown,Der Projektstrukturplan konnte nicht geladen werden
+Drop {0}? After the baseline the customer confirms this as a scope change.,{0} streichen? Nach der Baseline bestätigt der Kunde das als Umfangsänderung.
+Could not move the feature,Das Feature konnte nicht verschoben werden
+Without milestone,Ohne Meilenstein
+Level (current / target),Stufe (aktuell / Ziel)
+Not written yet.,Noch nicht geschrieben.
+Agreed on {0} with {1},Vereinbart am {0} mit {1}
+Not agreed yet,Noch nicht vereinbart
+"The definition of done says when the feature counts as finished, in words both sides agreed.","Die Definition of Done sagt, wann das Feature als fertig gilt, in Worten, auf die sich beide Seiten geeinigt haben."
+"It is written before the work starts, so everyone knows what “done” means and nobody argues about it later.","Sie wird geschrieben, bevor die Arbeit beginnt, damit alle wissen, was „fertig“ heißt, und niemand später darüber streitet."
+"When the text changes, the agreement starts again: the customer confirms the new version.","Ändert sich der Text, beginnt die Vereinbarung neu: Der Kunde bestätigt die neue Fassung."
+In GitLab,In GitLab
+No GitLab issues linked yet.,Noch keine GitLab-Issues verknüpft.
+What we build,Was wir bauen
+level {0},Stufe {0}
+Could not load the feature,Das Feature konnte nicht geladen werden
+Implementation Cockpit,Implementierungs-Cockpit
+Milestones,Meilensteine
+Contact & Team,Kontakt & Team
+Only phamos staff can move features.,Nur phamos-Mitarbeitende können Features verschieben.
+This feature does not belong to the implementation.,Dieses Feature gehört nicht zu der Implementierung.
+In progress: {0} of {1} agreed,In Arbeit: {0} von {1} vereinbart
+{0}/{1} open,{0}/{1} offen
+{0} d waiting,wartet {0} T
+Show issues,Issues zeigen
+Close (Esc),Schließen (Esc)
+Worked,Gearbeitet
+Frequently asked questions,Häufige Fragen
+FAQ,FAQ
+Web Profile FAQ,Web-Profil-FAQ
+Answer,Antwort
+"As a visitor would ask it, in this language.","So, wie Besucherinnen und Besucher sie stellen würden, in dieser Sprache."
+"Answer the question in the first sentence; details after it.","Beantworten Sie die Frage im ersten Satz; Einzelheiten danach."
+"Questions and answers at the bottom of the page, collapsed. A page shows only the rows in its own language; no rows, no FAQ. Also shown on anonymous pages: name no one who is not published by name.","Fragen und Antworten unten auf der Seite, zugeklappt. Eine Seite zeigt nur die Zeilen in ihrer eigenen Sprache; ohne Zeilen keine FAQ. Auch auf anonymen Seiten sichtbar: Nennen Sie niemanden, der nicht namentlich veröffentlicht ist."
+"One question and answer of a Web Profile page in one language (phamos/phamos#1823).","Eine Frage mit Antwort einer Web-Profil-Seite in einer Sprache (phamos/phamos#1823)."
+Use {0} as an app,{0} als App nutzen
+"Install it once and it opens in its own window, from the Dock or taskbar, without searching for a browser tab.","Einmal installiert, öffnet es sich in einem eigenen Fenster, aus dem Dock oder der Taskleiste, ohne Suche nach einem Browser-Tab."
+Your browser can do it with one click.,Ihr Browser erledigt das mit einem Klick.
+"Click the install icon at the right end of the address bar, or open the ⋮ menu.","Klicken Sie auf das Installations-Symbol rechts in der Adressleiste oder öffnen Sie das ⋮-Menü."
+"Choose “Cast, save and share” → “Install page as app”.","Wählen Sie „Streamen, speichern und teilen“ → „Seite als App installieren“."
+"Click the install icon at the right end of the address bar, or open the … menu.","Klicken Sie auf das Installations-Symbol rechts in der Adressleiste oder öffnen Sie das …-Menü."
+Choose “Apps” → “Install this site as an app”.,Wählen Sie „Apps“ → „Diese Website als App installieren“.
+Choose File → Add to Dock in the menu bar.,Wählen Sie in der Menüleiste Ablage → Zum Dock hinzufügen.
+Confirm with “Add”.,Bestätigen Sie mit „Hinzufügen“.
+"Firefox can't install web apps. Open the cockpit in Chrome, Edge or Safari to install it.","Firefox kann keine Web-Apps installieren. Öffnen Sie das Cockpit in Chrome, Edge oder Safari, um es zu installieren."
+Look for “Install” or “Add to Dock” in your browser's menu.,Suchen Sie im Menü Ihres Browsers nach „Installieren“ oder „Zum Dock hinzufügen“.
+"If the entry is missing, the app may already be installed: look for it in your apps.","Fehlt der Eintrag, ist die App vielleicht schon installiert: Schauen Sie in Ihren Apps nach."
+Install,Installieren
+Later,Später
+Don't show again,Nicht mehr anzeigen
+Install as app,Als App installieren
+this cockpit,dieses Cockpit
+Depends on,Hängt ab von
+no access,kein Zugriff
+ends {0},endet {0}
+Remove dependency on {0},Abhängigkeit von {0} entfernen
+Remove dependency,Abhängigkeit entfernen
+Add a task that must finish first…,"Aufgabe hinzufügen, die vorher fertig sein muss …"
+Searching…,Suche …
+No matching task,Keine passende Aufgabe
+Dependency linked,Abhängigkeit verknüpft
+Could not link tasks,Aufgaben konnten nicht verknüpft werden
+Dependency removed,Abhängigkeit entfernt
+Could not remove the dependency,Die Abhängigkeit konnte nicht entfernt werden
+Drag onto the task that follows,Auf die nachfolgende Aufgabe ziehen
+Dependency,Abhängigkeit
+must finish before,muss fertig sein vor
+"Starts {0}, but {1} ends {2}","Beginnt {0}, aber {1} endet {2}"
+Publish on website,Auf Webseite veröffentlichen
+Website summary,Kurzbeschreibung für die Webseite
+Content (HTML),Inhalt (HTML)
+Content Updated At,Inhalt aktualisiert am
+"Guides for ERPNext and the Frappe Framework, written by our team.",Anleitungen zu ERPNext und dem Frappe Framework von unserem Team.
+No documentation is published yet.,Es ist noch keine Dokumentation veröffentlicht.
+{0} pages,{0} Seiten
+Start reading,Lesen beginnen
+Open on {0},Auf {0} öffnen
+Updated on {0},Aktualisiert am {0}
+Previous,Zurück
+1 page,1 Seite
+Guides for {0} from our documentation.,Anleitungen zu {0} aus unserer Dokumentation.
+The documentation is in German.,Die Dokumentation ist auf Deutsch.
+in German,auf Deutsch
+Matching module,Passendes Modul
+Matching modules,Passende Module
+Book,Buch
+Hands and Reactions,Hände und Reaktionen
+"One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
+"Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Bookstack Browser,Bookstack-Browser
+Books,Bücher
+Shelves,Regale
+Chapters,Kapitel
+Bookstack Users,Bookstack-Benutzer
+Bookstack Roles,Bookstack-Rollen
+Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
+Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
+A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
+Sync finished with errors,Synchronisierung mit Fehlern beendet
+Sync complete,Synchronisierung abgeschlossen
+Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
+Leave me in peace,Lass mich in Ruhe
+Quiet until you call me back,"Ruhig, bis Sie mich zurückholen"
+Quiet until {0},Ruhig bis {0}
+Come back,Zurückkommen
+For 1 hour,Für 1 Stunde
+For today,Für heute
+Until I call you back,Bis ich dich zurückhole
+Mute warnings,Warnungen stummschalten
+Muted until {0},Stumm bis {0}
+Hear warnings again,Warnungen wieder zeigen
+Mute warnings for {0} minutes,Warnungen für {0} Minuten stummschalten
+Report a problem,Ein Problem melden
+Phriend Settings,Phriend-Einstellungen
+That didn't work. Please try again.,Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.
+right-click for options,Rechtsklick für Optionen
+Leave Me in Peace,Lass mich in Ruhe
+"A menu on the phriend (right-click): ""Leave me in peace"" for an hour, for today or until called back, and ""Mute warnings"" for up to 90 minutes. Each user decides for themselves.","Ein Menü am Phriend (Rechtsklick): „Lass mich in Ruhe“ für eine Stunde, für heute oder bis zum Zurückholen, und „Warnungen stummschalten“ für bis zu 90 Minuten. Jeder Nutzer entscheidet selbst."
+Leave me in peace is switched off in Phriend Settings,„Lass mich in Ruhe“ ist in den Phriend-Einstellungen ausgeschaltet
+"Phriend can be quiet for today at most, or until you call it back.","Phriend kann höchstens für heute ruhig sein, oder bis Sie ihn zurückholen."
+"Warnings can be muted for 30, 60 or 90 minutes.","Warnungen können für 30, 60 oder 90 Minuten stummgeschaltet werden."
+That time has already passed. Is your computer's clock right?,Diese Zeit ist schon vorbei. Geht die Uhr Ihres Computers richtig?
+Phriend has {0} things for you,Phriend hat {0} Dinge für Sie
+Phriend has something for you,Phriend hat etwas für Sie
+One Voice,Eine Stimme
+Bubbles per Day,Sprechblasen pro Tag
+"Everything Phriend says by itself goes through one queue: at most the bubbles per day below, never while someone types; the rest waits behind a small blue dot on Phriend.","Alles, was Phriend von sich aus sagt, läuft durch eine Warteschlange: höchstens die Sprechblasen pro Tag unten, nie während jemand tippt; der Rest wartet hinter einem kleinen blauen Punkt am Phriend."
+"How many bubbles Phriend may open by itself per person and day. Reactions, warnings and the person's own reports don't count.","Wie viele Sprechblasen Phriend pro Person und Tag von sich aus öffnen darf. Reaktionen, Warnungen und eigene Meldungen zählen nicht."
+One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
+A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
+"Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Nothing planned yet,Noch nichts geplant
+On the critical path,Auf dem kritischen Pfad
+Baseline: {0} – {1},Baseline: {0} – {1}
+GitLab milestone,GitLab-Meilenstein
+Against the baseline,Gegenüber der Baseline
++{0} d,+{0} T
+{0} d,{0} T
+{0} d late,{0} T zu spät
+{0} d slack,{0} T Puffer
+Warnings Go To,Warnungen gehen an
+Warn: AI Agent Run Failed,Warnen: KI-Agent-Lauf fehlgeschlagen
+Warn: Receipt E-Mails Not Read,Warnen: Beleg-E-Mails nicht gelesen
+Warn: GitLab Sync Failed,Warnen: GitLab-Abgleich fehlgeschlagen
+"Phriend hears what happens: your report became a GitLab issue, someone voted for your idea, an AI agent run failed, receipt e-mails couldn't be read, the GitLab sync failed.","Phriend erfährt, was passiert: Ihre Meldung wurde ein GitLab-Issue, jemand hat für Ihre Idee gestimmt, ein KI-Agent-Lauf ist fehlgeschlagen, Beleg-E-Mails konnten nicht gelesen werden, der GitLab-Abgleich ist fehlgeschlagen."
+"Who gets warnings about the whole system, such as a failed GitLab sync.","Wer Warnungen zum ganzen System bekommt, zum Beispiel einen fehlgeschlagenen GitLab-Abgleich."
+Ticked: a red ‼️ warning. Not ticked: a note behind the blue dot.,Angehakt: eine rote ‼️-Warnung. Nicht angehakt: eine Notiz hinter dem blauen Punkt.
+Your report is now a GitLab issue: {0},Ihre Meldung ist jetzt ein GitLab-Issue: {0}
+Someone voted for your idea: {0},Jemand hat für Ihre Idee gestimmt: {0}
+The AI agent couldn't finish on {0} {1}.,Der KI-Agent konnte {0} {1} nicht abschließen.
+The GitLab sync failed. See the Error Log.,Der GitLab-Abgleich ist fehlgeschlagen. Siehe Fehlerprotokoll.
+Unknown Phriend event: {0},Unbekanntes Phriend-Ereignis: {0}
+Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einstellungen ausgeschaltet
+"Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Easter Eggs,Easter Eggs
+"Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+This documentation is in German.,Diese Dokumentation ist auf Deutsch.
+Hide contents,Inhalt ausblenden
+Show contents,Inhalt einblenden
+On this page,Auf dieser Seite
+Back to top,Nach oben
+Next heading,Nächste Überschrift
+Next chapter,Nächstes Kapitel
+Expand all,Alle aufklappen
+Collapse all,Alle zuklappen
+Search the documentation,Dokumentation durchsuchen
+Search in {0},In {0} suchen
+Only this book,Nur in diesem Buch
+Please enter at least 2 characters.,Bitte mindestens 2 Zeichen eingeben.
+{0} results for “{1}”,{0} Treffer für „{1}“
+No results for “{0}”,Keine Treffer für „{0}“
+in {0},in {0}
+Search all books,In allen Büchern suchen
+Showing the first {0} pages. Add words to narrow the search.,Die ersten {0} Seiten werden angezeigt. Weitere Wörter grenzen die Suche ein.
+More to the right,Mehr rechts
+{0} has been live for a while. How do you like it now?,{0} ist schon eine Weile live. Wie gefällt es Ihnen jetzt?
+{0} is live. How do you like it?,{0} ist live. Wie gefällt es Ihnen?
+{0} has been live for a while. Still fixed?,{0} ist schon eine Weile live. Immer noch behoben?
+{0} is live. Did it fix it?,{0} ist live. Hat es das Problem gelöst?
+{0} of 5 stars,{0} von 5 Sternen
+"Yes, fixed","Ja, behoben"
+"No, not fixed","Nein, nicht behoben"
+No thanks,Nein danke
+Thank you! The team will see it.,Danke! Das Team bekommt es zu sehen.
+Thanks! Anything to add?,Danke! Möchten Sie noch etwas ergänzen?
+Send,Senden
+Rating Questions,Bewertungsfragen
+Battle-tested After (Weeks),Im Alltag erprobt nach (Wochen)
+Anonymous Feedback,Anonyme Rückmeldungen
+"When a Phriend report has gone live on production, Phriend asks the person who reported it how it turned out: right after, and again once it has been in daily use. Bugs get thumbs up or down, improvements 1 to 5 stars.","Wenn eine Phriend-Meldung auf Produktion live ist, fragt Phriend die meldende Person, wie es geworden ist: gleich danach und noch einmal nach einer Weile im Alltag. Fehler bekommen Daumen hoch oder runter, Verbesserungen 1 bis 5 Sterne."
+"The second question, ""Still good in daily use?"", this many weeks after going live.","Die zweite Frage, „Im Alltag immer noch gut?“, so viele Wochen nach dem Livegang."
+Answers are shown without the name of the person who gave them.,"Antworten werden ohne den Namen der Person gezeigt, die sie gegeben hat."
+This question was not for you.,Diese Frage war nicht für Sie.
+This question is already answered.,Diese Frage ist schon beantwortet.
+Please choose thumbs up or down.,Bitte wählen Sie Daumen hoch oder runter.
+Please choose 1 to 5 stars.,Bitte wählen Sie 1 bis 5 Sterne.
+Rating questions are switched off in Phriend Settings,Bewertungsfragen sind in den Phriend-Einstellungen ausgeschaltet
+Round is First impression or Battle tested.,Die Runde ist „First impression“ oder „Battle tested“.
+One rating question of Phriend to one person about one thing that went live (#2014).,"Eine Bewertungsfrage von Phriend an eine Person zu etwas, das live gegangen ist (#2014)."
+First impression,Erster Eindruck
+Battle tested,Im Alltag erprobt
+Thumbs,Daumen
+Stars,Sterne
+"Kept also for anonymous feedback, only so nobody is asked twice; never shown then.","Auch bei anonymen Rückmeldungen gespeichert, nur damit niemand zweimal gefragt wird; dann nie angezeigt."
+"Thumbs: 1 up, -1 down. Stars: 1 to 5.","Daumen: 1 hoch, -1 runter. Sterne: 1 bis 5."
+Times Put Off,Mal verschoben
+Live Since,Live seit
+Phriend Feedback,Phriend-Rückmeldung
+No module,Kein Modul
+Roadmap,Roadmap
+Weeks,Wochen
+Quarters,Quartale
+Compare with baseline,Mit Baseline vergleichen
+A baseline is set when the Planning meeting is submitted.,"Eine Baseline entsteht, wenn das Planungsmeeting gebucht wird."
+Propose a date change,Terminänderung vorschlagen
+{0} features,{0} Features
+"Nothing planned yet. Chapters and modules are planned in Desk, on the Implementation.","Noch nichts geplant. Kapitel und Module werden im Desk geplant, an der Implementation."
+1 chapter,1 Kapitel
+{0} chapters,{0} Kapitel
+Planned start,Geplanter Start
+Target date,Zieldatum
+Levels,Level
+Slack to the end date,Puffer bis zum Endtermin
+In a dependency loop,In einer Abhängigkeitsschleife
+On plan,Im Plan
+Added after the baseline,Nach der Baseline hinzugekommen
+Needed by,Gebraucht von
+This module is planned without a chapter. A chapter makes it plannable with dependencies and the critical path.,Dieses Modul ist ohne Kapitel geplant. Mit einem Kapitel wird es mit Abhängigkeiten und kritischem Pfad planbar.
+Late: {0},Verspätet: {0}
+Could not load the roadmap,Die Roadmap konnte nicht geladen werden
+L{0} → L{1},L{0} → L{1}
+"The roadmap shows when each module reaches which depth level, and which chapters decide the end date.","Die Roadmap zeigt, wann jedes Modul welches Tiefenlevel erreicht und welche Kapitel über den Endtermin entscheiden."
+"Each row is a module. A bar is a chapter: the work that takes the module from one level to the next. Levels 1 to 6 say how deep the module is in use, from first steps to fully running.","Jede Zeile ist ein Modul. Ein Balken ist ein Kapitel: die Arbeit, die das Modul von einem Level zum nächsten bringt. Die Level 1 bis 6 sagen, wie tief das Modul genutzt wird, von den ersten Schritten bis zum vollen Betrieb."
+"The critical path is the chain of chapters that decides the end date. Its bars have a red border: if one of them is late, the end date moves.","Der kritische Pfad ist die Kette von Kapiteln, die über den Endtermin entscheidet. Ihre Balken haben einen roten Rand: Verspätet sich eines davon, verschiebt sich der Endtermin."
+Slack is how many days a chapter can slip before it delays the end date. Late means it already does.,"Der Puffer sagt, um wie viele Tage sich ein Kapitel verschieben kann, bevor es den Endtermin verzögert. „Zu spät“ heißt, es tut das schon."
+"The baseline is the plan agreed in the Planning meeting. With “Compare with baseline” on, a thin bar under each chapter shows that plan, and “+5 d” how far the date has moved since.","Die Baseline ist der im Planungsmeeting vereinbarte Plan. Mit „Mit Baseline vergleichen“ zeigt ein dünner Balken unter jedem Kapitel diesen Plan, und „+5 T“, wie weit sich der Termin seitdem verschoben hat."
+"Dots are features: ○ planned, ● finished. Diamonds are GitLab milestones and releases.","Punkte sind Features: ○ geplant, ● fertig. Rauten sind GitLab-Meilensteine und Releases."
+Target level reached,Ziellevel erreicht
+Results for “{0}”,Ergebnisse für „{0}“
+Search only for “{0}”,Nur nach „{0}“ suchen
+The web address /de/dokumentation/{0} is reserved for the search. Rename the book in BookStack first.,Die Webadresse /de/dokumentation/{0} ist für die Suche reserviert. Bitte das Buch zuerst in BookStack umbenennen.
+Ophice,Ophice
+"Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)","Mit WASD oder den Pfeiltasten bewegen, Umschalttaste für schneller, Leertaste zum Springen (zweimal: Doppelsprung, halten: fliegen)"
+Ophice could not be loaded.,Ophice konnte nicht geladen werden.
+Please log in to use Ophice.,"Bitte melden Sie sich an, um Ophice zu nutzen."
+Ophice is only available to System Users.,Ophice steht nur Systembenutzern zur Verfügung.
+Chat with {0},Chat mit {0}
+Opening the chat…,Chat wird geöffnet…
+Say hello to {0}.,Sagen Sie {0} Hallo.
+"Write to {0}, Enter to send","An {0} schreiben, Enter zum Senden"
+The chat could not be opened.,Der Chat konnte nicht geöffnet werden.
+The message could not be sent.,Die Nachricht konnte nicht gesendet werden.
+This chat is not yours.,Dieser Chat gehört nicht Ihnen.
+This chat has ended.,Dieser Chat ist beendet.
+"Ophice encounter, {0}","Ophice-Begegnung, {0}"
+{0} can't chat: no Raven access.,{0} kann nicht chatten: kein Zugang zu Raven.
+Nobody to chat with here.,Hier ist niemand zum Chatten.
+Move closer to chat.,"Gehen Sie näher heran, um zu chatten."
+"This space has its own meeting: use its call and chat.","Dieser Bereich hat sein eigenes Meeting: Nutzen Sie dessen Anruf und Chat."
+Write something first.,Schreiben Sie zuerst etwas.
+A message can be at most {0} characters.,Eine Nachricht darf höchstens {0} Zeichen lang sein.
+Esc to close,Esc zum Schließen
+Close the chat and walk on,Chat schließen und weitergehen
+"Upload an image as the background of Ophice, for everyone","Ein Bild als Hintergrund von Ophice hochladen, für alle"
+"Remove the background, for everyone","Den Hintergrund entfernen, für alle"
+The image could not be uploaded.,Das Bild konnte nicht hochgeladen werden.
+The background could not be removed.,Der Hintergrund konnte nicht entfernt werden.
+Choose an image first.,Wählen Sie zuerst ein Bild.
+The image can be at most {0} MB.,Das Bild darf höchstens {0} MB groß sein.
+"This file is not an image Ophice can show (PNG, JPEG, WebP or GIF).","Diese Datei ist kein Bild, das Ophice zeigen kann (PNG, JPEG, WebP oder GIF)."
+Background,Hintergrund
+Kept,Behalten
+Moved to your Raven chat with {0}.,In Ihren Raven-Chat mit {0} verschoben.
+Burned,Verbrannt
+The chat with {0} is gone.,Der Chat mit {0} ist gelöscht.
+Chat with {0} burns in {1},Chat mit {0} verbrennt in {1}
+Saved,Gespeichert
+"You want to keep it. Waiting for {0}.","Sie möchten ihn behalten. Warten auf {0}."
+"{0} wants to keep it. Save to keep it.","{0} möchte ihn behalten. Speichern Sie, um ihn zu behalten."
+Kept only if you both save it.,"Er bleibt nur, wenn Sie beide speichern."
+The chat could not be saved.,Der Chat konnte nicht gespeichert werden.
+The video call could not be started.,Der Videoanruf konnte nicht gestartet werden.
+Joining the call…,Anruf wird verbunden…
+The chat is just being opened. Please try again.,Der Chat wird gerade geöffnet. Bitte versuchen Sie es noch einmal.
+Turn on the microphone,Mikrofon einschalten
+Turn off the microphone,Mikrofon ausschalten
+Turn on the camera,Kamera einschalten
+Turn off the camera,Kamera ausschalten
+No sound? Click once into the video.,Kein Ton? Einmal in das Video klicken.
+"Draw and edit meeting areas, for everyone","Besprechungsbereiche zeichnen und bearbeiten, für alle"
+Done,Fertig
+Meeting areas,Besprechungsbereiche
+"Drag on the grid to mark a meeting area, click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren; auf einen Bereich klicken, um ihn zu bearbeiten"
+Standup,Standup
+Jitsi meeting URL,Jitsi-Besprechungs-URL
+"Whoever stops inside the area joins this meeting, with microphone and camera on.","Wer im Bereich stehen bleibt, tritt dieser Besprechung bei, mit eingeschaltetem Mikrofon und eingeschalteter Kamera."
+The area could not be saved.,Der Bereich konnte nicht gespeichert werden.
+The area could not be deleted.,Der Bereich konnte nicht gelöscht werden.
+Meeting {0},Besprechung {0}
+Leave the meeting,Besprechung verlassen
+Leave (Esc),Verlassen (Esc)
+"The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup.","Die Besprechungs-URL muss mit https:// beginnen, zum Beispiel https://meet.systemli.org/OurStandup."
+Only meetings on {0} can be used here.,Hier können nur Besprechungen auf {0} verwendet werden.
+"The meeting URL needs a room name after the server, for example /OurStandup.","Die Besprechungs-URL braucht nach dem Server einen Raumnamen, zum Beispiel /OurStandup."
+Give the area a name.,Geben Sie dem Bereich einen Namen.
+This overlaps the area {0}.,Das überschneidet sich mit dem Bereich {0}.
+This area no longer exists.,Diesen Bereich gibt es nicht mehr.
+Ophice has room for at most {0} meeting areas.,Ophice hat Platz für höchstens {0} Besprechungsbereiche.
+"Size and position of the background image on the grid, for everyone","Größe und Lage des Hintergrundbilds auf dem Raster, für alle"
+Adjust,Anpassen
+Background image,Hintergrundbild
+Fit,Einpassen
+Size,Größe
+The background could not be adjusted.,Der Hintergrund konnte nicht angepasst werden.
+Upload a background first.,Laden Sie zuerst einen Hintergrund hoch.
+Away,Abwesend
+Be right back,Gleich zurück
+Available,Verfügbar
+"Set a status: be right back, or away until a time","Status setzen: gleich zurück oder abwesend bis zu einer Uhrzeit"
+"{0} (away, page closed)","{0} (abwesend, Seite geschlossen)"
+Was due back at {0},Wollte um {0} zurück sein
+Back at {0},Zurück um {0}
+{0} local time in {1},{0} Ortszeit in {1}
+My status,Mein Status
+Doctor's appointment,Arzttermin
+Getting a coffee,Hole mir einen Kaffee
+Back at,Zurück um
+30 min,30 Min.
+1 hour,1 Stunde
+2 hours,2 Stunden
+Tomorrow 9:00,Morgen 9:00
+Your time zone: {0}. Everyone sees the time on their own clock.,Ihre Zeitzone: {0}. Alle sehen die Uhrzeit in ihrer eigenen Zeitzone.
+Shown above your chip until you move again.,"Wird über Ihrem Chip angezeigt, bis Sie sich wieder bewegen."
+Set status,Status setzen
+Please say when you will be back.,"Bitte geben Sie an, wann Sie zurück sind."
+The status could not be set.,Der Status konnte nicht gesetzt werden.
+Unknown status.,Unbekannter Status.
+The note can be at most {0} characters.,Die Notiz darf höchstens {0} Zeichen lang sein.
+The return time must be in the future.,Die Rückkehrzeit muss in der Zukunft liegen.
+The return time can be at most {0} days ahead.,Die Rückkehrzeit darf höchstens {0} Tage in der Zukunft liegen.
+Fullscreen,Vollbild
+Leave fullscreen,Vollbild beenden
+Drag to resize,Ziehen zum Ändern der Größe
+Chat of {0},Chat von {0}
+Burn,Verbrennen
+No messages yet. Say hello to the room.,Noch keine Nachrichten. Sagen Sie dem Raum Hallo.
+Message the room,Nachricht an den Raum
+"Enter sends, Esc goes back to the map","Enter sendet, Esc geht zurück zur Karte"
+Confidential,Vertraulich
+"Never stored. Only people in the room see it, only now.","Nie gespeichert. Nur wer gerade im Raum ist, sieht es, und nur jetzt."
+The chat could not be loaded.,Der Chat konnte nicht geladen werden.
+"Saved: history is kept, can be burned","Gespeichert: Verlauf bleibt, kann verbrannt werden"
+"Not saved: deleted 10 minutes after the room empties, unless someone saves it","Nicht gespeichert: 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn"
+"Confidential: never stored, only live","Vertraulich: nie gespeichert, nur live"
+Unknown chat mode.,Unbekannter Chat-Modus.
+Step into the area to use its chat.,"Betreten Sie den Bereich, um seinen Chat zu nutzen."
+Ophice area chat: {0},Ophice-Bereichschat: {0}
+You can't chat: no Raven access.,Sie können nicht chatten: kein Zugang zu Raven.
+Find a person,Person suchen
+you,Sie
+Hide my details,Meine Details ausblenden
+"Others then only see that you are online, not where or on what.","Andere sehen dann nur, dass Sie online sind, nicht wo oder woran."
+back {0},zurück {0}
+Not in Ophice,Nicht in Ophice
+In a chat,Im Gespräch
+In {0},In {0}
+Around in Ophice,Unterwegs in Ophice
+Direct message,Direktnachricht
+New direct message,Neue Direktnachricht
+Recent chats together,Letzte gemeinsame Chats
+The chats could not be loaded.,Die Chats konnten nicht geladen werden.
+The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
+Open the Implementation,Implementation öffnen
+Working on,Arbeitet an
+"{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
+Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
+Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
+{0} msg.,{0} Nachr.
+Vote to burn {0},{0} zur Abstimmung stellen
+Vote to burn,Zur Abstimmung stellen
+Each meeting's chat is kept. The people who were there can vote to burn it.,"Der Chat jeder Besprechung bleibt erhalten. Wer dabei war, kann über das Verbrennen abstimmen."
+"Each meeting's chat is deleted 10 minutes after the room empties, unless someone saves it.","Der Chat jeder Besprechung wird 10 Minuten nachdem der Raum leer ist gelöscht, außer jemand speichert ihn."
+"Vote: {0} keep, {1} burn. You voted {2}. Decided {3} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Sie haben für {2} gestimmt. Entschieden spätestens {3}; bei Gleichstand bleibt er erhalten."
+keep,Behalten
+burn,Verbrennen
+"Vote: {0} keep, {1} burn. Keep or burn this chat? Decided {2} at the latest; a tie keeps it.","Abstimmung: {0} behalten, {1} verbrennen. Diesen Chat behalten oder verbrennen? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. This chat will be kept {0}.,Der Raum ist leer. Dieser Chat wird {0} behalten.
+The room is empty. This chat is deleted {0} unless someone saves it.,"Der Raum ist leer. Dieser Chat wird {0} gelöscht, außer jemand speichert ihn."
+This meeting's chat is saved.,Der Chat dieser Besprechung ist gespeichert.
+This meeting's chat is temporary until someone saves it.,"Der Chat dieser Besprechung ist vorläufig, bis jemand ihn speichert."
+Keep,Behalten
+Your vote could not be saved.,Ihre Stimme konnte nicht gespeichert werden.
+"{0} keep, {1} burn. Your vote? Decided {2} at the latest; a tie keeps it.","{0} behalten, {1} verbrennen. Ihre Stimme? Entschieden spätestens {2}; bei Gleichstand bleibt er erhalten."
+The room is empty. The chat will be kept.,Der Raum ist leer. Der Chat bleibt erhalten.
+The room is empty. Deleted {0} unless someone saves it.,"Der Raum ist leer. Wird {0} gelöscht, außer jemand speichert ihn."
+Vote Keep or Burn.,Stimmen Sie für Behalten oder Verbrennen.
+This chat no longer exists.,Diesen Chat gibt es nicht mehr.
+Only the people who were in this meeting can decide about its chat.,"Nur wer bei dieser Besprechung dabei war, kann über ihren Chat entscheiden."
+{0} (you),{0} (Sie)
+{0} joined the room,{0} ist dazugekommen
+{0} left the room,{0} ist gegangen
+You joined the room,Sie sind dazugekommen
+You left the room,Sie sind gegangen
+in the last {0} minutes,in den letzten {0} Minuten
+Only Ophice map editors can change the map.,Nur Ophice-Kartenbearbeiter können die Karte ändern.
+Ophice Map Editor,Ophice-Kartenbearbeiter
+Edit space,Bereich bearbeiten
+New space,Neuer Bereich
+Kind of space,Art des Bereichs
+Meeting,Besprechung
+Start,Start
+Entrance,Eingang
+"People coming in are beamed in here: on their first visit of the day, or when they are back after more than 5 minutes. There is only one start space.","Wer ins Ophice kommt, wird hier hineingebeamt: beim ersten Besuch des Tages oder nach mehr als 5 Minuten Abwesenheit. Es gibt nur einen Startbereich."
+Debug,Debug
+Debug: simulate things on your own screen only,Debug: Abläufe nur auf dem eigenen Bildschirm simulieren
+Simulate beam-in,Hineinbeamen simulieren
+There is already a start space: {0}.,Es gibt schon einen Startbereich: {0}.
+Unknown kind of space.,Unbekannte Art von Bereich.
+This space has no chat.,Dieser Bereich hat keinen Chat.
+Cockpit,Cockpit
+Back to the Ophice map (the cockpit stays open),Zurück zur Ophice-Karte (das Cockpit bleibt offen)
+Back to map,Zurück zur Karte
+Open {0},{0} öffnen
+Open the meeting in its own browser window,Besprechung in einem eigenen Browserfenster öffnen
+Own window,Eigenes Fenster
+"Here in Ophice, meet.jit.si ends the call after 5 minutes. In its own window the meeting runs up to 1 h 35 min.",Hier im Ophice beendet meet.jit.si den Anruf nach 5 Minuten. Im eigenen Fenster läuft die Besprechung bis zu 1 Std. 35 Min.
+Open in own window,Im eigenen Fenster öffnen
+Show that window,Dieses Fenster zeigen
+Back into Ophice,Zurück ins Ophice
+The browser blocked the new window. Please allow pop-ups for this site.,Der Browser hat das neue Fenster blockiert. Bitte Pop-ups für diese Seite erlauben.
+Keep the video on top,Video im Vordergrund halten
+"Right-click a person's video and choose ""Picture in picture"". If a small menu of the call opens first, right-click again.","Rechtsklick auf das Video einer Person und ""Bild im Bild"" wählen. Öffnet sich zuerst ein kleines Menü der Besprechung, noch einmal rechtsklicken."
+"The video then floats above all windows, also when you go back to another tab or app.","Das Video schwebt dann über allen Fenstern, auch wenn Sie zu einem anderen Tab oder Programm wechseln."
+Shortcut,Tastenkürzel
+with,mit
+Got it,Verstanden
+Keep the video on top of all windows,Video über allen Fenstern halten
+On top,Im Vordergrund
+The meeting window was closed,Das Besprechungsfenster wurde geschlossen
+Your call runs in its own window,Ihr Anruf läuft in einem eigenen Fenster
+"Open it again, or continue the call here in Ophice.",Öffnen Sie es wieder oder führen Sie den Anruf hier im Ophice weiter.
+You are still in the meeting of {0}. Video and sound are in the separate browser window.,Sie sind weiter in der Besprechung von {0}. Bild und Ton sind im separaten Browserfenster.
+Open it again,Wieder öffnen
+Can't find the call?,Anruf nicht zu finden?
+"Click ""Show that window"": it comes to the front.","Klicken Sie auf ""Dieses Fenster zeigen"": Es kommt nach vorn."
+Or press {0} to switch between the browser's windows.,"Oder drücken Sie {0}, um zwischen den Fenstern des Browsers zu wechseln."
+Or press {0} to switch windows.,"Oder drücken Sie {0}, um das Fenster zu wechseln."
+Keep the video visible while you work here,"Video sichtbar halten, während Sie hier arbeiten"
+"In the call's window, right-click a person's video and choose ""Picture in picture"". If a small menu of the call opens first, right-click again. The video then floats above all windows, also over Ophice.","Im Fenster des Anrufs per Rechtsklick auf das Video einer Person ""Bild im Bild"" wählen. Öffnet sich zuerst ein kleines Menü des Anrufs, noch einmal rechtsklicken. Das Video schwebt dann über allen Fenstern, auch über dem Ophice."
+Closes the separate window and continues the call here.,Schließt das separate Fenster und führt den Anruf hier weiter.
+Here meet.jit.si ends the call after 5 minutes.,Hier beendet meet.jit.si den Anruf nach 5 Minuten.
+Leaving,Verlassen
+"Walk out of the space or press ""Leave"": the separate window closes and the call ends.","Verlassen Sie den Bereich oder drücken Sie ""Verlassen"": Das separate Fenster schließt sich und der Anruf endet."
+Guest area,Gastbereich
+Customer meeting,Kundenbesprechung
+External guests arrive here through the guest link and can only move inside it. Employees walk in and out freely and meet them in its meeting. There is only one guest area.,Externe Gäste kommen über den Gast-Link hier an und können sich nur darin bewegen. Mitarbeitende gehen frei hinein und hinaus und treffen sie in der Besprechung des Bereichs. Es gibt nur einen Gastbereich.
+A meeting room for guests: employees invite a guest from the guest area to come here.,Ein Besprechungsraum für Gäste: Mitarbeitende laden einen Gast aus dem Gastbereich hierher ein.
+"Chat: the guest chat, kept only for a short while (comes with the guest chat).","Chat: der Gast-Chat, nur kurz gespeichert (kommt mit dem Gast-Chat)."
+Guests,Gäste
+There is already a guest area: {0}.,Es gibt schon einen Gastbereich: {0}.
+phamos Ophice,phamos Ophice
+Move with WASD or the arrow keys,Mit WASD oder den Pfeiltasten bewegen
+Welcome to the phamos Ophice,Willkommen im phamos Ophice
+Come in and meet us in {0}.,Kommen Sie herein und treffen Sie uns in {0}.
+Nobody can welcome guests at the moment. Please come back later.,Gerade kann niemand Gäste empfangen. Bitte kommen Sie später wieder.
+First and last name,Vor- und Nachname
+Drag your chip to the entrance to come in,"Ziehen Sie Ihren Chip zum Eingang, um hereinzukommen"
+Your chip: drag it to the entrance,Ihr Chip: zum Eingang ziehen
+Tell us your name first.,Bitte zuerst Ihren Namen angeben.
+Coming in…,Sie kommen herein …
+"Privacy: we use your name and where your chip stands only for this visit. Chats are not stored for long. Video runs through Jitsi. Your visit ends when you close this page, after 12 hours at the latest.","Datenschutz: Ihren Namen und den Ort Ihres Chips verwenden wir nur für diesen Besuch. Chats werden nicht lange gespeichert. Video läuft über Jitsi. Ihr Besuch endet, wenn Sie diese Seite schließen, spätestens nach 12 Stunden."
+Something went wrong. Please try again.,Etwas ist schiefgegangen. Bitte versuchen Sie es noch einmal.
+Almost: drop your chip right on the entrance.,Fast: Lassen Sie Ihren Chip genau auf dem Eingang los.
+Guest · {0},Gast · {0}
+Guest,Gast
+Your visit has ended. Please come in again.,Ihr Besuch ist beendet. Bitte kommen Sie erneut herein.
+Please tell us your name.,Bitte nennen Sie uns Ihren Namen.
+That did not work. Please drag your chip to the entrance again.,Das hat nicht geklappt. Bitte ziehen Sie Ihren Chip noch einmal zum Eingang.
+Ophice has no guest area at the moment.,Das Ophice hat gerade keinen Gastbereich.
+Ophice is full right now. Please try again in a few minutes.,Das Ophice ist gerade voll. Bitte versuchen Sie es in ein paar Minuten noch einmal.
+You are logged in: please use Ophice as an employee.,Sie sind angemeldet: Bitte nutzen Sie das Ophice mit Ihrem Konto.
+Opens a draft in your mail program with this chat,Öffnet einen Entwurf mit diesem Chat in Ihrem Mailprogramm
+Save by e-mail,Per E-Mail speichern
+Copy the whole chat,Den ganzen Chat kopieren
+Not stored: this chat is deleted 10 minutes after everyone has left. Save it by e-mail if you need it.,"Nicht gespeichert: Dieser Chat wird 10 Minuten nachdem alle gegangen sind gelöscht. Speichern Sie ihn per E-Mail, wenn Sie ihn brauchen."
+No messages yet. Say hello.,Noch keine Nachrichten. Sagen Sie Hallo.
+Write a message,Nachricht schreiben
+"(Earlier messages left out: use ""Copy chat"" for all of them.)","(Ältere Nachrichten ausgelassen: Mit ""Chat kopieren"" erhalten Sie alle.)"
+Chat copied,Chat kopiert
+The chat could not be copied.,Der Chat konnte nicht kopiert werden.
+"Not so fast, please.",Bitte nicht so schnell.
+Step into the area to chat.,"Gehen Sie in den Bereich, um zu chatten."
+This space has no guest chat.,Dieser Bereich hat keinen Gast-Chat.
+Invite {0},{0} einladen
+Invited to {0} by {1}. Waiting for the answer.,Von {1} nach {0} eingeladen. Wartet auf Antwort.
+On the way to {0} (invited by {1}).,Unterwegs nach {0} (eingeladen von {1}).
+In {0} (invited by {1}).,In {0} (eingeladen von {1}).
+Take the invite back,Einladung zurücknehmen
+Invite to a customer meeting:,Zu einer Kundenbesprechung einladen:
+No customer meeting areas yet. Map editors can draw one.,Noch keine Kundenbesprechungsbereiche. Kartenbearbeiter können einen anlegen.
+{0} is invited to {1}.,{0} ist nach {1} eingeladen.
+{0} accepted and is on the way to {1}.,{0} hat angenommen und ist unterwegs nach {1}.
+{0} declined the invite to {1}.,{0} hat die Einladung nach {1} abgelehnt.
+{0} invites you to {1},{0} lädt Sie nach {1} ein
+A dotted line will show you the way; your chip walks there by itself. Use the arrow keys to walk yourself.,Eine gepunktete Linie zeigt Ihnen den Weg; Ihr Chip geht von selbst dorthin. Mit den Pfeiltasten gehen Sie selbst.
+Decline,Ablehnen
+Accept,Annehmen
+On the way to {0} · arrow keys to walk yourself,"Unterwegs nach {0} · Pfeiltasten, um selbst zu gehen"
+Follow the dotted line to {0},Folgen Sie der gepunkteten Linie nach {0}
+This guest has left.,Dieser Gast ist gegangen.
+Guests can only be invited to a customer meeting area.,Gäste können nur in einen Kundenbesprechungsbereich eingeladen werden.
+This invite is no longer open.,Diese Einladung ist nicht mehr offen.
+{0} notices on the map,{0} Hinweise auf der Karte
+Float: keep the map on top of all windows,Schweben: Karte über allen Fenstern halten
+I'll get back to you in,Ich melde mich in
+Coming soon,Kommt bald
+Book an appointment with me,Termin mit mir buchen
+coming soon,kommt bald
+Show on the map,Auf der Karte zeigen
+{0}: {1},{0}: {1}
+{0} came over to you.,{0} ist zu Ihnen gekommen.
+{0} in {1}: {2},{0} in {1}: {2}
+I'll get back to you in {0} min,Ich melde mich in {0} Min.
+Time to get back to {0}.,"Zeit, sich bei {0} zu melden."
+Simulate a ping,Ping simulieren
+A colleague,Eine Kollegin / ein Kollege
+Open a cockpit to see the ping on the mini map.,"Öffnen Sie ein Cockpit, um den Ping auf der Mini-Karte zu sehen."
+You: {0},Sie: {0}
+Reply in the meeting chat,Im Besprechungs-Chat antworten
+Reply,Antworten
+I'll get back to you,Ich melde mich gleich
+You are no longer in the meeting.,Sie sind nicht mehr in der Besprechung.
+{0} has left.,{0} ist gegangen.
+"For more than {0} hours, please set Away.","Für mehr als {0} Stunden bitte ""Abwesend"" setzen."
+Float: call and chat in a small window on top of everything,Schweben: Anruf und Chat in einem kleinen Fenster über allem
+Float,Schweben
+Map,Karte
+Call,Anruf
+"Call (folded, still running)","Anruf (eingeklappt, läuft weiter)"
+Back to the map,Zurück zur Karte
+Cockpit space,Cockpit-Bereich
+"Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional.","Wer hier stehen bleibt, öffnet dieses Cockpit, sofern er es öffnen darf (jede Person kann das abschalten). Eine Besprechung ist optional."
+Pick a cockpit,Cockpit wählen
+Jitsi meeting URL (optional),Jitsi-Besprechungs-URL (optional)
+You can't open {0}; you can still use this space and its meeting.,Sie können {0} nicht öffnen; den Bereich und seine Besprechung können Sie trotzdem nutzen.
+Open cockpits in their spaces,Cockpits in ihren Bereichen öffnen
+Stopping in a cockpit space opens that cockpit.,"Wer in einem Cockpit-Bereich stehen bleibt, öffnet dieses Cockpit."
+Pick the cockpit this space belongs to.,"Wählen Sie das Cockpit, zu dem dieser Bereich gehört."
+Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldung
+"Float: call and chat in a small window on top of everything, also outside the browser","Schweben: Anruf und Chat in einem kleinen Fenster über allem, auch außerhalb des Browsers"
+Zoom out,Verkleinern
+Zoom in,Vergrößern
+Show the whole grid,Ganzes Raster zeigen
+{0} × {1} tiles,{0} × {1} Kacheln
+Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
+"Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
+Width,Breite
+Left,Links
+Top,Oben
+Half a tile less,Eine halbe Kachel weniger
+Half a tile more,Eine halbe Kachel mehr
+Grid,Raster
+Across,Breit
+Down,Hoch
+One tile less,Eine Kachel weniger
+One tile more,Eine Kachel mehr
+Grows the grid to the right and down until it covers the image,"Vergrößert das Raster nach rechts und unten, bis es das Bild abdeckt"
+Grid to cover the image,Raster über das ganze Bild
+Starting zoom for everyone: {0} %,Start-Zoom für alle: {0} %
+Use mine,Meinen nehmen
+Everyone sees the change.,Alle sehen die Änderung.
+The grid could not be changed.,Das Raster konnte nicht geändert werden.
+The space {0} would be cut off. Move or shrink it first.,Der Bereich {0} würde abgeschnitten. Verschieben oder verkleinern Sie ihn zuerst.
+Grid too small,Raster zu klein
+Keep the people list open,Personenliste offen halten
+Fold the list back to the chips,Liste zu den Chips zusammenklappen
+Text size of Ophice and the cockpits in it,Textgröße von Ophice und den Cockpits darin
+Smaller text,Kleinere Schrift
+Normal text size,Normale Schriftgröße
+Larger text,Größere Schrift
+Open the people list,Personenliste öffnen
+Find a person ({0}),Person suchen ({0})
+Vote on the chat of {0},Über den Chat von {0} abstimmen
+The chat of {0} will be deleted unless someone saves it,"Der Chat von {0} wird gelöscht, außer jemand speichert ihn"
+Make it the big tile,Zur großen Kachel machen
+"Standard arrangement of video, chat and map","Standard-Anordnung von Video, Chat und Karte"
+Double-click to switch,Doppelklick zum Wechseln
+Double-tap to switch,Doppeltippen zum Wechseln
+Video,Video
+Standard arrangement,Standard-Anordnung
+Layout,Anordnung
+Double-click for the meeting view,Doppelklick für die Besprechungsansicht
+Double-tap for the meeting view,Doppeltippen für die Besprechungsansicht
+"Phriend stands in the middle of this space, a little bigger than the people. A click on it does what Phriend does everywhere: report a problem, the reports here, its menu. Only one place.","Phriend steht in der Mitte dieses Bereichs, etwas größer als die Personen. Ein Klick darauf tut, was Phriend überall tut: ein Problem melden, die Meldungen hier, sein Menü. Nur ein Platz."
+Phriend already has a place on the map: {0}.,Phriend hat schon einen Platz auf der Karte: {0}.
+End {0}'s visit?,Besuch von {0} beenden?
+Send out,Hinausschicken
+Send out of Ophice,Aus dem Ophice schicken
+{0} has left Ophice.,{0} hat das Ophice verlassen.
+"Fly there. Hold {0} for: Fly or Beam",Hinfliegen. {0} gedrückt halten für: Fliegen oder Beamen
+Fly,Fliegen
+with wings,mit Flügeln
+Beam,Beamen
+at once,sofort
+Meeting point,Treffpunkt
+Set a meeting point for the two of you,Einen Treffpunkt für Sie beide setzen
+Meeting point of {0}: click to fly there,Treffpunkt von {0}: zum Hinfliegen klicken
+Your meeting point,Ihr Treffpunkt
+Meeting point · {0},Treffpunkt · {0}
+"Remove the meeting point, for everyone","Treffpunkt entfernen, für alle"
+Click on the map where you want to meet · Esc to cancel,"Klicken Sie auf die Karte, wo Sie sich treffen möchten · Esc zum Abbrechen"
+Set a meeting point for you and the people selected,Einen Treffpunkt für Sie und die ausgewählten Personen setzen
+Clear the selection (Esc),Auswahl aufheben (Esc)
+Not on the map right now.,Gerade nicht auf der Karte.
+The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
+{0} set a meeting point,{0} hat einen Treffpunkt gesetzt
+Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
+Call window,Anruffenster
+Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
+AI processing allowed,KI-Verarbeitung erlaubt
+Issue Assistant Settings,Einstellungen Anfrage-Assistent
+Assistant User,Assistent-Benutzer
+Excluded Pages,Ausgeschlossene Seiten
+First look at {0},Erster Blick auf {0}
+Sender: {0},Absender: {0}
+Phriend report forwarded from {0},"Phriend-Meldung, weitergeleitet von {0}"
+Created in ERPNext,In ERPNext angelegt
+AI model not used: reported from a sensitive page ({0}).,KI-Modell nicht genutzt: gemeldet von einer sensiblen Seite ({0}).
+AI model not used: AI processing is not allowed for customer {0}.,KI-Modell nicht genutzt: KI-Verarbeitung ist für Kunde {0} nicht erlaubt.
+AI model not used: the sender is not known as a customer or a phamos user.,KI-Modell nicht genutzt: Der Absender ist weder als Kunde noch als phamos-Benutzer bekannt.
+AI model may be used: customer {0} allows AI processing.,KI-Modell darf genutzt werden: Kunde {0} erlaubt KI-Verarbeitung.
+AI model may be used: internal Issue.,KI-Modell darf genutzt werden: interne Anfrage.
+The brief could not be posted in the Issue chat.,Die Kurzinfo konnte nicht im Anfrage-Chat gepostet werden.
+AI model not used: the check could not run.,KI-Modell nicht genutzt: Die Prüfung konnte nicht laufen.
+Test settings,Testeinstellungen
+Remove background,Hintergrund entfernen
+Unfold the sidebar: names and descriptions,Seitenleiste aufklappen: Namen und Beschreibungen
+Fold the sidebar to icons,Seitenleiste auf Symbole zuklappen
+"Be right back, or away until a time. Shown above your chip.","Gleich zurück, oder abwesend bis zu einer Uhrzeit. Wird über Ihrem Chip angezeigt."
+Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröße von Ophice und den Cockpits darin. Die Karte hat ihren eigenen Zoom.
+"Drag on the map to draw an area, click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Upload an image as the background of Ophice, for everyone.","Ein Bild als Hintergrund von Ophice hochladen, für alle."
+"Size and position of the background image, the grid's size and everyone's starting zoom.","Größe und Position des Hintergrundbilds, die Größe des Rasters und der Start-Zoom für alle."
+"Removes the background image, for everyone.","Entfernt das Hintergrundbild, für alle."
+"Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
+Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
+{0} wants to chat,{0} möchte mit Ihnen chatten
+Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
+Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
+Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
+to close,zum Schließen
+Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
+"Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
+Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Allow chat notifications,Chat-Benachrichtigungen erlauben
+Chat notifications on,Chat-Benachrichtigungen an
+Chat sound on,Chat-Ton an
+Chat notifications muted,Chat-Benachrichtigungen stumm
+Dock in the corner,In der Ecke andocken
+Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
+AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
+Started by hand by {0} (manual override).,Von Hand gestartet von {0} (manueller Override).
+Started by hand by {0}.,Von Hand gestartet von {0}.
+Automatic start,Automatischer Start
+AI model,KI-Modell
+Issue Assistant switched on,Issue-Assistent eingeschaltet
+Issue Assistant Settings: tick Enabled,Issue Assistant Settings: Aktiviert ankreuzen
+AI Agent for Issues enabled,KI-Agent für Anfragen aktiviert
+AI Agent {0}: tick Enabled,KI-Agent {0}: Aktiviert ankreuzen
+Run bench migrate to create the AI Agent,"bench migrate ausführen, um den KI-Agenten anzulegen"
+Project in scope,Projekt im Geltungsbereich
+Project on the Issue: one of {0},Projekt der Anfrage: eines von {0}
+Issue Type in scope,Anfragetyp im Geltungsbereich
+Issue Type on the Issue: one of {0},Anfragetyp der Anfrage: einer von {0}
+Not reported from a sensitive page,Nicht von einer sensiblen Seite gemeldet
+no page,keine Seite
+A report from a page other than {0},Eine Meldung von einer anderen Seite als {0}
+Customer allows AI processing,Kunde erlaubt KI-Verarbeitung
+Customer {0}: tick {1} (signed AVV),Kunde {0}: {1} ankreuzen (unterschriebener AVV)
+Internal Issue or known customer,Interne Anfrage oder bekannter Kunde
+"no Customer, created by {0}","kein Kunde, erstellt von {0}"
+"A Customer on the Issue (directly, via Implementation or Project) with AI processing allowed, or the Issue created by a phamos Desk user while logged in","Ein Kunde an der Anfrage (direkt, über Implementation oder Projekt) mit erlaubter KI-Verarbeitung, oder die Anfrage von einem angemeldeten phamos-Desk-Benutzer erstellt"
+Run Issue Assistant,Issue-Assistent starten
+Start anyway,Trotzdem starten
+The Issue Assistant is already working on this Issue.,Der Issue-Assistent arbeitet bereits an dieser Anfrage.
+The Issue Assistant could not start ({0}).,Der Issue-Assistent konnte nicht starten ({0}).
+Issue Assistant started (manual override),Issue-Assistent gestartet (manueller Override)
+Issue Assistant started,Issue-Assistent gestartet
+Would start automatically for a new Issue,Würde bei einer neuen Anfrage automatisch starten
+May use the AI model,Darf das KI-Modell nutzen
+The automatic start runs only when an Issue is created. Starting here always works; past a red check it is recorded as a manual override.,"Der automatische Start läuft nur, wenn eine Anfrage angelegt wird. Hier starten geht immer; an einer roten Prüfung vorbei wird es als manueller Override festgehalten."
+Needed to pass,Nötig zum Bestehen
+Last run,Letzter Lauf
+Manual Override,Manueller Override
+Override Reasons,Override-Gründe
+Started by hand although the automatic start or the AI gate would not have run it.,"Von Hand gestartet, obwohl der automatische Start oder die KI-Prüfung ihn nicht ausgeführt hätte."
+The checks the manual start went past.,"Die Prüfungen, an denen der manuelle Start vorbeiging."
+AI Agent Run {0} not found.,KI-Agenten-Lauf {0} nicht gefunden.
+The Issue Assistant is still running ({0}).,Der Issue-Assistent läuft noch ({0}).
+Issue Assistant finished,Issue-Assistent fertig
+Issue Assistant failed,Issue-Assistent fehlgeschlagen
+"Issue Assistant: {0}",Issue-Assistent: {0}
+AI model not used: the gate did not allow it.,KI-Modell nicht genutzt: Die Prüfung hat es nicht erlaubt.
+AI model {0} read the Issue.,KI-Modell {0} hat die Anfrage gelesen.
+account manager of {0},Account Manager von {0}
+user with permission on {0},Benutzer mit Berechtigung auf {0}
+internal stakeholder of {0},interner Stakeholder von {0}
+member of project {0},Mitglied im Projekt {0}
+worked on recent Issues of {0},hat an letzten Anfragen von {0} gearbeitet
+AI model not available: {0},KI-Modell nicht verfügbar: {0}
+Missing: {0},Fehlt: {0}
+{0} set to {1}: {2},{0} auf {1} gesetzt: {2}
+{0}: suggests {1} instead of {2}: {3},{0}: schlägt {1} statt {2} vor: {3}
+Assigned {0}: {1},{0} zugewiesen: {1}
+Suggested person: {0}: {1},Vorgeschlagene Person: {0}: {1}
+The screenshot was read too.,Der Screenshot wurde mitgelesen.
+"the model call failed ({0})",der Aufruf des Modells ist fehlgeschlagen ({0})
+Identified: {0},Erkannt: {0}
+nothing set,nichts gesetzt
+Likely sender: employee {0} (by e-mail address only),Wahrscheinlicher Absender: Mitarbeiter {0} (nur nach E-Mail-Adresse)
+{0} set: {1},{0} gesetzt: {1}
+Which {0} is it: {1}?,Welche(s) {0} ist es: {1}?
+(ERPNext picked {0}),(ERPNext hat {0} gewählt)
+No Implementation,Keine Implementierung
+Set the Implementation on this Issue first. The GitLab project is taken from it.,Setzen Sie zuerst die Implementierung an dieser Anfrage. Das GitLab-Projekt wird daraus übernommen.
+No GitLab Project,Kein GitLab-Projekt
+GitLab Project,GitLab-Projekt
+No GitLab Project is linked to Implementation {0}. Link one in {1} first.,Mit der Implementierung {0} ist kein GitLab-Projekt verknüpft. Verknüpfen Sie zuerst eines unter {1}.
+GitLab Project {0} does not belong to Implementation {1},GitLab-Projekt {0} gehört nicht zur Implementierung {1}
+Implementation {0} has several GitLab Projects. Choose one.,Die Implementierung {0} hat mehrere GitLab-Projekte. Wählen Sie eines aus.
+Save the Issue first.,Speichern Sie zuerst die Anfrage.
+Not available right now.,Gerade nicht erreichbar.
+Set yourself to Available first.,Setzen Sie sich zuerst auf Verfügbar.
+"Type, or tap the microphone on your keyboard to dictate.","Tippen Sie, oder tippen Sie auf das Mikrofon Ihrer Tastatur, um zu diktieren."
+Idea saved,Idee gespeichert
+Does it belong to an existing idea?,Gehört sie zu einer bestehenden Idee?
+Close in meaning,Inhaltlich nah
+Grew out of it,Daraus entstanden
+Add to it,Dort ergänzen
+What's the idea?,Was ist die Idee?
+Search my ideas,Meine Ideen durchsuchen
+1 idea waiting to send,1 Idee wartet auf Versand
+{0} ideas waiting to send,{0} Ideen warten auf Versand
+Kept on this phone. It is sent when you are online again.,"Auf diesem Telefon gespeichert. Sie wird gesendet, sobald Sie wieder online sind."
+Very close,Sehr nah
+Related,Verwandt
+Far,Fern
+No idea matches.,Keine Idee passt.
+No other ideas yet.,Noch keine anderen Ideen.
+Looking for close ideas …,Suche nach ähnlichen Ideen …
+Nothing close found.,Nichts Ähnliches gefunden.
+Linked: grew out of {0},Verknüpft: entstanden aus {0}
+Added to {0},Ergänzt in {0}
+No connection. The idea is saved; link it later in the Personal Cockpit.,Keine Verbindung. Die Idee ist gespeichert; verknüpfen Sie sie später im Personal Cockpit.
+Only colleagues can catch ideas.,Nur Kolleginnen und Kollegen können Ideen festhalten.
+Write or dictate your idea first.,Schreiben oder diktieren Sie zuerst Ihre Idee.
+Unknown link: {0},Unbekannte Verknüpfung: {0}
+Added {0},Ergänzt am {0}
+Idea suggestions failed,Ideen-Vorschläge fehlgeschlagen
+The AI could not be asked. Search instead.,Die KI konnte nicht gefragt werden. Bitte suchen Sie stattdessen.
+Suggest Related Ideas with AI,Verwandte Ideen per KI vorschlagen
+{0} already grew out of this idea.,{0} ist bereits aus dieser Idee entstanden.
+This idea has its own history. Link it instead of adding it.,"Diese Idee hat eine eigene Geschichte. Verknüpfen Sie sie, statt sie zu ergänzen."
+That is too long for a quick idea. Write it out in the Personal Cockpit.,Das ist zu lang für eine schnelle Idee. Schreiben Sie sie im Personal Cockpit aus.
+Sign in to send {0},"Anmelden, um {0} zu senden"
+"Stays its own idea, linked to this one.","Bleibt eine eigene Idee, verknüpft mit dieser."
+"Your text goes to the bottom of this idea, with date and time.","Ihr Text kommt unten an diese Idee, mit Datum und Uhrzeit."
+Grew out of this idea,Aus dieser Idee entstanden
+{0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."
+Install app,App installieren
+"Add to your Home Screen: tap Share, then 'Add to Home Screen'.","Zum Home-Bildschirm hinzufügen: auf Teilen tippen, dann „Zum Home-Bildschirm“."
+Too late to undo. Change the idea in the Personal Cockpit instead.,Zu spät zum Rückgängigmachen. Ändern Sie die Idee stattdessen im Personal Cockpit.
+"{0} was changed in the meantime, so this cannot be undone.","{0} wurde inzwischen geändert, daher lässt sich das nicht rückgängig machen."
+Team Assignment,Teamzuordnung
+Co-Lead,Co-Lead
+Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
+Change membership through Team Assignment.,Die Mitgliedschaft wird über die Teamzuordnung geändert.
+"Change membership through Team Assignment. Weekly capacity comes from Weekly Working Hours, or the Employment Contract.","Die Mitgliedschaft wird über die Teamzuordnung geändert. Die Wochenkapazität kommt aus den Wochenarbeitszeiten oder dem Arbeitsvertrag."
+"Who is in which team, and when. The Team's lead, co-lead and member table follow the assignments open today.","Wer wann in welchem Team ist. Teamleitung, Co-Leitung und Mitgliedertabelle des Teams folgen den heute offenen Zuordnungen."
+The end date of a team assignment cannot be before its start date.,Das Enddatum einer Teamzuordnung darf nicht vor ihrem Startdatum liegen.
+{0} is already assigned to team {1} in this period ({2}). One team at a time: end that assignment first.,"{0} ist in diesem Zeitraum bereits Team {1} zugeordnet ({2}). Immer nur ein Team: Beenden Sie zuerst diese Zuordnung."
+Team {0} already has a {1} in this period ({2}).,Team {0} hat in diesem Zeitraum bereits eine Rolle {1} ({2}).
+"The assignment is saved, but team {0} could not be updated. The daily job tries again; see the Error Log.","Die Zuordnung ist gespeichert, aber Team {0} konnte nicht aktualisiert werden. Der tägliche Job versucht es erneut; siehe Fehlerprotokoll."
+Implementation switched on for the assistant,Implementierung für den Assistenten eingeschaltet
+no Implementation found,keine Implementierung gefunden
+User Permission of {0} on Implementation {1},Benutzerberechtigung von {0} auf Implementierung {1}
+An Implementation on the Issue that the assistant is switched on for,"Eine Implementierung an der Anfrage, für die der Assistent eingeschaltet ist"
+Switched on for,Eingeschaltet für
+Run bench migrate to create the assistant's user.,"Bitte bench migrate ausführen, damit der Benutzer des Assistenten angelegt wird."
+None yet: the assistant takes no new Issues.,Noch keine: Der Assistent übernimmt keine neuen Anfragen.
+"The assistant only takes new Issues of these Implementations. Issues of other Implementations, and Issues without one, are left alone.","Der Assistent übernimmt nur neue Anfragen dieser Implementierungen. Anfragen anderer Implementierungen und Anfragen ohne Implementierung bleiben unberührt."
+Switch Implementations on or off,Implementierungen ein- oder ausschalten
+Switch an Implementation on,Implementierung einschalten
+applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.
+Actual hours per month; the line is the predicted hours per month,Ist-Stunden pro Monat; die Linie zeigt die geplanten Stunden pro Monat
+Billable rate,Abrechenbare Quote
+Billable · non-billable,Abrechenbar · nicht abrechenbar
+"Billable, non-billable customer work and internal hours; the line below each month is the booked rate.",Abrechenbare und nicht abrechenbare Kundenarbeit sowie interne Stunden; unter jedem Monat steht die Buchungsquote.
+Booked rate,Buchungsquote
+Could not load the implementations.,Die Implementierungen konnten nicht geladen werden.
+Could not load the statistics.,Die Statistik konnte nicht geladen werden.
+Health,Zustand
+Hours on this project count as internal in the Team Cockpit's statistics.,Stunden auf diesem Projekt zählen in der Statistik des Team-Cockpits als intern.
+Hours per FTE,Stunden pro VZÄ
+Hours this month,Stunden in diesem Monat
+Is Internal Project,Internes Projekt
+Last 6 months,Letzte 6 Monate
+Level {0},Stufe {0}
+Loading implementations…,Implementierungen werden geladen…
+Loading statistics…,Statistik wird geladen…
+Logged / available,Gebucht / verfügbar
+Logged against available hours,Gebuchte gegenüber verfügbaren Stunden
+Logged hours — 12 months,Gebuchte Stunden – 12 Monate
+"Maturity level, forecast and trend","Reifegrad, Prognose und Trend"
+Members this month,Mitglieder in diesem Monat
+No hours to show.,Keine Stunden vorhanden.
+No limit,Kein Limit
+No open implementation belongs to this team.,Zu diesem Team gehört keine offene Implementierung.
+Non-billable customer work,Nicht abrechenbare Kundenarbeit
+Open implementations,Offene Implementierungen
+Over their time limit,Über dem Zeitlimit
+Predicted per month,Geplant pro Monat
+Predicted: {0} h per month,Geplant: {0} h pro Monat
+Show member hours to team leads,Stunden der Mitglieder für Teamleitungen anzeigen
+Sold · delivered · left,Verkauft · geliefert · offen
+Sold · delivered · remaining hours,Verkaufte · gelieferte · verbleibende Stunden
+Sorted by name. Rates against each person's available hours after leave and holidays.,Nach Name sortiert. Quoten bezogen auf die verfügbaren Stunden jeder Person nach Urlaub und Feiertagen.
+Team leads and co-leads see logged and available hours of each member on the Team Cockpit's Statistics page. Members always see their own. Switch on only after the privacy owner has confirmed it (#1975).,"Teamleitung und Co-Leitung sehen auf der Statistikseite des Team-Cockpits die gebuchten und verfügbaren Stunden jedes Mitglieds. Mitglieder sehen immer ihre eigenen. Erst einschalten, wenn die Datenschutzverantwortliche Person es bestätigt hat (#1975)."
+"The team's implementations, in hours","Die Implementierungen des Teams, in Stunden"
+"Year to date: {0} h logged, booked rate {1}","Seit Jahresbeginn: {0} h gebucht, Buchungsquote {1}"
+Your hours this month,Ihre Stunden in diesem Monat
+from the 3-month prediction,aus der 3-Monats-Planung
+of logged hours,der gebuchten Stunden
+of {0} with a limit,von {0} mit Limit
+so far,bisher
+"so far, all implementations","bisher, alle Implementierungen"
+vs last year,ggü. Vorjahr
+vs {0},ggü. {0}
+{0} of {1} at target,{0} von {1} am Ziel
+{0} of {1} h,{0} von {1} h
+"{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
+"{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"

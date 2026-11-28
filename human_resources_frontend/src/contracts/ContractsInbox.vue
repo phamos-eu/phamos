@@ -67,9 +67,10 @@
 					</div>
 					<div class="truncate text-ink-gray-8">{{ row.contract_type }}</div>
 					<div class="truncate text-ink-gray-8">{{ formatPeriod(row) }}</div>
-					<div class="text-right tabular-nums text-ink-gray-8">{{ formatPercent(row.fte_percentage) }}</div>
-					<div class="text-right tabular-nums text-ink-gray-8">{{ formatHours(row.weekly_hours) }}</div>
-					<div class="text-right tabular-nums text-ink-gray-8">{{ formatMoney(row.monthly_gross, row.currency) }}</div>
+					<!-- Privacy mode (#1839): figures blur until "Show data". -->
+					<Sensitive tag="div" class="text-right tabular-nums text-ink-gray-8">{{ formatPercent(row.fte_percentage) }}</Sensitive>
+					<Sensitive tag="div" class="text-right tabular-nums text-ink-gray-8">{{ formatHours(row.weekly_hours) }}</Sensitive>
+					<Sensitive tag="div" class="text-right tabular-nums text-ink-gray-8">{{ formatMoney(row.monthly_gross, row.currency) }}</Sensitive>
 					<div><ContractStatusBadge :status="row.status" /></div>
 				</button>
 
@@ -113,6 +114,7 @@ import { call } from "frappe-ui"
 import ContractDetail from "./ContractDetail.vue"
 import ContractDialog from "./ContractDialog.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import {
 	CONTRACT_GRID,
 	CONTRACT_STATUSES,
