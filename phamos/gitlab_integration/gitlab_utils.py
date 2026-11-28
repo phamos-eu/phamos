@@ -1052,10 +1052,10 @@ def sync_gitlab_data():
         sync_gitlab_milestones()
         sync_all_issues()
         sync_gitlab_releases()
-        # merge requests for the Team Cockpit (#1977)
-        from phamos.gitlab_integration.merge_requests import sync_all_merge_requests
+        # merge requests for the Team Cockpit (#1977), in a job of their own
+        from phamos.gitlab_integration.merge_requests import sync_all_merge_requests_background
 
-        sync_all_merge_requests()
+        sync_all_merge_requests_background()
     except Exception:
         # a warning on the Phriend of the warning role (#2012); the job still fails as before
         from phamos.phriend import events as phriend_events

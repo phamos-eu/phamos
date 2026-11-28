@@ -183,7 +183,6 @@ def _merge_request_window(rows, start, end):
 	return frappe._dict(
 		merged={group: sum(1 for r in merged if r.group == group) for group in GROUPS},
 		merged_total=len(merged),
-		opened_total=sum(1 for r in rows if r.counts_opened and start <= r.created_on <= end),
 		# lines of the merge requests merged in the period: what reached the code base
 		lines_added={group: sum(r.lines_added or 0 for r in merged if r.group == group) for group in GROUPS},
 		lines_removed={group: sum(r.lines_removed or 0 for r in merged if r.group == group) for group in GROUPS},

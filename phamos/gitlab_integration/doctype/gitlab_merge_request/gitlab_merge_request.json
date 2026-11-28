@@ -53,9 +53,8 @@
   },
   {
    "fieldname": "web_url",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "URL",
-   "options": "URL",
    "read_only": 1
   },
   {
@@ -75,25 +74,30 @@
    "fieldname": "author_username",
    "fieldtype": "Data",
    "label": "Author Username",
-   "read_only": 1
+   "read_only": 1,
+   "length": 255
   },
   {
    "fieldname": "author_email",
    "fieldtype": "Data",
    "label": "Author Email",
-   "read_only": 1
+   "read_only": 1,
+   "length": 255,
+   "search_index": 1
   },
   {
    "fieldname": "source_branch",
    "fieldtype": "Data",
    "label": "Source Branch",
-   "read_only": 1
+   "read_only": 1,
+   "length": 255
   },
   {
    "fieldname": "target_branch",
    "fieldtype": "Data",
    "label": "Target Branch",
-   "read_only": 1
+   "read_only": 1,
+   "length": 255
   },
   {
    "fieldname": "sha",
@@ -112,13 +116,15 @@
    "fieldtype": "Datetime",
    "label": "Created At",
    "read_only": 1,
-   "description": "UTC, as GitLab sends it"
+   "description": "UTC, as GitLab sends it",
+   "search_index": 1
   },
   {
    "fieldname": "merged_at",
    "fieldtype": "Datetime",
    "label": "Merged At",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "closed_at",

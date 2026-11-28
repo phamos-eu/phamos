@@ -3392,3 +3392,5 @@ Without the excluded paths in GitLab Settings,Ohne die in den GitLab-Einstellung
 "One pattern per line (* matches any characters, also /). Changes in these files don't count as lines added or removed (#1977).","Ein Muster pro Zeile (* passt auf beliebige Zeichen, auch /). Änderungen in diesen Dateien zählen nicht als hinzugefügte oder entfernte Zeilen (#1977)."
 Last merge request sync; the next one fetches what changed since then (#1977).,"Letzte Synchronisierung der Merge Requests; die nächste holt, was sich seitdem geändert hat (#1977)."
 "A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
+Added,Hinzugefügt
+Merged,Gemergt
