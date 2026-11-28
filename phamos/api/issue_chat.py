@@ -728,7 +728,8 @@ def on_record_update(doc, method=None):
 def post_card_on_change(doc, method=None):
 	"""Issue on_update: when a field shown on the chat's card changes, a new card is posted with what
 	changed, so the chat shows the Issue's current state where people read (#2234). Runs before
-	on_record_update archives a closed chat. Never blocks the save."""
+	on_record_update archives a closed chat. Never blocks the save. The text is written in the language of
+	whoever saved the Issue, like the grey status lines it replaces."""
 	from phamos.setup.issue_chat_card import PREVIEW_FIELDS
 
 	before = doc.get_doc_before_save()
@@ -741,7 +742,8 @@ def post_card_on_change(doc, method=None):
 	if not channel:
 		return
 	try:
-		readers = _chat_readers(channel.name)
+		# members only matter when a customer's record is named: status or priority saves stay cheap
+		readers = _chat_readers(channel.name) if set(changes) & set(PRIVATE_LINKS) else ()
 		rows = "".join(
 			"<li>{0}: {1} → {2}</li>".format(
 				escape_html(_(doc.meta.get_label(f))),
