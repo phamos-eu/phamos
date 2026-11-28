@@ -111,8 +111,9 @@ def list_appointments(parent_doc):
 	return [_serialize_appointment(row) for row in parent_doc.get(EVENT_TABLE) or []]
 
 
-def appointment_options():
-	"""What the appointment dialog offers: mailboxes (name, email_id) that can send invites, and
+def appointment_options(mailboxes=None):
+	"""What the appointment dialog offers: mailboxes (name, email_id) that can send invites (all, or
+	the given ones), and
 	departments: active Employees with a company email, grouped by department ({department, label,
 	people: [{email, name, image}]}), people without a department last."""
 	employees = frappe.get_all(
@@ -134,13 +135,14 @@ def appointment_options():
 		{"department": department, "label": labels.get(department, department) if department else _("No department"), "people": people}
 		for department, people in sorted(groups.items(), key=lambda item: (not item[0], labels.get(item[0], item[0])))
 	]
-	return {"mailboxes": _allowed_mailboxes(), "departments": departments}
+	return {"mailboxes": mailboxes if mailboxes is not None else _allowed_mailboxes(), "departments": departments}
 
 
-def save_appointment(parent_doc, appointment):
+def save_appointment(parent_doc, appointment, mailboxes=None):
 	"""Create or update an appointment of `parent_doc` and send its invite. `appointment`: `name` of
 	the row to update (none: new), the fields in APPOINTMENT_FIELDS, and required_attendees /
-	optional_attendees as lists of emails. Returns the saved appointment with its sync status."""
+	optional_attendees as lists of emails. `mailboxes`: the ones this caller may send from (default:
+	every mailbox with a Mailcow calendar). Returns the saved appointment with its sync status."""
 	data = frappe._dict(frappe.parse_json(appointment) or {})
 	if not (data.subject or "").strip():
 		frappe.throw(_("Subject is required"))
@@ -148,7 +150,8 @@ def save_appointment(parent_doc, appointment):
 		frappe.throw(_("Start and end are required"))
 	if frappe.utils.get_datetime(data.end) < frappe.utils.get_datetime(data.start):
 		frappe.throw(_("End cannot be before start"))
-	if data.email_account not in {m.name for m in _allowed_mailboxes()}:
+	allowed = mailboxes if mailboxes is not None else _allowed_mailboxes()
+	if data.email_account not in {m.name for m in allowed}:
 		frappe.throw(_("Pick a mailbox with a Mailcow calendar to send the invite."))
 	if (data.repeat_on or "") not in REPEAT_OPTIONS:
 		frappe.throw(_("Unknown repeat option {0}").format(data.repeat_on))
@@ -191,3 +194,9 @@ def delete_appointment(parent_doc, name):
 	parent_doc.set(EVENT_TABLE, [row for row in parent_doc.get(EVENT_TABLE) if row.name != name])
 	_save_events(parent_doc)
 	return {"deleted": name}
+
+
+def mailbox(name):
+	"""[{name, email_id}] of one Email Account if it can send invites (has a Mailcow DAV password),
+	else []."""
+	return [m for m in _allowed_mailboxes() if m.name == name] if name else []

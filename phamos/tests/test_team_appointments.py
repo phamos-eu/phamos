@@ -32,6 +32,7 @@ class TeamAppointmentsTestCase(TeamAssignmentTestCase):
 			account.db_insert()
 		if not frappe.db.exists("Mailcow DAV Password", {"user": MAILBOX}):
 			frappe.get_doc({"doctype": "Mailcow DAV Password", "user": MAILBOX, "dav_password": "x"}).insert()
+		frappe.db.set_value("Team", TEAM_A, "team_mailbox", MAILBOX)
 		team_daily_schedule._email_for_account.cache_clear()
 		for target in ("_put_ics_upsert", "_delete_uid_for_mailbox"):
 			p = patch.object(team_daily_schedule, target, return_value=(True, None))
@@ -107,6 +108,31 @@ class TestPlanning(TeamAppointmentsTestCase):
 		# and she cannot make TEAM_A her active team
 		with self.assertRaises(frappe.PermissionError):
 			teams.set_active_team(TEAM_A)
+
+
+class TestTeamMailbox(TeamAppointmentsTestCase):
+	"""Invites go out only from the team's shared mailbox (decision 4 of #1979)."""
+
+	OTHER = "someone-else@example.com"
+
+	def test_only_the_team_mailbox_is_offered_and_accepted(self):
+		if not frappe.db.exists("Email Account", self.OTHER):
+			account = frappe.new_doc("Email Account")
+			account.update({"name": self.OTHER, "email_account_name": self.OTHER, "email_id": self.OTHER})
+			account.db_insert()
+		if not frappe.db.exists("Mailcow DAV Password", {"user": self.OTHER}):
+			frappe.get_doc({"doctype": "Mailcow DAV Password", "user": self.OTHER, "dav_password": "x"}).insert()
+		with self.as_member_of(self.ben, TEAM_A):
+			self.assertEqual([m.name for m in team_cockpit.get_appointment_options()["mailboxes"]], [MAILBOX])
+			with self.assertRaises(frappe.ValidationError):
+				team_cockpit.save_appointment(self.appointment(email_account=self.OTHER))
+
+	def test_without_a_team_mailbox_nothing_is_sent(self):
+		frappe.db.set_value("Team", TEAM_A, "team_mailbox", None)
+		with self.as_member_of(self.ben, TEAM_A):
+			self.assertFalse(team_cockpit.get_team_appointments()["has_mailbox"])
+			with self.assertRaises(frappe.ValidationError):
+				team_cockpit.save_appointment(self.appointment())
 
 
 class TestLeaveLayer(TeamAppointmentsTestCase):

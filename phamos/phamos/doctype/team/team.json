@@ -7,6 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "team_name",
+  "column_break_mailbox",
+  "team_mailbox",
   "section_break_riga",
   "team_lead",
   "column_break_ediq",
@@ -33,6 +35,17 @@
    "fieldtype": "Data",
    "label": "Team Name",
    "unique": 1
+  },
+  {
+   "fieldname": "column_break_mailbox",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "team_mailbox",
+   "fieldtype": "Link",
+   "label": "Team Mailbox",
+   "options": "Email Account",
+   "description": "The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979)."
   },
   {
    "fieldname": "section_break_riga",
@@ -142,7 +155,7 @@
    "link_fieldname": "team"
   }
  ],
- "modified": "2026-11-28 10:00:00.000000",
+ "modified": "2026-11-28 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team",

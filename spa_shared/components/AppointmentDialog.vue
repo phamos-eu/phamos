@@ -165,7 +165,8 @@ function reset() {
 		description: a.description || "",
 		start: toInput(a.start || props.suggested.start),
 		end: toInput(a.end || props.suggested.end),
-		email_account: a.email_account || "",
+		// one mailbox to choose from (the Team Cockpit's team mailbox): take it
+		email_account: a.email_account || (props.options.mailboxes?.length === 1 ? props.options.mailboxes[0].name : ""),
 		repeat_this_event: Boolean(a.repeat_this_event),
 		repeat_on: a.repeat_on || "Weekly",
 		repeat_till: a.repeat_till || "",

@@ -621,7 +621,7 @@ def _team_emails(team):
 	emails = []
 	for row in frappe.get_all(
 		"Employee",
-		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]]},
+		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]], "status": "Active"},
 		fields=["company_email", "user_id"],
 		order_by="employee_name asc",
 	):
@@ -643,16 +643,25 @@ def get_team_appointments():
 		"team": doc.name,
 		"appointments": appointments.list_appointments(doc),
 		"default_attendees": _team_emails(doc.name),
+		"has_mailbox": bool(_team_mailboxes(doc)),
 	}
+
+
+def _team_mailboxes(team_doc):
+	"""Team invites go out only from the Team's shared mailbox (decision 4 of #1979): members must
+	not send as a colleague or a manager."""
+	from phamos.cockpits import appointments
+
+	return appointments.mailbox(team_doc.get("team_mailbox"))
 
 
 @frappe.whitelist()
 @_require_access
 def get_appointment_options():
-	"""What the appointment dialog offers (mailboxes and people by department)."""
+	"""What the appointment dialog offers: the team's mailbox and the people by department."""
 	from phamos.cockpits import appointments
 
-	return appointments.appointment_options()
+	return appointments.appointment_options(mailboxes=_team_mailboxes(_active_team_doc()))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -662,7 +671,11 @@ def save_appointment(appointment):
 	plan (decision 9 of #1954)."""
 	from phamos.cockpits import appointments
 
-	return appointments.save_appointment(_active_team_doc(), appointment)
+	doc = _active_team_doc()
+	mailboxes = _team_mailboxes(doc)
+	if not mailboxes:
+		frappe.throw(_("Set a team mailbox with a Mailcow calendar on team {0} first.").format(doc.name))
+	return appointments.save_appointment(doc, appointment, mailboxes=mailboxes)
 
 
 @frappe.whitelist(methods=["POST"])

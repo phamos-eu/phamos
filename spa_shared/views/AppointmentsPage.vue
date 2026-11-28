@@ -24,7 +24,10 @@
 			</div>
 			<FormControl v-if="view === 'List'" v-model="showPast" :label="__('Show past')" type="checkbox" size="sm" />
 			<span v-if="departmentLabel" class="text-xs text-ink-gray-5">{{ departmentLabel }}</span>
-			<Button class="ml-auto" variant="solid" size="sm" :disabled="Boolean(error)" @click="openNew()">
+			<span v-if="noMailbox" class="text-xs text-ink-amber-3">
+				{{ __("Invites go out from the team mailbox. Set one on the Team in Desk first.") }}
+			</span>
+			<Button class="ml-auto" variant="solid" size="sm" :disabled="Boolean(error) || !loaded || noMailbox" @click="openNew()">
 				<template #prefix><FeatherIcon name="plus" class="h-3.5 w-3.5" /></template>
 				{{ __("New appointment") }}
 			</Button>
@@ -125,6 +128,8 @@ const CALENDAR_DAYS_AHEAD = 730
 
 const view = ref(readView())
 const defaultAttendees = ref([])
+// The Team Cockpit sends only from the team mailbox (#1979); without one nothing can be sent.
+const noMailbox = ref(false)
 const absences = ref({ absences: [], holidays: [] })
 // The leave layer covers a month back to three months ahead (the server takes up to 120 days).
 const ABSENCE_DAYS_BACK = 30
@@ -159,21 +164,45 @@ watch(view, (value) => {
 
 const listItems = computed(() => listAppointments(appointments.value, new Date(), showPast.value))
 
+/** "YYYY-MM-DD" days from `from` to `to`, inclusive. */
+function daysBetween(from, to) {
+	const days = []
+	const day = new Date(`${from}T00:00:00`)
+	const last = new Date(`${to}T00:00:00`)
+	while (day <= last) {
+		days.push(`${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`)
+		day.setDate(day.getDate() + 1)
+	}
+	return days
+}
+
+/** "Christmas (Anna, Ben +2)": the people a holiday applies to, shortened. */
+function holidayTitle(h) {
+	const title = h.description || __("Public holiday")
+	if (!h.people?.length) return title
+	const shown = h.people.slice(0, 2).map((name) => name.split(" ")[0])
+	const more = h.people.length > 2 ? ` +${h.people.length - 2}` : ""
+	return `${title} (${shown.join(", ")}${more})`
+}
+
+// One calendar entry per day: frappe-ui's Calendar shows an entry on its first day only.
 const absenceEvents = computed(() => [
 	// approved leave, neutral: no leave type (#1979)
-	...absences.value.absences.map((a, i) => ({
-		id: `absence-${i}`,
-		title: a.half_day_date && a.from_date === a.to_date ? __("{0} absent (half day)", [a.employee_name]) : __("{0} absent", [a.employee_name]),
-		participant: "",
-		fromDate: `${a.from_date}T00:00:00`,
-		toDate: `${a.to_date}T23:59:00`,
-		isFullDay: true,
-		color: "violet",
-		readOnly: true,
-	})),
+	...absences.value.absences.flatMap((a, i) =>
+		daysBetween(a.from_date, a.to_date).map((day) => ({
+			id: `absence-${i}-${day}`,
+			title: day === a.half_day_date ? __("{0} absent (half day)", [a.employee_name]) : __("{0} absent", [a.employee_name]),
+			participant: "",
+			fromDate: `${day}T00:00:00`,
+			toDate: `${day}T23:59:00`,
+			isFullDay: true,
+			color: "violet",
+			readOnly: true,
+		}))
+	),
 	...absences.value.holidays.map((h, i) => ({
 		id: `holiday-${i}`,
-		title: h.description || __("Public holiday"),
+		title: holidayTitle(h),
 		participant: h.people.join(", "),
 		fromDate: `${h.date}T00:00:00`,
 		toDate: `${h.date}T23:59:00`,
@@ -281,6 +310,7 @@ async function load() {
 		departmentLabel.value = data.department_label || data.department || data.team || ""
 		appointments.value = data.appointments
 		defaultAttendees.value = data.default_attendees || []
+		noMailbox.value = data.has_mailbox === false
 		absences.value = layer
 		options.value = opts
 		error.value = ""
@@ -342,6 +372,15 @@ onMounted(load)
 /* Event cards: amber on the dark surface instead of a light box. */
 [data-theme="dark"] .gm-calendar .bg-amber-100 {
 	background-color: var(--surface-amber-2);
+}
+
+/* the leave and holiday layer (#1979) */
+[data-theme="dark"] .gm-calendar .bg-violet-100 {
+	background-color: var(--surface-gray-3);
+}
+
+[data-theme="dark"] .gm-calendar .bg-green-100 {
+	background-color: var(--surface-green-2);
 }
 
 [data-theme="dark"] .gm-calendar .text-gray-800 {
