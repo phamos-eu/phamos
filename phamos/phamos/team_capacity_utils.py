@@ -24,8 +24,16 @@ def get_employee_daily_hours(employee, work_date):
 
     From the submitted Weekly Working Hours (HR Addon) whose validity covers the date, as HR Addon
     itself reads them (workday.get_employee_default_work_hour). A draft or cancelled record, or
-    one valid at another time, does not count (#1983). No valid record, or no HR Addon: 0.
+    one valid at another time, does not count (#1983). Without a valid record: the weekly hours of
+    the submitted Employment Contract valid that day, spread over Monday to Friday (#1975).
+    Neither: 0.
     """
+    return get_employee_scheduled_hours(employee, work_date)[0]
+
+
+def get_employee_scheduled_hours(employee, work_date):
+    """(hours, source) of `employee` on `work_date`. source: "wwh" (Weekly Working Hours),
+    "contract" (Employment Contract, weekly hours / 5 on Monday to Friday) or None (unknown)."""
     cache = _get_team_capacity_cache()
     daily_key = (employee, work_date)
     if daily_key in cache["daily_hours"]:
@@ -34,15 +42,40 @@ def get_employee_daily_hours(employee, work_date):
     if employee not in cache["wwh_by_employee"]:
         cache["wwh_by_employee"][employee] = _weekly_working_hours(employee)
 
-    hours = 0
-    day_name = work_date.strftime("%A")
+    result = (0, None)
     for record in cache["wwh_by_employee"][employee]:
         if record["valid_from"] <= work_date <= (record["valid_to"] or work_date):
-            hours = record["hours"].get(day_name, 0)
+            result = (record["hours"].get(work_date.strftime("%A"), 0), "wwh")
             break
+    else:
+        contract = _contract_on(employee, work_date)
+        if contract:
+            weekday = work_date.weekday() < 5
+            result = ((contract.weekly_hours or 0) / 5 if weekday else 0, "contract")
 
-    cache["daily_hours"][daily_key] = hours
-    return hours
+    cache["daily_hours"][daily_key] = result
+    return result
+
+
+def _contract_on(employee, on_date):
+    """The submitted Employment Contract of `employee` valid on `on_date`, latest start first."""
+    cache = _get_team_capacity_cache()
+    contracts = cache.setdefault("contracts_by_employee", {})
+    if employee not in contracts:
+        contracts[employee] = (
+            frappe.get_all(
+                "Employment Contract",
+                filters={"employee": employee, "docstatus": 1},
+                fields=["effective_from", "valid_until", "weekly_hours", "fte_percentage"],
+                order_by="effective_from desc",
+            )
+            if frappe.db.exists("DocType", "Employment Contract")
+            else []
+        )
+    for contract in contracts[employee]:
+        if contract.effective_from and contract.effective_from <= on_date <= (contract.valid_until or on_date):
+            return contract
+    return None
 
 
 # Approved leave only: HRMS also submits Leave Applications with the status Rejected.
@@ -72,15 +105,8 @@ def get_employee_weekly_hours(employee, on_date):
 		if record["valid_from"] <= on_date <= (record["valid_to"] or on_date):
 			return sum(record["hours"].values())
 
-	contracts = frappe.get_all(
-		"Employment Contract",
-		filters={"employee": employee, "docstatus": 1, "effective_from": ["<=", on_date]},
-		or_filters=[["valid_until", "is", "not set"], ["valid_until", ">=", on_date]],
-		fields=["weekly_hours"],
-		order_by="effective_from desc",
-		limit_page_length=1,
-	)
-	return (contracts[0].weekly_hours or 0) if contracts else 0
+	contract = _contract_on(employee, on_date)
+	return (contract.weekly_hours or 0) if contract else 0
 
 
 def _weekly_working_hours(employee):

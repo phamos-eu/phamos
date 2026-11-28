@@ -217,10 +217,39 @@ def expand_issue_sections():
 		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
 
 
+INTERNAL_PROJECT_FIELD = "custom_is_internal_project"
+PROJECT_FIELDS = [
+	{
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
+		"fieldtype": "Section Break",
+		"insert_after": "",
+		"collapsible": 0,
+	},
+	{
+		"fieldname": INTERNAL_PROJECT_FIELD,
+		"label": "Is Internal Project",
+		"fieldtype": "Check",
+		"insert_after": IMPLEMENTATION_SECTION,
+		"description": "Hours on this project count as internal in the Team Cockpit's statistics.",
+	},
+]
+
+
+def ensure_project_fields():
+	""""Is Internal Project" on Project (#1975). Most sites have it already as a site customization
+	in the "phamos" section; it is left where it is. Only a site without it gets it, in the
+	Implementation Specific section."""
+	if frappe.get_meta("Project").has_field(INTERNAL_PROJECT_FIELD):
+		return
+	create_custom_fields({"Project": [{**field, "module": MODULE} for field in PROJECT_FIELDS]}, update=True)
+
+
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
 	ensure_issue_fields()
+	ensure_project_fields()
 
 
 def after_install():
