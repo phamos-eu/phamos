@@ -4,6 +4,7 @@
 """Ophice slice 1 (#2054): my own chip's remembered position and the dummy chips."""
 
 import json
+import re
 from unittest import skipUnless
 from unittest.mock import patch
 
@@ -669,6 +670,23 @@ class OphiceAreaTestCase(FrappeTestCase):
 			ophice.save_area("Clash", "https://meet.jit.si/ClashRoom", 37, 23, 2, 2)
 		# moving an area onto itself is fine
 		ophice.save_area("Corner", "https://meet.jit.si/CornerRoom", 38, 23, 2, 2, name=name)
+
+	def test_new_space_gets_a_ready_meeting_url(self):
+		# #2094: a random room on the site's Jitsi server, which saving accepts as it is.
+		url = ophice.new_meeting_url()
+		# Whatever the site's default server is (#2108 moved it off meet.jit.si).
+		domain = re.escape(ophice._jitsi_domain())
+		self.assertRegex(url, rf"^https://{domain}/ophice-[a-z0-9]{{24}}$")
+		self.assertNotEqual(url, ophice.new_meeting_url())
+		name = ophice.save_area("Ready", url, 1, 1, 2, 2)
+		self.assertEqual(frappe.db.get_value("Ophice Area", name, "meeting_url"), url)
+		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "Jitsi.Example.org/"}):
+			self.assertTrue(ophice.new_meeting_url().startswith("https://jitsi.example.org/ophice-"))
+
+	def test_ready_meeting_url_only_for_map_editors(self):
+		with patch.object(ophice, "can_edit_map", return_value=False):
+			with self.assertRaises(frappe.PermissionError):
+				ophice.new_meeting_url()
 
 	def test_delete(self):
 		name = ophice.save_area("Gone", "https://meet.jit.si/GoneRoom", 1, 1, 1, 1)
