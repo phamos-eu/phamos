@@ -85,7 +85,7 @@
    "label": "Follow-up window (minutes)",
    "default": "10",
    "non_negative": 1,
-   "description": "After the assistant answered someone in an Issue chat, that person's next messages in the same chat or thread are answered without @mention for this many minutes. 0: only thread replies under its messages and @mentions (#2231)."
+   "description": "After the assistant answered in an Issue chat, the next messages in the same chat or thread are answered without @mention for this many minutes, by anyone. \"stop\" / \"Ruhe\" silences it in that chat until it is @mentioned. 0: only thread replies under its messages and @mentions (#2231)."
   }
  ],
  "issingle": 1,

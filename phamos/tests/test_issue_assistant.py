@@ -978,8 +978,9 @@ class TestChat(IssueAssistantTestCase):
 		self.answer(doc, self.say(channel, "first question"))  # answered, e.g. after an @mention
 		# the same person's next message in the main chat: answered without @mention
 		self.addressed(self.say(channel, "and one more thing")).assert_called_once()
-		# a colleague's message is not addressed to the assistant
-		self.addressed(self.say(channel, "lunch?", user=DESK_USER), user=DESK_USER).assert_not_called()
+		# a colleague's message within the window too: it takes part in the conversation
+		frappe.get_doc("User", DESK_USER).add_roles("Raven User")
+		self.addressed(self.say(channel, "what about the VAT?", user=DESK_USER), user=DESK_USER).assert_called_once()
 		# outside the window: not answered
 		frappe.db.sql("update `tabAI Agent Run` set finished_at = %s where triggered_by = %s and `trigger` = 'Chat'",
 			(frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=-11), self.CHAT_USER))
@@ -989,6 +990,34 @@ class TestChat(IssueAssistantTestCase):
 			(frappe.utils.now_datetime(), self.CHAT_USER))
 		frappe.db.set_single_value(setup.SETTINGS, "chat_follow_up_minutes", 0)
 		self.addressed(self.say(channel, "hello?")).assert_not_called()
+
+	def test_stop_silences_it_until_mentioned(self):
+		frappe.reload_doc("ai_agents", "doctype", "issue_assistant_settings")
+		frappe.db.set_single_value(setup.SETTINGS, "chat_follow_up_minutes", 10)
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.addCleanup(frappe.db.set_global, f"issue_assistant_silent::{doc.name}", None)
+		self.llm.return_value = ({"answer": "ok", "actions": []}, "mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "first question"))
+		self.addressed(self.say(brief, "Stop please!")).assert_not_called()
+		self.assertTrue(self.chat.is_silent(doc.name))
+		bot_texts = frappe.get_all("Raven Message", filters={"channel_id": channel, "is_bot_message": 1}, pluck="text")
+		self.assertTrue(any("quiet" in (t or "") for t in bot_texts), bot_texts)
+		# silent: neither the window nor a thread reply wakes it
+		self.addressed(self.reply_in_thread(brief, "and the invoice?")).assert_not_called()
+		# an @mention does
+		bot_user = frappe.db.get_value("Raven Bot", setup.ASSISTANT_NAME, "raven_user")
+		message = self.say(channel, "please check again")
+		message.append("mentions", {"user": bot_user})
+		self.addressed(message).assert_called_once()
+		self.assertFalse(self.chat.is_silent(doc.name))
+
+	def test_only_short_messages_silence(self):
+		message = frappe._dict(text="<p>stop</p>")
+		self.assertTrue(self.chat.asks_for_silence(message))
+		self.assertTrue(self.chat.asks_for_silence(frappe._dict(text="<p>Ruhe bitte</p>")))
+		self.assertFalse(self.chat.asks_for_silence(frappe._dict(text="<p>can you stop the timer on this Issue</p>")))
+		self.assertFalse(self.chat.asks_for_silence(frappe._dict(text="<p>are you still there?</p>")))
 
 	def test_reply_under_the_brief_is_answered_other_messages_not(self):
 		doc, channel, brief = self.issue_with_brief()
