@@ -117,6 +117,8 @@ async function load() {
 		team.value = data.team
 		ideas.value = data.ideas || []
 		error.value = ""
+		// the open idea was withdrawn or moved away: close its panel
+		if (selected.value && !ideas.value.some((r) => r.name === selected.value)) close()
 	} catch (e) {
 		error.value = e.messages?.[0] || e.message || __("Could not load the ideas.")
 	} finally {

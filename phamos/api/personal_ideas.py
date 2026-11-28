@@ -102,6 +102,8 @@ def _serialize(doc):
 		"vote_status": doc.vote_status or "",
 		"vote_count": cint(doc.vote_count),
 		"team": doc.get("team") or None,
+		# share / move needs a team I am in (#1980)
+		"my_teams": _my_teams(),
 		"handed_in_on": str(doc.handed_in_on) if doc.handed_in_on else None,
 		"creation": str(doc.creation),
 		"modified": str(doc.modified),
@@ -460,27 +462,56 @@ def withdraw_idea_from_vote(name):
 	return _serialize(doc)
 
 
-def share_idea_with_team(name, team=None):
-	"""Share my idea with my team: up for vote, but only my team reads, votes and chats on it
-	(#1980). The same vote as the company's, so votes stay when it widens or moves. `team`: one of
-	the teams I may open; default my current team."""
+def share_idea_with_team(name, team=None, any_open_team=False):
+	"""Share my idea with a team: up for vote, but only that team reads, votes and chats on it
+	(#1980). The same vote as the company's, so votes stay when it widens or moves.
+
+	`team`: default my active team if I am in it, else the first team I am in. Only teams I am in,
+	or with `any_open_team` (the Team Cockpit) any team I may open there.
+	"""
 	from phamos.cockpits import teams
 
 	doc = _get_my_idea(name)
 	if doc.stage in IDEA_VOTE_BLOCKED_STAGES:
 		frappe.throw(_("A composted idea cannot be shared. Take it up again first."))
-	mine = teams.member_teams() or (teams.available_teams() if teams.sees_all_teams() else [])
-	team = team or (mine[0] if mine else None)
-	if not team or team not in mine:
+	mine = teams.member_teams()
+	allowed = set(teams.available_teams()) if any_open_team else set(mine)
+	if not team:
+		active = teams.active_team()
+		team = active if active in mine else (mine[0] if mine else None)
+	if not team or team not in allowed:
 		frappe.throw(_("You are not in a team to share it with."), frappe.PermissionError)
 	if doc.vote_status != IDEA_VOTE_OPEN or doc.get("team") != team:
 		doc.vote_status = IDEA_VOTE_OPEN
 		doc.team = team
 		doc.flags.ignore_permissions = True
 		doc.save(ignore_version=True)
+		prune_idea_chat(doc.name)
 		_publish(doc)
 		_publish_vote(doc.name, doc.vote_count, doc.vote_status)
 	return _serialize(doc)
+
+
+def prune_idea_chat(name):
+	"""Take everyone out of the idea's Raven chat who can no longer read the idea: after it moved to
+	another team, or after a company round it is shared with one team only (#1980). Their messages
+	stay."""
+	if not issue_chat.is_raven_installed():
+		return
+	channel = issue_chat.find_channel("Idea", name)
+	if not channel:
+		return
+	leavers = [user for user in issue_chat.channel_member_users(channel) if not can_read_idea(name, user)]
+	issue_chat._remove_members(channel, leavers)
+
+
+def _my_teams():
+	"""My teams, once per request (_serialize runs for every idea of a list)."""
+	from phamos.cockpits import teams
+
+	if getattr(frappe.local, "idea_my_teams", None) is None:
+		frappe.local.idea_my_teams = teams.member_teams()
+	return frappe.local.idea_my_teams
 
 
 def _readable_open_ideas(filters=None):

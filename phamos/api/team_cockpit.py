@@ -782,7 +782,7 @@ def create_team_idea(title):
 	from phamos.api import personal_ideas
 
 	doc = personal_ideas.create_idea(title=title)
-	return personal_ideas.share_idea_with_team(doc["name"], teams.require_active_team())
+	return personal_ideas.share_idea_with_team(doc["name"], teams.require_active_team(), any_open_team=True)
 
 
 @frappe.whitelist()

@@ -137,3 +137,50 @@ class TestTeamCockpit(TeamIdeasTestCase):
 			with self.assertRaises(frappe.PermissionError):
 				team_chat.check_channel_member(frappe._dict(channel_id="chan", user_id="ru-cara"))
 			team_chat.check_channel_member(frappe._dict(channel_id="chan", user_id="ru-anna"))
+
+
+class TestReviewFindings(TeamIdeasTestCase):
+	def test_moving_takes_the_old_team_out_of_the_chat(self):
+		name = self.shared_idea()
+		frappe.set_user("Administrator")
+		self.ben_a.until_date = frappe.utils.add_days(frappe.utils.today(), -1)
+		self.ben_a.save()
+		self.assign(self.ben, TEAM_B, frappe.utils.today())
+		members = [self.users[self.anna], self.users[self.ben], self.users[self.cara]]
+		with patch.object(personal_ideas.issue_chat, "is_raven_installed", return_value=True), patch.object(
+			personal_ideas.issue_chat, "find_channel", return_value=frappe._dict(name="chan")
+		), patch.object(personal_ideas.issue_chat, "channel_member_users", return_value=members), patch.object(
+			personal_ideas.issue_chat, "_remove_members"
+		) as remove, patch.object(personal_ideas.issue_chat, "on_idea_vote_change"):
+			self.as_user(self.ben)
+			personal_ideas.share_idea_with_team(name)
+		# anna stays in team A and can no longer read it; ben (author) and cara (team B) stay
+		self.assertEqual(remove.call_args.args[1], [self.users[self.anna]])
+
+	def test_the_team_cockpit_shares_with_the_team_on_screen(self):
+		frappe.set_user("Administrator")
+		with patch.object(teams, "require_active_team", return_value=TEAM_B):
+			created = team_cockpit.create_team_idea("From the GM's view")
+		self.assertEqual(frappe.db.get_value("Idea", created["name"], "team"), TEAM_B)
+
+	def test_without_a_team_the_personal_cockpit_cannot_share(self):
+		frappe.set_user("Administrator")
+		name = personal_ideas.create_idea(title="GM idea")["name"]
+		with patch.object(teams, "member_teams", return_value=[]), self.assertRaises(frappe.PermissionError):
+			personal_ideas.share_idea_with_team(name)
+
+	def test_composting_makes_it_private_again(self):
+		name = self.shared_idea()
+		doc = frappe.get_doc("Idea", name)
+		doc.stage = "Compost"
+		doc.flags.ignore_permissions = True
+		doc.save()
+		self.assertEqual(frappe.db.get_value("Idea", name, ["vote_status", "team"]), ("", None))
+
+	def test_the_owner_cannot_set_the_team_through_the_api(self):
+		self.as_user(self.cara)
+		name = personal_ideas.create_idea(title="Sneaky")["name"]
+		doc = frappe.get_doc("Idea", name)
+		doc.team = TEAM_A
+		doc.save()
+		self.assertIsNone(frappe.db.get_value("Idea", name, "team"))

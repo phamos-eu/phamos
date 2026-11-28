@@ -39,6 +39,16 @@
 										{{ idea.team ? __("Shared with {0}", [idea.team]) : __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
 									</Badge>
 								</router-link>
+								<!-- shared with a team I am no longer in (#1980): bring it to my team, the votes stay -->
+								<Button
+									v-if="idea.team && idea.my_teams?.length && !idea.my_teams.includes(idea.team)"
+									variant="subtle"
+									:loading="sharing"
+									@click="shareWithTeam"
+								>
+									<template #prefix><FeatherIcon name="users" class="h-4 w-4" /></template>
+									{{ __("Move to my team") }}
+								</Button>
 								<!-- shared with the team (#1980): open it to everyone, the votes stay -->
 								<Button v-if="idea.team" variant="subtle" :loading="handingIn" @click="handIn">
 									<template #prefix><FeatherIcon name="globe" class="h-4 w-4" /></template>
@@ -59,7 +69,7 @@
 							/>
 							<template v-else-if="!composted">
 								<!-- only the own team reads, votes and chats (#1980) -->
-								<Button variant="subtle" :loading="sharing" @click="shareWithTeam">
+								<Button v-if="idea.my_teams?.length" variant="subtle" :loading="sharing" @click="shareWithTeam">
 									<template #prefix><FeatherIcon name="users" class="h-4 w-4" /></template>
 									{{ __("Share with team") }}
 								</Button>
@@ -307,7 +317,9 @@ async function handIn() {
 const sharing = ref(false)
 
 async function shareWithTeam() {
-	const question = __("Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.")
+	const question = idea.value.team
+		? __("Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.")
+		: __("Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.")
 	if (!window.confirm(question)) return
 	sharing.value = true
 	try {
