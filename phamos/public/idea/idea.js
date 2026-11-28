@@ -658,10 +658,18 @@
 			return false
 		}
 	}
+	// An uploaded file of this site: /files/… or /private/files/… (no "..", which the browser would
+	// resolve to another path).
+	function siteFile(value) {
+		if (!sameSite(value)) return false
+		var path = new URL(plainUrl(value), location.href).pathname
+		return /^\/(private\/)?files\/[^/]/.test(path) && !/\/\.\.?(\/|$)|%2e/i.test(path)
+	}
 	function keepAttribute(tag, name, value) {
 		if (tag === "A" && name === "href") return /^(https?:|mailto:)/i.test(plainUrl(value)) || sameSite(value)
-		// Images only from this site: one from another host would tell it who read the idea.
-		if (tag === "IMG" && name === "src") return sameSite(value)
+		// Images only from this site's uploaded files: one from another host would tell it who read
+		// the idea, and any other path here (/api/method/…) would be a request in the reader's name.
+		if (tag === "IMG" && name === "src") return siteFile(value)
 		if (tag === "IMG" && name === "alt") return true
 		if ((tag === "TD" || tag === "TH") && (name === "colspan" || name === "rowspan")) return /^\d{1,2}$/.test(value)
 		return false
