@@ -18,7 +18,7 @@
 				v-if="data.unmatched_own_items"
 				class="rounded-lg border border-outline-amber-2 bg-surface-amber-1 px-3 py-2 text-sm text-ink-amber-3"
 			>
-				{{ __("{0} items in the team's own implementations have an assignee that matches no employee by email; they are not counted.", [data.unmatched_own_items]) }}
+				{{ __("{0} open or this month's items in the team's own implementations have an assignee that matches no employee by email; they are not counted.", [data.unmatched_own_items]) }}
 			</div>
 
 			<div class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-rows-1">

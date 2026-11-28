@@ -25,10 +25,12 @@ SLA figures (decision 4): the team's Issues (Team field, or a project of the tea
 Implementations), only while SLA tracking is on in Support Settings.
 """
 
+from datetime import timezone
 from statistics import median
+from zoneinfo import ZoneInfo
 
 import frappe
-from frappe.utils import add_months, get_datetime, get_first_day, get_last_day, getdate
+from frappe.utils import add_months, get_datetime, get_first_day, get_last_day, get_system_timezone, getdate
 
 from phamos.cockpits import teams
 from phamos.cockpits.team_hours import month_windows
@@ -59,6 +61,19 @@ def _all_employee_emails():
 	return known
 
 
+def _system_time(utc_value):
+	"""The sync stores GitLab times as naive UTC (gitlab_utils._parse_gitlab_datetime); dates and
+	ages are taken in the system time zone, so an item closed at 00:30 on 1 March counts in March."""
+	if not utc_value:
+		return None
+	return (
+		get_datetime(utc_value)
+		.replace(tzinfo=timezone.utc)
+		.astimezone(ZoneInfo(get_system_timezone()))
+		.replace(tzinfo=None)
+	)
+
+
 def _in_team(periods, day):
 	return any(start <= day <= end for start, end in periods)
 
@@ -79,7 +94,11 @@ def _project_groups(team):
 
 
 def _items(range_start):
-	"""GitLab Issues that matter for [range_start, today]: created or closed since then, or open."""
+	"""GitLab Issues that matter for [range_start, today]: created or closed since then, or open.
+	`range_start` is a system-time date; the stored times are UTC, so the filter is converted."""
+	from phamos.gitlab_integration.issue_refs import _system_to_utc
+
+	range_start = _system_to_utc(get_datetime(range_start))
 	rows = frappe.db.sql(
 		"""
 		select gi.name, gi.state, gi.created_at, gi.closed_at, gi.assignee_email, gi.parent_issue,
@@ -181,20 +200,29 @@ def team_gitlab_statistics(team, today=None):
 	known_emails = _all_employee_emails()
 	groups, own_projects = _project_groups(team)
 
+	month_start = get_first_day(today)
 	team_items, unmatched = [], 0
 	for item in _items(range_start):
+		if not item.created_at:
+			# a time the sync could not parse: no date to count it on
+			continue
+		item.created_at = _system_time(item.created_at)
+		item.closed_at = _system_time(item.closed_at)
+		item.created_on = getdate(item.created_at)
+		item.closed_on = getdate(item.closed_at) if item.closed_at else None
 		email = (item.assignee_email or "").strip().lower()
 		employee = emails.get(email)
 		item.group = groups.get(item.gitlab_project, "internal")
 		if not employee:
-			if item.gitlab_project in own_projects and email not in known_emails:
+			# the notice: open items and items closed this month in the team's own projects whose
+			# assignee is nobody we know; unassigned items are not a matching problem
+			recent = item.state == "opened" or (item.closed_on and item.closed_on >= month_start)
+			if email and recent and item.gitlab_project in own_projects and email not in known_emails:
 				unmatched += 1
 			continue
-		item.created_on = getdate(item.created_at)
-		item.closed_on = getdate(item.closed_at) if item.closed_at else None
 		member_periods = periods[employee]
 		item.counts_opened = _in_team(member_periods, item.created_on)
-		item.counts_closed = bool(item.closed_on) and _in_team(member_periods, item.closed_on)
+		item.counts_closed = item.state == "closed" and bool(item.closed_on) and _in_team(member_periods, item.closed_on)
 		item.counts_open = item.state == "opened" and _in_team(member_periods, today)
 		if item.closed_at:
 			item.closing_days = _days_between(item.created_at, item.closed_at)

@@ -84,8 +84,30 @@ class TestWhichItemsCount(TeamGitlabTestCase):
 		# unmatched outside the team's own projects: not the team's concern
 		self.item("stranger@example.com", "2026-03-02 09:00:00", project=PROJECTS[1])
 		data = self.stats()
-		self.assertEqual(data.unmatched_own_items, 2)
+		# only the stranger in the own project: unassigned items are no matching problem
+		self.assertEqual(data.unmatched_own_items, 1)
 		self.assertEqual(data.open_items.count, 0)
+
+	def test_dates_are_taken_in_the_system_time_zone(self):
+		self.assign(self.anna, TEAM_A, "2026-03-01")
+		# stored as UTC: 28 Feb 23:30 UTC is 1 March 00:30 in Berlin, the day anna joined
+		self.item(self.anna_email, "2026-02-20 09:00:00", "2026-02-28 23:30:00")
+		with patch.object(team_gitlab, "get_system_timezone", return_value="Europe/Berlin"):
+			self.assertEqual(self.stats().windows["current"].closed_total, 1)
+		with patch.object(team_gitlab, "get_system_timezone", return_value="UTC"):
+			self.assertEqual(self.stats().windows["current"].closed_total, 0)
+
+	def test_an_open_item_from_before_the_range_is_open_not_opened(self):
+		self.assign(self.anna, TEAM_A, "2026-01-01")
+		self.item(self.anna_email, "2024-05-01 09:00:00")
+		data = self.stats()
+		self.assertEqual((data.open_items.count, data.windows["current"].opened_total), (1, 0))
+
+	def test_a_member_who_leaves_mid_month(self):
+		self.assign(self.anna, TEAM_A, "2026-01-01", "2026-03-10")
+		self.item(self.anna_email, "2026-03-02 09:00:00", "2026-03-05 09:00:00")
+		self.item(self.anna_email, "2026-03-02 09:00:00", "2026-03-15 09:00:00")
+		self.assertEqual(self.stats().windows["current"].closed_total, 1)
 
 
 class TestFigures(TeamGitlabTestCase):
@@ -106,9 +128,16 @@ class TestFigures(TeamGitlabTestCase):
 		open_items = self.stats().open_items
 		self.assertEqual((open_items.count, open_items.median_age_days, open_items.oldest_age_days), (2, 20, 30))
 
-	def test_twelve_months(self):
-		months = self.stats().months
+	def test_twelve_months_by_group_and_the_previous_month(self):
+		self.assign(self.anna, TEAM_A, "2026-01-01")
+		self.item(self.anna_email, "2026-02-02 09:00:00", "2026-02-10 09:00:00", project=PROJECTS[1])
+		self.item(self.anna_email, "2026-03-02 09:00:00", "2026-03-04 09:00:00")
+		data = self.stats()
+		months = data.months
 		self.assertEqual((months[0].start, months[-1].start, len(months)), (date(2025, 4, 1), date(2026, 3, 1), 12))
+		self.assertEqual(months[-2].closed, {"own": 0, "other": 1, "internal": 0})
+		self.assertEqual(months[-1].closed, {"own": 1, "other": 0, "internal": 0})
+		self.assertEqual(data.windows["previous"].closed_total, 1)
 
 
 class TestSla(TeamGitlabTestCase):
@@ -148,9 +177,10 @@ class TestEndpoint(TeamGitlabTestCase):
 		self.assign(self.ben, TEAM_A, "2026-01-01")
 		self.item("stranger@example.com", "2026-03-02 09:00:00")
 		self.addCleanup(frappe.set_user, "Administrator")
+		real = team_gitlab.team_gitlab_statistics
 		with patch.object(teams, "require_active_team", return_value=TEAM_A), patch.object(
 			team_cockpit, "check_app_permission", return_value=True
-		), patch.object(team_gitlab, "getdate", side_effect=lambda value=None: frappe.utils.getdate(value or TODAY)):
+		), patch.object(team_gitlab, "team_gitlab_statistics", side_effect=lambda team: real(team, today=TODAY)):
 			frappe.set_user(self.ben_email)
 			self.assertIsNone(team_cockpit.get_gitlab_statistics().unmatched_own_items)
 			frappe.set_user(self.anna_email)
