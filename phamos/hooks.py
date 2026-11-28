@@ -671,6 +671,8 @@ scheduler_events = {
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # Team Cockpit: successes found by the daily rules (#1981)
+        "phamos.cockpits.team_successes.run_all_teams",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",

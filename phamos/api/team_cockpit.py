@@ -801,3 +801,64 @@ def ensure_idea_chat(name):
 	from phamos.api import personal_ideas
 
 	return personal_ideas.ensure_idea_chat(name)
+
+
+# --- Successes (#1981) ------------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_successes(success_type=None):
+	"""The active team's successes, newest first, with who gave kudos and praise (visible to the
+	team, decision 3 of #1981)."""
+	from phamos.cockpits import team_successes
+
+	team = teams.require_active_team()
+	rows = team_successes.list_successes(team, success_type or None)
+	for row in rows:
+		row["given_by_name"] = frappe.utils.get_fullname(row.given_by) if row.given_by else None
+		row["customer_name"] = frappe.db.get_value("Customer", row.customer, "customer_name") if row.customer else None
+	return {"team": team, "successes": rows}
+
+
+@frappe.whitelist()
+@_require_access
+def get_success_options():
+	"""For the kudos and praise dialogs: the team's people and the customers of its implementations."""
+	from phamos.cockpits.team_status import _people
+
+	team = teams.require_active_team()
+	people = frappe.get_all(
+		"Employee",
+		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]], "status": "Active"},
+		fields=["name", "employee_name", "user_id"],
+		order_by="employee_name asc",
+	)
+	customers = sorted(
+		{
+			c
+			for c in frappe.get_all("Implementation", filters={"team": team, "customer": ["is", "set"]}, pluck="customer")
+		}
+	)
+	return {
+		"people": [{"value": p.name, "label": p.employee_name, "me": p.user_id == frappe.session.user} for p in people],
+		"customers": [{"value": c, "label": frappe.db.get_value("Customer", c, "customer_name") or c} for c in customers],
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def give_kudos(employee, text):
+	"""Kudos to a team mate, posted in the team chat; the team sees who gave them."""
+	from phamos.cockpits import team_successes
+
+	return team_successes.give_kudos(teams.require_active_team(), employee, text)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def add_customer_praise(customer, text, employee=None):
+	"""Praise from a customer, entered by a team member."""
+	from phamos.cockpits import team_successes
+
+	return team_successes.add_customer_praise(teams.require_active_team(), customer, text, employee or None)

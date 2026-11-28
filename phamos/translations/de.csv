@@ -3450,3 +3450,64 @@ Only the people of the idea's team can join its chat.,Nur die Personen des Teams
 Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company.,"Mit diesem Team geteilt: nur seine Personen lesen die Idee und stimmen ab (#1980). Leer, solange sie für das ganze Unternehmen offen ist."
 Move to my team,In mein Team verschieben
 "Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.","Diese Idee in Ihr Team verschieben? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten; die Stimmen bleiben."
+"A success of a team: found by a daily rule, or kudos and customer praise (#1981).","Ein Erfolg eines Teams: von einer täglichen Regel gefunden, oder Kudos und Kundenlob (#1981)."
+About (name),Über (Name)
+About (optional),Über (optional)
+Add praise,Lob hinzufügen
+An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981).,"Ein Issue ohne Team gilt als aufgegriffen, wenn es so viele Tage ohne Aktivität war, bevor ein Team es übernahm (#1981)."
+Could not load the successes.,Die Erfolge konnten nicht geladen werden.
+Could not save.,Konnte nicht gespeichert werden.
+Customer praise,Kundenlob
+Each of the {0} members with working hours booked at least {1} %.,Jedes der {0} Mitglieder mit Arbeitszeit hat mindestens {1} % gebucht.
+Everyone booked their hours in {0},Alle haben im {0} ihre Stunden gebucht
+Fastest month: items closed in {0} days (median),Schnellster Monat: Einträge in {0} Tagen geschlossen (Median)
+For what,Wofür
+Give kudos,Kudos geben
+Given By,Gegeben von
+Idea harvested: {0},Idee geerntet: {0}
+Idle for {0} days before the team took it on.,"{0} Tage ohne Aktivität, bevor das Team es übernahm."
+Kudos,Kudos
+Kudos and customer praise: who entered it,Kudos und Kundenlob: wer es eingetragen hat
+Kudos go to someone else.,Kudos gehen an jemand anderen.
+Kudos go to someone in team {0}.,Kudos gehen an jemanden im Team {0}.
+Loading successes…,Erfolge werden geladen…
+Milestone on time: {0},Meilenstein pünktlich: {0}
+More than in any of the {0} months before.,Mehr als in jedem der {0} Monate davor.
+No open item older than {0} days,Kein offener Eintrag älter als {0} Tage
+No successes yet. The daily rules add them as the team delivers; kudos and praise you can add now.,"Noch keine Erfolge. Die täglichen Regeln fügen sie hinzu, wenn das Team liefert; Kudos und Lob können Sie jetzt hinzufügen."
+Nobody in particular,Niemand Bestimmtes
+"One success per team, rule and period (#1981)","Ein Erfolg je Team, Regel und Zeitraum (#1981)"
+Pick a customer…,Kunden wählen…
+Pick a team mate…,Teammitglied wählen…
+Pick the customer who praised.,"Wählen Sie den Kunden, der gelobt hat."
+Picked up,Aufgegriffen
+Picked up: idle days,Aufgegriffen: Tage ohne Aktivität
+Picked up: {0},Aufgegriffen: {0}
+Praise from {0},Lob von {0}
+Quick response: {0},Schnelle Antwort: {0}
+Record month: {0} items closed,Rekordmonat: {0} Einträge geschlossen
+Resolved in time: {0},Rechtzeitig gelöst: {0}
+SLA,SLA
+Say what the kudos are for.,"Sagen Sie, wofür die Kudos sind."
+Shipped: {0},Ausgeliefert: {0}
+Successes,Erfolge
+Team Success,Teamerfolg
+Team ideas,Team-Ideen
+The parent item and all {0} of its items are closed.,Der übergeordnete Eintrag und alle {0} seiner Einträge sind geschlossen.
+The praise goes to someone in team {0}.,Das Lob geht an jemanden im Team {0}.
+"The rule that found it, or Kudos / Customer praise","Die Regel, die ihn gefunden hat, oder Kudos / Kundenlob"
+The team booked at least {0} % of its available hours every week.,Das Team hat jede Woche mindestens {0} % seiner verfügbaren Stunden gebucht.
+The team sees the kudos and that they are from you; they are also posted in the team chat.,Das Team sieht die Kudos und dass sie von Ihnen sind; sie werden auch im Teamchat gepostet.
+What did the customer say?,Was hat der Kunde gesagt?
+What the team achieved,Was das Team erreicht hat
+What they said,Was gesagt wurde
+"Who the success is about, if one person","Um wen es beim Erfolg geht, falls um eine Person"
+entered by {0},eingetragen von {0}
+{0} complete weeks in a row,{0} vollständige Wochen in Folge
+"{0} items open, the oldest {1} days.","{0} Einträge offen, der älteste {1} Tage."
+{0} reached maturity level {1},{0} hat Reifegrad {1} erreicht
+{0} → {1},{0} → {1}
+{0}: hours budget kept three months in a row,{0}: Stundenbudget drei Monate in Folge eingehalten
+{0}: the forecast improved,{0}: die Prognose hat sich verbessert
+"{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
+{0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht
