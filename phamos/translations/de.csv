@@ -2651,7 +2651,7 @@ Easter Eggs,Easter Eggs
 "This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"
 Removes what BookStack no longer has. Books and chapters only when their pages are synced too.,"Entfernt, was es in BookStack nicht mehr gibt. Bücher und Kapitel nur, wenn auch ihre Seiten synchronisiert werden."
 Last Full Sync,Letzte vollständige Synchronisierung
-"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.",Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog.
+"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.","Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog."
 Sync Errors (last full sync),Synchronisierungsfehler (letzte vollständige Synchronisierung)
 This documentation is in German.,Diese Dokumentation ist auf Deutsch.
 Hide contents,Inhalt ausblenden
