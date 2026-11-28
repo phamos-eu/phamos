@@ -167,7 +167,7 @@ class TestTeamFollows(TeamAssignmentTestCase):
 
 		def get_all(doctype, *args, **kwargs):
 			if doctype == "Employment Contract":
-				return [frappe._dict(weekly_hours=20)] if kwargs["filters"]["employee"] == self.anna else []
+				return [frappe._dict(weekly_hours=20, effective_from=date(2026, 1, 1), valid_until=None, fte_percentage=50)] if kwargs["filters"]["employee"] == self.anna else []
 			return real_get_all(doctype, *args, **kwargs)
 
 		with patch.object(utils.frappe, "get_all", side_effect=get_all):
@@ -281,3 +281,19 @@ class TestSyncEdges(TeamAssignmentTestCase):
 		# the daily job catches up once the Team is fine again
 		ta.sync_all_teams()
 		self.assertEqual([row.employee for row in frappe.get_doc("Team", TEAM_A).team_members], [self.anna])
+
+
+class TestConnections(FrappeTestCase):
+	"""Team Assignments show on the Connections tab of the Team and of the Employee."""
+
+	def test_team_shows_its_assignments(self):
+		dashboard = frappe.get_meta("Team").get_dashboard_data()
+		items = [item for group in dashboard.transactions for item in group["items"]]
+		self.assertIn("Team Assignment", items)
+		self.assertEqual(dashboard.fieldname, "team")
+
+	def test_employee_shows_their_assignments(self):
+		from phamos.custom_scripts.custom_python.employee_dashboard import get_employee_dashboard_data
+
+		data = get_employee_dashboard_data({"transactions": []})
+		self.assertIn("Team Assignment", data["transactions"][0]["items"])

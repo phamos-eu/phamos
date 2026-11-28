@@ -80,6 +80,7 @@ def after_migrate():
 	ensure_identify_skill()
 	ensure_classify_skill()
 	ensure_customer_fields()
+	switch_on_own_implementation(user)
 
 
 def ensure_role():
@@ -234,3 +235,29 @@ def ensure_customer_fields():
 		return
 	create_custom_fields({"Customer": [{**f, "module": "AI Agents"} for f in CUSTOMER_FIELDS]}, update=False)
 
+
+OWN_IMPLEMENTATION_SEEDED = "issue_assistant_own_implementation_switched_on"
+
+
+def switch_on_implementation(implementation, user):
+	"""Let the assistant work on Issues of this Implementation (#2114): a User Permission of its user,
+	limited to reading Implementations, so it hides no Issue or Project from the assistant."""
+	filters = {"user": user, "allow": "Implementation", "for_value": implementation}
+	if frappe.db.exists("User Permission", filters):
+		return
+	frappe.get_doc({"doctype": "User Permission", **filters, "apply_to_all_doctypes": 0,
+		"applicable_for": "Implementation"}).insert(ignore_permissions=True)
+
+
+def switch_on_own_implementation(user):
+	"""Once per site: switch the assistant on for phamos' own Implementation (Phriend Settings "System
+	Implementation"). A flag, not the presence of entries, says it was done, so switching it off again
+	stays off after the next migrate."""
+	if frappe.db.get_global(OWN_IMPLEMENTATION_SEEDED):
+		return
+	implementation = frappe.db.get_single_value("Phriend Settings", "system_implementation") \
+		if frappe.db.exists("DocType", "Phriend Settings") else None
+	if not implementation or not frappe.db.exists("Implementation", implementation):
+		return
+	switch_on_implementation(implementation, user)
+	frappe.db.set_global(OWN_IMPLEMENTATION_SEEDED, 1)
