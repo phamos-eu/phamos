@@ -10,6 +10,7 @@ clears the cache.
 """
 
 import html
+import re
 
 import frappe
 from babel.dates import format_date, format_time
@@ -225,11 +226,18 @@ def _organizer(record, stakeholders):
 		"website": normalize_url(record.organizer_website_link)} if record.organizer_name else {}
 
 
+# Line breaks and block edges in text editor HTML; each becomes a space so words of two
+# paragraphs don't run together once the tags are gone.
+_BLOCK_BREAK = re.compile(r"<br\s*/?>|</?(?:p|div|li|ul|ol|h[1-6]|blockquote|tr|td|th)\b[^>]*>", re.IGNORECASE)
+
+
 def _plain_text(value):
-	"""Text editor HTML as plain text: tags removed and entities such as &amp; or &nbsp; decoded.
+	"""Text editor HTML as one line of plain text: tags removed, paragraphs and line breaks turned
+	into single spaces, entities such as &amp; or &nbsp; decoded.
 
 	The template escapes the result again, so decoding here is safe and keeps "&amp;" from showing literally."""
-	return html.unescape(strip_html(value or "")).replace("\xa0", " ").strip()
+	text = html.unescape(strip_html(_BLOCK_BREAK.sub(" ", value or "")))
+	return " ".join(text.replace("\xa0", " ").split())
 
 
 def _sponsor(row, stakeholders):
