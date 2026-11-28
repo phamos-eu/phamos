@@ -87,7 +87,7 @@
    "label": "Accept after (days)",
    "default": "7",
    "non_negative": 1,
-   "description": "A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later correction still counts (#2225)."
+   "description": "A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later change is normal work and no longer counts as a correction (#2225)."
   },
   {
    "fieldname": "column_break_learning",

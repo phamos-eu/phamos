@@ -566,3 +566,336 @@ def get_gitlab_statistics():
 		data.unmatched_own_items = None
 	data.team = team
 	return data
+
+
+# --- Team mates and team chat (#1978) -------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_mates():
+	"""The active team's people with their status today. Every team member sees every row:
+	presence, focus, and project and task of a running timer (decision 1 of #1978)."""
+	from phamos.cockpits import team_status
+
+	team = teams.require_active_team()
+	return {"team": team, "members": team_status.team_mates(team), "event": team_status.EVENT}
+
+
+def _team_doc(name):
+	"""The Team, if the session user may open it (its people, General Management, System Manager)."""
+	if not name or name not in teams.available_teams():
+		frappe.throw(_("You are not a member of team {0}.").format(name or ""), frappe.PermissionError)
+	return frappe.get_doc("Team", name)
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_chat(name):
+	"""Chat state of the team's Raven channel (IssueChatButton calls get_<doctype>_chat)."""
+	from phamos.api import issue_chat
+
+	return issue_chat.get_chat(_team_doc(name))
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def ensure_team_chat(name):
+	"""Create or join the team's chat; its members are the team's people (#1978)."""
+	from phamos.api import issue_chat
+
+	return issue_chat.ensure_chat(_team_doc(name))
+
+
+# --- Appointments with leave and public holidays (#1979) ------------------------------------
+
+
+def _active_team_doc():
+	return frappe.get_doc("Team", teams.require_active_team())
+
+
+def _team_emails(team):
+	"""Invite addresses of the team's people today: company email, else their user."""
+	from phamos.cockpits.team_status import _people
+
+	emails = []
+	for row in frappe.get_all(
+		"Employee",
+		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]], "status": "Active"},
+		fields=["company_email", "user_id"],
+		order_by="employee_name asc",
+	):
+		email = row.company_email or row.user_id
+		if email and email not in emails:
+			emails.append(email)
+	return emails
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_appointments():
+	"""The active team's appointments (its Event Schedule rows), and the default attendees of a
+	new one: every person of the team (decision 1 of #1979)."""
+	from phamos.cockpits import appointments
+
+	doc = _active_team_doc()
+	return {
+		"team": doc.name,
+		"appointments": appointments.list_appointments(doc),
+		"default_attendees": _team_emails(doc.name),
+		"has_mailbox": bool(_team_mailboxes(doc)),
+	}
+
+
+def _team_mailboxes(team_doc):
+	"""Team invites go out only from the Team's shared mailbox (decision 4 of #1979): members must
+	not send as a colleague or a manager."""
+	from phamos.cockpits import appointments
+
+	return appointments.mailbox(team_doc.get("team_mailbox"))
+
+
+@frappe.whitelist()
+@_require_access
+def get_appointment_options():
+	"""What the appointment dialog offers: the team's mailbox and the people by department."""
+	from phamos.cockpits import appointments
+
+	return appointments.appointment_options(mailboxes=_team_mailboxes(_active_team_doc()))
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def save_appointment(appointment):
+	"""Create or update an appointment of the active team and send its invite. Every member may
+	plan (decision 9 of #1954)."""
+	from phamos.cockpits import appointments
+
+	doc = _active_team_doc()
+	mailboxes = _team_mailboxes(doc)
+	if not mailboxes:
+		frappe.throw(_("Set a team mailbox with a Mailcow calendar on team {0} first.").format(doc.name))
+	return appointments.save_appointment(doc, appointment, mailboxes=mailboxes)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def delete_appointment(name):
+	"""Remove an appointment of the active team; the Mailcow sync cancels its invite."""
+	from phamos.cockpits import appointments
+
+	return appointments.delete_appointment(_active_team_doc(), name)
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_absences(start, end):
+	"""The calendar's read-only layer for [start, end] (decision 2 of #1979): approved leave of the
+	team's people as a neutral "absent" (no leave type), and public holidays (no weekly offs) with
+	the people they apply to."""
+	from phamos.cockpits.team_status import _people
+	from phamos.phamos.team_capacity_utils import employee_holiday_list
+
+	start, end = frappe.utils.getdate(start), frappe.utils.getdate(end)
+	if (end - start).days > 120:
+		frappe.throw(_("Pick a shorter period."))
+	team = teams.require_active_team()
+	people = _people(team, frappe.utils.getdate()) or []
+	names = dict(frappe.get_all("Employee", filters={"name": ["in", people or [""]]}, fields=["name", "employee_name"], as_list=True))
+	absences = []
+	if people and frappe.db.table_exists("Leave Application"):
+		for leave in frappe.get_all(
+			"Leave Application",
+			filters={
+				"employee": ["in", people],
+				"docstatus": 1,
+				"status": "Approved",
+				"from_date": ["<=", end],
+				"to_date": [">=", start],
+			},
+			fields=["employee", "from_date", "to_date", "half_day", "half_day_date"],
+		):
+			absences.append(
+				{
+					"employee": leave.employee,
+					"employee_name": names.get(leave.employee, leave.employee),
+					"from_date": leave.from_date,
+					"to_date": leave.to_date,
+					"half_day_date": leave.half_day_date if leave.half_day else None,
+				}
+			)
+	holidays = {}
+	for employee in people:
+		holiday_list = employee_holiday_list(employee)
+		if not holiday_list:
+			continue
+		for row in frappe.get_all(
+			"Holiday",
+			filters={"parent": holiday_list, "holiday_date": ["between", [start, end]], "weekly_off": 0},
+			fields=["holiday_date", "description"],
+		):
+			entry = holidays.setdefault(
+				(row.holiday_date, frappe.utils.strip_html_tags(row.description or "")),
+				{"date": row.holiday_date, "description": frappe.utils.strip_html_tags(row.description or ""), "people": []},
+			)
+			entry["people"].append(names.get(employee, employee))
+	return {"absences": absences, "holidays": sorted(holidays.values(), key=lambda h: h["date"])}
+
+
+# --- Team ideas (#1980) -----------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_ideas():
+	"""Ideas shared with the active team, most votes first, with my vote and (if the setting
+	allows) the author. The same vote as the company's, read by the team only."""
+	from phamos.api import personal_ideas
+
+	team = teams.require_active_team()
+	return {"team": team, "ideas": personal_ideas._vote_rows(personal_ideas._readable_open_ideas({"team": team}))}
+
+
+@frappe.whitelist()
+@_require_access
+def get_idea_for_vote(name):
+	"""One shared idea: its text and the vote (personal_ideas checks who may read it)."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.get_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def vote_idea(name):
+	"""Toggle my upvote on a team idea."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.vote_idea(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def create_team_idea(title):
+	"""A new idea of mine, shared with the active team right away. I write it out in my Personal
+	Cockpit; only I edit it."""
+	from phamos.api import personal_ideas
+
+	doc = personal_ideas.create_idea(title=title)
+	return personal_ideas.share_idea_with_team(doc["name"], teams.require_active_team(), any_open_team=True)
+
+
+@frappe.whitelist()
+@_require_access
+def get_idea_chat(name):
+	"""The Raven chat of a team idea (IssueChatButton calls get_<doctype>_chat)."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.get_idea_chat(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def ensure_idea_chat(name):
+	"""Start or join the chat of a team idea; only those who may read it join."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.ensure_idea_chat(name)
+
+
+# --- Successes (#1981) ------------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_successes(success_type=None):
+	"""The active team's successes, newest first, with who gave kudos and praise (visible to the
+	team, decision 3 of #1981)."""
+	from phamos.cockpits import team_successes
+
+	team = teams.require_active_team()
+	rows = team_successes.list_successes(team, success_type or None)
+	for row in rows:
+		# the name only: the giver's e-mail address is not for the team
+		row["given_by_name"] = frappe.utils.get_fullname(row.pop("given_by")) if row.given_by else None
+		row["customer_name"] = frappe.db.get_value("Customer", row.customer, "customer_name") if row.customer else None
+	return {"team": team, "successes": rows}
+
+
+@frappe.whitelist()
+@_require_access
+def get_success_options():
+	"""For the kudos and praise dialogs: the team's people and the customers of its implementations."""
+	from phamos.cockpits.team_status import _people
+
+	team = teams.require_active_team()
+	people = frappe.get_all(
+		"Employee",
+		filters={"name": ["in", _people(team, frappe.utils.getdate()) or [""]], "status": "Active"},
+		fields=["name", "employee_name", "user_id"],
+		order_by="employee_name asc",
+	)
+	customers = sorted(
+		{
+			c
+			for c in frappe.get_all("Implementation", filters={"team": team, "customer": ["is", "set"]}, pluck="customer")
+		}
+	)
+	return {
+		"people": [{"value": p.name, "label": p.employee_name, "me": p.user_id == frappe.session.user} for p in people],
+		"customers": [{"value": c, "label": frappe.db.get_value("Customer", c, "customer_name") or c} for c in customers],
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def give_kudos(employee, text):
+	"""Kudos to a team mate, posted in the team chat; the team sees who gave them."""
+	from phamos.cockpits import team_successes
+
+	return team_successes.give_kudos(teams.require_active_team(), employee, text)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def add_customer_praise(customer, text, employee=None):
+	"""Praise from a customer, entered by a team member."""
+	from phamos.cockpits import team_successes
+
+	return team_successes.add_customer_praise(teams.require_active_team(), customer, text, employee or None)
+
+
+# --- Needs attention (#2235) -----------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_attention():
+	"""The active team's records that need attention: SLA missed or due soon (while SLA tracking is
+	on), then open Issues and Tasks idle for N days. Records, never a figure per person."""
+	from phamos.cockpits import team_attention
+
+	frappe.has_permission("Issue", "read", throw=True)
+	team = teams.require_active_team()
+	idle_days, _due_hours = team_attention._settings()
+	# as the user: records they cannot read stay out (Task rights, User Permissions)
+	items = team_attention.attention_items(team, as_user=True)
+	truncated = len(items) > team_attention.LIST_LIMIT
+	items = items[: team_attention.LIST_LIMIT]
+	return {
+		"team": team,
+		"idle_days": idle_days,
+		"sla_on": team_attention.sla_on(),
+		"truncated": truncated,
+		"items": [
+			{
+				"doctype": i.doctype,
+				"name": i.name,
+				"title": i.title,
+				"kind": i.kind,
+				"detail": i.detail,
+				"assignees": i.assignees,
+			}
+			for i in items
+		],
+	}

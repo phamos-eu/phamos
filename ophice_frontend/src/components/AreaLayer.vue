@@ -1,8 +1,11 @@
 <template>
 	<!--
-		Meeting areas (#2060): lightly tinted rectangles with their name and the Jitsi watermark.
-		In edit mode a layer over the grid takes the pointer: drag on free grid to draw, drag an area
-		to move it, drag its edge or corner to resize it, click an area to edit it.
+		Meeting areas (#2060): lightly tinted rectangles, ellipses or polygons (#2144) with their name
+		and the Jitsi watermark. In edit mode a layer over the grid takes the pointer: drag on free
+		grid to draw a rectangle, click on free grid to set a polygon's corners (click the first one,
+		or Enter, to close it; Esc cancels, Backspace takes the last one back), drag an area to move
+		it, drag its edge or corner to resize it, drag a polygon's corner, click its edge to add one,
+		double-click a corner to remove it, click an area to edit it.
 	-->
 	<div class="pointer-events-none absolute inset-0">
 		<div
@@ -16,11 +19,24 @@
 				'area--start': area.kind === 'Start',
 				'area--guests': area.kind === 'Guest' || area.kind === 'Customer meeting',
 				'area--phriend': area.kind === 'Phriend',
+				'area--ellipse': shapeOf(area) === 'Ellipse',
+				'area--polygon': shapeOf(area) === 'Polygon',
 			}"
 			:style="{ ...rectStyle(area), '--area-h': area.color_hue ?? 265, '--tile-px': `${tile}px` }"
 			:title="area.title"
 			data-testid="meeting-area"
 		>
+			<!-- A polygon (#2144): fill and edge as SVG; the box itself stays clear. -->
+			<svg
+				v-if="shapeOf(area) === 'Polygon'"
+				class="area__shape"
+				:viewBox="`0 0 ${area.width} ${area.height}`"
+				preserveAspectRatio="none"
+				aria-hidden="true"
+			>
+				<polygon :points="svgPoints(area)" vector-effect="non-scaling-stroke" />
+			</svg>
+			<div :style="contentStyle(area)">
 			<!-- Phriend's place (#2053): the ball itself stands on it (Ophice.vue); while editing, a
 				 dashed frame to move it by. The anchor in the middle tells Ophice where to pin the ball. -->
 			<template v-if="area.kind === 'Phriend'">
@@ -49,19 +65,83 @@
 				@error="failedLogos[area.jitsi_domain] = true"
 			/>
 			<span v-else class="area__logo-text">Jitsi</span>
-			<span v-if="area.kind !== 'Phriend'" class="area__title truncate">{{ area.title }}</span>
+			<span
+				v-if="area.kind !== 'Phriend'"
+				class="area__title truncate"
+				data-testid="area-title"
+				@mouseenter="peekTitle(area, $event)"
+				@mouseleave="peek = null"
+			>{{ area.title }}</span>
 			<!-- Where external guests can be (#2081): a marker everyone sees. -->
 			<span v-if="area.kind === 'Guest' || area.kind === 'Customer meeting'" class="area__guests" data-testid="area-guest-marker">
 				<FeatherIcon :name="area.kind === 'Guest' ? 'user-plus' : 'briefcase'" class="h-5 w-5" />
 				{{ area.kind === "Guest" ? __("Guests") : __("Customers") }}
 			</span>
-			<!-- Resize handles at the corners, only while editing (the layer above takes the pointer). -->
-			<template v-if="editing">
+			</div>
+			<!-- Handles, only while editing (the layer above takes the pointer): a polygon's corners,
+				 else the box's corners. -->
+			<template v-if="editing && shapeOf(area) === 'Polygon'">
+				<span
+					v-for="(point, index) in pointsOf(area)"
+					:key="index"
+					class="area__handle area__handle--point"
+					:style="{ left: `${(point[0] - area.x) * tile}px`, top: `${(point[1] - area.y) * tile}px` }"
+				/>
+			</template>
+			<template v-else-if="editing">
 				<span v-for="corner in CORNERS" :key="corner" class="area__handle" :class="`area__handle--${corner}`" />
 			</template>
 		</div>
 
-		<div v-if="draft" class="area area--draft absolute rounded-md" :style="rectStyle(draft)" />
+		<div
+			v-if="draft && shapeOf(draft) !== 'Polygon'"
+			class="area area--draft absolute"
+			:class="shapeOf(draft) === 'Ellipse' ? 'rounded-full' : 'rounded-md'"
+			:style="rectStyle(draft)"
+		/>
+		<!-- A polygon being reshaped, or the corners set so far while drawing one (in tiles). -->
+		<svg
+			v-if="(draft && shapeOf(draft) === 'Polygon') || pen"
+			class="area-pen pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+			:viewBox="`0 0 ${cols} ${rows}`"
+			preserveAspectRatio="none"
+			aria-hidden="true"
+		>
+			<polygon
+				v-if="draft && shapeOf(draft) === 'Polygon'"
+				:points="pointsOf(draft).map((p) => p.join(',')).join(' ')"
+				class="area-pen__shape"
+				:class="{ 'area-pen__shape--bad': selfCrossing(pointsOf(draft)) }"
+				vector-effect="non-scaling-stroke"
+			/>
+			<template v-if="pen">
+				<polyline :points="penLine" class="area-pen__line" :class="{ 'area-pen__line--bad': penCrosses }" vector-effect="non-scaling-stroke" />
+				<circle
+					v-for="(point, index) in pen.points"
+					:key="index"
+					:cx="point[0]"
+					:cy="point[1]"
+					:r="index === 0 && pen.points.length >= 3 ? 10 / tile : 6 / tile"
+					class="area-pen__corner"
+					:class="{ 'area-pen__corner--close': index === 0 && pen.points.length >= 3 }"
+				/>
+			</template>
+		</svg>
+		<p v-if="pen" class="area-pen__hint" data-testid="area-pen-hint">
+			{{ __("Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel") }}
+		</p>
+
+		<!-- A cut-off name in full while the mouse is on it (#2096), over the label, outside the
+			 area's clipping. -->
+		<Teleport to="body">
+			<span
+				v-if="peek"
+				ref="peekEl"
+				class="area__title area__title--peek"
+				:style="{ left: `${peek.x}px`, top: `${peek.y}px`, '--area-h': peek.hue }"
+				data-testid="area-title-peek"
+			>{{ peek.title }}</span>
+		</Teleport>
 
 		<div
 			v-if="editing"
@@ -73,14 +153,17 @@
 			@pointermove="onMove"
 			@pointerup="onUp"
 			@pointercancel="cancel"
+			@dblclick="onDoubleClick"
 		/>
 	</div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from "vue"
+import { isCutOff } from "../utils/ophiceView.js"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { boxOf, contains, labelPoint, MAX_POINTS, nearestOnSegment, pointsOf, segmentDistance, selfCrossing, shapeOf, svgPoints } from "../utils/ophiceShapes.js"
 
 const props = defineProps({
 	areas: { type: Array, default: () => [] },
@@ -91,6 +174,35 @@ const props = defineProps({
 	/** The area whose meeting I am in */
 	activeName: { type: String, default: "" },
 })
+
+// The full name of a cut-off space name, while the mouse is on it (#2096).
+const peek = ref(null)
+const peekEl = ref(null)
+// Space between the full name and the window's edge.
+const PEEK_MARGIN = 8
+async function peekTitle(area, event) {
+	const label = event.currentTarget
+	if (props.editing || !isCutOff(label)) return
+	const rect = label.getBoundingClientRect()
+	const shown = { title: area.title, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, hue: area.color_hue ?? 265 }
+	peek.value = shown
+	// Centred on the label, a long name near the window's left or right edge would itself be
+	// cut off: once it is rendered and its width known, keep it inside the window.
+	await nextTick()
+	// Gone or replaced by another label meanwhile (peek holds a reactive proxy of `shown`).
+	if (toRaw(peek.value) !== shown || !peekEl.value) return
+	const half = peekEl.value.offsetWidth / 2
+	const min = half + PEEK_MARGIN
+	const max = window.innerWidth - half - PEEK_MARGIN
+	peek.value.x = max < min ? window.innerWidth / 2 : Math.min(Math.max(shown.x, min), max)
+}
+// Editing, new spaces, or the map moving under the mouse (keys walk and pan, the wheel zooms):
+// no stale name left floating where the label no longer is.
+watch(() => [props.editing, props.areas], () => (peek.value = null))
+const dropPeek = () => (peek.value = null)
+const PEEK_ENDERS = ["keydown", "wheel", "pointerdown", "blur"]
+onMounted(() => PEEK_ENDERS.forEach((name) => window.addEventListener(name, dropPeek, { passive: true })))
+onBeforeUnmount(() => PEEK_ENDERS.forEach((name) => window.removeEventListener(name, dropPeek)))
 const emit = defineEmits(["draw", "pick", "change"])
 
 // The symbol of each cockpit's app icon; keep in step with spa_shared/scripts/generate_app_manifests.py.
@@ -120,8 +232,105 @@ function rectStyle(rect) {
 	}
 }
 
+// labelPoint samples the whole polygon, and the layer re-renders on every pointer move (hover):
+// work it out once per area list, not per frame.
+const labelPoints = computed(() => {
+	const points = new Map()
+	for (const area of props.areas) if (shapeOf(area) === "Polygon") points.set(area, labelPoint(area))
+	return points
+})
+
+// Name and logo: centred in the box, or for an L-shaped polygon on a spot inside it (#2144).
+function contentStyle(area) {
+	if (shapeOf(area) !== "Polygon") return { display: "contents" }
+	const [lx, ly] = labelPoints.value.get(area) || labelPoint(area)
+	const t = props.tile
+	return {
+		position: "absolute",
+		left: `${(lx - area.x) * t}px`,
+		top: `${(ly - area.y) * t}px`,
+		transform: "translate(-50%, -50%)",
+		display: "flex",
+		flexDirection: "column",
+		alignItems: "center",
+		gap: "3px",
+		width: `${Math.max(2, area.width) * t}px`,
+		maxWidth: `${area.width * t}px`,
+	}
+}
+
 // Areas snap to half tiles (#2067): double the resolution of the chips' grid.
 const STEP = 0.5
+
+/** The nearest half-tile corner to the pointer: where a polygon's corner goes. */
+function cornerAt(event) {
+	const box = layer.value.getBoundingClientRect()
+	const x = snap((event.clientX - box.left) / props.tile)
+	const y = snap((event.clientY - box.top) / props.tile)
+	return [Math.max(0, Math.min(props.cols, x)), Math.max(0, Math.min(props.rows, y))]
+}
+
+// --- Drawing a polygon (#2144): corners by clicks on free grid.
+const pen = ref(null)
+const penLine = computed(() => {
+	if (!pen.value) return ""
+	const points = pen.value.hover ? [...pen.value.points, pen.value.hover] : pen.value.points
+	return points.map((p) => p.join(",")).join(" ")
+})
+const penCrosses = computed(() => Boolean(pen.value) && pen.value.points.length >= 3 && selfCrossing(pen.value.points))
+
+function penClick(event) {
+	const corner = cornerAt(event)
+	if (!pen.value) {
+		pen.value = { points: [corner], hover: corner }
+		return
+	}
+	const [first] = pen.value.points
+	const near = Math.hypot(corner[0] - first[0], corner[1] - first[1]) * props.tile <= EDGE_PX * 1.5
+	if (near && pen.value.points.length >= 3) return finishPen()
+	const last = pen.value.points[pen.value.points.length - 1]
+	if (corner[0] === last[0] && corner[1] === last[1]) return
+	if (pen.value.points.length >= MAX_POINTS) return
+	pen.value.points.push(corner)
+}
+
+function finishPen() {
+	const points = pen.value?.points || []
+	if (points.length < 3 || selfCrossing(points)) return
+	pen.value = null
+	emit("draw", { shape: "Polygon", points, ...boxOf(points) })
+}
+
+// Fields whose own Backspace, Enter and Esc win over the drawing keys.
+const TYPING = "input, textarea, select, [contenteditable='true'], [contenteditable='']"
+
+function onKey(event) {
+	if (!pen.value) return
+	// Typing elsewhere (chat, a dialog field) keeps its own Backspace, Enter and Esc.
+	if (event.target?.closest?.(TYPING)) return
+	if (event.key === "Escape") pen.value = null
+	else if (event.key === "Enter") finishPen()
+	else if (event.key === "Backspace") {
+		pen.value.points.pop()
+		if (!pen.value.points.length) pen.value = null
+	} else return
+	event.preventDefault()
+	event.stopPropagation()
+}
+watch(
+	() => Boolean(pen.value),
+	(on) => {
+		if (!on) return window.removeEventListener("keydown", onKey, true)
+		// A field that still has focus would keep the drawing keys from working: drawing takes it.
+		if (document.activeElement?.closest?.(TYPING)) document.activeElement.blur()
+		window.addEventListener("keydown", onKey, true)
+	}
+)
+watch(
+	() => props.editing,
+	(on) => !on && (pen.value = null)
+)
+onBeforeUnmount(() => window.removeEventListener("keydown", onKey, true))
 
 function tileAt(event) {
 	const box = layer.value.getBoundingClientRect()
@@ -147,8 +356,10 @@ const gesture = ref(null)
 const hover = ref(null)
 const cursor = computed(() => {
 	const hit = gesture.value || hover.value
-	if (!hit || hit.kind === "draw") return "crosshair"
+	if (pen.value || !hit || hit.kind === "draw") return "crosshair"
 	if (hit.kind === "move") return gesture.value ? "grabbing" : "grab"
+	if (hit.kind === "point") return "move"
+	if (hit.kind === "edge") return "copy"
 	return CURSORS[hit.edges] || "crosshair"
 })
 
@@ -160,6 +371,16 @@ function hitAt(event) {
 	const t = props.tile
 	// The last area wins: it is drawn on top.
 	for (const area of [...props.areas].reverse()) {
+		if (shapeOf(area) === "Polygon") {
+			// A corner, an edge (adds a corner), or inside (moves it) (#2144).
+			const points = pointsOf(area)
+			const index = points.findIndex(([x, y]) => Math.hypot(x * t - px, y * t - py) <= EDGE_PX + 2)
+			if (index >= 0) return { kind: "point", area, index }
+			const edge = points.findIndex((p, i) => segmentDistance(p, points[(i + 1) % points.length], px / t, py / t) * t <= EDGE_PX)
+			if (edge >= 0) return { kind: "edge", area, index: edge }
+			if (contains(area, px / t, py / t)) return { kind: "move", area }
+			continue
+		}
 		const left = area.x * t
 		const top = area.y * t
 		const right = left + area.width * t
@@ -169,7 +390,7 @@ function hitAt(event) {
 			(Math.abs(py - top) <= EDGE_PX ? "n" : Math.abs(py - bottom) <= EDGE_PX ? "s" : "") +
 			(Math.abs(px - left) <= EDGE_PX ? "w" : Math.abs(px - right) <= EDGE_PX ? "e" : "")
 		if (edges) return { kind: "resize", area, edges }
-		if (px >= left && px <= right && py >= top && py <= bottom) return { kind: "move", area }
+		if (contains(area, px / t, py / t)) return { kind: "move", area }
 	}
 	return { kind: "draw" }
 }
@@ -181,6 +402,7 @@ function snap(value) {
 /** The area's new rectangle for a move or resize by (dx, dy) tiles, kept inside the grid. */
 function reshape(g, dx, dy) {
 	const a = g.area
+	if (shapeOf(a) === "Polygon") return reshapePolygon(g, dx, dy)
 	if (g.kind === "move") {
 		return {
 			x: Math.max(0, Math.min(props.cols - a.width, a.x + dx)),
@@ -200,9 +422,30 @@ function reshape(g, dx, dy) {
 	return { x: left, y: top, width: right - left, height: bottom - top }
 }
 
+/** A polygon moved, or one of its corners dragged (a new one when the drag started on an edge). */
+function reshapePolygon(g, dx, dy) {
+	const a = g.area
+	let points = pointsOf(a).map((p) => [...p])
+	if (g.kind === "move") {
+		const box = boxOf(points)
+		const mx = Math.max(-box.x, Math.min(props.cols - box.x - box.width, dx))
+		const my = Math.max(-box.y, Math.min(props.rows - box.y - box.height, dy))
+		points = points.map(([x, y]) => [x + mx, y + my])
+	} else {
+		const at = [
+			Math.max(0, Math.min(props.cols, snap(g.corner[0] + dx))),
+			Math.max(0, Math.min(props.rows, snap(g.corner[1] + dy))),
+		]
+		if (g.kind === "edge") points.splice(g.index + 1, 0, at)
+		else points[g.index] = at
+	}
+	return { shape: "Polygon", points, ...boxOf(points) }
+}
+
 function onDown(event) {
 	if (event.button !== 0) return
-	gesture.value = { ...hitAt(event), start: tileAt(event), clientX: event.clientX, clientY: event.clientY }
+	const hit = pen.value ? { kind: "draw" } : hitAt(event)
+	gesture.value = { ...hit, start: tileAt(event), corner: edgeCorner(hit, event) || cornerAt(event), clientX: event.clientX, clientY: event.clientY }
 	try {
 		// Keeps the drag when the pointer leaves the grid; some pointers can't be captured.
 		layer.value.setPointerCapture(event.pointerId)
@@ -211,8 +454,22 @@ function onDown(event) {
 	}
 }
 
+/** A new corner on a polygon's edge: the edge's point nearest the pointer, on the half-square grid. */
+function edgeCorner(hit, event) {
+	if (hit.kind !== "edge") return null
+	const box = layer.value.getBoundingClientRect()
+	const points = pointsOf(hit.area)
+	const pointer = [(event.clientX - box.left) / props.tile, (event.clientY - box.top) / props.tile]
+	const [x, y] = nearestOnSegment(points[hit.index], points[(hit.index + 1) % points.length], ...pointer)
+	return [Math.max(0, Math.min(props.cols, snap(x))), Math.max(0, Math.min(props.rows, snap(y)))]
+}
+
 function onMove(event) {
 	const g = gesture.value
+	if (pen.value) {
+		pen.value.hover = cornerAt(event)
+		return
+	}
 	if (!g) {
 		hover.value = hitAt(event)
 		return
@@ -236,13 +493,36 @@ function onUp() {
 	gesture.value = null
 	draft.value = null
 	if (!rect) {
-		// A click without dragging: edit the area under the pointer, if any.
+		// A click without dragging: free grid sets a polygon corner; an edge gets a new corner;
+		// a corner does nothing (a double-click removes it); else edit the area.
+		if (g.kind === "draw") return penClick(g)  // a gesture carries clientX / clientY like an event
+		if (g.kind === "edge") {
+			const split = reshapePolygon(g, 0, 0)
+			if (!selfCrossing(split.points)) emit("change", g.area, split)
+			return
+		}
+		if (g.kind === "point") return
 		if (g.area) emit("pick", g.area)
 		return
 	}
 	if (g.kind === "draw") return emit("draw", rect)
 	const a = g.area
+	if (rect.shape === "Polygon") {
+		if (selfCrossing(rect.points)) return
+		if (JSON.stringify(rect.points) !== JSON.stringify(pointsOf(a))) emit("change", a, rect)
+		return
+	}
 	if (rect.x !== a.x || rect.y !== a.y || rect.width !== a.width || rect.height !== a.height) emit("change", a, rect)
+}
+
+/** Double-click a polygon's corner: remove it (at least 3 stay). */
+function onDoubleClick(event) {
+	const hit = hitAt(event)
+	if (hit.kind !== "point") return
+	const points = pointsOf(hit.area)
+	if (points.length <= 3) return
+	points.splice(hit.index, 1)
+	if (!selfCrossing(points)) emit("change", hit.area, { shape: "Polygon", points, ...boxOf(points) })
 }
 
 function cancel() {
@@ -387,6 +667,90 @@ function cancel() {
 	right: -2px;
 	bottom: -2px;
 }
+/* Shapes (#2144). An ellipse: the box rounded. A polygon: the box stays clear, the SVG draws it
+   with the same fill and edge as a rectangle. */
+.area--ellipse {
+	border-radius: 50%;
+}
+.area--polygon {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+.area__shape {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+.area__shape polygon {
+	fill: hsl(var(--area-h) 70% 42% / 0.32);
+	stroke: hsl(var(--area-h) 70% 42% / 0.9);
+	stroke-width: 2.5px;
+	stroke-linejoin: round;
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.area--active .area__shape polygon {
+	fill: hsl(var(--area-h) 70% 42% / 0.45);
+	stroke: hsl(var(--area-h) 70% 35%);
+}
+.area--editing .area__shape polygon {
+	stroke-dasharray: 6 4;
+}
+.area--start .area__shape polygon {
+	fill: rgba(255, 255, 255, 0.4);
+	stroke: rgba(255, 255, 255, 0.95);
+	stroke-dasharray: 2 4;
+}
+.area--guests .area__shape polygon {
+	stroke-width: 4px;
+}
+.area__handle--point {
+	transform: translate(-50%, -50%);
+	border-radius: 50%;
+}
+.area-pen__shape {
+	fill: rgba(124, 58, 237, 0.35);
+	stroke: rgb(109, 40, 217);
+	stroke-width: 2.5px;
+	stroke-dasharray: 6 4;
+}
+.area-pen__line {
+	fill: none;
+	stroke: rgb(109, 40, 217);
+	stroke-width: 2.5px;
+	stroke-dasharray: 6 4;
+}
+.area-pen__shape--bad,
+.area-pen__line--bad {
+	stroke: rgb(220, 38, 38);
+}
+.area-pen__corner {
+	fill: #fff;
+	stroke: rgb(109, 40, 217);
+	stroke-width: 2px;
+	vector-effect: non-scaling-stroke;
+}
+.area-pen__corner--close {
+	fill: rgb(196, 181, 253);
+}
+.area-pen__hint {
+	position: absolute;
+	left: 50%;
+	top: 8px;
+	transform: translateX(-50%);
+	z-index: 40;
+	white-space: nowrap;
+	border-radius: 6px;
+	background: rgba(15, 23, 42, 0.85);
+	color: #fff;
+	font-size: 12px;
+	padding: 3px 8px;
+	pointer-events: none;
+}
 .area--draft {
 	background: rgba(124, 58, 237, 0.35);
 	border: 2.5px dashed rgb(109, 40, 217);
@@ -406,7 +770,9 @@ function cancel() {
 	opacity: 0.9;
 	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
+/* Takes the mouse (the layer does not) so a cut-off name can show in full (#2096). */
 .area__title {
+	pointer-events: auto;
 	max-width: 95%;
 	padding: 1px 6px;
 	border-radius: 4px;
@@ -414,5 +780,20 @@ function cancel() {
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1.4;
+}
+.area__title--peek {
+	position: fixed;
+	z-index: 60;
+	/* One line as long as it fits; a longer name wraps instead of running out of the box, since
+	   the peek exists to show the whole name (an ellipsis would cut it again). */
+	width: max-content;
+	max-width: min(24rem, calc(100vw - 16px));
+	transform: translate(-50%, -50%);
+	color: #fff;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: center;
+	pointer-events: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 </style>

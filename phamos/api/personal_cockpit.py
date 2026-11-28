@@ -845,6 +845,12 @@ def withdraw_idea_from_vote(name):
 	return personal_ideas.withdraw_idea_from_vote(name)
 
 
+@frappe.whitelist(methods=["POST"])
+def share_idea_with_team(name):
+	"""Share my idea with my team only (#1980): the team reads, votes and chats on it."""
+	return personal_ideas.share_idea_with_team(name)
+
+
 @frappe.whitelist()
 def get_ideas_for_vote():
 	"""Every idea open for vote, most votes first."""

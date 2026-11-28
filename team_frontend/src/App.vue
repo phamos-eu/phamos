@@ -19,6 +19,7 @@ import { call, toast } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { __ } from "@spa/utils/i18n.js"
+import { IDEA_ICON } from "@spa/utils/icons.js"
 import spaConfig from "./config"
 
 const route = useRoute()
@@ -26,6 +27,16 @@ const team = ref("")
 const teams = ref([])
 
 const navItems = [
+	// who is there and on what they work, live, with the team chat (#1978)
+	{ name: "TeamMates", label: "Team mates", icon: "users", match: ["TeamMates"] },
+	// appointments with leave and public holidays (#1979)
+	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
+	// ideas shared with the team (#1980)
+	{ name: "TeamIdeas", label: "Ideas", icon: IDEA_ICON, match: ["TeamIdeas"] },
+	// successes: daily rules, kudos, customer praise (#1981)
+	{ name: "TeamSuccesses", label: "Successes", icon: "award", match: ["TeamSuccesses"] },
+	// needs attention: idle records and SLA (#2235)
+	{ name: "TeamAttention", label: "Needs attention", icon: "alert-circle", match: ["TeamAttention"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -117,6 +128,11 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamStatistics") return "Statistics"
 	if (route.name === "TeamImplementations") return "Implementations"
 	if (route.name === "TeamGitlab") return "GitLab"
+	if (route.name === "TeamMates") return "Team mates"
+	if (route.name === "TeamAppointments") return "Appointments"
+	if (route.name === "TeamIdeas") return "Ideas"
+	if (route.name === "TeamSuccesses") return "Successes"
+	if (route.name === "TeamAttention") return "Needs attention"
 	return "Issues"
 })
 
@@ -139,6 +155,11 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamStatistics") return "Logged against available hours"
 	if (route.name === "TeamImplementations") return "The team's implementations, in hours"
 	if (route.name === "TeamGitlab") return "Closing times and SLA of the team"
+	if (route.name === "TeamMates") return "Who is there, and on what they work"
+	if (route.name === "TeamAppointments") return "The team's appointments, leave and public holidays"
+	if (route.name === "TeamIdeas") return "Ideas shared with the team"
+	if (route.name === "TeamSuccesses") return "What the team achieved"
+	if (route.name === "TeamAttention") return "What lies around or misses its SLA"
 	return "Team issues overview"
 })
 </script>

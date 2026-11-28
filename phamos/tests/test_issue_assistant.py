@@ -1046,7 +1046,7 @@ class TestLearning(IssueAssistantTestCase):
 		other = self.make_project("Issue Assistant Learning Other")
 		run = self.change(doc, project=other)
 		self.assertEqual((run.outcome, run.corrected_by), ("Corrected", DESK_USER))
-		key = f"Issue::sender::{self.SENDER}::project::{other}"
+		key = self.learning.suggestion_key("sender", "project", self.SENDER, other)
 		skill = frappe.get_doc("AI Skill", {"suggestion_key": key})
 		self.assertEqual((skill.origin, skill.enabled, skill.handler, skill.occurrences), ("Suggested", 0, "sender_mapping", 1))
 		self.assertEqual(frappe.parse_json(skill.params)["values"], {"project": other})
@@ -1061,7 +1061,7 @@ class TestLearning(IssueAssistantTestCase):
 		self.run_with(doc)
 		run = self.change(doc, user=self.assistant, project=self.make_project("Issue Assistant Learning AI"))
 		self.assertFalse(run.outcome)
-		self.assertFalse(frappe.db.exists("AI Skill", {"suggestion_key": ("like", f"Issue::sender::{self.SENDER}::project%")}))
+		self.assertFalse(frappe.db.exists("AI Skill", {"suggestion_key": ("like", "Issue::sender::project::%")}))
 
 	def test_reassigning_away_from_its_person_suggests_a_prompt_rule(self):
 		doc = self.issue(raised_by=self.SENDER, priority="High")
@@ -1073,7 +1073,7 @@ class TestLearning(IssueAssistantTestCase):
 		remove("Issue", doc.name, DESK_USER)  # by Administrator, a person
 		run = frappe.get_doc("AI Agent Run", {"reference_name": doc.name})
 		self.assertEqual(run.outcome, "Corrected")
-		skill = frappe.get_doc("AI Skill", {"suggestion_key": ("like", f"Issue::rule::{doc.customer}::person::%")})
+		skill = frappe.get_doc("AI Skill", {"suggestion_key": ("like", "Issue::rule::person::%")})
 		self.assertEqual((skill.phase, skill.party_doctype, skill.party, skill.enabled), ("Classify", "Customer", doc.customer, 0))
 		self.assertIn(frappe.utils.get_fullname(DESK_USER), skill.prompt_rules[0].action)
 		# the model may word it better, in the background
@@ -1100,10 +1100,10 @@ class TestLearning(IssueAssistantTestCase):
 		run = self.run_with(doc)
 		self.assertFalse(frappe.db.get_value("Issue", doc.name, "custom_implementation"))
 		self.change(doc, custom_implementation=self.IMPLEMENTATION)
-		skill = frappe.db.get_value("AI Skill", {"suggestion_key": ("like", f"Issue::sender::{sender}::custom_implementation%")})
+		skill = frappe.db.get_value("AI Skill", {"suggestion_key": ("like", "Issue::sender::custom_implementation::%")})
 		self.assertFalse(skill, "nothing set by the run, so nothing to correct")
 		# a rule written from a correction elsewhere, accepted by a trainer
-		key = f"Issue::sender::{sender}::custom_implementation"
+		key = self.learning.suggestion_key("sender", "custom_implementation", sender, self.IMPLEMENTATION)
 		name = self.feedback.suggestion(key, run, lambda: {"skill_name": "rule", "phase": "Identify", "order": 5,
 			"handler": "sender_mapping", "params": frappe.as_json({"match": sender,
 			"values": {"custom_implementation": self.IMPLEMENTATION}})})
@@ -1122,7 +1122,7 @@ class TestLearning(IssueAssistantTestCase):
 		self.run_with(doc)
 		other = self.make_project("Issue Assistant Learning Dismiss")
 		run = self.change(doc, project=other)
-		key = f"Issue::sender::{self.SENDER}::project::{other}"
+		key = self.learning.suggestion_key("sender", "project", self.SENDER, other)
 		name = frappe.db.get_value("AI Skill", {"suggestion_key": key})
 		self.as_user(self.assistant)
 		# refused for being an AI agent, not merely for lacking write
@@ -1213,10 +1213,10 @@ class TestLearning(IssueAssistantTestCase):
 		first, second = self.make_project("Issue Assistant Learning A"), self.make_project("Issue Assistant Learning B")
 		self.change(doc, project=first)
 		self.change(doc, project=second)
-		keys = frappe.get_all("AI Skill", filters={"suggestion_key": ("like", f"Issue::sender::{self.SENDER}::project::%")},
+		keys = frappe.get_all("AI Skill", filters={"suggestion_key": ("like", "Issue::sender::project::%")},
 			pluck="suggestion_key")
-		self.assertEqual(sorted(keys), sorted([f"Issue::sender::{self.SENDER}::project::{first}",
-			f"Issue::sender::{self.SENDER}::project::{second}"]))
+		self.assertEqual(sorted(keys), sorted([self.learning.suggestion_key("sender", "project", self.SENDER, first),
+			self.learning.suggestion_key("sender", "project", self.SENDER, second)]))
 
 	def test_changes_after_the_accept_window_are_no_correction(self):
 		doc = self.issue(raised_by=self.SENDER)

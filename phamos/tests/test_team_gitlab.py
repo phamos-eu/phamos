@@ -148,7 +148,7 @@ class TestSla(TeamGitlabTestCase):
 	def test_figures_of_the_teams_issues(self):
 		frappe.db.set_single_value("Support Settings", "track_service_level_agreement", 1)
 
-		def issue(team, responded, response_by, status=None):
+		def issue(team, responded, response_by, status=None, resolved=None, resolution_by=None):
 			name = frappe.get_doc({"doctype": "Issue", "subject": "SLA test", "custom_team": team}).insert(ignore_permissions=True).name
 			frappe.db.set_value(
 				"Issue",
@@ -159,15 +159,20 @@ class TestSla(TeamGitlabTestCase):
 					"first_response_time": 7200,
 					"opening_date": "2026-03-02",
 					"agreement_status": status,
+					"sla_resolution_date": resolved,
+					"sla_resolution_by": resolution_by,
 				},
 				update_modified=False,
 			)
 
-		issue(TEAM_A, "2026-03-02 10:00:00", "2026-03-02 12:00:00", "Fulfilled")
-		issue(TEAM_A, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed")
-		issue(None, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed")
+		issue(TEAM_A, "2026-03-02 10:00:00", "2026-03-02 12:00:00", "Fulfilled", "2026-03-04 10:00:00", "2026-03-05 10:00:00")
+		issue(TEAM_A, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed", "2026-03-06 10:00:00", "2026-03-05 10:00:00")
+		issue(None, "2026-03-03 10:00:00", "2026-03-03 09:00:00", "Failed", "2026-03-06 10:00:00", "2026-03-05 10:00:00")
+		# SLA without resolution tracking: ERPNext marks it Fulfilled at the first response while
+		# the Issue is still open, so it is a response but not a resolution
+		issue(TEAM_A, "2026-03-04 10:00:00", "2026-03-04 12:00:00", "Fulfilled")
 		sla = self.stats().sla["current"]
-		self.assertEqual((sla.responses, sla.first_response_hours, sla.responses_in_time), (2, 2.0, 50.0))
+		self.assertEqual((sla.responses, sla.first_response_hours, sla.responses_in_time), (3, 2.0, 66.7))
 		self.assertEqual((sla.resolutions, sla.resolutions_in_time), (2, 50.0))
 
 
@@ -185,3 +190,41 @@ class TestEndpoint(TeamGitlabTestCase):
 			self.assertIsNone(team_cockpit.get_gitlab_statistics().unmatched_own_items)
 			frappe.set_user(self.anna_email)
 			self.assertEqual(team_cockpit.get_gitlab_statistics().unmatched_own_items, 1)
+
+
+class TestMergeRequests(TeamGitlabTestCase):
+	"""Merge requests (#1977) count like items: by the author's email, member on the merge date."""
+
+	def merge_request(self, email, created, merged=None, project=PROJECTS[0], added=0, removed=0):
+		doc = frappe.get_doc(
+			{
+				"doctype": "GitLab Merge Request",
+				"gitlab_project": project,
+				"iid": frappe.db.count("GitLab Merge Request") + 1000,
+				"title": "Test MR",
+				"state": "merged" if merged else "opened",
+				"author_email": email,
+				"created_at": created,
+				"merged_at": merged,
+				"lines_added": added,
+				"lines_removed": removed,
+			}
+		)
+		doc.flags.ignore_links = True
+		return doc.insert(ignore_permissions=True).name
+
+	def test_figures_by_author_and_merge_date(self):
+		self.assign(self.anna, TEAM_A, "2026-02-10")
+		self.merge_request(self.anna_email, "2026-03-02 09:00:00", "2026-03-04 09:00:00", added=100, removed=20)
+		self.merge_request(self.anna_email, "2026-03-05 09:00:00", "2026-03-11 09:00:00", project=PROJECTS[1], added=10, removed=5)
+		# merged before anna joined: not the team's
+		self.merge_request(self.anna_email, "2026-02-01 09:00:00", "2026-02-05 09:00:00", added=999)
+		# another person
+		self.merge_request(self.ben_email, "2026-03-02 09:00:00", "2026-03-03 09:00:00", added=50)
+		data = self.stats()
+		current = data.merge_requests["current"]
+		self.assertEqual(current.merged, {"own": 1, "other": 1, "internal": 0})
+		self.assertEqual((current.lines_added["own"], current.lines_removed["other"]), (100, 5))
+		self.assertEqual(current.days_to_merge, {"average": 4.0, "median": 4.0, "count": 2})
+		self.assertEqual(data.months[-1].lines_added, {"own": 100, "other": 10, "internal": 0})
+		self.assertEqual(data.months[-2].lines_added, {"own": 0, "other": 0, "internal": 0})

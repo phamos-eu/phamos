@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import cint, get_first_day, get_last_day, flt, getdate, add_to_date
+from frappe.utils import cint, get_first_day, get_last_day, flt, getdate, add_to_date, date_diff
 from frappe.query_builder import DocType, Order
 from frappe.desk.form.assign_to import add
 from frappe.desk.form.assign_to import add as add_assignment
@@ -1520,3 +1520,101 @@ def get_deliveries_overview(docname: str):
 		"billable_hours": flt(doc.billable_hours, 2),
 		"not_invoiced_hours": flt(sum(dn.hours for dn in delivery_notes if dn.status == "To Bill"), 2),
 	}
+
+
+# ── Sales Order hours banner (#1484) ────────────────────────────────────────
+
+SO_RUNWAY_RED_DAYS = 28
+DAYS_PER_MONTH = 30.44
+
+
+def so_hours_runway(total_hours, delivered_hours, so_date, today=None):
+	"""How long the remaining hours of one Sales Order last at its average monthly pace (#1484).
+
+	rate = delivered hours / months since the SO date (at least 1 month); runway = remaining / rate.
+	level is "red" when the hours are used up or last 4 weeks or less, else "orange"."""
+	total = flt(total_hours, 2)
+	delivered = flt(delivered_hours, 2)
+	remaining = flt(total - delivered, 2)
+	out = {
+		"total_hours": total,
+		"delivered_hours": delivered,
+		"remaining_hours": remaining,
+		"monthly_rate": 0,
+		"runway_days": None,
+		"used_up": False,
+		"level": "orange",
+	}
+	rate = 0
+	if delivered > 0.0001:
+		months = 1
+		if so_date:
+			months = max(date_diff(getdate(today), getdate(so_date)) / DAYS_PER_MONTH, 1)
+		rate = delivered / months
+	return _with_runway(out, rate)
+
+
+def _with_runway(out, rate):
+	"""Set monthly_rate, runway_days, used_up and level from remaining_hours and a monthly rate."""
+	remaining = out["remaining_hours"]
+	if remaining <= 0.0001:
+		out.update(used_up=True, level="red")
+		return out
+	if rate <= 0:
+		return out  # no deliveries yet: no pace, no runway
+	runway_days = remaining / rate * DAYS_PER_MONTH
+	out["monthly_rate"] = flt(rate, 2)
+	out["runway_days"] = flt(runway_days, 1)
+	if runway_days <= SO_RUNWAY_RED_DAYS:
+		out["level"] = "red"
+	return out
+
+
+def so_hours_total(rows):
+	"""One line for the whole MIS: the Sales Orders' hours added up, and how long the remaining
+	hours last at their combined monthly pace (the sum of each SO's rate).
+
+	An over-delivered SO counts as 0 remaining, not negative, so it can't eat the other SOs' hours;
+	an SO with no hours left adds nothing to the pace, since its hours can't be spent any more."""
+	open_rows = [r for r in rows if r["remaining_hours"] > 0]
+	out = {
+		"total_hours": flt(sum(r["total_hours"] for r in rows), 2),
+		"delivered_hours": flt(sum(r["delivered_hours"] for r in rows), 2),
+		"remaining_hours": flt(sum(r["remaining_hours"] for r in open_rows), 2),
+		"monthly_rate": 0,
+		"runway_days": None,
+		"used_up": False,
+		"level": "orange",
+	}
+	return _with_runway(out, sum(flt(r["monthly_rate"]) for r in open_rows))
+
+
+@frappe.whitelist()
+def get_so_hours_alert(docname: str):
+	"""Delivered / remaining hours and runway of the deliverable Sales Orders on this MIS (#1484):
+	each SO in rows, all of them added up in total. Nothing for a closed MIS."""
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+	if doc.is_closed():
+		return {"rows": [], "total": None}
+	so_rows = [
+		r for r in (doc.sales_order_status_information or [])
+		if r.sales_order and r.status in ("To Deliver", "To Deliver and Bill")
+	]
+	if not so_rows:
+		return {"rows": [], "total": None}
+	so_dates = dict(
+		frappe.get_all(
+			"Sales Order",
+			filters={"name": ["in", [r.sales_order for r in so_rows]]},
+			fields=["name", "transaction_date"],
+			as_list=True,
+		)
+	)
+	rows = []
+	for r in so_rows:
+		row = so_hours_runway(r.total_hrs, r.delivered_total_hrs, so_dates.get(r.sales_order))
+		row.update(sales_order=r.sales_order, so_title=r.so_title or "", project=r.project or "")
+		rows.append(row)
+	return {"rows": rows, "total": so_hours_total(rows)}

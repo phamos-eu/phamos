@@ -1490,6 +1490,14 @@ Subject is required,Betreff ist erforderlich
 Expected start and end dates are required,Erwarteter Beginn und erwartetes Ende sind erforderlich
 Expected end date cannot be before start date,Das erwartete Ende darf nicht vor dem Beginn liegen
 Estimated time must be more than 0 hours,Die geschätzte Zeit muss mehr als 0 Stunden betragen
+used up,aufgebraucht
+no deliveries yet,noch keine Lieferungen
+Estimated time 1 week,Geschätzt noch 1 Woche
+Estimated time {0} weeks,Geschätzt noch {0} Wochen
+Estimated time 1 month,Geschätzt noch 1 Monat
+Estimated time {0} months,Geschätzt noch {0} Monate
+Delivered Hours: {0} hrs,Gelieferte Stunden: {0} Std.
+Remaining Hours: {0} / {1} hrs ({2}),Verbleibende Stunden: {0} / {1} Std. ({2})
 Task Owner is required,Aufgabenverantwortliche/r ist erforderlich
 Priority is required,Priorität ist erforderlich
 Task Type {0} does not exist,Aufgabentyp {0} existiert nicht
@@ -1651,6 +1659,18 @@ Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
 "You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
 DATEV auto-send failed,Automatischer DATEV-Versand fehlgeschlagen
+Send to DATEV,An DATEV senden
+Send test,Test senden
+Test send: the receipt is not marked as sent to DATEV.,Testversand: Der Beleg wird nicht als an DATEV gesendet markiert.
+DATEV address: {0},DATEV-Adresse: {0}
+No DATEV address is configured.,Es ist keine DATEV-Adresse eingerichtet.
+"This document was already sent on {0} by {1}.","Dieser Beleg wurde bereits am {0} von {1} gesendet."
+Building the PDF…,PDF wird erstellt …
+with the note for the accounting office,mit dem Hinweis für die Buchhaltung
+Could not build the DATEV PDF.,Das DATEV-PDF konnte nicht erstellt werden.
+{0} is not a valid email address.,{0} ist keine gültige E-Mail-Adresse.
+Test send to DATEV: sent to {0} by {1}.,Testversand an DATEV: von {1} an {0} gesendet.
+Test send queued to {0}. The receipt is not marked as sent to DATEV.,Testversand an {0} eingereiht. Der Beleg wird nicht als an DATEV gesendet markiert.
 Sick Leave Types,Krankheitsarten
 Sick days this year,Krankheitstage dieses Jahr
 Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
@@ -1882,6 +1902,9 @@ Improved,Verbessert
 Declined,Gesunken
 Same month a year earlier,Gleicher Monat im Vorjahr
 Lighter bar: the same month a year earlier,Hellerer Balken: gleicher Monat im Vorjahr
+Side by side,Nebeneinander
+Stacked,Gestapelt
+Chart view,Diagrammansicht
 No source,Ohne Quelle
 12-month average,12-Monats-Durchschnitt
 There is no complete month of leads yet.,Es gibt noch keinen vollständigen Monat mit Interessenten.
@@ -2556,6 +2579,27 @@ Book,Buch
 Hands and Reactions,Hände und Reaktionen
 "One switch per Phriend feature. A feature that is off shows nowhere.","Ein Schalter pro Phriend-Funktion. Eine ausgeschaltete Funktion erscheint nirgends."
 "Emoji hands next to the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji-Hände neben den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
+Sync…,Synchronisieren…
+Sync from {0},Synchronisieren von {0}
+What to sync,Was synchronisiert wird
+Links each user to the roles synced before.,Verknüpft jeden Benutzer mit den zuvor synchronisierten Rollen.
+One call per shelf; links the books.,Ein Aufruf pro Regal; verknüpft die Bücher.
+Website content,Website-Inhalte
+Copies the pages of books published on the website.,Kopiert die Seiten der auf der Webseite veröffentlichten Bücher.
+Removed (deleted in BookStack),Entfernt (in BookStack gelöscht)
+Remove records deleted in BookStack,In BookStack gelöschte Einträge entfernen
+Choose at least one part to sync.,Wählen Sie mindestens einen Teil zum Synchronisieren.
+Unknown sync step: {0},Unbekannter Synchronisierungsschritt: {0}
+"Books, chapters and pages","Bücher, Kapitel und Seiten"
+Save selection,Auswahl speichern
+Selection saved; {0} records removed from ERPNext.,Auswahl gespeichert; {0} Einträge aus ERPNext entfernt.
+Loading books from BookStack…,Bücher werden aus BookStack geladen…
+Filter books…,Bücher filtern…
+{0} of {1} books,{0} von {1} Büchern
+"Unticked books, chapters and pages are never mirrored into ERPNext, by any sync; their copies are removed when you save. New items in BookStack are synced.","Nicht angehakte Bücher, Kapitel und Seiten übernimmt keine Synchronisierung nach ERPNext; vorhandene Kopien werden beim Speichern entfernt. Neue Einträge in BookStack werden synchronisiert."
+Sync Selection,Auswahl für die Synchronisierung
+Left out of the sync,Von der Synchronisierung ausgenommen
+Unknown item type: {0},Unbekannter Typ: {0}
 Bookstack Browser,Bookstack-Browser
 Books,Bücher
 Shelves,Regale
@@ -2565,6 +2609,7 @@ Bookstack Roles,Bookstack-Rollen
 Sync started in the background. The result shows here when it is done.,"Synchronisierung läuft im Hintergrund. Das Ergebnis erscheint hier, sobald sie fertig ist."
 Sync started in the background. The tree reloads when it is done.,"Synchronisierung läuft im Hintergrund. Der Baum lädt neu, sobald sie fertig ist."
 A sync of {0} is already running. Try again when it has finished.,"Eine Synchronisierung von {0} läuft bereits. Versuchen Sie es erneut, wenn sie beendet ist."
+Another published book already uses the web address /de/doku/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/doku/{0}.
 Sync finished with errors,Synchronisierung mit Fehlern beendet
 Sync complete,Synchronisierung abgeschlossen
 Another published book already uses the web address /de/dokumentation/{0}.,Ein anderes veröffentlichtes Buch nutzt bereits die Webadresse /de/dokumentation/{0}.
@@ -2598,6 +2643,9 @@ Bubbles per Day,Sprechblasen pro Tag
 One voice is switched off in Phriend Settings,„Eine Stimme“ ist in den Phriend-Einstellungen ausgeschaltet
 A day looks like 2026-11-21.,Ein Tag sieht so aus: 2026-11-21.
 "Phriend can be quiet for a number of minutes, like 60.","Phriend kann für eine Anzahl Minuten ruhig sein, zum Beispiel 60."
+Only users who may edit this configuration change the selection.,"Nur wer diese Konfiguration bearbeiten darf, ändert die Auswahl."
+"BookStack could not be reached. The saved selection stays as it is, and Sync uses it.",BookStack ist nicht erreichbar. Die gespeicherte Auswahl bleibt unverändert und gilt für die Synchronisierung.
+Invalid BookStack ID: {0},Ungültige BookStack-ID: {0}
 Nothing planned yet,Noch nichts geplant
 On the critical path,Auf dem kritischen Pfad
 Baseline: {0} – {1},Baseline: {0} – {1}
@@ -2623,6 +2671,11 @@ Events are switched off in Phriend Settings,Ereignisse sind in den Phriend-Einst
 "Emoji in the speech bubbles, and short reactions without words (thanks, high five, heart, ‼️).","Emoji in den Sprechblasen und kurze Reaktionen ohne Worte (Danke, High five, Herz, ‼️)."
 Easter Eggs,Easter Eggs
 "Now and then Phriend plays: when the pointer rests on it for 10 seconds, after 5 minutes without mouse or keyboard, and when it is shaken around. Never with words, never while quiet, not for people who asked for less motion.","Ab und zu spielt Phriend: wenn der Mauszeiger 10 Sekunden auf ihm ruht, nach 5 Minuten ohne Maus und Tastatur, und wenn er herumgeschüttelt wird. Nie mit Worten, nie im Ruhemodus, nicht für Menschen, die weniger Bewegung eingestellt haben."
+"This removes {0} chapters and {1} pages from ERPNext, with their copies on the website. The books stay and come back when ticked again. Continue?","Damit werden {0} Kapitel und {1} Seiten aus ERPNext entfernt, samt ihren Kopien auf der Webseite. Die Bücher bleiben und kommen zurück, wenn sie wieder angehakt werden. Fortfahren?"
+Removes what BookStack no longer has. Books and chapters only when their pages are synced too.,"Entfernt, was es in BookStack nicht mehr gibt. Bücher und Kapitel nur, wenn auch ihre Seiten synchronisiert werden."
+Last Full Sync,Letzte vollständige Synchronisierung
+"Set by syncs that run every part. A partial sync shows its result in the Sync dialog only.","Wird von Synchronisierungen gesetzt, die alle Teile ausführen. Eine teilweise Synchronisierung zeigt ihr Ergebnis nur im Dialog."
+Sync Errors (last full sync),Synchronisierungsfehler (letzte vollständige Synchronisierung)
 This documentation is in German.,Diese Dokumentation ist auf Deutsch.
 Hide contents,Inhalt ausblenden
 Show contents,Inhalt einblenden
@@ -2841,7 +2894,7 @@ The chats could not be loaded.,Die Chats konnten nicht geladen werden.
 The setting could not be saved.,Die Einstellung konnte nicht gespeichert werden.
 Open the Implementation,Implementation öffnen
 Working on,Arbeitet an
-"{0}: click to set your availability","{0}: Klicken, um Ihre Verfügbarkeit festzulegen"
+"{0}: click for your timesheet timer and availability","{0}: Klicken für Ihren Zeiterfassungs-Timer und Ihre Verfügbarkeit"
 Burn chats: pick which meetings to delete,Chats verbrennen: Besprechungen zum Löschen auswählen
 Tick the meetings whose chat should be burned. The people who were there vote; a tie keeps it.,"Kreuzen Sie die Besprechungen an, deren Chat verbrannt werden soll. Die Teilnehmenden stimmen ab; bei Gleichstand bleibt er erhalten."
 Only the people who were in this meeting can burn its chat.,"Nur wer bei dieser Besprechung dabei war, kann ihren Chat verbrennen."
@@ -3021,6 +3074,7 @@ Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldun
 Zoom out,Verkleinern
 Zoom in,Vergrößern
 Show the whole grid,Ganzes Raster zeigen
+Show the whole image,Ganzes Bild zeigen
 {0} × {1} tiles,{0} × {1} Kacheln
 Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
 "Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
@@ -3085,6 +3139,7 @@ Not on the map right now.,Gerade nicht auf der Karte.
 The meeting point could not be set.,Der Treffpunkt konnte nicht gesetzt werden.
 {0} set a meeting point,{0} hat einen Treffpunkt gesetzt
 Choose the people to meet.,"Wählen Sie die Personen aus, die Sie treffen möchten."
+Availability,Verfügbarkeit
 A meeting point was just set. Please wait a moment.,Gerade wurde ein Treffpunkt gesetzt. Bitte warten Sie einen Moment.
 Call window,Anruffenster
 Open the video call with {0} in its own window,Den Videoanruf mit {0} im eigenen Fenster öffnen
@@ -3116,7 +3171,7 @@ Text size of Ophice and the cockpits in it. The map has its own zoom.,Textgröß
 "Simulate a beam-in or a ping, on your own screen only.","Ein Hereinbeamen oder einen Ping simulieren, nur auf dem eigenen Bildschirm."
 Close the chat and walk on (Esc),Chat schließen und weitergehen (Esc)
 {0} wants to chat,{0} möchte mit Ihnen chatten
-Get a sound and a browser notification when someone starts a chat with you,Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt
+Get a sound and a browser notification when someone starts a chat with you,"Ton und Browser-Benachrichtigung erhalten, wenn jemand einen Chat mit Ihnen beginnt"
 Sound and notification on when someone starts a chat with you. Click to mute.,"Ton und Benachrichtigung an, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Stummschalten."
 Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute.,"Ton an, wenn jemand einen Chat mit Ihnen beginnt. Browser-Benachrichtigungen sind in diesem Browser blockiert. Klicken zum Stummschalten."
 Muted: no sound or notification when someone starts a chat with you. Click to turn on.,"Stumm: kein Ton und keine Benachrichtigung, wenn jemand einen Chat mit Ihnen beginnt. Klicken zum Einschalten."
@@ -3124,10 +3179,44 @@ to close,zum Schließen
 Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
 "Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Unknown shape.,Unbekannte Form.
+A polygon needs its corner points.,Ein Vieleck braucht seine Eckpunkte.
+A corner point is not a number.,Ein Eckpunkt ist keine Zahl.
+A polygon needs at least 3 corners.,Ein Vieleck braucht mindestens 3 Ecken.
+A polygon can have at most {0} corners.,Ein Vieleck kann höchstens {0} Ecken haben.
+The polygon is too small.,Das Vieleck ist zu klein.
+The edges of the polygon cross each other.,Die Kanten des Vielecks kreuzen sich.
+Shape,Form
+Rectangle,Rechteck
+Ellipse,Ellipse
+Polygon,Vieleck
+"On the map: drag a corner to move it, click an edge to add a corner, double-click a corner to remove it.","Auf der Karte: Ecke ziehen, um sie zu verschieben, auf eine Kante klicken, um eine Ecke hinzuzufügen, Ecke doppelklicken, um sie zu entfernen."
+Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel,Klicken setzt Ecken · erste Ecke anklicken oder Enter schließt · Rücktaste: letzte Ecke zurück · Esc: abbrechen
+"Drag on the map to draw an area, or click corner by corner for a polygon; click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Drag on the grid to mark a meeting area, or click corner by corner for a polygon; click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten"
 Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
 Chat notifications muted,Chat-Benachrichtigungen stumm
+Contracts,Verträge
+Contract Type,Vertragsart
+"AVVs, NDAs and other contracts","AVVs, NDAs und andere Verträge"
+Ends within,Endet innerhalb von
+Party,Partei
+Search party,Partei suchen
+{0} contracts,{0} Verträge
+{0}+ contracts,{0}+ Verträge
+No contracts,Keine Verträge
+Signed,Unterschrieben
+All types,Alle Arten
+Any time,Beliebig
+Could not load the contracts,Die Verträge konnten nicht geladen werden
+Unsigned,Nicht unterschrieben
+Active,Aktiv
+Inactive,Inaktiv
+Supplier,Lieferant
+Unknown contract status: {0},Unbekannter Vertragsstatus: {0}
+Days must be a whole number from 0 to {0}.,Die Tage müssen eine ganze Zahl von 0 bis {0} sein.
 Dock in the corner,In der Ecke andocken
 Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
 AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}
@@ -3239,10 +3328,65 @@ Sign in to send {0},"Anmelden, um {0} zu senden"
 "Your text goes to the bottom of this idea, with date and time.","Ihr Text kommt unten an diese Idee, mit Datum und Uhrzeit."
 Grew out of this idea,Aus dieser Idee entstanden
 {0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."
+"Your flag: drag it to move it, click it for colour, pattern or to take it down","Ihre Fahne: ziehen, um sie zu versetzen; anklicken für Farbe, Muster oder zum Einholen"
+Flag of {0},Fahne von {0}
+Your flag,Ihre Fahne
+Pattern,Muster
+Red,Rot
+Orange,Orange
+Green,Grün
+Teal,Petrol
+Blue,Blau
+Violet,Violett
+Pink,Pink
+Plain,Schlicht
+Dots,Punkte
+Stripes,Streifen
+Waves,Wellen
+Take down,Einholen
+Back to the sidebar. Drag the flag on the map to move it.,"Zurück in die Seitenleiste. Ziehen Sie die Fahne auf der Karte, um sie zu versetzen."
+"Plant your flag: click it, then click on the map, or drag it onto the map","Fahne aufstellen: anklicken, dann auf die Karte klicken, oder auf die Karte ziehen"
+Click on the map,Auf die Karte klicken
+Plant your flag,Fahne aufstellen
+"Your flag is planted. Drag it on the map to move it; click it for colour, pattern or to take it down.","Ihre Fahne steht. Ziehen Sie sie auf der Karte, um sie zu versetzen; klicken Sie darauf für Farbe, Muster oder zum Einholen."
+Your flag is planted,Ihre Fahne steht
+"Drag it on the map to move it; click it for colour, pattern or to take it down.","Auf der Karte ziehen, um sie zu versetzen; anklicken für Farbe, Muster oder zum Einholen."
+"Click it, then click on the map, or drag it onto the map.","Anklicken, dann auf die Karte klicken, oder auf die Karte ziehen."
+Click on the map where your flag should stand · Esc to cancel,"Klicken Sie auf die Karte, wo Ihre Fahne stehen soll · Esc zum Abbrechen"
+A flag can't stand inside an area.,Eine Fahne kann nicht in einem Bereich stehen.
+There is already a flag on this spot.,Hier steht schon eine Fahne.
+Your flag could not be planted.,Ihre Fahne konnte nicht aufgestellt werden.
+Your flag could not be taken down.,Ihre Fahne konnte nicht eingeholt werden.
+Choose a spot on the map.,Wählen Sie einen Platz auf der Karte.
+Plant your flag on the map first.,Stellen Sie zuerst Ihre Fahne auf der Karte auf.
+Unknown colour.,Unbekannte Farbe.
+Unknown pattern.,Unbekanntes Muster.
+Click on the map where your flag should stand,"Klicken Sie auf die Karte, wo Ihre Fahne stehen soll"
+Esc to cancel,Esc zum Abbrechen
 Install app,App installieren
 "Add to your Home Screen: tap Share, then 'Add to Home Screen'.","Zum Home-Bildschirm hinzufügen: auf Teilen tippen, dann „Zum Home-Bildschirm“."
 Too late to undo. Change the idea in the Personal Cockpit instead.,Zu spät zum Rückgängigmachen. Ändern Sie die Idee stattdessen im Personal Cockpit.
 "{0} was changed in the meantime, so this cannot be undone.","{0} wurde inzwischen geändert, daher lässt sich das nicht rückgängig machen."
+Add to this idea,Zu dieser Idee hinzufügen
+Added,Hinzugefügt
+Another thought on this idea …,Ein weiterer Gedanke zu dieser Idee …
+Catch,Festhalten
+Grow to {0},Wachsen zu {0}
+My ideas,Meine Ideen
+No connection. Try again when you are online.,"Keine Verbindung. Versuchen Sie es erneut, sobald Sie online sind."
+No connection. Your ideas show when you are online.,"Keine Verbindung. Ihre Ideen erscheinen, sobald Sie online sind."
+No idea is up for vote right now.,Gerade steht keine Idee zur Abstimmung.
+No ideas yet.,Noch keine Ideen.
+Now {0},Jetzt {0}
+Only you can see this idea.,Nur Sie sehen diese Idee.
+Open for vote · 1 vote,Zur Abstimmung · 1 Stimme
+Open for vote · {0} votes,Zur Abstimmung · {0} Stimmen
+Save changes,Änderungen speichern
+Save your changes first.,Speichern Sie zuerst Ihre Änderungen.
+Take back my vote,Meine Stimme zurücknehmen
+This idea was changed elsewhere. Reload it to see the latest version.,"Diese Idee wurde anderswo geändert. Laden Sie sie neu, um die aktuelle Fassung zu sehen."
+Title is required,Titel ist erforderlich
+Up for vote,Zur Abstimmung
 Team Assignment,Teamzuordnung
 Co-Lead,Co-Lead
 Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
@@ -3363,7 +3507,7 @@ The reply could not be posted: {0},Die Antwort konnte nicht gepostet werden: {0}
 Learning,Lernen
 Accept after (days),Akzeptiert nach (Tagen)
 Statistics window (days),Statistikzeitraum (Tage)
-A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later correction still counts (#2225).,"Ein Lauf, den in diesen Tagen niemand korrigiert, gilt als akzeptiert (früher, wenn die Anfrage geschlossen wird). Eine spätere Korrektur zählt trotzdem (#2225)."
+A run nobody corrected within these days counts as accepted (earlier when its Issue is closed). A later change is normal work and no longer counts as a correction (#2225).,"Ein Lauf, den in diesen Tagen niemand korrigiert, gilt als akzeptiert (früher, wenn die Anfrage geschlossen wird). Eine spätere Änderung ist normale Arbeit und zählt nicht mehr als Korrektur (#2225)."
 How far back the correction rates look.,Wie weit die Korrekturquoten zurückreichen.
 Issue Assistant Trainer,Anfrage-Assistent-Trainer
 An AI agent can't accept or dismiss suggestions.,Ein KI-Agent kann Vorschläge weder annehmen noch verwerfen.
@@ -3378,3 +3522,176 @@ Don't suggest {0} as the person for such Issues.,Für solche Anfragen {0} nicht 
 "Leave the {0} empty for such Issues instead of ""{1}"".",Bei solchen Anfragen {0} leer lassen statt „{1}“.
 Learned rule for {0},Gelernte Regel für {0}
 Not this sender,Nicht dieser Absender
+Lines changed — 12 months,Geänderte Zeilen – 12 Monate
+"Lines added (full bar) and removed (pale bar) in merged merge requests, without generated files; merged merge requests under each month.","Hinzugefügte (voller Balken) und entfernte Zeilen (blasser Balken) in gemergten Merge Requests, ohne generierte Dateien; unter jedem Monat die gemergten Merge Requests."
+Merge requests this month,Merge Requests in diesem Monat
+Lines added,Zeilen hinzugefügt
+Lines removed,Zeilen entfernt
+Time to merge (median),Zeit bis zum Merge (Median)
+Removed,Entfernt
+{0} merged so far,bisher {0} gemergt
+{0} merged,{0} gemergt
+GitLab Merge Request,GitLab Merge Request
+GitLab Merge Request Issue,GitLab Merge Request Issue
+Linked GitLab Issues,Verknüpfte GitLab Issues
+Head SHA,Head-SHA
+Author Username,Benutzername des Autors
+Author Email,E-Mail des Autors
+Source Branch,Quell-Branch
+Target Branch,Ziel-Branch
+Merged At,Gemergt am
+Closed At,Geschlossen am
+Files Changed,Geänderte Dateien
+Lines Added,Zeilen hinzugefügt
+Lines Removed,Zeilen entfernt
+Merge Requests,Merge Requests
+Paths left out of line counts,Bei Zeilenzahlen ausgelassene Pfade
+Merge Requests Synced At,Merge Requests synchronisiert am
+IID,IID
+The line counts are taken again when it changes.,"Ändert er sich, werden die Zeilen neu gezählt."
+"UTC, as GitLab sends it","UTC, wie GitLab es sendet"
+Without the excluded paths in GitLab Settings,Ohne die in den GitLab-Einstellungen ausgeschlossenen Pfade
+"One pattern per line (* matches any characters, also /). Changes in these files don't count as lines added or removed (#1977).","Ein Muster pro Zeile (* passt auf beliebige Zeichen, auch /). Änderungen in diesen Dateien zählen nicht als hinzugefügte oder entfernte Zeilen (#1977)."
+Last merge request sync; the next one fetches what changed since then (#1977).,"Letzte Synchronisierung der Merge Requests; die nächste holt, was sich seitdem geändert hat (#1977)."
+"A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
+Added,Hinzugefügt
+Merged,Gemergt
+{0} changed:,{0} hat geändert:
+{0} of {1} checked in · updated {2},{0} von {1} eingecheckt · aktualisiert {2}
+Loading team mates…,Teammitglieder werden geladen…
+Nobody is in this team today.,Heute ist niemand in diesem Team.
+In focus,Im Fokus
+No project,Kein Projekt
+On a break,In der Pause
+No timer running,Kein Timer läuft
+Public holiday,Feiertag
+Day off,Freier Tag
+Checked in since {0},Eingecheckt seit {0}
+Not checked in,Nicht eingecheckt
+Could not load the team mates.,Die Teammitglieder konnten nicht geladen werden.
+Team mates,Teammitglieder
+"Who is there, and on what they work",Wer da ist und woran gearbeitet wird
+No team chat yet.,Noch kein Teamchat.
+Start one with the people of this team. Messages also show up in Raven.,Starten Sie ihn mit den Personen dieses Teams. Nachrichten erscheinen auch in Raven.
+Start the team chat in Raven,Teamchat in Raven starten
+Join the team chat in Raven,Dem Teamchat in Raven beitreten
+Read the team chat,Teamchat lesen
+Open the team chat in Raven,Teamchat in Raven öffnen
+Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
+Team chat of {0},Teamchat von {0}
+Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
+(hidden),(verborgen)
+{0} absent (half day),{0} abwesend (halber Tag)
+{0} absent,{0} abwesend
+"The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"
+Pick a shorter period.,Wählen Sie einen kürzeren Zeitraum.
+Invites go out from the team mailbox. Set one on the Team in Desk first.,Einladungen gehen vom Team-Postfach aus. Legen Sie es zuerst im Team in Desk fest.
+Set a team mailbox with a Mailcow calendar on team {0} first.,Legen Sie zuerst ein Team-Postfach mit Mailcow-Kalender für Team {0} fest.
+Team Mailbox,Team-Postfach
+The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979).,"Das gemeinsame Postfach, von dem die Termine des Teams versendet werden (braucht ein Mailcow-DAV-Passwort). Teammitglieder können Einladungen nur von diesem Postfach senden (#1979)."
+"Ideas shared with {0}: the same vote as the company's, read by the team only.","Mit {0} geteilte Ideen: dieselbe Abstimmung wie im Unternehmen, nur vom Team gelesen."
+the team,dem Team
+New team idea,Neue Team-Idee
+Loading ideas…,Ideen werden geladen…
+"No idea is shared with the team yet. Share one of yours from your Personal Cockpit, or start a new one here.",Noch keine Idee mit dem Team geteilt. Teilen Sie eine Ihrer Ideen im Personal Cockpit oder beginnen Sie hier eine neue.
+Voted,Abgestimmt
+Edit in my Personal Cockpit,Im Personal Cockpit bearbeiten
+"It is your idea: you write it out in your Personal Cockpit. Your team can read it, vote and chat right away.","Es ist Ihre Idee: Sie schreiben sie im Personal Cockpit aus. Ihr Team kann sie sofort lesen, abstimmen und darüber chatten."
+Share with team,Mit dem Team teilen
+Could not open the idea,Die Idee konnte nicht geöffnet werden
+Could not vote,Die Stimme konnte nicht abgegeben werden
+Could not load the ideas.,Die Ideen konnten nicht geladen werden.
+Ideas shared with the team,Mit dem Team geteilte Ideen
+Shared with {0},Geteilt mit {0}
+Open to the company,Für das Unternehmen öffnen
+"Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.","Diese Idee mit Ihrem Team teilen? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten. Ihre Schreibsitzungen und der Verlauf bleiben privat."
+Idea shared with your team,Idee mit Ihrem Team geteilt
+Could not share the idea,Die Idee konnte nicht geteilt werden
+Team {0} only,Nur Team {0}
+A composted idea cannot be shared. Take it up again first.,Eine kompostierte Idee kann nicht geteilt werden. Nehmen Sie sie zuerst wieder auf.
+You are not in a team to share it with.,"Sie sind in keinem Team, mit dem Sie sie teilen können."
+Only the people of the idea's team can join its chat.,Nur die Personen des Teams der Idee können ihrem Chat beitreten.
+Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company.,"Mit diesem Team geteilt: nur seine Personen lesen die Idee und stimmen ab (#1980). Leer, solange sie für das ganze Unternehmen offen ist."
+Move to my team,In mein Team verschieben
+"Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.","Diese Idee in Ihr Team verschieben? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten; die Stimmen bleiben."
+"A success of a team: found by a daily rule, or kudos and customer praise (#1981).","Ein Erfolg eines Teams: von einer täglichen Regel gefunden, oder Kudos und Kundenlob (#1981)."
+About (name),Über (Name)
+About (optional),Über (optional)
+Add praise,Lob hinzufügen
+An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981).,"Ein Issue ohne Team gilt als aufgegriffen, wenn es so viele Tage ohne Aktivität war, bevor ein Team es übernahm (#1981)."
+Could not load the successes.,Die Erfolge konnten nicht geladen werden.
+Could not save.,Konnte nicht gespeichert werden.
+Customer praise,Kundenlob
+Each of the {0} members with working hours booked at least {1} %.,Jedes der {0} Mitglieder mit Arbeitszeit hat mindestens {1} % gebucht.
+Everyone booked their hours in {0},Alle haben im {0} ihre Stunden gebucht
+Fastest month: items closed in {0} days (median),Schnellster Monat: Einträge in {0} Tagen geschlossen (Median)
+For what,Wofür
+Give kudos,Kudos geben
+Given By,Gegeben von
+Idea harvested: {0},Idee geerntet: {0}
+Idle for {0} days before the team took it on.,"{0} Tage ohne Aktivität, bevor das Team es übernahm."
+Kudos,Kudos
+Kudos and customer praise: who entered it,Kudos und Kundenlob: wer es eingetragen hat
+Kudos go to someone else.,Kudos gehen an jemand anderen.
+Kudos go to someone in team {0}.,Kudos gehen an jemanden im Team {0}.
+Loading successes…,Erfolge werden geladen…
+Milestone on time: {0},Meilenstein pünktlich: {0}
+More than in any of the {0} months before.,Mehr als in jedem der {0} Monate davor.
+No open item older than {0} days,Kein offener Eintrag älter als {0} Tage
+No successes yet. The daily rules add them as the team delivers; kudos and praise you can add now.,"Noch keine Erfolge. Die täglichen Regeln fügen sie hinzu, wenn das Team liefert; Kudos und Lob können Sie jetzt hinzufügen."
+Nobody in particular,Niemand Bestimmtes
+"One success per team, rule and period (#1981)","Ein Erfolg je Team, Regel und Zeitraum (#1981)"
+Pick a customer…,Kunden wählen…
+Pick a team mate…,Teammitglied wählen…
+Pick the customer who praised.,"Wählen Sie den Kunden, der gelobt hat."
+Picked up,Aufgegriffen
+Picked up: idle days,Aufgegriffen: Tage ohne Aktivität
+Picked up: {0},Aufgegriffen: {0}
+Praise from {0},Lob von {0}
+Quick responses: {0} Issues answered within their SLA time last week,Schnelle Antworten: {0} Issues letzte Woche innerhalb ihrer SLA-Zeit beantwortet
+Record month: {0} items closed,Rekordmonat: {0} Einträge geschlossen
+Resolved in time: {0} Issues within their SLA last week,Rechtzeitig gelöst: {0} Issues letzte Woche innerhalb ihrer SLA
+a module,ein Modul
+SLA,SLA
+Say what the kudos are for.,"Sagen Sie, wofür die Kudos sind."
+Shipped: {0},Ausgeliefert: {0}
+Successes,Erfolge
+Team Success,Teamerfolg
+Team ideas,Team-Ideen
+The parent item and all {0} of its items are closed.,Der übergeordnete Eintrag und alle {0} seiner Einträge sind geschlossen.
+The praise goes to someone in team {0}.,Das Lob geht an jemanden im Team {0}.
+"The rule that found it, or Kudos / Customer praise","Die Regel, die ihn gefunden hat, oder Kudos / Kundenlob"
+The team booked at least {0} % of its available hours every week.,Das Team hat jede Woche mindestens {0} % seiner verfügbaren Stunden gebucht.
+The team sees the kudos and that they are from you; they are also posted in the team chat.,Das Team sieht die Kudos und dass sie von Ihnen sind; sie werden auch im Teamchat gepostet.
+What did the customer say?,Was hat der Kunde gesagt?
+What the team achieved,Was das Team erreicht hat
+What they said,Was gesagt wurde
+"Who the success is about, if one person","Um wen es beim Erfolg geht, falls um eine Person"
+entered by {0},eingetragen von {0}
+{0} complete weeks in a row,{0} vollständige Wochen in Folge
+"{0} items open, the oldest {1} days.","{0} Einträge offen, der älteste {1} Tage."
+{0} reached maturity level {1},{0} hat Reifegrad {1} erreicht
+{0} → {1},{0} → {1}
+{0}: hours budget kept three months in a row,{0}: Stundenbudget drei Monate in Folge eingehalten
+{0}: the forecast improved,{0}: die Prognose hat sich verbessert
+"{0}: {1} h, within 10 % of the {2} h predicted","{0}: {1} h, innerhalb von 10 % der geplanten {2} h"
+{0}: {1} reached level {2},{0}: {1} hat Stufe {2} erreicht
+No activity for {0} days,Seit {0} Tagen keine Aktivität
+First response missed,Erste Antwort verpasst
+First response due,Erste Antwort bald fällig
+Resolution missed,Lösung verpasst
+Resolution due,Lösung bald fällig
+and {0} more in the Team Cockpit,und {0} weitere im Team-Cockpit
+Needs attention since the last summary,Braucht Aufmerksamkeit seit der letzten Übersicht
+Needs attention,Braucht Aufmerksamkeit
+What lies around or misses its SLA,Was liegen bleibt oder sein SLA verpasst
+"Issues whose SLA is missed or due soon, and open Issues and Tasks of the team without activity for {0} days.","Issues, deren SLA verpasst oder bald fällig ist, und offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen."
+Open Issues and Tasks of the team without activity for {0} days.,Offene Issues und Aufgaben des Teams ohne Aktivität seit {0} Tagen.
+Nothing needs attention. Every open record of the team moved recently.,Nichts braucht Aufmerksamkeit. Jeder offene Datensatz des Teams hat sich zuletzt bewegt.
+Could not load what needs attention.,"Konnte nicht laden, was Aufmerksamkeit braucht."
+Not assigned,Nicht zugewiesen
+Needs attention: idle days,Braucht Aufmerksamkeit: Tage ohne Aktivität
+Needs attention: SLA due within hours,Braucht Aufmerksamkeit: SLA fällig innerhalb von Stunden
+Only the first {0} are shown.,Nur die ersten {0} werden gezeigt.
+Needs attention: morning summary in the team chat,Braucht Aufmerksamkeit: Morgenübersicht im Team-Chat
+Team Attention Notice,Team-Aufmerksamkeitshinweis

@@ -147,6 +147,49 @@ def _window(items, start, end):
 	)
 
 
+def _merge_requests(range_start, emails, periods, groups):
+	"""The team's merge requests (#1977): by the author's email, member on the merge date (the
+	creation date for opened ones), wherever they work; times in system time like the items."""
+	from phamos.gitlab_integration.issue_refs import _system_to_utc
+
+	if not frappe.db.table_exists("GitLab Merge Request"):
+		return []
+	start_utc = _system_to_utc(get_datetime(range_start))
+	rows = frappe.get_all(
+		"GitLab Merge Request",
+		or_filters=[["created_at", ">=", start_utc], ["merged_at", ">=", start_utc]],
+		fields=["gitlab_project", "author_email", "created_at", "merged_at", "lines_added", "lines_removed"],
+		limit_page_length=0,
+	)
+	team_rows = []
+	for row in rows:
+		employee = emails.get((row.author_email or "").strip().lower())
+		if not employee or not row.created_at:
+			continue
+		row.created_at = _system_time(row.created_at)
+		row.merged_at = _system_time(row.merged_at)
+		row.created_on = getdate(row.created_at)
+		row.merged_on = getdate(row.merged_at) if row.merged_at else None
+		row.group = groups.get(row.gitlab_project, "internal")
+		row.counts_opened = _in_team(periods[employee], row.created_on)
+		row.counts_merged = bool(row.merged_on) and _in_team(periods[employee], row.merged_on)
+		if row.counts_opened or row.counts_merged:
+			team_rows.append(row)
+	return team_rows
+
+
+def _merge_request_window(rows, start, end):
+	merged = [r for r in rows if r.counts_merged and start <= r.merged_on <= end]
+	return frappe._dict(
+		merged={group: sum(1 for r in merged if r.group == group) for group in GROUPS},
+		merged_total=len(merged),
+		# lines of the merge requests merged in the period: what reached the code base
+		lines_added={group: sum(r.lines_added or 0 for r in merged if r.group == group) for group in GROUPS},
+		lines_removed={group: sum(r.lines_removed or 0 for r in merged if r.group == group) for group in GROUPS},
+		days_to_merge=_summary([_days_between(r.created_at, r.merged_at) for r in merged]),
+	)
+
+
 def _sla(team, windows):
 	"""SLA figures of the team's Issues per window, or None while SLA tracking is off."""
 	if not frappe.db.get_single_value("Support Settings", "track_service_level_agreement"):
@@ -164,11 +207,18 @@ def _sla(team, windows):
 			fields=["first_response_time", "first_responded_on", "response_by"],
 		)
 		with_target = [r for r in responded if r.response_by]
+		# Only Issues with a resolution target that were actually resolved count. agreement_status is
+		# no use here: for an SLA without "Apply SLA for Resolution" ERPNext sets it to Fulfilled or
+		# Failed at the first response, while the Issue is still open.
 		resolved = frappe.get_all(
 			"Issue",
-			filters={"opening_date": ["between", [start, end]], "agreement_status": ["in", ["Fulfilled", "Failed"]]},
+			filters={
+				"opening_date": ["between", [start, end]],
+				"sla_resolution_by": ["is", "set"],
+				"sla_resolution_date": ["is", "set"],
+			},
 			or_filters=or_filters,
-			fields=["agreement_status"],
+			fields=["sla_resolution_date", "sla_resolution_by"],
 		)
 		result[key] = frappe._dict(
 			responses=len(responded),
@@ -183,7 +233,9 @@ def _sla(team, windows):
 			if with_target
 			else None,
 			resolutions=len(resolved),
-			resolutions_in_time=round(sum(1 for r in resolved if r.agreement_status == "Fulfilled") / len(resolved) * 100, 1)
+			resolutions_in_time=round(
+				sum(1 for r in resolved if r.sla_resolution_date <= r.sla_resolution_by) / len(resolved) * 100, 1
+			)
 			if resolved
 			else None,
 		)
@@ -229,6 +281,7 @@ def team_gitlab_statistics(team, today=None):
 		if item.counts_opened or item.counts_closed or item.counts_open:
 			team_items.append(item)
 
+	merge_requests = _merge_requests(range_start, emails, periods, groups)
 	windows = month_windows(today)
 	open_items = [i for i in team_items if i.counts_open]
 	open_ages = [(today - i.created_on).days for i in open_items]
@@ -237,11 +290,26 @@ def team_gitlab_statistics(team, today=None):
 		start = get_first_day(add_months(today, -offset))
 		end = min(getdate(get_last_day(start)), today)
 		window = _window(team_items, start, end)
-		months.append(frappe._dict(start=start, closed=window.closed, opened_total=window.opened_total, mtd=end < getdate(get_last_day(start))))
+		mr_window = _merge_request_window(merge_requests, start, end)
+		months.append(
+			frappe._dict(
+				start=start,
+				closed=window.closed,
+				opened_total=window.opened_total,
+				lines_added=mr_window.lines_added,
+				lines_removed=mr_window.lines_removed,
+				merged_total=mr_window.merged_total,
+				# for the record rules of the successes (#1981)
+				work_item_median=window.work_item_days["median"],
+				closed_total=window.closed_total,
+				mtd=end < getdate(get_last_day(start)),
+			)
+		)
 
 	return frappe._dict(
 		today=today,
 		windows={key: _window(team_items, start, end) for key, (start, end) in windows.items()},
+		merge_requests={key: _merge_request_window(merge_requests, start, end) for key, (start, end) in windows.items()},
 		months=months,
 		open_items=frappe._dict(
 			count=len(open_items),

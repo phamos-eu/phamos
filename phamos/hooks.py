@@ -334,7 +334,9 @@ after_migrate = [
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
+	"phamos.setup.contracts.after_migrate",  # Contract Type on Contract, AVV and NDA (#2148)
 	"phamos.setup.implementation_cockpit.after_migrate",  # Implementation Cockpit role (#1671)
+	"phamos.setup.issue_chat_card.after_migrate",  # fields on the Issue chat's card (#2234)
 ]
 
 # Uninstallation
@@ -457,8 +459,14 @@ doc_events = {
         "on_update": [
             "phamos.events.team_daily_schedule.sync_events_from_parent",
             "phamos.web_profile.mirror.push_to_profiles",
+            # the team chat's members follow the team (#1978)
+            "phamos.cockpits.team_chat.on_team_update",
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
+    },
+    # a team's chat is for the team's people only (#1978)
+    "Raven Channel Member": {
+        "before_insert": "phamos.cockpits.team_chat.check_channel_member",
     },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
@@ -469,6 +477,8 @@ doc_events = {
 	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
 	"Issue": {
 		"on_update": [
+			# a new card in the chat when a field on it changes (#2234); before the chat may be archived
+			"phamos.api.issue_chat.post_card_on_change",
 			"phamos.api.issue_chat.on_record_update",
 			# the Issue Assistant learns from people correcting it (#2225)
 			"phamos.ai_agents.agents.issue_feedback.on_issue_update",
@@ -676,6 +686,8 @@ scheduler_events = {
         "phamos.phamos.doctype.implementation_release.implementation_release.refresh_all_release_checks",
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # Team Cockpit: successes found by the daily rules (#1981)
+        "phamos.cockpits.team_successes.run_all_teams",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
@@ -705,6 +717,10 @@ scheduler_events = {
         # Keep GitLab projects/milestones/issues fresh, including already synced issues.
         "30 */2 * * *": [
             "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data_background",
+        ],
+        # Team Cockpit: morning summary of what needs attention, weekdays (#2235).
+        "30 7 * * 1-5": [
+            "phamos.cockpits.team_attention.post_all_summaries",
         ],
         # Personal Cockpit: end focus sessions that ran past their limit (#1556).
         "*/5 * * * *": [
@@ -811,6 +827,9 @@ user_data_fields = [
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 ]
+
+# Automatically update python controller files with type annotations for this app.
+export_python_type_annotations = True
 
 # Authentication and authorization
 # --------------------------------
