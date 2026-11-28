@@ -47,6 +47,11 @@ class IssueAssistantTestCase(FrappeTestCase):
 		self.settings.scope_issue_types = []
 		self.settings.save(ignore_permissions=True)
 		self.assistant = self.settings.assistant_user
+		# the tests switch Implementations on themselves; entries made on the site by hand (#2114) would
+		# limit what the assistant may read (rolled back in tearDown)
+		frappe.db.delete("User Permission", {"user": self.assistant})
+		frappe.clear_cache(user=self.assistant)
+		self.addCleanup(frappe.clear_cache, user=self.assistant)
 		make_user(DESK_USER, "System User")
 		make_user(WEBSITE_USER, "Website User")
 		if not frappe.db.exists("Customer", CUSTOMER):
