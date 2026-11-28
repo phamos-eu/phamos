@@ -16,6 +16,7 @@
   "imported_from",
   "section_vote",
   "vote_status",
+  "team",
   "handed_in_on",
   "column_break_vote",
   "vote_count",
@@ -160,6 +161,14 @@
    "description": "Open for vote: every Personal Cockpit user can read this idea and vote for it (#1842)."
   },
   {
+   "fieldname": "team",
+   "fieldtype": "Link",
+   "label": "Team",
+   "options": "Team",
+   "read_only": 1,
+   "description": "Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company."
+  },
+  {
    "fieldname": "handed_in_on",
    "fieldtype": "Datetime",
    "label": "Handed In On",
@@ -180,7 +189,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-17 12:00:00.000000",
+ "modified": "2026-11-28 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Idea",

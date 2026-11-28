@@ -145,6 +145,13 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"save_appointment",
 			"delete_appointment",
 			"get_team_absences",
+			# team ideas (#1980)
+			"get_team_ideas",
+			"get_idea_for_vote",
+			"vote_idea",
+			"create_team_idea",
+			"get_idea_chat",
+			"ensure_idea_chat",
 		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 

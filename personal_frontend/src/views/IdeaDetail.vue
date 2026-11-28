@@ -35,10 +35,15 @@
 							<template v-if="idea.vote_status">
 								<router-link :to="{ name: 'IdeaVoteDetail', params: { name: idea.name } }">
 									<Badge theme="green" size="lg">
-										<template #prefix><FeatherIcon name="thumbs-up" class="h-3 w-3" /></template>
-										{{ __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
+										<template #prefix><FeatherIcon :name="idea.team ? 'users' : 'thumbs-up'" class="h-3 w-3" /></template>
+										{{ idea.team ? __("Shared with {0}", [idea.team]) : __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
 									</Badge>
 								</router-link>
+								<!-- shared with the team (#1980): open it to everyone, the votes stay -->
+								<Button v-if="idea.team" variant="subtle" :loading="handingIn" @click="handIn">
+									<template #prefix><FeatherIcon name="globe" class="h-4 w-4" /></template>
+									{{ __("Open to the company") }}
+								</Button>
 								<Button variant="subtle" :loading="withdrawing" @click="withdrawVote">
 									<template #prefix><FeatherIcon name="corner-up-left" class="h-4 w-4" /></template>
 									{{ __("Withdraw from vote") }}
@@ -52,10 +57,17 @@
 								:subject="idea.title"
 								:api="API"
 							/>
-							<Button v-else-if="!composted" variant="subtle" :loading="handingIn" @click="handIn">
-								<template #prefix><FeatherIcon name="thumbs-up" class="h-4 w-4" /></template>
-								{{ __("Hand in for Vote") }}
-							</Button>
+							<template v-else-if="!composted">
+								<!-- only the own team reads, votes and chats (#1980) -->
+								<Button variant="subtle" :loading="sharing" @click="shareWithTeam">
+									<template #prefix><FeatherIcon name="users" class="h-4 w-4" /></template>
+									{{ __("Share with team") }}
+								</Button>
+								<Button variant="subtle" :loading="handingIn" @click="handIn">
+									<template #prefix><FeatherIcon name="thumbs-up" class="h-4 w-4" /></template>
+									{{ __("Hand in for Vote") }}
+								</Button>
+							</template>
 							<Button v-if="!closed" variant="solid" @click="startWriting">
 								<template #prefix><FeatherIcon name="edit-3" class="h-4 w-4" /></template>
 								{{ __("Start writing") }}
@@ -289,6 +301,23 @@ async function handIn() {
 		notify.error(__("Could not hand in the idea"), e?.messages?.[0] || e?.message || "")
 	} finally {
 		handingIn.value = false
+	}
+}
+
+const sharing = ref(false)
+
+async function shareWithTeam() {
+	const question = __("Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.")
+	if (!window.confirm(question)) return
+	sharing.value = true
+	try {
+		await autosave.flush()
+		adopt(await call(`${API}.share_idea_with_team`, { name: idea.value.name }))
+		notify.success(__("Idea shared with your team"))
+	} catch (e) {
+		notify.error(__("Could not share the idea"), e?.messages?.[0] || e?.message || "")
+	} finally {
+		sharing.value = false
 	}
 }
 

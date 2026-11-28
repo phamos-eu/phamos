@@ -48,14 +48,24 @@ def on_team_update(doc, method=None):
 
 def check_channel_member(doc, method=None):
 	"""Raven Channel Member before_insert: only the team's people (and those who see every team)
-	join a team's chat. Raven lets any member add others to a private channel; this keeps the team
+	join a team's chat, and only readers join the chat of an idea shared with a team (#1980). Raven lets any member add others to a private channel; this keeps the team
 	chat to the team (#1978). Bots and other channels are not touched."""
-	linked_doctype, team = frappe.db.get_value("Raven Channel", doc.channel_id, ["linked_doctype", "linked_document"]) or (None, None)
-	if linked_doctype != issue_chat.TEAM_CHAT or not team:
+	linked_doctype, linked_name = frappe.db.get_value("Raven Channel", doc.channel_id, ["linked_doctype", "linked_document"]) or (None, None)
+	if linked_doctype not in (issue_chat.TEAM_CHAT, "Idea") or not linked_name:
 		return
 	user, user_type = frappe.db.get_value("Raven User", doc.user_id, ["user", "type"]) or (None, None)
 	if user_type != "User":
 		return
+	if linked_doctype == "Idea":
+		# an idea shared with a team: only those who may read it join its chat (#1980)
+		if not frappe.db.get_value("Idea", linked_name, "team"):
+			return
+		from phamos.cockpits.permissions import can_read_idea
+
+		if not can_read_idea(linked_name, user):
+			frappe.throw(frappe._("Only the people of the idea's team can join its chat."), frappe.PermissionError)
+		return
+	team = linked_name
 	if teams.sees_all_teams(user) or user in {row["name"] for row in teams.team_users(team)}:
 		return
 	frappe.throw(frappe._("Only the people of team {0} can join its chat.").format(team), frappe.PermissionError)
