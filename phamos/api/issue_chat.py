@@ -713,14 +713,136 @@ def on_record_update(doc, method=None):
 	try:
 		if before.status in closing and doc.status not in closing and channel.is_archived:
 			_set_archived(channel.name, False)
-		_post_system_message(
-			channel.name,
-			_("{0} set the status to {1}.").format(_display_name(frappe.session.user), _(doc.status)),
-		)
+		if doc.doctype != "Issue":
+			# an Issue's new card says it (post_card_on_change, #2234)
+			_post_system_message(
+				channel.name,
+				_("{0} set the status to {1}.").format(_display_name(frappe.session.user), _(doc.status)),
+			)
 		if doc.status in closing and not channel.is_archived:
 			_set_archived(channel.name, True)
 	except Exception:
 		frappe.log_error(title=f"Record chat: could not follow the status of {doc.doctype} {doc.name}")
+
+
+def post_card_on_change(doc, method=None):
+	"""Issue on_update: when a field shown on the chat's card changes, a new card is posted with what
+	changed, so the chat shows the Issue's current state where people read (#2234). Runs before
+	on_record_update archives a closed chat. Never blocks the save. The text is written in the language of
+	whoever saved the Issue, like the grey status lines it replaces."""
+	from phamos.setup.issue_chat_card import PREVIEW_FIELDS
+
+	before = doc.get_doc_before_save()
+	if not before or not is_enabled():
+		return
+	changes = [f for f in PREVIEW_FIELDS if doc.meta.has_field(f) and (before.get(f) or None) != (doc.get(f) or None)]
+	if not changes:
+		return
+	channel = find_channel(doc.doctype, doc.name)
+	if not channel:
+		return
+	try:
+		# members only matter when a customer's record is named: status or priority saves stay cheap
+		readers = _chat_readers(channel.name) if set(changes) & set(PRIVATE_LINKS) else ()
+		rows = "".join(
+			"<li>{0}: {1} → {2}</li>".format(
+				escape_html(_(doc.meta.get_label(f))),
+				_card_value_html(doc, f, before.get(f), readers),
+				_card_value_html(doc, f, doc.get(f), readers),
+			)
+			for f in changes
+		)
+		who = escape_html(_("{0} changed:").format(_display_name(frappe.session.user)))
+		message = frappe.get_doc(
+			{
+				"doctype": "Raven Message",
+				"channel_id": channel.name,
+				"message_type": "Text",
+				"text": f"<p>{who}</p><ul>{rows}</ul>",
+				"link_doctype": doc.doctype,
+				"link_document": doc.name,
+			}
+		).insert(ignore_permissions=True)
+		bot_user = _agent_bot_user(frappe.session.user)
+		if bot_user:
+			# an AI agent changed it: its bot is the sender Raven can show (#2111)
+			frappe.db.set_value("Raven Message", message.name, "owner", bot_user, update_modified=False)
+	except Exception:
+		frappe.log_error(title=f"Record chat: could not post the new card of {doc.doctype} {doc.name}")
+
+
+# The colours of Raven's own card badges (DocumentLinkRenderer: SELECT_VALUE_THEMES, PRIORITY_BADGES), so a
+# status or priority in the change line looks like the pill on the card. Raven keeps inline styles and drops
+# classes; its CSS variables switch for dark mode, the hex values are the fallback.
+PILL_THEMES = {
+	"Open": "blue", "In Progress": "blue", "Pending": "amber", "On Hold": "amber", "Closed": "gray",
+	"Completed": "green", "Cancelled": "red", "Urgent": "red", "High": "red", "Medium": "amber", "Low": "gray",
+}
+PILL_FALLBACK = {
+	"gray": ("#f3f3f3", "#525252"), "blue": ("#dbeafe", "#1e40af"), "green": ("#dcfce7", "#166534"),
+	"amber": ("#fef3c7", "#92400e"), "red": ("#fee2e2", "#991b1b"),
+}
+PILL_FIELDS = ("status", "priority")
+# card links that name a customer's records; master data (priority, issue type) is never hidden
+PRIVATE_LINKS = ("customer", "custom_implementation", "project")
+
+
+def _pill(text, value):
+	theme = PILL_THEMES.get(value, "gray")
+	background, ink = PILL_FALLBACK[theme]
+	ink_step = 6 if theme == "gray" else 8
+	style = (
+		f"display:inline-block;padding:0 8px;border-radius:9999px;font-size:12px;font-weight:500;"
+		f"background-color:var(--surface-{theme}-2, {background});color:var(--ink-{theme}-{ink_step}, {ink})"
+	)
+	return f'<span style="{style}">{escape_html(text)}</span>'
+
+
+def _chat_readers(channel_id):
+	"""The people in the chat: human members (Raven users of type User), not AI agents' users."""
+	members = frappe.get_all("Raven Channel Member", filters={"channel_id": channel_id}, pluck="user_id")
+	users = set(frappe.get_all("Raven User", filters={"name": ("in", members or [""]), "type": "User", "enabled": 1,
+		"user": ("is", "set")}, pluck="user"))
+	if frappe.db.exists("DocType", "AI Agent"):
+		users -= set(frappe.get_all("AI Agent", filters={"user": ("is", "set")}, pluck="user"))
+	return users
+
+
+def _card_value_html(doc, fieldname, value, readers=()):
+	"""A changed value for the card's message: status and priority as the card's pills, others in bold. A linked
+	record only by name when everyone in the chat may read it (AI review on !1401; #2230 decision 1). Checked
+	when the message is posted: someone who joins later sees it as it was written; Raven's card below the
+	message checks each viewer's permissions itself."""
+	field = doc.meta.get_field(fieldname)
+	if value and fieldname in PRIVATE_LINKS and (not readers or not all(
+		frappe.has_permission(field.options, "read", doc=value, user=user) for user in readers
+	)):
+		# nobody known in the chat: hidden too (fail closed, AI review on !1401)
+		return escape_html(_("(hidden)"))
+	text = _card_value(doc, fieldname, value)
+	if value and fieldname in PILL_FIELDS:
+		return _pill(text, value)
+	return f"<strong>{escape_html(text)}</strong>" if value else escape_html(text)
+
+
+def _card_value(doc, fieldname, value):
+	"""A field's value as people read it: a link's title (customer name, project name), "–" when empty."""
+	if not value:
+		return "–"
+	field = doc.meta.get_field(fieldname)
+	if field.fieldtype == "Link" and field.options:
+		title_field = frappe.get_meta(field.options).get_title_field()
+		if title_field and title_field != "name":
+			return frappe.db.get_value(field.options, value, title_field) or value
+	if field.fieldtype == "Select":
+		return _(value)
+	return value
+
+
+def _agent_bot_user(user):
+	"""The Raven user of the bot of the AI agent that works as `user`, if any."""
+	bot = frappe.db.get_value("AI Agent", {"user": user}, "raven_bot") if frappe.db.exists("DocType", "AI Agent") else None
+	return frappe.db.get_value("Raven Bot", bot, "raven_user") if bot else None
 
 
 def on_task_insert(doc, method=None):

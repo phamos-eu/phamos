@@ -3074,6 +3074,7 @@ Ophice is the start page after login,Ophice ist die Startseite nach der Anmeldun
 Zoom out,Verkleinern
 Zoom in,Vergrößern
 Show the whole grid,Ganzes Raster zeigen
+Show the whole image,Ganzes Bild zeigen
 {0} × {1} tiles,{0} × {1} Kacheln
 Drag to resize (Alt: without snapping),Ziehen zum Ändern der Größe (Alt: ohne Einrasten)
 "Drag the image on the map to move it, a corner to resize it (half tiles; Alt: free). Arrow keys: 1 px, with Shift half a tile.","Bild auf der Karte ziehen zum Verschieben, an einer Ecke zum Ändern der Größe (halbe Kacheln; Alt: frei). Pfeiltasten: 1 px, mit Umschalt eine halbe Kachel."
@@ -3178,6 +3179,21 @@ to close,zum Schließen
 Width of the chat (arrow keys),Breite des Chats (Pfeiltasten)
 "Drag to make the chat wider or narrower, or use the arrow keys","Ziehen, um den Chat breiter oder schmaler zu machen, oder die Pfeiltasten nutzen"
 Video quality: {0}. Click for {1}.,Videoqualität: {0}. Klicken für {1}.
+Unknown shape.,Unbekannte Form.
+A polygon needs its corner points.,Ein Vieleck braucht seine Eckpunkte.
+A corner point is not a number.,Ein Eckpunkt ist keine Zahl.
+A polygon needs at least 3 corners.,Ein Vieleck braucht mindestens 3 Ecken.
+A polygon can have at most {0} corners.,Ein Vieleck kann höchstens {0} Ecken haben.
+The polygon is too small.,Das Vieleck ist zu klein.
+The edges of the polygon cross each other.,Die Kanten des Vielecks kreuzen sich.
+Shape,Form
+Rectangle,Rechteck
+Ellipse,Ellipse
+Polygon,Vieleck
+"On the map: drag a corner to move it, click an edge to add a corner, double-click a corner to remove it.","Auf der Karte: Ecke ziehen, um sie zu verschieben, auf eine Kante klicken, um eine Ecke hinzuzufügen, Ecke doppelklicken, um sie zu entfernen."
+Click to set corners · click the first corner or press Enter to close · Backspace: last corner back · Esc: cancel,Klicken setzt Ecken · erste Ecke anklicken oder Enter schließt · Rücktaste: letzte Ecke zurück · Esc: abbrechen
+"Drag on the map to draw an area, or click corner by corner for a polygon; click an area to edit it. Everyone sees the changes.","Auf der Karte ziehen, um einen Bereich zu zeichnen, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten. Alle sehen die Änderungen."
+"Drag on the grid to mark a meeting area, or click corner by corner for a polygon; click an area to edit it","Auf dem Raster ziehen, um einen Besprechungsbereich zu markieren, oder Ecke für Ecke klicken für ein Vieleck; auf einen Bereich klicken, um ihn zu bearbeiten"
 Allow chat notifications,Chat-Benachrichtigungen erlauben
 Chat notifications on,Chat-Benachrichtigungen an
 Chat sound on,Chat-Ton an
@@ -3522,6 +3538,7 @@ Last merge request sync; the next one fetches what changed since then (#1977).,"
 "A GitLab merge request, synced every 2 hours and by webhook (#1977).","Ein GitLab Merge Request, alle 2 Stunden und per Webhook synchronisiert (#1977)."
 Added,Hinzugefügt
 Merged,Gemergt
+{0} changed:,{0} hat geändert:
 {0} of {1} checked in · updated {2},{0} von {1} eingecheckt · aktualisiert {2}
 Loading team mates…,Teammitglieder werden geladen…
 Nobody is in this team today.,Heute ist niemand in diesem Team.
@@ -3545,6 +3562,7 @@ Open the team chat in Raven,Teamchat in Raven öffnen
 Everyone in the team is in this chat.,Alle im Team sind in diesem Chat.
 Team chat of {0},Teamchat von {0}
 Only the people of team {0} can join its chat.,Nur die Personen des Teams {0} können seinem Chat beitreten.
+(hidden),(verborgen)
 {0} absent (half day),{0} abwesend (halber Tag)
 {0} absent,{0} abwesend
 "The team's appointments, leave and public holidays","Termine, Abwesenheiten und Feiertage des Teams"

@@ -301,6 +301,7 @@ import { canFloat } from "../utils/pip.js"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { cornerBox, dropZone, isOverCorner } from "../utils/miniMapCorner.js"
+import { pointsOf, shapeOf } from "../utils/ophiceShapes.js"
 
 const props = defineProps({
 	cols: { type: Number, required: true },
@@ -477,7 +478,18 @@ function areaStyle(area) {
 		height: `${area.height * t}px`,
 		border: `1.5px solid hsl(${h} 70% 45%)`,
 		background: `hsl(${h} 70% 45% / 0.25)`,
+		...shapeStyle(area, h),
 	}
+}
+
+// Shapes (#2144) on the small map: an ellipse is rounded, a polygon cut out of its box (no edge
+// line there, so a little more fill).
+function shapeStyle(area, h) {
+	const shape = shapeOf(area)
+	if (shape === "Ellipse") return { borderRadius: "50%" }
+	if (shape !== "Polygon" || !area.width || !area.height) return {}
+	const corners = pointsOf(area).map(([x, y]) => `${((x - area.x) / area.width) * 100}% ${((y - area.y) / area.height) * 100}%`)
+	return { border: "none", background: `hsl(${h} 70% 45% / 0.4)`, clipPath: `polygon(${corners.join(", ")})` }
 }
 
 function chipStyle(chip, color) {

@@ -15,6 +15,8 @@
   "y",
   "width",
   "height",
+  "shape",
+  "points",
   "section_jitsi",
   "jitsi_domain",
   "jitsi_room",
@@ -94,6 +96,21 @@
    "description": "In tiles (half steps)."
   },
   {
+   "default": "Rectangle",
+   "fieldname": "shape",
+   "fieldtype": "Select",
+   "label": "Shape",
+   "options": "Rectangle\nEllipse\nPolygon",
+   "description": "An ellipse fills X, Y, Width and Height; a polygon's box is computed from its points (#2144)."
+  },
+  {
+   "depends_on": "eval:doc.shape=='Polygon'",
+   "fieldname": "points",
+   "fieldtype": "JSON",
+   "label": "Points",
+   "description": "Corner points of a polygon, in tiles (half steps): [[x, y], ...]."
+  },
+  {
    "fieldname": "section_jitsi",
    "fieldtype": "Section Break",
    "label": "Jitsi",
@@ -138,7 +155,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 21:30:00.000000",
+ "modified": "2026-11-25 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ophice",
  "name": "Ophice Area",
