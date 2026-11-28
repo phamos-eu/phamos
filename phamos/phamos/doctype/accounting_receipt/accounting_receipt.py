@@ -386,7 +386,9 @@ def send_to_datev(accounting_receipt_name, recipient=None):
 	test_send = _is_test_recipient(recipient, configured)
 	if test_send:
 		recipient = recipient.strip()
-		if not validate_email_address(recipient):
+		# Exactly one address: validate_email_address keeps the valid parts of a comma list and
+		# drops the rest, so anything but the unchanged input means a list or a partly bad entry
+		if validate_email_address(recipient) != recipient:
 			return {"ok": False, "message": _("{0} is not a valid email address.").format(recipient)}
 	else:
 		recipient = configured

@@ -236,3 +236,9 @@ class TestDatevTestSend(FrappeTestCase):
 		result, sendmail = self.send("not-an-address")
 		self.assertFalse(result["ok"])
 		sendmail.assert_not_called()
+
+	def test_only_one_address_is_accepted(self):
+		for recipient in ("tester@phamos.test, other@phamos.test", "tester@phamos.test,not-an-address"):
+			result, sendmail = self.send(recipient)
+			self.assertFalse(result["ok"], recipient)
+			sendmail.assert_not_called()
