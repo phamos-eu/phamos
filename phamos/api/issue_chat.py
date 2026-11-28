@@ -741,9 +741,12 @@ def post_card_on_change(doc, method=None):
 	if not channel:
 		return
 	try:
+		readers = _chat_readers(channel.name)
 		rows = "".join(
 			"<li>{0}: {1} → {2}</li>".format(
-				escape_html(_(doc.meta.get_label(f))), _card_value_html(doc, f, before.get(f)), _card_value_html(doc, f, doc.get(f))
+				escape_html(_(doc.meta.get_label(f))),
+				_card_value_html(doc, f, before.get(f), readers),
+				_card_value_html(doc, f, doc.get(f), readers),
 			)
 			for f in changes
 		)
@@ -778,6 +781,8 @@ PILL_FALLBACK = {
 	"amber": ("#fef3c7", "#92400e"), "red": ("#fee2e2", "#991b1b"),
 }
 PILL_FIELDS = ("status", "priority")
+# links that name a customer's records; master data (priority, issue type) is never hidden
+PRIVATE_LINKS = ("customer", "custom_implementation", "project", "contact")
 
 
 def _pill(text, value):
@@ -791,8 +796,24 @@ def _pill(text, value):
 	return f'<span style="{style}">{escape_html(text)}</span>'
 
 
-def _card_value_html(doc, fieldname, value):
-	"""A changed value for the card's message: status and priority as the card's pills, others in bold."""
+def _chat_readers(channel_id):
+	"""The people in the chat: human members (Raven users of type User), not AI agents' users."""
+	members = frappe.get_all("Raven Channel Member", filters={"channel_id": channel_id}, pluck="user_id")
+	users = set(frappe.get_all("Raven User", filters={"name": ("in", members or [""]), "type": "User", "enabled": 1,
+		"user": ("is", "set")}, pluck="user"))
+	if frappe.db.exists("DocType", "AI Agent"):
+		users -= set(frappe.get_all("AI Agent", filters={"user": ("is", "set")}, pluck="user"))
+	return users
+
+
+def _card_value_html(doc, fieldname, value, readers=()):
+	"""A changed value for the card's message: status and priority as the card's pills, others in bold. A linked
+	record only by name when everyone in the chat may read it (AI review on !1401; #2230 decision 1)."""
+	field = doc.meta.get_field(fieldname)
+	if value and fieldname in PRIVATE_LINKS and readers and not all(
+		frappe.has_permission(field.options, "read", doc=value, user=user) for user in readers
+	):
+		return escape_html(_("(hidden)"))
 	text = _card_value(doc, fieldname, value)
 	if value and fieldname in PILL_FIELDS:
 		return _pill(text, value)

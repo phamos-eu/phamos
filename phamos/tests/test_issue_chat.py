@@ -480,6 +480,21 @@ class TestIssueChat(FrappeTestCase):
 		self.assertIn(f">{priority}</span>", cards[-1])
 		self.assertIn(frappe._("Priority"), cards[-1])
 
+	def test_card_hides_a_linked_record_someone_in_the_chat_cannot_read(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		customer = frappe.db.get_value("Customer", {"disabled": 0}, "name")
+		if not customer:
+			self.skipTest("No Customer")
+		# OUTSIDER-like member: a Raven user without read on Customer
+		frappe.get_doc({"doctype": "Raven Channel Member", "channel_id": channel_id, "user_id": NO_READER}).insert(
+			ignore_permissions=True)
+		self.issue.reload()
+		self.issue.customer = customer
+		self.issue.save()
+		card = _card_lines(channel_id)[-1]
+		self.assertIn(frappe._("(hidden)"), card)
+		self.assertNotIn(frappe.db.get_value("Customer", customer, "customer_name"), card)
+
 	def test_other_changes_post_no_card(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
 		before = len(_card_lines(channel_id))
