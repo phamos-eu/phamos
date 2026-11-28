@@ -888,6 +888,11 @@ class TestChat(IssueAssistantTestCase):
 		self.answer(doc, self.reply_in_thread(brief, "set the project"))
 		self.assertFalse(frappe.db.get_value("Issue", doc.name, "project"))
 
+	def test_system_prompt_forbids_promising_what_it_cannot_do(self):
+		# local test 2026-11-28: asked for an e-mail, it answered "I will prepare the email now"
+		self.assertIn("cannot send or draft e-mails", self.chat.CHAT_SYSTEM)
+		self.assertIn("Never say you will do something", self.chat.CHAT_SYSTEM)
+
 	def test_prompt_has_the_thread_and_no_other_issue(self):
 		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)  # the model may be used
 		self.issue(raised_by=WEBSITE_USER, subject="Another customer's secret Issue")
