@@ -281,6 +281,20 @@ class OphiceEncounterTestCase(FrappeTestCase):
 		self._put(self.B, 8, 5)
 		self.assertTrue(self._open(self.A, self.B)["encounter"])
 
+	def test_no_encounter_unless_both_are_available(self):
+		"""Away or be right back (#2168): nobody starts a chat or call with me, nor I with anyone."""
+		for kind, until in (("away", (ophice.datetime.now(ophice.timezone.utc) + ophice.timedelta(hours=1)).isoformat()), ("brb", "")):
+			frappe.set_user(self.B)
+			ophice.set_status(kind, "", until)
+			with self.assertRaisesRegex(frappe.ValidationError, "^Not available right now.$"):
+				self._open(self.A, self.B)
+			with self.assertRaisesRegex(frappe.ValidationError, "^Set yourself to Available first.$"):
+				self._open(self.B, self.A)
+			self.assertFalse(frappe.db.exists("Ophice Encounter", {"pair_key": ophice._pair_key(self.A, self.B)}))
+			frappe.set_user(self.B)
+			ophice.set_status("")
+		self.assertTrue(self._open(self.A, self.B)["encounter"])
+
 	def test_both_pages_opening_at_once_get_the_same_encounter(self):
 		"""The page that loses the race to insert takes the winner's encounter (Pair Key unique)."""
 		first = self._open(self.A, self.B)

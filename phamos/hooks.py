@@ -685,6 +685,7 @@ override_doctype_dashboards = {
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
     "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
     "Opportunity": "phamos.custom_scripts.custom_python.opportunity_dashboard.get_opportunity_dashboard_data",
+    "Lead": "phamos.custom_scripts.custom_python.lead_dashboard.get_lead_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
