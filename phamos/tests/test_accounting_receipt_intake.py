@@ -238,7 +238,19 @@ class TestDatevTestSend(FrappeTestCase):
 		sendmail.assert_not_called()
 
 	def test_only_one_address_is_accepted(self):
-		for recipient in ("tester@phamos.test, other@phamos.test", "tester@phamos.test,not-an-address"):
+		for recipient in (
+			"tester@phamos.test, other@phamos.test",
+			"tester@phamos.test,not-an-address",
+			"tester@phamos.test\nother@phamos.test",
+			"tester@phamos.test;other@phamos.test",
+		):
 			result, sendmail = self.send(recipient)
 			self.assertFalse(result["ok"], recipient)
 			sendmail.assert_not_called()
+
+	def test_single_address_keeps_its_case(self):
+		# The check compares Frappe's cleaned address with the input, so a mixed-case address
+		# must come back unchanged and pass.
+		result, sendmail = self.send("Tester@Phamos.test", configured=None)
+		self.assertTrue(result["ok"])
+		sendmail.assert_called_once()
