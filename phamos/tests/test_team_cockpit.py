@@ -135,6 +135,30 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"get_hours_statistics",
 			"get_team_implementations",
 			"get_gitlab_statistics",
+			# team mates and team chat (#1978)
+			"get_team_mates",
+			"get_team_chat",
+			"ensure_team_chat",
+			# appointments with leave and holidays (#1979)
+			"get_team_appointments",
+			"get_appointment_options",
+			"save_appointment",
+			"delete_appointment",
+			"get_team_absences",
+			# team ideas (#1980)
+			"get_team_ideas",
+			"get_idea_for_vote",
+			"vote_idea",
+			"create_team_idea",
+			"get_idea_chat",
+			"ensure_idea_chat",
+			# successes (#1981)
+			"get_team_successes",
+			"get_success_options",
+			"give_kudos",
+			"add_customer_praise",
+			# needs attention (#2235)
+			"get_team_attention",
 		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 

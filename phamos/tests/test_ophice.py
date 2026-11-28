@@ -4,6 +4,7 @@
 """Ophice slice 1 (#2054): my own chip's remembered position and the dummy chips."""
 
 import json
+import re
 from unittest import skipUnless
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import ophice
+from phamos.api import ophice_shapes as shapes
 
 
 
@@ -571,7 +573,12 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				ophice.set_background_layout(0, 1, 1, 30)  # no background yet
 			ophice._store_background(self._png(), "map.png")
-			self.assertEqual(ophice.get_space()["background_layout"], {"fit": True, "left": 0, "top": 0, "width": cols, "zoom": 1.0})
+			# A new image covers the grid, centred (#2139: the grid lies on it as large as fits).
+			left, top, width = ophice._cover_box(1.0, cols, rows)
+			self.assertEqual(
+				ophice.get_space()["background_layout"],
+				{"fit": True, "left": round(left, 3), "top": round(top, 3), "width": round(width, 3), "zoom": 1.0},
+			)
 			ratio = ophice.get_space()["background_ratio"]
 			self.assertGreater(ratio, 0)
 			layout = ophice.set_background_layout(0, -999, 3.25, 999, 9)
@@ -585,10 +592,55 @@ class OphiceBackgroundTestCase(FrappeTestCase):
 			ophice._store_background(self._png(), "map.png")
 		cols, rows = ophice._grid()
 		value = ophice._background()
+		value.pop("grid")  # stored before #2139
 		value["layout"] = {"fit": False, "scale": 50, "x": 100, "y": 0}
 		layout = ophice._background_layout(value)
 		# Half the grid wide, flush right, at the top.
 		self.assertEqual((layout["width"], layout["left"], layout["top"]), (cols / 2, cols / 2, 0))
+
+
+	def _grid_40_by_25(self):
+		frappe.db.set_default(ophice.GRID_KEY, json.dumps({"cols": 40, "rows": 25}))
+
+	def test_squares_keep_their_size_on_the_image_when_the_grid_changes(self):
+		"""#2139: the image stays put and so do the squares; more squares make the grid bigger."""
+		self._grid_40_by_25()
+		with (
+			patch.object(ophice.frappe, "publish_realtime"),
+			patch.object(ophice, "_require_map_editor"),
+			patch.object(ophice, "_areas", return_value=[]),  # the site's own areas must not block shrinking
+		):
+			ophice._store_background(self._png(), "map.png")
+			ophice.set_background_layout(0, 2, 1, 30, 1.5)
+			stored = ophice._background()["grid"]
+			self.assertEqual(ophice.set_grid(60, 5), {"cols": 60, "rows": 5})  # 5 is the smallest
+			self.assertEqual(ophice._background()["grid"], stored)
+			layout = ophice.get_space()["background_layout"]
+			self.assertEqual((layout["left"], layout["top"], layout["width"], layout["zoom"]), (2.0, 1.0, 30.0, 1.5))
+			self.assertEqual(ophice.set_grid(1, 1), {"cols": 5, "rows": 5})
+
+	def test_patch_converts_the_old_layout_once_and_the_map_looks_the_same(self):
+		from phamos.patches.v1_0 import ophice_grid_on_background
+
+		self._grid_40_by_25()
+		with patch.object(ophice.frappe, "publish_realtime"):
+			ophice._store_background(self._png(), "map.png")
+		value = ophice._background()
+		value.pop("grid"), value.pop("zoom")
+		value["layout"] = {"fit": False, "left": -4, "top": 2.5, "width": 50, "zoom": 1.2}
+		frappe.db.set_default(ophice.BACKGROUND_KEY, json.dumps(value))
+		before = ophice._background_layout(ophice._background())
+		ophice_grid_on_background.execute()
+		converted = ophice._background()
+		self.assertEqual(converted["layout"]["width"], 50)  # the old value is kept
+		after = ophice._background_layout(converted)
+		self.assertEqual((after["left"], after["top"], after["width"]), (-4.0, 2.5, 50.0))
+		self.assertEqual(after, before)
+		# Old zoom 1.2 counted from the 40 x 25 grid (40 px squares in 1600 x 1000); the 50 x 50
+		# image fits with 20 px squares, so the same view is zoom 2.4.
+		self.assertEqual(after["zoom"], 2.4)
+		ophice_grid_on_background.execute()
+		self.assertEqual(ophice._background(), converted)
 
 
 class OphiceAreaTestCase(FrappeTestCase):
@@ -607,6 +659,41 @@ class OphiceAreaTestCase(FrappeTestCase):
 		self.publish.stop()
 		self.conf.stop()
 		frappe.db.rollback()
+
+	def test_shapes_polygon_and_ellipse_are_saved_and_overlap_by_shape(self):
+		"""#2144: a polygon's box comes from its corners; areas only clash where the shapes meet."""
+		frappe.db.delete("Ophice Area")  # room on the map; the site's areas come back with the rollback
+		url = "https://jitsi.example.org/Shapes"
+		# An L: 0..4 x 0..4 without its top right quarter 2..4 x 0..2.
+		corners = [[0, 0], [2, 0], [2, 2], [4, 2], [4, 4], [0, 4]]
+		name = ophice.save_area("L", url, shape="Polygon", points=json.dumps(corners))
+		area = next(a for a in ophice.get_space()["areas"] if a.name == name)
+		self.assertEqual((area.shape, area.points), ("Polygon", corners))
+		self.assertEqual((area.x, area.y, area.width, area.height), (0, 0, 4, 4))
+		# In the L's empty quarter: no clash, though the boxes overlap.
+		ophice.save_area("Notch", url + "2", 2.5, 0, 1.5, 1.5, shape="Ellipse")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Clash", url + "3", 0.5, 0.5, 1, 1)
+		# Inside by shape: the L's corner square counts, the notch does not.
+		self.assertTrue(shapes.contains(area, 1, 3))
+		self.assertFalse(shapes.contains(area, 3, 1))
+		self.assertTrue(shapes.contains(area, 3, 1.6, ophice.AREA_SLACK))  # just above its edge
+
+	def test_polygon_points_are_checked(self):
+		cols, rows = 40, 25
+		self.assertEqual(shapes.clean_points("[[0.2,0],[3.9,0],[3.9,3.1]]", cols, rows), [[0, 0], [4, 0], [4, 3]])
+		self.assertEqual(shapes.clean_points([[-5, 0], [99, 0], [99, 99]], cols, rows), [[0, 0], [40, 0], [40, 25]])
+		for bad in ("nonsense", [[0, 0], [1, 1]], [[0, 0], [0, 0], [0, 0], [0, 0]], [[0, 0], [4, 4], [4, 0], [0, 4]], [[0, "x"], [1, 1], [2, 0]]):
+			with self.assertRaises(frappe.ValidationError):
+				shapes.clean_points(bad, cols, rows)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.save_area("Odd", "https://jitsi.example.org/Odd", shape="Hexagon")
+
+	def test_a_guest_is_kept_inside_an_ellipse(self):
+		ellipse = {"x": 0, "y": 0, "width": 4, "height": 2, "shape": "Ellipse"}
+		x, y = shapes.nearest_inside(ellipse, 10, 1)
+		self.assertTrue(shapes.contains(ellipse, x, y))
+		self.assertAlmostEqual(y, 1, places=3)
 
 	def test_save_reads_the_room_from_the_url_and_shows_in_the_space(self):
 		name = ophice.save_area("Standup", " https://meet.systemli.org/FullTimeDefencesRejectOverly ", 2, 3, 4, 2)
@@ -669,6 +756,23 @@ class OphiceAreaTestCase(FrappeTestCase):
 			ophice.save_area("Clash", "https://meet.jit.si/ClashRoom", 37, 23, 2, 2)
 		# moving an area onto itself is fine
 		ophice.save_area("Corner", "https://meet.jit.si/CornerRoom", 38, 23, 2, 2, name=name)
+
+	def test_new_space_gets_a_ready_meeting_url(self):
+		# #2094: a random room on the site's Jitsi server, which saving accepts as it is.
+		url = ophice.new_meeting_url()
+		# Whatever the site's default server is (#2108 moved it off meet.jit.si).
+		domain = re.escape(ophice._jitsi_domain())
+		self.assertRegex(url, rf"^https://{domain}/ophice-[a-z0-9]{{24}}$")
+		self.assertNotEqual(url, ophice.new_meeting_url())
+		name = ophice.save_area("Ready", url, 1, 1, 2, 2)
+		self.assertEqual(frappe.db.get_value("Ophice Area", name, "meeting_url"), url)
+		with patch.dict(frappe.conf, {"ophice_jitsi_domain": "Jitsi.Example.org/"}):
+			self.assertTrue(ophice.new_meeting_url().startswith("https://jitsi.example.org/ophice-"))
+
+	def test_ready_meeting_url_only_for_map_editors(self):
+		with patch.object(ophice, "can_edit_map", return_value=False):
+			with self.assertRaises(frappe.PermissionError):
+				ophice.new_meeting_url()
 
 	def test_delete(self):
 		name = ophice.save_area("Gone", "https://meet.jit.si/GoneRoom", 1, 1, 1, 1)
@@ -1817,3 +1921,89 @@ class OphiceInstantTestCase(FrappeTestCase):
 			value = ophice._as_instant("2026-11-22 10:00:00")
 		self.assertEqual(datetime.fromisoformat(value), datetime(2026, 11, 22, 9, 0, tzinfo=ZoneInfo("UTC")))
 		self.assertEqual(ophice._as_instant(None), "")
+
+
+class OphiceFlagTestCase(FrappeTestCase):
+	"""My flag (#2130): plant, move, dress, take down; not in an area, not on another flag."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.delete("DefaultValue", {"defkey": ophice.FLAG_KEY})
+		frappe.db.delete(ophice.AREA_DOCTYPE)
+		self.other = "flag-tester@example.com"
+		if not frappe.db.exists("User", self.other):
+			frappe.get_doc(
+				{"doctype": "User", "email": self.other, "first_name": "Flag", "user_type": "System User", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		# A desk role makes a System User (Ophice is for them only).
+		frappe.get_doc("User", self.other).add_roles("Projects User")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _area(self, x, y, width, height):
+		frappe.get_doc(
+			{"doctype": ophice.AREA_DOCTYPE, "title": "Flag test area", "x": x, "y": y, "width": width, "height": height}
+		).insert(ignore_permissions=True)
+
+	def test_plant_move_dress_take_down(self):
+		flag = ophice.set_my_flag(2, 3)
+		self.assertEqual((flag["x"], flag["y"], flag["pattern"]), (2, 3, "plain"))
+		self.assertEqual(flag["color"], ophice._default_flag_color("Administrator"))
+		ophice.set_my_flag(4.7, "5")
+		ophice.set_my_flag(color="teal", pattern="waves")
+		mine = [f for f in ophice.get_space()["flags"] if f["user"] == "Administrator"]
+		self.assertEqual([(f["x"], f["y"], f["color"], f["pattern"]) for f in mine], [(4, 5, "teal", "waves")])
+		ophice.take_down_my_flag()
+		self.assertEqual([f for f in ophice._flags() if f["user"] == "Administrator"], [])
+		# Taken down, it keeps its look; planted again, it comes back in it.
+		self.assertEqual(ophice.get_space()["flag_look"], {"color": "teal", "pattern": "waves"})
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(color="red")
+		self.assertEqual(ophice.set_my_flag(1, 1)["color"], "teal")
+
+	def test_not_inside_an_area(self):
+		self._area(1, 1, 3, 2)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(3, 2)
+		# Just outside the area's right edge is fine.
+		self.assertEqual(ophice.set_my_flag(4, 2)["x"], 4)
+
+	def test_not_on_another_flag(self):
+		frappe.set_user(self.other)
+		ophice.set_my_flag(6, 6)
+		frappe.set_user("Administrator")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(6, 6)
+		# Back onto my own cell is fine.
+		ophice.set_my_flag(7, 6)
+		ophice.set_my_flag(7, 6)
+
+	def test_refuses_bad_input(self):
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(color="teal")  # not planted yet
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(-1, 0)
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(0, 0, color="gold")
+		with self.assertRaises(frappe.ValidationError):
+			ophice.set_my_flag(0, 0, pattern="tartan")
+		# Not a number int() can hold: the same friendly error, not a 500.
+		for bad in ("inf", "1e999", "nan", "abc"):
+			with self.assertRaises(frappe.ValidationError):
+				ophice.set_my_flag(bad, 0)
+
+	def test_disabled_users_flags_are_gone(self):
+		frappe.set_user(self.other)
+		ophice.set_my_flag(8, 8)
+		frappe.set_user("Administrator")
+		frappe.db.set_value("User", self.other, "enabled", 0)
+		self.assertNotIn(self.other, [f["user"] for f in ophice._flags()])
+
+	def test_guest_is_refused(self):
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.PermissionError):
+			ophice.set_my_flag(1, 1)
+		with self.assertRaises(frappe.PermissionError):
+			ophice.take_down_my_flag()

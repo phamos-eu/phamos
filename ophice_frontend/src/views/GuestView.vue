@@ -135,10 +135,28 @@
 						<div
 							v-for="area in space.areas"
 							:key="`frame-${area.name}`"
-							class="absolute rounded-md border-2 border-white/90 shadow-[0_0_14px_rgba(255,255,255,0.7)]"
+							class="absolute"
+							:class="
+								shapeOf(area) === 'Polygon'
+									? ''
+									: [
+											'border-2 border-white/90 shadow-[0_0_14px_rgba(255,255,255,0.7)]',
+											shapeOf(area) === 'Ellipse' ? 'rounded-full' : 'rounded-md',
+										]
+							"
 							:style="rectStyle(area)"
 							data-testid="guest-area"
 						>
+							<!-- A polygon (#2144): its outline as SVG. -->
+							<svg
+								v-if="shapeOf(area) === 'Polygon'"
+								class="absolute inset-0 h-full w-full overflow-visible"
+								:viewBox="`0 0 ${area.width} ${area.height}`"
+								preserveAspectRatio="none"
+								aria-hidden="true"
+							>
+								<polygon :points="svgPoints(area)" class="guest-area-outline" vector-effect="non-scaling-stroke" />
+							</svg>
 							<span class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
 								{{ area.title }}
 							</span>
@@ -211,6 +229,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { imagePlacement } from "../utils/ophiceView.js"
+import { clipPath, nearestInside, shapeOf, svgPoints } from "../utils/ophiceShapes.js"
 import { Button, call, FeatherIcon, FormControl, toast } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import ChipFigure from "../components/ChipFigure.vue"
@@ -359,6 +378,9 @@ function rectStyle(area) {
 
 function clipOf(area) {
 	const t = tile.value
+	// An ellipse or polygon (#2144) is cut out in its own shape.
+	const shaped = clipPath(area, t)
+	if (shaped) return shaped
 	const right = space.value.cols * t - (area.x + area.width) * t
 	const bottom = space.value.rows * t - (area.y + area.height) * t
 	return `inset(${area.y * t}px ${right}px ${bottom}px ${area.x * t}px round 6px)`
@@ -376,10 +398,7 @@ function chipStyle(chip) {
 function clamp(x, y) {
 	const px = x + 0.5
 	const py = y + 0.5
-	const candidates = (space.value?.areas || []).map((area) => [
-		Math.min(Math.max(px, area.x), area.x + area.width),
-		Math.min(Math.max(py, area.y), area.y + area.height),
-	])
+	const candidates = (space.value?.areas || []).map((area) => nearestInside(area, px, py))
 	// The way to the pin (#2084), while it is open: a band along the line.
 	const corridor = space.value?.invite?.status === "accepted" ? space.value.invite.corridor : null
 	if (corridor) candidates.push(ontoBand(corridor, px, py))
@@ -594,6 +613,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.guest-area-outline {
+	fill: none;
+	stroke: rgba(255, 255, 255, 0.9);
+	stroke-width: 2px;
+	stroke-linejoin: round;
+	filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
+}
 .guest-map__layer {
 	position: absolute;
 	inset: 0;

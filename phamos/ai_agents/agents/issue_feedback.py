@@ -172,6 +172,15 @@ def rates():
 # --- suggestions ---------------------------------------------------------------------------------
 
 
+def suggestion_key(kind, field, *parts):
+	"""Short and stable: e-mails, names and comma-joined users can exceed the 140 characters of
+	`suggestion_key`, so the variable parts are hashed (AI review on !1392)."""
+	import hashlib
+
+	digest = hashlib.sha1("|".join(cstr(p) for p in parts).encode()).hexdigest()[:20]
+	return f"Issue::{kind}::{field}::{digest}"
+
+
 def suggest(doc, run, correction):
 	if correction["group"] == "identify":
 		return suggest_mapping(doc, run, correction)
@@ -198,7 +207,7 @@ def suggest_mapping(doc, run, correction):
 		return None
 	# the value is part of the key: another value is another suggestion, and a dismissed wrong one doesn't
 	# block a right one (AI review on !1392)
-	key = f"Issue::sender::{email}::{field}::{value}"
+	key = suggestion_key("sender", field, email, value)
 	who = frappe.utils.get_fullname(correction.get("user") or frappe.session.user)
 
 	def make():
@@ -224,7 +233,8 @@ def suggest_prompt_rule(doc, run, correction):
 	if not customer:
 		return None
 	field = correction["field"]
-	key = f"Issue::rule::{customer}::{field}::{correction['ai_value'] or ''}->{correction['human_value'] or ''}"
+	key = suggestion_key("rule", field, customer, correction["ai_value"], correction["human_value"])
+	created = not frappe.db.exists("AI Skill", {"suggestion_key": key})
 	customer_name = frappe.db.get_value("Customer", customer, "customer_name") or customer
 	who = frappe.utils.get_fullname(correction.get("user") or frappe.session.user)
 	ai_value, human_value = _display(field, correction["ai_value"]), _display(field, correction["human_value"])
@@ -249,7 +259,7 @@ def suggest_prompt_rule(doc, run, correction):
 		}
 
 	name = feedback.suggestion(key, run, make)
-	if name and frappe.db.get_value("AI Skill", name, "occurrences") == 1:
+	if name and created:  # only a new suggestion; a dismissed one is never reworded again (AI review on !1392)
 		frappe.enqueue(draft_wording, queue="long", timeout=120, skill=name, issue=doc.name, enqueue_after_commit=True)
 	return name
 

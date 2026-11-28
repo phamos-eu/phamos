@@ -21,7 +21,7 @@ from phamos.cockpits.defaults import (
 
 
 # Fields an employee may not set from Desk, with their value on a new idea (#1951).
-DESK_PROTECTED_FIELDS = {"vote_count": 0, "handed_in_on": None, "imported_from": None}
+DESK_PROTECTED_FIELDS = {"vote_count": 0, "handed_in_on": None, "imported_from": None, "team": None}
 
 
 def excerpt(html, length=IDEA_SUMMARY_LENGTH):
@@ -76,6 +76,8 @@ class Idea(Document):
 		else:
 			self.vote_status = ""
 			self.handed_in_on = None
+			# a private idea is shared with nobody (#1980)
+			self.team = None
 
 	def on_update(self):
 		before = self.get_doc_before_save()

@@ -48,12 +48,18 @@ function fakeAudio() {
 			this.state = Audio.startState
 			this.currentTime = 0
 			this.destination = {}
+			this.sampleRate = 8000
 		}
 		resume() {
 			return Promise.reject(new Error("needs a gesture"))
 		}
 		createOscillator() {
-			const osc = { frequency: {}, connect: (g) => g, start: vi.fn(), stop: vi.fn() }
+			const osc = {
+				frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+				connect: (g) => g,
+				start: vi.fn(),
+				stop: vi.fn(),
+			}
 			tones.push(osc)
 			return osc
 		}
@@ -63,8 +69,21 @@ function fakeAudio() {
 				connect: (d) => d,
 			}
 		}
+		createBuffer(channels, length) {
+			const data = new Float32Array(length)
+			return { getChannelData: () => data }
+		}
+		createBufferSource() {
+			const source = { connect: (f) => f, start: vi.fn(), stop: vi.fn() }
+			Audio.noises.push(source)
+			return source
+		}
+		createBiquadFilter() {
+			return { frequency: {}, Q: {}, connect: (g) => g }
+		}
 		close() {}
 	}
+	Audio.noises = []
 	Audio.tones = tones
 	Audio.startState = "running"
 	return Audio
@@ -211,5 +230,28 @@ describe("createEncounterAlert", () => {
 		expect(alert.notify("Anna wants to chat")).toBe(true)
 		expect(doc.title).toBe("👋 Anna wants to chat")
 		alert.stop()
+	})
+})
+
+describe("thump (#2130)", () => {
+	it("plays a falling low tone and a little soil noise", () => {
+		const { alert, Audio } = setup()
+		expect(alert.thump()).toBe(true)
+		expect(Audio.tones).toHaveLength(1)
+		expect(Audio.tones[0].frequency.setValueAtTime).toHaveBeenCalledWith(110, expect.any(Number))
+		expect(Audio.tones[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(55, expect.any(Number))
+		expect(Audio.noises).toHaveLength(1)
+	})
+
+	it("is silent while the bell is muted", () => {
+		const { alert, Audio } = setup()
+		alert.setMuted(true)
+		expect(alert.thump()).toBe(false)
+		expect(Audio.tones).toHaveLength(0)
+	})
+
+	it("needs no sound at all", () => {
+		const alert = createEncounterAlert({ win: { setInterval, clearInterval }, doc: fakeDoc() })
+		expect(alert.thump()).toBe(false)
 	})
 })

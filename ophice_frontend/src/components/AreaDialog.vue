@@ -22,6 +22,31 @@
 						{{ option.label }}
 					</button>
 				</div>
+				<!-- The shape (#2144): a polygon from a rectangle starts with its four corners. -->
+				<div class="flex items-center gap-2 text-sm" role="radiogroup" :aria-label="__('Shape')">
+					<span class="text-ink-gray-6">{{ __("Shape") }}</span>
+					<div class="flex gap-1 rounded-lg bg-surface-gray-2 p-1">
+						<button
+							v-for="option in SHAPE_OPTIONS"
+							:key="option.shape"
+							type="button"
+							role="radio"
+							:aria-checked="shape === option.shape"
+							class="flex items-center gap-1.5 rounded-md px-2 py-1"
+							:class="shape === option.shape ? 'bg-surface-white font-medium text-ink-gray-9 shadow-sm' : 'text-ink-gray-6 hover:text-ink-gray-8'"
+							:data-testid="`area-shape-${option.shape}`"
+							@click="shape = option.shape"
+						>
+							<svg viewBox="0 0 16 16" class="h-4 w-4" aria-hidden="true">
+								<path :d="option.icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+							</svg>
+							{{ option.label }}
+						</button>
+					</div>
+				</div>
+				<p v-if="shape === 'Polygon'" class="text-xs text-ink-gray-5" data-testid="area-shape-hint">
+					{{ __("On the map: drag a corner to move it, click an edge to add a corner, double-click a corner to remove it.") }}
+				</p>
 				<FormControl
 					v-model="title"
 					:label="__('Name')"
@@ -91,6 +116,7 @@
 import { computed, ref, watch } from "vue"
 import { Button, call, Dialog, FeatherIcon, FormControl } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { boxCorners, pointsOf, shapeOf } from "../utils/ophiceShapes.js"
 
 const props = defineProps({
 	/** { name?, title?, meeting_url?, x, y, width, height } or null (closed) */
@@ -120,6 +146,12 @@ const KIND_HINTS = {
 	"Customer meeting": __("A meeting room for guests: employees invite a guest from the guest area to come here."),
 	Cockpit: __("Stopping inside opens this cockpit, for everyone who may open it (each person can switch that off). A meeting is optional."),
 }
+const SHAPE_OPTIONS = [
+	{ shape: "Rectangle", label: __("Rectangle"), icon: "M2.5 3.5h11v9h-11z" },
+	{ shape: "Ellipse", label: __("Ellipse"), icon: "M8 3.5c3 0 5.5 2 5.5 4.5S11 12.5 8 12.5 2.5 10.5 2.5 8 5 3.5 8 3.5z" },
+	{ shape: "Polygon", label: __("Polygon"), icon: "M2.5 3.5h6v4h5v5h-11z" },
+]
+const shape = ref("Rectangle")
 const kind = ref("Meeting")
 const cockpit = ref("")
 const cockpitOptions = ref([])
@@ -139,18 +171,49 @@ const chatMode = ref("Saved")
 const error = ref("")
 const busy = ref("")
 
+// Kinds that need a meeting; a cockpit space's meeting stays optional and empty (#2094).
+const MEETING_KINDS = ["Meeting", "Guest", "Customer meeting"]
+const readyUrl = ref("")
+watch(kind, (value) => {
+	if (!readyUrl.value) return
+	if (MEETING_KINDS.includes(value) && !url.value) url.value = readyUrl.value
+	else if (!MEETING_KINDS.includes(value) && url.value === readyUrl.value) url.value = ""
+})
+// Typed over or cleared on a meeting kind: that is the editor's choice, and switching the kind
+// back and forth must not bring the ready URL back. (Switching to Cockpit empties the field
+// while the kind is already Cockpit, so it does not count as a choice.)
+watch(url, (value) => {
+	if (readyUrl.value && value !== readyUrl.value && MEETING_KINDS.includes(kind.value)) readyUrl.value = ""
+})
+
 watch(
 	() => props.area,
 	(area) => {
 		kind.value = area?.kind || "Meeting"
+		shape.value = shapeOf(area)
 		cockpit.value = area?.cockpit || ""
 		title.value = area?.title || ""
 		url.value = area?.meeting_url || ""
 		chatMode.value = area?.chat_mode || "Saved"
 		error.value = ""
+		readyUrl.value = ""
+		if (area && !area.name) prefillMeetingUrl(area)
 	},
 	{ immediate: true }
 )
+
+/** A new space comes with a ready meeting URL with a random room (#2094); it stays editable. */
+async function prefillMeetingUrl(area) {
+	try {
+		const ready = await call("phamos.api.ophice.new_meeting_url")
+		// Only if the dialog still shows this new space and nobody typed a URL meanwhile.
+		if (props.area !== area) return
+		readyUrl.value = ready || ""
+		if (!url.value && MEETING_KINDS.includes(kind.value)) url.value = readyUrl.value
+	} catch {
+		// No ready URL: the field stays empty, as before.
+	}
+}
 
 async function save() {
 	busy.value = "save"
@@ -163,6 +226,9 @@ async function save() {
 			meeting_url: kind.value === "Start" || kind.value === "Phriend" ? "" : url.value,
 			chat_mode: chatMode.value,
 			cockpit: kind.value === "Cockpit" ? cockpit.value : "",
+			shape: shape.value,
+			// A polygon keeps its corners; a rectangle or ellipse turned into one starts with its box's.
+			points: shape.value === "Polygon" ? (shapeOf(props.area) === "Polygon" ? pointsOf(props.area) : boxCorners(props.area)) : [],
 		})
 		emit("close")
 	} catch (e) {

@@ -96,6 +96,59 @@ export function createEncounterAlert({ win, doc, storage, Notify, Audio } = {}) 
 		}
 	}
 
+	/**
+	 * My flag goes into the ground (#2130): a soft, earthy thump, not aggressive (PM chose
+	 * variant A, 2026-11-27). A falling low tone and a little muffled noise for the soil. Only
+	 * for the one who plants it; the bell's mute silences it too.
+	 */
+	function thump() {
+		if (isMuted()) return false
+		unlock()
+		if (!audio) return false
+		const play = () => {
+			try {
+				const t = audio.currentTime + 0.01
+				const out = audio.createGain()
+				out.gain.value = 0.6
+				out.connect(audio.destination)
+				const osc = audio.createOscillator()
+				osc.type = "sine"
+				osc.frequency.setValueAtTime(110, t)
+				osc.frequency.exponentialRampToValueAtTime(55, t + 0.12)
+				const body = audio.createGain()
+				body.gain.setValueAtTime(0.0001, t)
+				body.gain.exponentialRampToValueAtTime(0.45, t + 0.008)
+				body.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
+				osc.connect(body).connect(out)
+				osc.start(t)
+				osc.stop(t + 0.27)
+				const length = Math.floor(audio.sampleRate * 0.11)
+				const buffer = audio.createBuffer(1, length, audio.sampleRate)
+				const data = buffer.getChannelData(0)
+				for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1
+				const noise = audio.createBufferSource()
+				noise.buffer = buffer
+				const soil = audio.createBiquadFilter()
+				soil.type = "lowpass"
+				soil.frequency.value = 400
+				soil.Q.value = 0.7
+				const crumble = audio.createGain()
+				crumble.gain.setValueAtTime(0.0001, t)
+				crumble.gain.exponentialRampToValueAtTime(0.1, t + 0.004)
+				crumble.gain.exponentialRampToValueAtTime(0.0001, t + 0.06)
+				noise.connect(soil).connect(crumble).connect(out)
+				noise.start(t)
+				noise.stop(t + 0.11)
+			} catch {
+				// No sound is no reason to lose the flag.
+			}
+		}
+		// Planting is a click or a drop: the context may still be waking up from it.
+		if (audio.state === "running") play()
+		else Promise.resolve(audio.resume?.()).then(play, () => {})
+		return true
+	}
+
 	function stopBlink() {
 		if (!blink) return
 		win.clearInterval(blink.timer)
@@ -156,5 +209,5 @@ export function createEncounterAlert({ win, doc, storage, Notify, Audio } = {}) 
 		audio = null
 	}
 
-	return { isMuted, setMuted, permission, requestPermission, unlock, notify, stop }
+	return { isMuted, setMuted, permission, requestPermission, unlock, notify, thump, stop }
 }

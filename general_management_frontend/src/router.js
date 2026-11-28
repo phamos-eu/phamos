@@ -3,6 +3,7 @@ import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
 import TasksGanttPage from "./views/TasksGanttPage.vue"
 import AppointmentsPage from "./views/AppointmentsPage.vue"
 import IssueAssistantPage from "./views/IssueAssistantPage.vue"
+import ContractsPage from "./views/ContractsPage.vue"
 import spaConfig from "./config"
 
 export default createSpaRouter({
@@ -36,6 +37,12 @@ export default createSpaRouter({
 			path: "/issue-assistant",
 			name: "IssueAssistant",
 			component: IssueAssistantPage,
+		},
+		// Contracts: AVV, NDA, ... (#2148)
+		{
+			path: "/contracts",
+			name: "Contracts",
+			component: ContractsPage,
 		},
 	],
 })

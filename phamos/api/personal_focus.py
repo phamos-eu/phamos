@@ -194,6 +194,10 @@ def _next_open(doc, after=None):
 
 def _publish(doc):
 	frappe.publish_realtime(EVENT, {"name": doc.name, "status": doc.status}, user=doc.user, after_commit=True)
+	# team mates see "in focus" (#1978): only that, never the session's to-dos
+	from phamos.cockpits.team_status import publish_quietly
+
+	publish_quietly(frappe.db.get_value("Employee", {"user_id": doc.user, "status": "Active"}, "name"))
 
 
 def _save(doc):

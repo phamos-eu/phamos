@@ -41,6 +41,13 @@ const baseNavItems = [
 		icon: "calendar",
 		match: ["Appointments"],
 	},
+	// Contracts: AVV, NDA, ... (#2148)
+	{
+		name: "Contracts",
+		label: "Contracts",
+		icon: "file-text",
+		match: ["Contracts"],
+	},
 	{
 		name: "ChecklistsHome",
 		label: "Checklists",
@@ -71,6 +78,7 @@ const navItems = computed(() =>
 const pageTitle = computed(() => {
 	if (route.name === "IssueAssistant") return "Issue Assistant"
 	if (route.name === "Appointments") return "Appointments"
+	if (route.name === "Contracts") return "Contracts"
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
@@ -81,6 +89,7 @@ const pageTitle = computed(() => {
 const pageSubtitle = computed(() => {
 	if (route.name === "IssueAssistant") return "What the assistant learns from corrections"
 	if (route.name === "Appointments") return "Company-wide appointments, sent as calendar invites"
+	if (route.name === "Contracts") return "AVVs, NDAs and other contracts"
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "General Management department tasks"
 	}
