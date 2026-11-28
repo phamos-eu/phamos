@@ -969,3 +969,101 @@ class TestChat(IssueAssistantTestCase):
 		self.assertIn("what do you know?", prompt)
 		self.assertIn(doc.name, prompt)
 		self.assertNotIn("Another customer's secret Issue", prompt)
+
+
+class TestChatContext(IssueAssistantTestCase):
+	"""#2238: what the chat answer knows beyond the Issue, only what every chat member may read."""
+
+	CHAT_USER = TestChat.CHAT_USER
+	PROJECT = TestChat.PROJECT
+	OTHER = "Issue Assistant Context Other Customer"
+	NO_READ = "issue-assistant-no-read@example.com"
+	# TestChat's helpers, without running its tests again
+	issue_with_brief = TestChat.issue_with_brief
+	say = TestChat.say
+	reply_in_thread = TestChat.reply_in_thread
+
+	def setUp(self):
+		super().setUp()
+		if "raven" not in frappe.get_installed_apps() or not frappe.get_all("Raven Workspace", limit=1):
+			self.skipTest("Raven with a workspace is needed")
+		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 1)
+		if not frappe.db.exists("User", self.CHAT_USER):
+			frappe.get_doc({"doctype": "User", "email": self.CHAT_USER, "first_name": "Chat Colleague",
+				"send_welcome_email": 0, "roles": [{"role": "Support Team"}, {"role": "Raven User"}]}).insert(
+				ignore_permissions=True)
+		from phamos.ai_agents.agents import issue_chat_answer as chat
+		from phamos.ai_agents.agents import issue_context
+
+		self.chat = chat
+		patch("phamos.ai_agents.agents.issue_chat_answer.llm.chat_json").start()
+
+		self.context = issue_context
+		for name in (CUSTOMER, self.OTHER):
+			if not frappe.db.exists("Customer", name):
+				frappe.get_doc({"doctype": "Customer", "customer_name": name,
+					"customer_group": frappe.db.get_value("Customer Group", {"is_group": 0}),
+					"territory": frappe.db.get_value("Territory", {"is_group": 0})}).insert(ignore_permissions=True)
+
+	def context_of(self, doc, asker=None):
+		return self.context.build(doc, self.context.readers(doc.name, asker or self.CHAT_USER))
+
+	def test_related_issues_of_the_same_customer_only(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		same = self.issue(raised_by=self.CHAT_USER, customer=CUSTOMER, subject="Same customer, older")
+		other = self.issue(raised_by=self.CHAT_USER, customer=self.OTHER, subject="Other customer",
+			custom_implementation=doc.custom_implementation)
+		names = [r["name"] for r in self.context_of(doc)["related_issues"]]
+		self.assertIn(same.name, names)
+		self.assertNotIn(other.name, names)
+
+	def test_a_member_who_cannot_read_keeps_it_out(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		self.issue(raised_by=self.CHAT_USER, customer=CUSTOMER, subject="Related")
+		self.assertTrue(self.context_of(doc)["related_issues"])
+		if not frappe.db.exists("User", self.NO_READ):
+			frappe.get_doc({"doctype": "User", "email": self.NO_READ, "first_name": "No Read", "send_welcome_email": 0,
+				"roles": [{"role": "Raven User"}]}).insert(ignore_permissions=True)
+		raven_user = frappe.db.get_value("Raven User", {"user": self.NO_READ}, "name")
+		frappe.get_doc({"doctype": "Raven Channel Member", "channel_id": channel, "user_id": raven_user}).insert(
+			ignore_permissions=True)
+		context = self.context_of(doc)
+		self.assertEqual(context["related_issues"], [])
+		self.assertEqual(context["activity"], {})
+
+	def test_comments_and_emails_of_the_issue(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		doc.add_comment("Comment", "Customer called, it is about the March invoice")
+		frappe.get_doc({"doctype": "Communication", "communication_type": "Communication", "communication_medium": "Email",
+			"sent_or_received": "Received", "subject": "Re: invoice", "content": "<p>Here is the invoice number 4711</p>",
+			"sender": "anna@example.com", "reference_doctype": "Issue", "reference_name": doc.name}).insert(
+			ignore_permissions=True)
+		activity = self.context_of(doc)["activity"]
+		self.assertTrue(any("March invoice" in c["text"] for c in activity["comments"]))
+		self.assertTrue(any("4711" in e["text"] for e in activity["emails"]))
+
+	def test_time_without_money(self):
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		task = frappe.get_doc({"doctype": "Task", "subject": "Look into it", "issue": doc.name}).insert(ignore_permissions=True)
+		sheet = frappe.get_doc({"doctype": "Timesheet", "time_logs": [{"activity_type": frappe.db.get_value("Activity Type", {}),
+			"from_time": frappe.utils.now_datetime(), "hours": 1.5, "task": task.name, "billing_rate": 120,
+			"costing_rate": 80}]})
+		sheet.flags.ignore_mandatory = True
+		sheet.flags.ignore_validate = True
+		sheet.insert(ignore_permissions=True)
+		# a colleague without read on Timesheet: the time stays out
+		self.assertEqual(self.context_of(doc)["time"], [])
+		frappe.get_doc("User", self.CHAT_USER).add_roles("Projects User")
+		rows = self.context_of(doc)["time"]
+		self.assertEqual([r["hours"] for r in rows], [1.5])
+		self.assertNotIn(self.assistant, self.context.readers(doc.name))  # the assistant is no reader
+		self.assertFalse(any("rate" in k or "amount" in k or "cost" in k for r in rows for k in r))
+
+	def test_context_is_in_the_prompt(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief(customer=CUSTOMER)
+		related = self.issue(raised_by=self.CHAT_USER, customer=CUSTOMER, subject="Printing fails again")
+		message = self.reply_in_thread(brief, "is there a similar issue?")
+		prompt = self.chat.build_prompt(doc, message, self.CHAT_USER, False)
+		self.assertIn(related.name, prompt)
+		self.assertIn('"related_issues"', prompt)
