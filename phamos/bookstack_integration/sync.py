@@ -170,12 +170,12 @@ def sync_books(client: BookstackClient, instance: str, seen: dict | None = None)
 	ids = set()
 	excluded = exclusions(instance)
 	for book in client.paginate("books"):
+		# Still in BookStack, so seen for remove_deleted(), also when it is left out below.
+		ids.add(book["id"])
 		if is_excluded(excluded, "Book", book):
 			# Left out on the configuration (#2029): not synced, but its record stays while BookStack
-			# still has the book (decided 2026-11-21), so it counts as seen for remove_deleted().
-			ids.add(book["id"])
+			# still has the book (decided 2026-11-21).
 			continue
-		ids.add(book["id"])
 		_upsert("Bookstack Book", instance, book["id"], {
 			"title": book.get("name"),
 			"slug": book.get("slug"),
