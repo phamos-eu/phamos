@@ -30,6 +30,8 @@ const navItems = [
 	{ name: "TeamMates", label: "Team mates", icon: "users", match: ["TeamMates"] },
 	// appointments with leave and public holidays (#1979)
 	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
+	// ideas shared with the team (#1980)
+	{ name: "TeamIdeas", label: "Ideas", icon: "zap", match: ["TeamIdeas"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -123,6 +125,7 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamGitlab") return "GitLab"
 	if (route.name === "TeamMates") return "Team mates"
 	if (route.name === "TeamAppointments") return "Appointments"
+	if (route.name === "TeamIdeas") return "Ideas"
 	return "Issues"
 })
 
@@ -147,6 +150,7 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamGitlab") return "Closing times and SLA of the team"
 	if (route.name === "TeamMates") return "Who is there, and on what they work"
 	if (route.name === "TeamAppointments") return "The team's appointments, leave and public holidays"
+	if (route.name === "TeamIdeas") return "Ideas shared with the team"
 	return "Team issues overview"
 })
 </script>

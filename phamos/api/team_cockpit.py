@@ -740,3 +740,64 @@ def get_team_absences(start, end):
 			)
 			entry["people"].append(names.get(employee, employee))
 	return {"absences": absences, "holidays": sorted(holidays.values(), key=lambda h: h["date"])}
+
+
+# --- Team ideas (#1980) -----------------------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_ideas():
+	"""Ideas shared with the active team, most votes first, with my vote and (if the setting
+	allows) the author. The same vote as the company's, read by the team only."""
+	from phamos.api import personal_ideas
+
+	team = teams.require_active_team()
+	return {"team": team, "ideas": personal_ideas._vote_rows(personal_ideas._readable_open_ideas({"team": team}))}
+
+
+@frappe.whitelist()
+@_require_access
+def get_idea_for_vote(name):
+	"""One shared idea: its text and the vote (personal_ideas checks who may read it)."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.get_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def vote_idea(name):
+	"""Toggle my upvote on a team idea."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.vote_idea(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def create_team_idea(title):
+	"""A new idea of mine, shared with the active team right away. I write it out in my Personal
+	Cockpit; only I edit it."""
+	from phamos.api import personal_ideas
+
+	doc = personal_ideas.create_idea(title=title)
+	return personal_ideas.share_idea_with_team(doc["name"], teams.require_active_team(), any_open_team=True)
+
+
+@frappe.whitelist()
+@_require_access
+def get_idea_chat(name):
+	"""The Raven chat of a team idea (IssueChatButton calls get_<doctype>_chat)."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.get_idea_chat(name)
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def ensure_idea_chat(name):
+	"""Start or join the chat of a team idea; only those who may read it join."""
+	from phamos.api import personal_ideas
+
+	return personal_ideas.ensure_idea_chat(name)

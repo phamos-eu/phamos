@@ -33,6 +33,7 @@
 									</span>
 									<span v-if="row.handed_in_on">{{ __("Handed in {0}", [formatDatetime(row.handed_in_on)]) }}</span>
 									<span class="text-ink-gray-6">{{ __(row.stage) }}</span>
+									<span v-if="row.team" class="text-ink-gray-6">{{ __("Team {0} only", [row.team]) }}</span>
 								</div>
 							</router-link>
 							<VoteButton :row="row" />

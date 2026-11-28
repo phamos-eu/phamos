@@ -3553,3 +3553,28 @@ Invites go out from the team mailbox. Set one on the Team in Desk first.,Einladu
 Set a team mailbox with a Mailcow calendar on team {0} first.,Legen Sie zuerst ein Team-Postfach mit Mailcow-Kalender für Team {0} fest.
 Team Mailbox,Team-Postfach
 The shared mailbox the team's appointments are sent from (needs a Mailcow DAV password). Team members can send invites only from this mailbox (#1979).,"Das gemeinsame Postfach, von dem die Termine des Teams versendet werden (braucht ein Mailcow-DAV-Passwort). Teammitglieder können Einladungen nur von diesem Postfach senden (#1979)."
+"Ideas shared with {0}: the same vote as the company's, read by the team only.","Mit {0} geteilte Ideen: dieselbe Abstimmung wie im Unternehmen, nur vom Team gelesen."
+the team,dem Team
+New team idea,Neue Team-Idee
+Loading ideas…,Ideen werden geladen…
+"No idea is shared with the team yet. Share one of yours from your Personal Cockpit, or start a new one here.",Noch keine Idee mit dem Team geteilt. Teilen Sie eine Ihrer Ideen im Personal Cockpit oder beginnen Sie hier eine neue.
+Voted,Abgestimmt
+Edit in my Personal Cockpit,Im Personal Cockpit bearbeiten
+"It is your idea: you write it out in your Personal Cockpit. Your team can read it, vote and chat right away.","Es ist Ihre Idee: Sie schreiben sie im Personal Cockpit aus. Ihr Team kann sie sofort lesen, abstimmen und darüber chatten."
+Share with team,Mit dem Team teilen
+Could not open the idea,Die Idee konnte nicht geöffnet werden
+Could not vote,Die Stimme konnte nicht abgegeben werden
+Could not load the ideas.,Die Ideen konnten nicht geladen werden.
+Ideas shared with the team,Mit dem Team geteilte Ideen
+Shared with {0},Geteilt mit {0}
+Open to the company,Für das Unternehmen öffnen
+"Share this idea with your team? Only your team can then read it, vote for it and chat about it. Your writing sessions and history stay private.","Diese Idee mit Ihrem Team teilen? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten. Ihre Schreibsitzungen und der Verlauf bleiben privat."
+Idea shared with your team,Idee mit Ihrem Team geteilt
+Could not share the idea,Die Idee konnte nicht geteilt werden
+Team {0} only,Nur Team {0}
+A composted idea cannot be shared. Take it up again first.,Eine kompostierte Idee kann nicht geteilt werden. Nehmen Sie sie zuerst wieder auf.
+You are not in a team to share it with.,"Sie sind in keinem Team, mit dem Sie sie teilen können."
+Only the people of the idea's team can join its chat.,Nur die Personen des Teams der Idee können ihrem Chat beitreten.
+Shared with this team: only its people read and vote on the idea (#1980). Empty while it is open to the whole company.,"Mit diesem Team geteilt: nur seine Personen lesen die Idee und stimmen ab (#1980). Leer, solange sie für das ganze Unternehmen offen ist."
+Move to my team,In mein Team verschieben
+"Move this idea to your team? Only your team can then read it, vote for it and chat about it; the votes stay.","Diese Idee in Ihr Team verschieben? Dann kann nur Ihr Team sie lesen, für sie stimmen und darüber chatten; die Stimmen bleiben."
