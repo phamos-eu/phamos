@@ -3337,3 +3337,7 @@ median,Median
 "median age {0}, oldest {1}","Alter im Median {0}, ältester {1}"
 {0} open or this month's items in the team's own implementations have an assignee that matches no employee by email; they are not counted.,"{0} offene oder in diesem Monat geschlossene Einträge in den eigenen Implementierungen des Teams haben eine zugewiesene Person, die per E-Mail keinem Mitarbeiter zugeordnet werden kann; sie werden nicht gezählt."
 {0} opened,{0} eröffnet
+{0} opened so far,{0} bisher eröffnet
+Opened,Eröffnet
+Average,Durchschnitt
+Internal,Intern

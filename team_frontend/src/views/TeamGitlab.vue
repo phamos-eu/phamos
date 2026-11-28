@@ -193,7 +193,8 @@ const monthPeriods = computed(() =>
 	data.value.months.map((month) => ({
 		label: monthLabel(month.start),
 		values: [Object.keys(GROUP_COLORS).map((key) => ({ value: month.closed[key], color: GROUP_COLORS[key], label: GROUP_LABELS[key] }))],
-		footer: `${__("{0} opened", [month.opened_total])}${month.mtd ? ` ${__("so far")}` : ""}`,
+		// One whole string per case: glued fragments read badly once translated.
+		footer: month.mtd ? __("{0} opened so far", [month.opened_total]) : __("{0} opened", [month.opened_total]),
 	}))
 )
 
