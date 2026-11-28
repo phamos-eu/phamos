@@ -136,7 +136,12 @@
 				:status="me.status"
 				:on-save="saveStatus"
 				@close="statusOpen = false"
-			/>
+			>
+				<!-- From my own chip: my timesheet timer first, as in the Personal Cockpit (#2101). -->
+				<template v-if="statusAt" #top>
+					<MyTimesheet />
+				</template>
+			</StatusMenu>
 			<!-- The area's chat (#2062), above the mini map. -->
 			<!-- Left column: the people in the meeting huddle above its chat (#2067). -->
 			<Teleport :to="pipBody || 'body'" :disabled="!pipBody">
@@ -487,7 +492,7 @@
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
 					:style="chipStyle(me)"
-					:title="__('{0}: click to set your availability', [me.full_name])"
+					:title="__('{0}: click for your timesheet timer and availability', [me.full_name])"
 					data-testid="my-chip"
 					@click="toggleStatus($event)"
 				>
@@ -830,6 +835,7 @@ import GoToButton from "../components/GoToButton.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
+import MyTimesheet from "../components/MyTimesheet.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { mountPhriend } from "@spa/phriend.js"
 import router from "../router.js"
@@ -3043,11 +3049,12 @@ let nowTimer = null
 
 const AWAY_GRACE_MS = 3600 * 1000
 const statusOpen = ref(false)
-// Where the status menu opens: next to my chip when I click it, else under the header button.
+// Where the status menu opens: next to my chip when I click it (with my timesheet timer on top,
+// #2101, so it is taller), else under the header button.
 const statusAt = ref(null)
 const statusMenuStyle = computed(() => ({
 	left: `${Math.max(8, Math.min(window.innerWidth - 336, statusAt.value.x + 12))}px`,
-	top: `${Math.max(8, Math.min(window.innerHeight - 380, statusAt.value.y + 12))}px`,
+	top: `${Math.max(8, Math.min(window.innerHeight - 480, statusAt.value.y + 12))}px`,
 }))
 
 function toggleStatus(event) {
