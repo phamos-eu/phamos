@@ -10,6 +10,7 @@
 			:key="frameKey"
 			:src="src"
 			class="min-h-0 w-full flex-1 border-0"
+			data-ophice-frame
 			:title="__('Cockpit')"
 			allow="clipboard-write; fullscreen"
 			@load="onLoad"

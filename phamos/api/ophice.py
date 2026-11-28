@@ -87,8 +87,16 @@ EVENT_SAVED = "ophice_saved"
 EVENT_BURNED = "ophice_burned"
 
 # Video call on encounter (#2059): a Jitsi room per encounter, joined muted with the camera off.
-# Site config: "ophice_jitsi_domain" (default meet.jit.si), "ophice_video": 0 turns it off.
-JITSI_DEFAULT_DOMAIN = "meet.jit.si"
+# Site config: "ophice_jitsi_domain" (default meet.systemli.org), "ophice_video": 0 turns it off.
+# meet.jit.si was the default until #2108: a new room there waits for a logged-in moderator, and
+# embedded calls end after 5 minutes. Its links still work: they move to the site's server.
+JITSI_DEFAULT_DOMAIN = "meet.systemli.org"
+LEGACY_JITSI_DOMAINS = ("meet.jit.si",)
+
+
+def _jitsi_domain():
+	"""The site's Jitsi server: site config or the default."""
+	return str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/").lower()
 
 # Meeting areas (#2060): rectangles of the grid with a fixed Jitsi meeting.
 AREA_DOCTYPE = "Ophice Area"
@@ -115,6 +123,8 @@ ARRIVAL_GAP_SECONDS = 5 * 60
 LAST_SEEN_CACHE_KEY = "phamos_ophice_last_seen"
 # Chips in the start space keep at least this distance (tiles) from each other.
 START_SPOT_GAP = 1.2
+# Closer than this (tiles, centres) is on top of each other: MIN_DISTANCE in Ophice.vue.
+CHIP_MIN_DISTANCE = 0.8
 # Area chat (#2062): what happens to what is written in an area.
 CHAT_MODES = ("Saved", "Not saved", "Confidential")
 EVENT_AREA_MESSAGE = "ophice_area_message"
@@ -391,6 +401,45 @@ def _free_spot(start, user):
 	}
 
 
+def _clear_spot(position, user):
+	"""This spot, or the nearest free one around it when someone else stands on it (#2160).
+
+	Back after a reload, my chip lands where it stood; someone may have walked there meanwhile.
+	On top of each other, the two chats and calls kept reopening.
+	"""
+	taken = [(c["x"], c["y"]) for c in _online(exclude=user)]
+	if all(math.hypot(position["x"] - tx, position["y"] - ty) >= CHIP_MIN_DISTANCE for tx, ty in taken):
+		return position
+	areas = _areas()
+
+	def area_at(x, y):
+		cx, cy = x + 0.5, y + 0.5
+		return next((a.name for a in areas if a.x <= cx < a.x + a.width and a.y <= cy < a.y + a.height), None)
+
+	# Stay in the space I was in (or outside all of them): a free spot must not put me into a
+	# meeting or cockpit space I did not walk into.
+	home = area_at(position["x"], position["y"])
+	max_x, max_y = _cols() - 1, _rows() - 1
+	for radius in range(1, 6):
+		ring = [
+			(dx, dy)
+			for dx in range(-radius, radius + 1)
+			for dy in range(-radius, radius + 1)
+			if max(abs(dx), abs(dy)) == radius
+		]
+		for dx, dy in sorted(ring, key=lambda d: math.hypot(*d)):
+			x, y = position["x"] + dx, position["y"] + dy
+			if (
+				0 <= x <= max_x
+				and 0 <= y <= max_y
+				and area_at(x, y) == home
+				and all(math.hypot(x - tx, y - ty) >= START_SPOT_GAP for tx, ty in taken)
+			):
+				return {"x": float(x), "y": float(y)}
+	# Crowded all around: stay; walking away is always possible on the page.
+	return position
+
+
 def _beam_key(user):
 	return f"phamos_ophice_beam:{user}"
 
@@ -416,7 +465,10 @@ def get_space():
 		position = _start_spot(user)
 		frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	else:
-		position = _stored_position() or _spawn()
+		stored = _stored_position() or _spawn()
+		position = _clear_spot(stored, user)
+		if position != stored:
+			frappe.defaults.set_user_default(POSITION_KEY, json.dumps(position, separators=(",", ":")))
 	# Every re-join beams in (PM, 2026-11-22): a reload too, at the spot it had. Not a second tab
 	# while the chip is already on the map. The others see it with my first heartbeat.
 	beam_in = arriving or not _present(user)
@@ -472,10 +524,14 @@ def move(x, y, lift=0, beam=0):
 	_require_user()
 	user = frappe.session.user
 	entry = frappe.cache.hget(PRESENCE_CACHE_KEY, user)
-	if not isinstance(entry, dict) or _throttled():
+	if not isinstance(entry, dict):
 		return None
 	entry.update({"x": _clamp(x, _cols()), "y": _clamp(y, _rows()), "ts": time.time()})
 	frappe.cache.hset(PRESENCE_CACHE_KEY, user, entry)
+	# Over the limit only the broadcast is dropped: the spot is kept, so the distance check of
+	# open_encounter sees where the chip stands (#2161).
+	if _throttled():
+		return None
 	message = {"user": user, "x": entry["x"], "y": entry["y"]}
 	if frappe.utils.cint(lift):
 		message["lift"] = 1
@@ -514,6 +570,8 @@ def leave(x=None, y=None):
 PIN_CACHE_KEY = "phamos_ophice_pins"
 PIN_TTL = 10 * 60
 PIN_MAX_PEOPLE = 50
+# Each pin notifies up to PIN_MAX_PEOPLE people; a short wait keeps a script from flooding them.
+PIN_WAIT_SECONDS = 2
 EVENT_PIN = "ophice_pin"
 EVENT_PIN_REMOVED = "ophice_pin_removed"
 
@@ -531,6 +589,10 @@ def _pins():
 	return pins
 
 
+def _pin_wait_key(user):
+	return f"phamos_ophice_pin_wait:{user}"
+
+
 def _my_pins(user):
 	return [pin for pin in _pins().values() if user in pin.get("users", [])]
 
@@ -544,15 +606,21 @@ def set_meeting_pin(users, x, y):
 		users = frappe.parse_json(users)
 	if not isinstance(users, list):
 		frappe.throw(_("Choose the people to meet."))
+	if frappe.cache.get_value(_pin_wait_key(me)):
+		frappe.throw(_("A meeting point was just set. Please wait a moment."))
 	wanted = list(dict.fromkeys(u for u in users if isinstance(u, str) and u != me))[:PIN_MAX_PEOPLE]
 	# Only System Users can see the map (and get realtime events); guests have their own invite (#2084).
-	people = []
-	for user in wanted:
-		row = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
-		if row and row.enabled and row.user_type == "System User":
-			people.append(user)
+	allowed = set(
+		frappe.get_all(
+			"User",
+			filters={"name": ["in", wanted or [""]], "enabled": 1, "user_type": "System User"},
+			pluck="name",
+		)
+	)
+	people = [user for user in wanted if user in allowed]
 	if not people:
 		frappe.throw(_("Choose the people to meet."))
+	frappe.cache.set_value(_pin_wait_key(me), 1, expires_in_sec=PIN_WAIT_SECONDS)
 	_remove_pin(me)
 	pin = {
 		"by": me,
@@ -1018,7 +1086,7 @@ def _video(doc):
 	switch = frappe.conf.get("ophice_video")
 	if switch is not None and not frappe.utils.cint(switch):
 		return None
-	domain = str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().strip("/")
+	domain = _jitsi_domain()
 	# A bare host name: the page loads https://<domain>/external_api.js from it.
 	if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", domain):
 		return None
@@ -1059,8 +1127,19 @@ def open_encounter(with_user):
 	if not isinstance(with_user, str) or with_user == me or not frappe.db.get_value("User", with_user, "enabled"):
 		frappe.throw(_("Nobody to chat with here."))
 	mine, theirs = _position_of(me), _position_of(with_user)
-	if not mine or not theirs or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
+	if not theirs:
+		# Reloading or gone (#2161): standing next to them is not the problem. No name: `with_user`
+		# comes from the caller, and the reply must not turn any e-mail address into a full name.
+		frappe.throw(_("Not on the map right now."))
+	if not mine or math.dist(mine, theirs) > ENCOUNTER_DISTANCE + SERVER_DISTANCE_SLACK:
 		frappe.throw(_("Move closer to chat."))
+	if _call_area_at(mine) or _call_area_at(theirs):
+		frappe.throw(_("This space has its own meeting: use its call and chat."))
+	# Only "Available" can be met (#2168): no chat and no call that turns on someone's mic and camera.
+	if _status_of(with_user):
+		frappe.throw(_("Not available right now."))
+	if _status_of(me):
+		frappe.throw(_("Set yourself to Available first."))
 
 	pair_key = _pair_key(me, with_user)
 	_lock_pair(pair_key)
@@ -1317,11 +1396,32 @@ def _reindex_messages(names):
 		pass
 
 
+def _by_pair(rows):
+	"""Rows sorted by pair key. A request that locks several pairs (leaving the page, the
+	scheduler) takes them in one order, so two of them don't wait for each other in a circle."""
+	return sorted(rows, key=lambda r: _pair_key(r.user_a, r.user_b))
+
+
+def _locked(doc):
+	"""Take the pair's lock, then read the encounter again; None when it ended meanwhile (#2161).
+
+	Both pages act on an encounter at the same moment: walking apart, closing the page, the
+	countdown reaching zero; the scheduler too. Burning deletes the row without waiting for its
+	lock ("being modified by another user"), so they go one after the other. The locking read
+	sees what the first one committed while this one waited.
+	"""
+	_lock_pair(_pair_key(doc.user_a, doc.user_b))
+	return frappe.db.get_value(ENCOUNTER_DOCTYPE, doc.name, ENCOUNTER_FIELDS, as_dict=True, for_update=True)
+
+
 @frappe.whitelist(methods=["POST"])
 def part_encounter(encounter):
 	"""The two chips walked apart: start the burn notice (both pages call this; once is enough)."""
 	_require_user()
-	doc = _require_party(encounter, ("Open", "Parting"))
+	doc = _locked(_require_party(encounter, ("Open", "Parting")))
+	if not doc:
+		# The other page parted first and the empty chat is gone.
+		return None
 	_start_parting(doc)
 	if not frappe.db.exists(ENCOUNTER_DOCTYPE, doc.name):
 		return None
@@ -1332,8 +1432,10 @@ def part_encounter(encounter):
 def save_encounter(encounter):
 	"""I want to keep this chat. Saved for real only when the other person says so too."""
 	_require_user()
-	# Locking read: when both press Save at the same moment, the second waits for the first and
-	# then sees its flag, so one of the two requests does the save (review of the release).
+	# When both press Save at the same moment, the second waits for the first and then sees its
+	# flag, so one of the two requests does the save (review of the release). The pair's lock
+	# keeps a burn from the other page or the scheduler out meanwhile (#2161).
+	_locked(_require_party(encounter, ("Parting",)))
 	doc = _require_party(encounter, ("Parting",), for_update=True)
 	field = "saved_by_a" if frappe.session.user == doc.user_a else "saved_by_b"
 	frappe.db.set_value(ENCOUNTER_DOCTYPE, doc.name, field, 1, update_modified=False)
@@ -1368,6 +1470,10 @@ def burn_if_due(encounter):
 	_require_user()
 	doc = frappe.db.get_value(ENCOUNTER_DOCTYPE, encounter, ENCOUNTER_FIELDS, as_dict=True)
 	if not doc or frappe.session.user not in (doc.user_a, doc.user_b):
+		return {"burned": True}
+	# Both pages reach zero at the same moment: the second finds it gone (#2161).
+	doc = _locked(doc)
+	if not doc:
 		return {"burned": True}
 	# One second of slack for the page's clock.
 	if doc.status == "Parting" and get_datetime(doc.burn_at) <= add_to_date(now_datetime(), seconds=1):
@@ -1407,22 +1513,35 @@ def burn_due_encounters():
 	other person has left (tab closed, connection gone) without anyone walking away."""
 	from phamos.api.ophice_guest import purge_guests
 
+	def burn_if_still_due(doc):
+		# A page may have burned, saved or reopened it since the list was read (#2161).
+		doc = _locked(doc)
+		if doc and doc.status == "Parting" and get_datetime(doc.burn_at) <= now_datetime():
+			_burn_or_save(doc)
+
 	_each(
-		frappe.get_all(
-			ENCOUNTER_DOCTYPE,
-			filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
-			fields=ENCOUNTER_FIELDS,
+		_by_pair(
+			frappe.get_all(
+				ENCOUNTER_DOCTYPE,
+				filters={"status": "Parting", "burn_at": ("<=", now_datetime())},
+				fields=ENCOUNTER_FIELDS,
+			)
 		),
-		_burn_or_save,
+		burn_if_still_due,
 		"burn encounter",
 	)
+	# Releases this round's pair locks, so the next round takes its own in order again (_by_pair).
+	frappe.db.commit()
 
 	def part_if_alone(doc):
 		if not (_position_of(doc.user_a) and _position_of(doc.user_b)):
-			_start_parting(doc)
+			doc = _locked(doc)
+			# Still open: the other page may have parted it while this one waited.
+			if doc and doc.status == "Open":
+				_start_parting(doc)
 
 	_each(
-		frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS),
+		_by_pair(frappe.get_all(ENCOUNTER_DOCTYPE, filters={"status": "Open"}, fields=ENCOUNTER_FIELDS)),
 		part_if_alone,
 		"part encounter",
 	)
@@ -1443,10 +1562,16 @@ def _my_notices(user):
 
 
 def _part_all_mine(user):
-	for doc in frappe.get_all(
+	rows = frappe.get_all(
 		ENCOUNTER_DOCTYPE, filters={"status": "Open"}, or_filters={"user_a": user, "user_b": user}, fields=ENCOUNTER_FIELDS
-	):
-		_start_parting(doc)
+	)
+	# Pair locks are held until the request ends: always taken in the same order (_by_pair).
+	for doc in _by_pair(rows):
+		# The other page notices that I left and parts at the same moment (#2161).
+		doc = _locked(doc)
+		# Still open: the other page may have parted it while this one waited.
+		if doc and doc.status == "Open":
+			_start_parting(doc)
 
 
 # --- Meeting areas (#2060).
@@ -1455,7 +1580,7 @@ def _part_all_mine(user):
 def _allowed_jitsi_domains():
 	"""The Jitsi servers areas may point to. The page loads external_api.js from that server, so
 	only servers the site trusts: the configured one plus an optional list."""
-	domains = {str(frappe.conf.get("ophice_jitsi_domain") or JITSI_DEFAULT_DOMAIN).strip().lower()}
+	domains = {_jitsi_domain()}
 	extra = frappe.conf.get("ophice_jitsi_domains") or []
 	if isinstance(extra, list):
 		domains |= {str(d).strip().lower() for d in extra if d}
@@ -1472,7 +1597,10 @@ def _parse_meeting_url(url):
 		domain = f"{domain}:{parsed.port}"
 	room = unquote(parsed.path.strip("/"))
 	if parsed.scheme != "https" or not domain:
-		frappe.throw(_("The meeting URL must start with https://, for example https://meet.jit.si/OurStandup."))
+		frappe.throw(_("The meeting URL must start with https://, for example https://meet.systemli.org/OurStandup."))
+	# An old meet.jit.si link (#2108): same room on the site's server; Jitsi rooms are just names.
+	if domain in LEGACY_JITSI_DOMAINS and domain not in _allowed_jitsi_domains():
+		domain = _jitsi_domain()
 	if domain not in _allowed_jitsi_domains():
 		frappe.throw(
 			_("Only meetings on {0} can be used here.").format(", ".join(sorted(_allowed_jitsi_domains())))
@@ -1638,6 +1766,24 @@ def _inside_area(area, user):
 	return (
 		area.x - AREA_SLACK <= cx < area.x + area.width + AREA_SLACK
 		and area.y - AREA_SLACK <= cy < area.y + area.height + AREA_SLACK
+	)
+
+
+def _call_area_at(position):
+	"""The meeting space with a call (Jitsi link) the spot lies in, or None. No encounters there:
+	the space's own call and chat would collide with an encounter's. No slack: the page posts its
+	latest spot before it asks, so this matches what the page shows."""
+	cx, cy = position[0] + 0.5, position[1] + 0.5
+	return next(
+		(
+			a
+			for a in _areas()
+			if (a.kind or "Meeting") in MEETING_KINDS
+			and a.jitsi_room
+			and a.x <= cx < a.x + a.width
+			and a.y <= cy < a.y + a.height
+		),
+		None,
 	)
 
 

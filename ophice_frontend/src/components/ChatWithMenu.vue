@@ -20,7 +20,8 @@
 		<!-- Find people (PM, 2026-11-22): go to them, or call them to a meeting point. -->
 		<div v-if="onMap" class="flex items-center gap-1.5 px-1.5 pb-2" data-testid="chat-with-actions">
 			<GoToButton @go="(mode) => $emit('go', mode)" />
-			<Button size="sm" variant="subtle" :title="__('Set a meeting point for the two of you')" class="whitespace-nowrap" data-testid="meeting-point" @click="$emit('pin')">
+			<!-- Guests get no meeting point: they have their own invite (#2084). -->
+			<Button v-if="!person.guest" size="sm" variant="subtle" :title="__('Set a meeting point for the two of you')" class="whitespace-nowrap" data-testid="meeting-point" @click="$emit('pin')">
 				<template #prefix><FeatherIcon name="map-pin" class="h-3.5 w-3.5" /></template>
 				{{ __("Meeting point") }}
 			</Button>

@@ -159,6 +159,17 @@ export function stackEvents(events, timeline, minGapPx = 10) {
 	})
 }
 
+/**
+ * What selecting a dot or a stack emits (#2035 decision 6): `{ type: "event", name }` for one
+ * feature, plus `names` (every feature of the stack, in date order, each once) when the stack
+ * holds more than one feature. A feature's planned and finished dots count as one feature.
+ */
+export function stackSelection(stack) {
+	const names = [...new Set((stack?.events || []).map((e) => e.name))]
+	const selection = { type: "event", name: stack?.name ?? names[0] }
+	return names.length > 1 ? { ...selection, names } : selection
+}
+
 /** Quarter header segments ("Q4 2026") of a timeline, like its `months` and `weeks`. */
 export function quarterSegments(timeline) {
 	const quarters = []

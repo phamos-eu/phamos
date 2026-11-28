@@ -99,7 +99,7 @@
 import { computed, ref, watch } from "vue"
 import dayjs from "dayjs"
 import { call } from "frappe-ui"
-import KpiStrip from "../components/KpiStrip.vue"
+import KpiStrip from "@spa/components/dashboard/KpiStrip.vue"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "../config"
 
