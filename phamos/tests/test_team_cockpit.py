@@ -135,6 +135,10 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			"get_hours_statistics",
 			"get_team_implementations",
 			"get_gitlab_statistics",
+			# team mates and team chat (#1978)
+			"get_team_mates",
+			"get_team_chat",
+			"ensure_team_chat",
 		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 

@@ -566,3 +566,42 @@ def get_gitlab_statistics():
 		data.unmatched_own_items = None
 	data.team = team
 	return data
+
+
+# --- Team mates and team chat (#1978) -------------------------------------------------------
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_mates():
+	"""The active team's people with their status today. Every team member sees every row:
+	presence, focus, and project and task of a running timer (decision 1 of #1978)."""
+	from phamos.cockpits import team_status
+
+	team = teams.require_active_team()
+	return {"team": team, "members": team_status.team_mates(team), "event": team_status.EVENT}
+
+
+def _team_doc(name):
+	"""The Team, if the session user may open it (its people, General Management, System Manager)."""
+	if not name or name not in teams.available_teams():
+		frappe.throw(_("You are not a member of team {0}.").format(name or ""), frappe.PermissionError)
+	return frappe.get_doc("Team", name)
+
+
+@frappe.whitelist()
+@_require_access
+def get_team_chat(name):
+	"""Chat state of the team's Raven channel (IssueChatButton calls get_<doctype>_chat)."""
+	from phamos.api import issue_chat
+
+	return issue_chat.get_chat(_team_doc(name))
+
+
+@frappe.whitelist(methods=["POST"])
+@_require_access
+def ensure_team_chat(name):
+	"""Create or join the team's chat; its members are the team's people (#1978)."""
+	from phamos.api import issue_chat
+
+	return issue_chat.ensure_chat(_team_doc(name))

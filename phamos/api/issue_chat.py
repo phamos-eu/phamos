@@ -27,6 +27,9 @@ from phamos.cockpits.defaults import IDEA_VOTE_OPEN
 from phamos.cockpits.settings import COCKPIT_SETTINGS
 
 CHAT_DOCTYPES = ("Issue", "Task", "Idea")
+# One chat per Team (#1978). Not in CHAT_DOCTYPES: a team chat has no assignees and no mentions that
+# join people; its members are the team's people, kept in step by phamos.cockpits.team_chat.
+TEAM_CHAT = "Team"
 # Record types a mention assigns to. Not Idea: an assignment shares the record with the person,
 # which would keep a withdrawn idea readable for them (#1842).
 ASSIGN_DOCTYPES = ("Issue", "Task")
@@ -74,7 +77,7 @@ def _require_enabled():
 
 
 def _require_chat_doctype(doctype):
-	if doctype not in CHAT_DOCTYPES:
+	if doctype not in CHAT_DOCTYPES and doctype != TEAM_CHAT:
 		frappe.throw(_("Chats are not available for {0}.").format(_(doctype)))
 
 
@@ -124,6 +127,11 @@ def _raven_user(user):
 def _record_users(doc):
 	"""The people a record's chat starts with: its creator, its Task Owner (custom field on Task,
 	the person responsible in the cockpits) and its assignees."""
+	if doc.doctype == TEAM_CHAT:
+		# the team's people today; nobody else (#1978)
+		from phamos.cockpits.teams import team_users
+
+		return [row["name"] for row in team_users(doc.name)]
 	users = [doc.owner, doc.get("custom_task_owner")]
 	if doc.doctype == "Idea":
 		# The idea's author; colleagues join themselves. While authors are hidden from voters, the
@@ -143,6 +151,35 @@ def _resolve_workspace():
 	if not workspaces:
 		frappe.throw(_("No Raven Workspace found. Create one in Raven first."))
 	return workspaces[0]
+
+
+def _remove_members(channel, users):
+	"""Take the users out of the channel (their messages stay). Returns the users removed."""
+	removed = []
+	for user in users:
+		raven_user = frappe.db.get_value("Raven User", {"user": user, "type": "User"}, "name")
+		member = raven_user and frappe.db.get_value(
+			"Raven Channel Member", {"channel_id": channel.name, "user_id": raven_user}, "name"
+		)
+		if member:
+			frappe.delete_doc("Raven Channel Member", member, ignore_permissions=True)
+			removed.append(user)
+	if removed:
+		try:
+			from raven.utils import delete_channel_members_cache
+
+			delete_channel_members_cache(channel.name)
+		except ImportError:
+			pass
+	return removed
+
+
+def channel_member_users(channel):
+	"""Frappe users of the channel's members."""
+	raven_users = frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
+	if not raven_users:
+		return []
+	return frappe.get_all("Raven User", filters={"name": ["in", raven_users], "type": "User"}, pluck="user")
 
 
 def _ensure_members(channel, users, admin=None, silent=False):
@@ -452,14 +489,21 @@ def ensure_chat(doc):
 	users = [frappe.session.user] + _record_users(doc)
 	_ensure_members(channel, users, admin=frappe.session.user if created else None)
 	if created:
-		if doc.doctype == "Idea":
+		if doc.doctype == TEAM_CHAT:
+			intro = _("Team chat of {0}").format(doc.name)
+		elif doc.doctype == "Idea":
 			intro = _("Chat about the idea {0}").format(_doc_title(doc))
 		else:
 			intro = _("Chat about {0}: {1}").format(doc.name, _doc_title(doc))
 		if doc.doctype == "Task" and doc.get("issue"):
 			# The Issue's chat ends with "converted to Task …"; this keeps the thread findable.
 			intro += " " + _("It follows on from Issue {0}.").format(doc.issue)
-		if doc.doctype == "Idea":
+		if doc.doctype == TEAM_CHAT:
+			# plain text: Raven's document card would need read permission on Team (System Manager)
+			frappe.get_doc(
+				{"doctype": "Raven Message", "channel_id": channel.name, "message_type": "Text", "text": f"<p>{escape_html(intro)}</p>"}
+			).insert(ignore_permissions=True)
+		elif doc.doctype == "Idea":
 			_post_idea_intro(channel.name, doc, intro)
 		else:
 			_post_link_message(channel.name, doc, intro)
