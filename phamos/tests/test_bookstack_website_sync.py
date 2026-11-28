@@ -372,6 +372,18 @@ class TestSyncSelection(_BookstackSyncCase):
 		self.assertEqual(frappe.db.get_value("Bookstack Book", f"{INSTANCE}-BSB-2", "publish_on_website"), 1)
 		self.assertIsNotNone(_page(200), "its pages and their website copy are back")
 
+	def test_left_out_book_deleted_in_bookstack_is_removed(self):
+		self._sync()
+		self._exclude(("Book", 2))
+		self._sync()
+		self.assertTrue(self._exists("Bookstack Book", 2), "still in BookStack: the record stays")
+
+		FakeBookstack.data["books"] = [b for b in FakeBookstack.data["books"] if b["id"] != 2]
+		FakeBookstack.data["pages"] = [p for p in FakeBookstack.data["pages"] if p["book_id"] != 2]
+		self._sync()
+		self.assertFalse(self._exists("Bookstack Book", 2), "gone from BookStack: the record goes too")
+		self.assertTrue(self._exists("Bookstack Book", 1))
+
 	def test_preview_counts_what_saving_would_remove(self):
 		from phamos.bookstack_integration.selection import preview_selection
 

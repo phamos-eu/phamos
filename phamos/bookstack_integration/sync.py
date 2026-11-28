@@ -171,7 +171,10 @@ def sync_books(client: BookstackClient, instance: str, seen: dict | None = None)
 	excluded = exclusions(instance)
 	for book in client.paginate("books"):
 		if is_excluded(excluded, "Book", book):
-			continue  # left out on the configuration (#2029)
+			# Left out on the configuration (#2029): not synced, but its record stays while BookStack
+			# still has the book (decided 2026-11-21), so it counts as seen for remove_deleted().
+			ids.add(book["id"])
+			continue
 		ids.add(book["id"])
 		_upsert("Bookstack Book", instance, book["id"], {
 			"title": book.get("name"),
@@ -356,9 +359,6 @@ def remove_deleted(instance: str, seen: dict) -> int:
 		# must have come in complete, which they may do empty (a wiki without chapters).
 		if not ids or any(child not in seen for child in _CHILDREN.get(doctype, ())):
 			continue
-		if doctype == "Bookstack Book":
-			# A left-out book is not listed by the sync but keeps its record (decided 2026-11-21).
-			ids = ids | exclusions(instance)["Book"]
 		stale = frappe.get_all(
 			doctype,
 			filters={"instance": instance, "bookstack_id": ["not in", list(ids)]},
