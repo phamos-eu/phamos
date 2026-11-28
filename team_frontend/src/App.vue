@@ -32,6 +32,8 @@ const navItems = [
 	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
 	// ideas shared with the team (#1980)
 	{ name: "TeamIdeas", label: "Ideas", icon: "zap", match: ["TeamIdeas"] },
+	// successes: daily rules, kudos, customer praise (#1981)
+	{ name: "TeamSuccesses", label: "Successes", icon: "award", match: ["TeamSuccesses"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -126,6 +128,7 @@ const pageTitle = computed(() => {
 	if (route.name === "TeamMates") return "Team mates"
 	if (route.name === "TeamAppointments") return "Appointments"
 	if (route.name === "TeamIdeas") return "Ideas"
+	if (route.name === "TeamSuccesses") return "Successes"
 	return "Issues"
 })
 
@@ -151,6 +154,7 @@ const pageSubtitle = computed(() => {
 	if (route.name === "TeamMates") return "Who is there, and on what they work"
 	if (route.name === "TeamAppointments") return "The team's appointments, leave and public holidays"
 	if (route.name === "TeamIdeas") return "Ideas shared with the team"
+	if (route.name === "TeamSuccesses") return "What the team achieved"
 	return "Team issues overview"
 })
 </script>
