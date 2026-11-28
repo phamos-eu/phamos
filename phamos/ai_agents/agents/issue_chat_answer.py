@@ -23,7 +23,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cstr, escape_html, now_datetime, strip_html_tags
+from frappe.utils import add_to_date, cint, cstr, escape_html, now_datetime, strip_html_tags
 
 from phamos.ai_agents import llm
 
@@ -128,7 +128,28 @@ def addressed_issue(message):
 		return None
 	bot_raven_user = frappe.db.get_value("Raven Bot", bot_name, "raven_user")
 	mentioned = bool(bot_raven_user) and any(m.user == bot_raven_user for m in (message.get("mentions") or []))
-	return channel.linked_document if mentioned or replies_to_bot(message, bot_name) else None
+	if mentioned or replies_to_bot(message, bot_name) or follows_up(message, frappe.session.user):
+		return channel.linked_document
+	return None
+
+
+def follows_up(message, user):
+	"""Whether the assistant answered `user` in this chat or thread within the follow-up window, so their next
+	message needs no @mention (Issue Assistant Settings, "Follow-up window (minutes)", #2231). Only the same
+	person: a colleague talking to them is not addressed to the assistant."""
+	from phamos.ai_agents.agents.issue import SETTINGS
+
+	minutes = cint(frappe.db.get_single_value(SETTINGS, "chat_follow_up_minutes"))
+	if minutes <= 0 or not user:
+		return False
+	since = add_to_date(now_datetime(), minutes=-minutes)
+	runs = frappe.get_all("AI Agent Run", filters={"trigger": CHAT_TRIGGER, "triggered_by": user, "status": "Completed",
+		"finished_at": (">=", since), "chat_message": ("is", "set")}, pluck="chat_message", limit=20)
+	for asked in runs:
+		# the answer went into the asked message's thread, or the thread the question was in
+		if message.channel_id == asked or message.channel_id == frappe.db.get_value("Raven Message", asked, "channel_id"):
+			return True
+	return False
 
 
 def replies_to_bot(message, bot_name):

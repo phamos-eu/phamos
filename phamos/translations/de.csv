@@ -3470,3 +3470,5 @@ Whom should I assign?,Wem soll ich die Anfrage zuweisen?
 Vote in the poll below.,Bitte unten in der Umfrage abstimmen.
 Only someone who may change {0} decides here; {1}'s vote changes nothing.,"Hier entscheidet nur, wer {0} ändern darf; die Stimme von {1} ändert nichts."
 {0} chose none of these; nothing changed.,{0} hat „Nichts davon“ gewählt; nichts wurde geändert.
+Follow-up window (minutes),Nachfrage-Zeitfenster (Minuten)
+"After the assistant answered someone in an Issue chat, that person's next messages in the same chat or thread are answered without @mention for this many minutes. 0: only thread replies under its messages and @mentions (#2231).","Nachdem der Assistent jemandem im Anfrage-Chat geantwortet hat, beantwortet er weitere Nachrichten dieser Person im selben Chat oder Thread so viele Minuten lang ohne @-Erwähnung. 0: nur Antworten im Thread unter seinen Nachrichten und @-Erwähnungen (#2231)."
