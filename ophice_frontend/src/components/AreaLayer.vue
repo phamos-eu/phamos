@@ -301,10 +301,13 @@ function finishPen() {
 	emit("draw", { shape: "Polygon", points, ...boxOf(points) })
 }
 
+// Fields whose own Backspace, Enter and Esc win over the drawing keys.
+const TYPING = "input, textarea, select, [contenteditable='true'], [contenteditable='']"
+
 function onKey(event) {
 	if (!pen.value) return
 	// Typing elsewhere (chat, a dialog field) keeps its own Backspace, Enter and Esc.
-	if (event.target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return
+	if (event.target?.closest?.(TYPING)) return
 	if (event.key === "Escape") pen.value = null
 	else if (event.key === "Enter") finishPen()
 	else if (event.key === "Backspace") {
@@ -316,7 +319,12 @@ function onKey(event) {
 }
 watch(
 	() => Boolean(pen.value),
-	(on) => (on ? window.addEventListener("keydown", onKey, true) : window.removeEventListener("keydown", onKey, true))
+	(on) => {
+		if (!on) return window.removeEventListener("keydown", onKey, true)
+		// A field that still has focus would keep the drawing keys from working: drawing takes it.
+		if (document.activeElement?.closest?.(TYPING)) document.activeElement.blur()
+		window.addEventListener("keydown", onKey, true)
+	}
 )
 watch(
 	() => props.editing,
