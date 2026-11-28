@@ -3146,7 +3146,7 @@ Active,Aktiv
 Inactive,Inaktiv
 Supplier,Lieferant
 Unknown contract status: {0},Unbekannter Vertragsstatus: {0}
-Days must not be negative.,Die Tage dürfen nicht negativ sein.
+Days must be a whole number from 0 to {0}.,Die Tage müssen eine ganze Zahl von 0 bis {0} sein.
 Dock in the corner,In der Ecke andocken
 Drop here to dock the map,"Hier ablegen, um die Karte anzudocken"
 AI model may be used: manual override. Without it: {0},KI-Modell darf genutzt werden: manueller Override. Ohne ihn: {0}

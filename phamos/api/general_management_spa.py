@@ -8,10 +8,11 @@ gets in: reading Issues or Tasks is not enough. Every whitelisted function check
 """
 
 import functools
+import re
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, today
+from frappe.utils import add_days, today
 
 from phamos.api import department_cockpit as dc
 from phamos.cockpits.settings import COCKPIT_SETTINGS, COCKPITS, cockpit_window
@@ -749,6 +750,8 @@ CONTRACT_FIELDS = (
 )
 CONTRACT_STATUSES = ("Unsigned", "Active", "Inactive")
 CONTRACT_LIMIT = 500
+# Upper bound for the "ends within N days" filter: ten years.
+MAX_ENDING_WITHIN_DAYS = 3650
 
 
 @frappe.whitelist()
@@ -773,9 +776,14 @@ def get_contracts(contract_type=None, status=None, party=None, ending_within_day
 			frappe.throw(_("Unknown contract status: {0}").format(status))
 		filters.append(["status", "=", status])
 	if ending_within_days not in (None, ""):
-		days = cint(ending_within_days)
-		if days < 0:
-			frappe.throw(_("Days must not be negative."))
+		# cint() would turn "abc" into 0 ("ends today") and a huge number makes add_days overflow,
+		# so only whole numbers in a sane range are accepted.
+		days_text = str(ending_within_days).strip()
+		if not re.fullmatch(r"[0-9]{1,5}", days_text) or int(days_text) > MAX_ENDING_WITHIN_DAYS:
+			frappe.throw(
+				_("Days must be a whole number from 0 to {0}.").format(MAX_ENDING_WITHIN_DAYS)
+			)
+		days = int(days_text)
 		filters.append(["end_date", "between", [today(), add_days(today(), days)]])
 	or_filters = None
 	if party:

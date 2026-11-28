@@ -622,3 +622,6 @@ class TestContracts(FrappeTestCase):
 			gm.get_contracts(status="Signed")
 		with self.assertRaises(frappe.ValidationError):
 			gm.get_contracts(ending_within_days=-1)
+		for bad in ("abc", "1.5", "99999", "1e9"):
+			with self.subTest(bad=bad), self.assertRaises(frappe.ValidationError):
+				gm.get_contracts(ending_within_days=bad)
