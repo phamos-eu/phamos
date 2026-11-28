@@ -73,7 +73,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { totalUnread, unreadSummary, unreadTone } from "@spa/utils/chatUnread.js"
 
 const props = defineProps({
-	/** "Issue", "Task" or "Idea": picks the cockpit endpoints (get_issue_chat, get_idea_chat …) and texts */
+	/** "Issue", "Task", "Idea" or "Team" (#1978): picks the cockpit endpoints (get_issue_chat, get_idea_chat …) and texts */
 	doctype: { type: String, default: "Issue" },
 	recordName: { type: String, required: true },
 	subject: { type: String, default: "" },
@@ -89,7 +89,17 @@ const method = computed(() => ({
 
 // Whole sentences per record type, so each translates on its own.
 const texts = computed(() =>
-	props.doctype === "Idea"
+	props.doctype === "Team"
+		? {
+				noChat: __("No team chat yet."),
+				startHint: __("Start one with the people of this team. Messages also show up in Raven."),
+				start: __("Start the team chat in Raven"),
+				join: __("Join the team chat in Raven"),
+				closed: __("Read the team chat"),
+				open: __("Open the team chat in Raven"),
+				mentionNote: __("Everyone in the team is in this chat."),
+			}
+		: props.doctype === "Idea"
 		? {
 				noChat: __("No chat about this idea yet."),
 				startHint: __("Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea."),

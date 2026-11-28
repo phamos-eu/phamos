@@ -450,6 +450,8 @@ doc_events = {
         "on_update": [
             "phamos.events.team_daily_schedule.sync_events_from_parent",
             "phamos.web_profile.mirror.push_to_profiles",
+            # the team chat's members follow the team (#1978)
+            "phamos.cockpits.team_chat.on_team_update",
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },

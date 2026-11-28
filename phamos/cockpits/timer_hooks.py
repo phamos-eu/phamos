@@ -16,6 +16,10 @@ def _publish(doc):
 	user = frappe.db.get_value("Employee", doc.employee, "user_id") if doc.get("employee") else None
 	if user:
 		frappe.publish_realtime(REALTIME_EVENT, {"name": doc.name}, user=user, after_commit=True)
+	# the person's team mates see the new status (#1978)
+	from phamos.cockpits.team_status import publish_quietly
+
+	publish_quietly(doc.get("employee"))
 
 
 def on_change(doc, method=None):
