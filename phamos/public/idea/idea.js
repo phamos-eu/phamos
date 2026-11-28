@@ -72,7 +72,9 @@
 	// --- server ---------------------------------------------------------------------------
 
 	function call(method, args, post) {
-		var url = API + method
+		// Short names are Idea Catcher methods; dotted paths reach other modules (the Personal
+		// Cockpit's idea endpoints, #2210).
+		var url = method.indexOf(".") > -1 ? "/api/method/" + method : API + method
 		var options = { headers: { Accept: "application/json" }, credentials: "same-origin" }
 		if (post) {
 			options.method = "POST"
@@ -237,8 +239,8 @@
 
 	function focusText() {
 		setTimeout(function () {
-			// Not while the link sheet is open or another field (the search) has the cursor.
-			if (!sheet.hidden) return
+			// Only on the Catch view, not while the link sheet is open or another field has the cursor.
+			if (!sheet.hidden || currentView !== "catch") return
 			var active = document.activeElement
 			if (active && active !== text && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return
 			text.focus({ preventScroll: true })
@@ -464,7 +466,9 @@
 		var mod = event.metaKey || event.ctrlKey
 		if (mod && (event.key === "Enter" || event.key === "s" || event.key === "S")) {
 			event.preventDefault()
-			if (sheet.hidden && !saveBtn.disabled) saveBtn.click()
+			if (currentView === "detail") {
+				if (!$("d-save").disabled) $("d-save").click()
+			} else if (currentView === "catch" && sheet.hidden && !saveBtn.disabled) saveBtn.click()
 		} else if (event.key === "Escape" && !sheet.hidden) {
 			event.preventDefault()
 			closeSheet()
@@ -548,8 +552,496 @@
 		else flush()
 	})
 
+
+	// --- views: Catch, My ideas, one idea, Vote (#2210) ----------------------------------------
+	// Hash routes, so the phone's back gesture and the browser's back button work:
+	// #/ catch · #/ideas · #/idea/<name> · #/vote · #/vote/<name>
+	// Reading, editing, growing and voting go to the Personal Cockpit's endpoints; only capture
+	// works offline.
+
+	var PC = "phamos.api.personal_cockpit."
+	var currentView = "catch"
+	var VIEWS = ["catch", "ideas", "detail", "vote", "vote-detail"]
+	var TAB_OF = { catch: "catch", ideas: "ideas", detail: "ideas", vote: "vote", "vote-detail": "vote" }
+	var options = null // stages and their jobs, loaded once
+	var detail = null // the idea open on #/idea/<name>
+	var backBtn = $("back")
+
+	function showView(name, title) {
+		currentView = name
+		VIEWS.forEach(function (view) {
+			$("view-" + view).hidden = view !== name
+		})
+		document.querySelectorAll(".tab").forEach(function (tab) {
+			tab.classList.toggle("active", tab.getAttribute("data-tab") === TAB_OF[name])
+		})
+		$("bar-label").textContent = title || __("Idea")
+		backBtn.hidden = name !== "detail" && name !== "vote-detail"
+	}
+
+	// Every load bumps this; an answer that arrives after a newer load (another tab, Back, a new
+	// search) is dropped, so it never renders into the view now shown.
+	var loadSeq = 0
+	function newLoad() {
+		loadSeq += 1
+		var seq = loadSeq
+		return function stale() {
+			return seq !== loadSeq
+		}
+	}
+
+	// A dropped answer leaves the busy mark to the newer load of the same view, if that view is
+	// still shown; otherwise nobody would clear it.
+	function dropBusy(view, name) {
+		if (currentView !== name) view.removeAttribute("aria-busy")
+	}
+
+	function route() {
+		newLoad() // whatever was loading for the previous view is now stale
+		var hash = location.hash.replace(/^#\/?/, "")
+		var parts = hash.split("/")
+		if (parts[0] === "ideas") {
+			showView("ideas", __("My ideas"))
+			loadIdeas()
+		} else if (parts[0] === "idea" && parts[1]) {
+			showView("detail", __("Idea"))
+			loadDetail(decodeURIComponent(parts[1]))
+		} else if (parts[0] === "vote" && parts[1]) {
+			showView("vote-detail", __("Vote"))
+			loadVoteDetail(decodeURIComponent(parts[1]))
+		} else if (parts[0] === "vote") {
+			showView("vote", __("Up for vote"))
+			loadVotes()
+		} else {
+			showView("catch")
+			focusText()
+		}
+	}
+	window.addEventListener("hashchange", route)
+
+	backBtn.addEventListener("click", function () {
+		if (history.length > 1) history.back()
+		else location.hash = currentView === "vote-detail" ? "#/vote" : "#/ideas"
+	})
+
+	function getOptions() {
+		if (options) return Promise.resolve(options)
+		return call(PC + "get_idea_options").then(function (result) {
+			options = result
+			return options
+		})
+	}
+
+	function emptyRow(ul, message) {
+		var li = document.createElement("li")
+		li.className = "empty"
+		li.textContent = message
+		ul.appendChild(li)
+	}
+
+	// Ideas are shown as HTML: keep only plain formatting tags and a few safe attributes, so nothing
+	// in a text can run. The list covers what the cockpit and Desk editors write (images, tables,
+	// highlights), so an own idea edited here loses as little as possible.
+	var ALLOWED =
+		/^(P|BR|HR|B|STRONG|I|EM|U|S|DEL|STRIKE|MARK|SUB|SUP|UL|OL|LI|H1|H2|H3|H4|H5|H6|BLOCKQUOTE|CODE|PRE|A|SPAN|DIV|IMG|TABLE|THEAD|TBODY|TR|TH|TD)$/
+	// The URL as the browser reads it: it drops tabs and line breaks anywhere and control characters
+	// and spaces at the ends, so "/&#9;/host" would load from "//host". Check that, not the raw text.
+	function plainUrl(value) {
+		return value.replace(/[\t\n\r]/g, "").replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+	}
+	// A path or URL on this site ("/files/…"); "//host" and "/\host" resolve to another host.
+	function sameSite(value) {
+		try {
+			var url = new URL(plainUrl(value), location.href)
+			return url.origin === location.origin && /^https?:$/.test(url.protocol)
+		} catch (e) {
+			return false
+		}
+	}
+	function keepAttribute(tag, name, value) {
+		if (tag === "A" && name === "href") return /^(https?:|mailto:)/i.test(plainUrl(value)) || sameSite(value)
+		// Images only from this site: one from another host would tell it who read the idea.
+		if (tag === "IMG" && name === "src") return sameSite(value)
+		if (tag === "IMG" && name === "alt") return true
+		if ((tag === "TD" || tag === "TH") && (name === "colspan" || name === "rowspan")) return /^\d{1,2}$/.test(value)
+		return false
+	}
+	function safeHtml(html) {
+		var doc = new DOMParser().parseFromString("<div>" + (html || "") + "</div>", "text/html")
+		var root = doc.body.firstChild
+		;(function clean(node) {
+			Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+				if (child.nodeType === 3) return
+				if (child.nodeType !== 1 || !ALLOWED.test(child.tagName)) {
+					child.replaceWith(doc.createTextNode(child.nodeType === 1 ? child.textContent : ""))
+					return
+				}
+				Array.prototype.slice.call(child.attributes).forEach(function (attr) {
+					if (!keepAttribute(child.tagName, attr.name, attr.value)) child.removeAttribute(attr.name)
+				})
+				if (child.tagName === "A") child.setAttribute("rel", "noopener noreferrer")
+				clean(child)
+			})
+		})(root)
+		return root.innerHTML
+	}
+
+	// -- My ideas --
+
+	var ideasTimer = null
+	$("ideas-search").placeholder = __("Search my ideas")
+	$("ideas-search").addEventListener("input", function () {
+		clearTimeout(ideasTimer)
+		ideasTimer = setTimeout(loadIdeas, 250)
+	})
+	$("ideas-closed").addEventListener("change", loadIdeas)
+
+	function loadIdeas() {
+		var ul = $("ideas-list")
+		var query = $("ideas-search").value.trim().toLowerCase()
+		var stale = newLoad()
+		call(PC + "get_ideas", { include_closed: $("ideas-closed").checked ? 1 : 0 })
+			.then(function (ideas) {
+				if (stale()) return
+				ul.innerHTML = ""
+				ideas
+					.filter(function (idea) {
+						return !query || (idea.title + " " + (idea.summary || "")).toLowerCase().indexOf(query) > -1
+					})
+					.forEach(function (idea) {
+						ul.appendChild(ideaRow(idea, "#/idea/" + encodeURIComponent(idea.name)))
+					})
+				if (!ul.children.length) emptyRow(ul, query ? __("No idea matches.") : __("No ideas yet."))
+			})
+			.catch(function (error) {
+				if (stale()) return
+				ul.innerHTML = ""
+				emptyRow(ul, error.message || __("No connection. Your ideas show when you are online."))
+			})
+	}
+
+	function ideaRow(idea, href, right) {
+		var li = document.createElement("li")
+		li.className = "item"
+		var a = document.createElement("a")
+		a.className = "item-link"
+		a.href = href
+		var title = document.createElement("div")
+		title.className = "item-title"
+		title.textContent = idea.title
+		a.appendChild(title)
+		var meta = document.createElement("div")
+		meta.className = "item-sub"
+		var bits = [__(idea.stage)]
+		if (idea.vote_status) bits.push(__("Open for vote"))
+		if (idea.spawned_from_title) bits.push(__("from {0}", [idea.spawned_from_title]))
+		meta.textContent = bits.join(" · ")
+		a.appendChild(meta)
+		if (idea.summary && idea.summary !== idea.title) {
+			var summary = document.createElement("div")
+			summary.className = "item-sub item-summary"
+			summary.textContent = idea.summary
+			a.appendChild(summary)
+		}
+		if (right) {
+			var chip = document.createElement("span")
+			chip.className = "chip" + (right.on ? " chip-on" : "")
+			chip.textContent = right.text
+			a.appendChild(chip)
+		}
+		li.appendChild(a)
+		return li
+	}
+
+	// -- One of my ideas --
+
+	var titleInput = $("d-title")
+	var editor = $("d-content")
+	var stageSelect = $("d-stage-select")
+	var detailDirty = false
+	// The text is shown cleaned (safeHtml); it is only sent back when it was edited here, so
+	// saving a title or a stage never rewrites formatting this page can't show.
+	var contentDirty = false
+
+	function setDirty(dirty) {
+		detailDirty = dirty
+		if (!dirty) contentDirty = false
+		$("d-save").disabled = !dirty
+	}
+	// The title wraps instead of being cut off; Enter does not add a line to it.
+	function fitTitle() {
+		titleInput.style.height = "auto"
+		titleInput.style.height = titleInput.scrollHeight + "px"
+	}
+	titleInput.addEventListener("input", function () {
+		setDirty(true)
+		fitTitle()
+	})
+	titleInput.addEventListener("keydown", function (event) {
+		if (event.key === "Enter") {
+			event.preventDefault()
+			editor.focus()
+		}
+	})
+	editor.addEventListener("input", function () {
+		contentDirty = true
+		setDirty(true)
+	})
+
+	$("d-tools").addEventListener("mousedown", function (event) {
+		event.preventDefault() // keep the selection in the editor
+	})
+	$("d-tools").addEventListener("click", function (event) {
+		var button = event.target.closest("button")
+		if (!button) return
+		var cmd = button.getAttribute("data-cmd")
+		editor.focus()
+		if (cmd === "h3") document.execCommand("formatBlock", false, "h3")
+		else document.execCommand(cmd)
+		contentDirty = true
+		setDirty(true)
+	})
+
+	function loadDetail(name) {
+		var view = $("view-detail")
+		if (!detail || detail.name !== name) {
+			detail = null
+			view.setAttribute("aria-busy", "true") // nothing of another idea flashes up
+		}
+		setDirty(false)
+		var stale = newLoad()
+		Promise.all([call(PC + "get_idea", { name: name }), getOptions()])
+			.then(function (results) {
+				if (stale()) return dropBusy(view, "detail")
+				renderDetail(results[0])
+				view.removeAttribute("aria-busy")
+			})
+			.catch(function (error) {
+				if (stale()) return dropBusy(view, "detail")
+				view.removeAttribute("aria-busy")
+				toast(error.message || __("No connection. Your ideas show when you are online."))
+			})
+	}
+
+	function renderDetail(idea) {
+		detail = idea
+		titleInput.value = idea.title
+		requestAnimationFrame(fitTitle)
+		editor.innerHTML = safeHtml(idea.content)
+		setDirty(false)
+		$("d-stage").textContent = __(idea.stage)
+		$("d-job").textContent = idea.stage_job ? __(idea.stage_job) : ""
+		stageSelect.innerHTML = ""
+		options.stages.forEach(function (stage) {
+			var option = document.createElement("option")
+			option.value = stage
+			option.textContent = __(stage)
+			option.selected = stage === idea.stage
+			stageSelect.appendChild(option)
+		})
+		var next = nextStage(idea.stage)
+		$("d-grow").hidden = !next
+		if (next) $("d-grow").textContent = __("Grow to {0}", [__(next)])
+		renderOwnVote(idea)
+	}
+
+	// The next stage on the way to Harvest; Compost and Harvest have none.
+	function nextStage(stage) {
+		var growing = options.stages.filter(function (s) {
+			return options.closed_stages.indexOf(s) === -1 || s === "Harvest"
+		})
+		var i = growing.indexOf(stage)
+		return i > -1 && i < growing.length - 1 ? growing[i + 1] : null
+	}
+
+	function saveDetail(changes) {
+		var args = Object.assign({ name: detail.name, modified: detail.modified }, changes)
+		return call(PC + "update_idea", args, true)
+			.then(function (idea) {
+				renderDetail(idea)
+				return idea
+			})
+			.catch(function (error) {
+				toast(
+					error.excType === "TimestampMismatchError"
+						? __("This idea was changed elsewhere. Reload it to see the latest version.")
+						: error.message || __("No connection. Try again when you are online.")
+				)
+				throw error
+			})
+	}
+
+	$("d-save").addEventListener("click", function () {
+		var title = titleInput.value.trim()
+		if (!title) {
+			toast(__("Title is required"))
+			return
+		}
+		var changes = { title: title }
+		if (contentDirty) changes.content = editor.innerHTML
+		saveDetail(changes)
+			.then(function () {
+				toast(__("Saved"))
+			})
+			.catch(function () {}) // saveDetail has shown the reason
+	})
+
+	function changeStage(stage) {
+		if (!detail || stage === detail.stage) return
+		// Unsaved text goes along, so a stage change never drops an edit.
+		var changes = { stage: stage }
+		if (detailDirty) changes.title = titleInput.value.trim() || detail.title
+		if (contentDirty) changes.content = editor.innerHTML
+		saveDetail(changes)
+			.then(function (idea) {
+				toast(__("Now {0}", [__(idea.stage)]))
+			})
+			.catch(function () {
+				// Refused or offline: the picker shows the stage the idea really has again.
+				stageSelect.value = detail.stage
+			})
+	}
+	$("d-grow").addEventListener("click", function () {
+		changeStage(nextStage(detail.stage))
+	})
+	stageSelect.addEventListener("change", function () {
+		changeStage(stageSelect.value)
+	})
+
+	var addBox = $("d-add")
+	addBox.placeholder = __("Another thought on this idea …")
+	addBox.addEventListener("input", function () {
+		$("d-add-btn").disabled = !addBox.value.trim()
+	})
+	$("d-add-btn").addEventListener("click", function () {
+		if (detailDirty) {
+			toast(__("Save your changes first."))
+			return
+		}
+		call("add_to_idea", { name: detail.name, text: addBox.value }, true)
+			.then(function (idea) {
+				addBox.value = ""
+				$("d-add-btn").disabled = true
+				renderDetail(idea)
+				toast(__("Added"))
+			})
+			.catch(function (error) {
+				toast(error.message || __("No connection. Try again when you are online."))
+			})
+	})
+
+	function renderOwnVote(idea) {
+		var open = idea.vote_status === "Open for vote"
+		$("d-vote-state").textContent = open
+			? idea.vote_count === 1
+				? __("Open for vote · 1 vote")
+				: __("Open for vote · {0} votes", [idea.vote_count])
+			: __("Only you can see this idea.")
+		var toggle = $("d-vote-toggle")
+		toggle.hidden = !open && idea.stage === "Compost"
+		toggle.textContent = open ? __("Withdraw from vote") : __("Hand in for Vote")
+	}
+
+	$("d-vote-toggle").addEventListener("click", function () {
+		var open = detail.vote_status === "Open for vote"
+		var question = open
+			? __("Withdraw this idea from the vote? The votes so far are removed.")
+			: __(
+					"Hand in this idea for a vote? Every cockpit user can then read it and vote for it. Your writing sessions and history stay private."
+			  )
+		if (!window.confirm(question)) return
+		call(PC + (open ? "withdraw_idea_from_vote" : "hand_in_idea_for_vote"), { name: detail.name }, true)
+			.then(renderDetail)
+			.catch(function (error) {
+				toast(error.message || __("No connection. Try again when you are online."))
+			})
+	})
+
+	// -- Vote --
+
+	function voteChip(row) {
+		return { text: (row.voted ? "♥ " : "♡ ") + row.vote_count, on: row.voted }
+	}
+
+	function loadVotes() {
+		var ul = $("vote-list")
+		var stale = newLoad()
+		call(PC + "get_ideas_for_vote")
+			.then(function (rows) {
+				if (stale()) return
+				ul.innerHTML = ""
+				rows.forEach(function (row) {
+					var li = ideaRow(
+						{ title: row.title, summary: row.summary, stage: row.stage },
+						"#/vote/" + encodeURIComponent(row.name),
+						voteChip(row)
+					)
+					var by = row.mine ? __("Your idea") : row.author ? row.author.full_name : ""
+					if (by) li.querySelector(".item-sub").textContent += " · " + by
+					ul.appendChild(li)
+				})
+				if (!rows.length) emptyRow(ul, __("No idea is up for vote right now."))
+			})
+			.catch(function (error) {
+				if (stale()) return
+				ul.innerHTML = ""
+				emptyRow(ul, error.message || __("No connection. Try again when you are online."))
+			})
+	}
+
+	var voting = null // the idea open on #/vote/<name>
+
+	function loadVoteDetail(name) {
+		var view = $("view-vote-detail")
+		if (!voting || voting.name !== name) view.setAttribute("aria-busy", "true")
+		var stale = newLoad()
+		call(PC + "get_idea_for_vote", { name: name })
+			.then(function (row) {
+				if (stale()) return dropBusy(view, "vote-detail")
+				renderVoteDetail(row)
+				view.removeAttribute("aria-busy")
+			})
+			.catch(function (error) {
+				if (stale()) return dropBusy(view, "vote-detail")
+				view.removeAttribute("aria-busy")
+				toast(error.message || __("No connection. Try again when you are online."))
+			})
+	}
+
+	function renderVoteDetail(row) {
+		voting = row
+		$("v-title").textContent = row.title
+		var bits = [__(row.stage)]
+		if (row.author && !row.mine) bits.push(row.author.full_name)
+		bits.push(row.vote_count === 1 ? __("1 vote") : __("{0} votes", [row.vote_count]))
+		$("v-meta").textContent = bits.join(" · ")
+		$("v-content").innerHTML = safeHtml(row.content)
+		var button = $("v-vote")
+		if (row.mine) {
+			button.textContent = __("Your idea")
+			button.disabled = true
+		} else {
+			button.disabled = false
+			button.textContent = row.voted ? __("Take back my vote") : __("Vote for this idea")
+			button.classList.toggle("btn-voted", row.voted)
+		}
+	}
+
+	$("v-vote").addEventListener("click", function () {
+		if (!voting || voting.mine) return
+		call(PC + "vote_idea", { name: voting.name }, true)
+			.then(function (result) {
+				voting.voted = result.voted
+				voting.vote_count = result.vote_count
+				renderVoteDetail(voting)
+			})
+			.catch(function (error) {
+				toast(error.message || __("No connection. Try again when you are online."))
+			})
+	})
+
 	renderQueue(readQueue())
 	updateSave()
 	flush()
-	focusText()
+	route()
 })()

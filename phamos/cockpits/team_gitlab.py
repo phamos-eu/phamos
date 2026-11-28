@@ -207,11 +207,18 @@ def _sla(team, windows):
 			fields=["first_response_time", "first_responded_on", "response_by"],
 		)
 		with_target = [r for r in responded if r.response_by]
+		# Only Issues with a resolution target that were actually resolved count. agreement_status is
+		# no use here: for an SLA without "Apply SLA for Resolution" ERPNext sets it to Fulfilled or
+		# Failed at the first response, while the Issue is still open.
 		resolved = frappe.get_all(
 			"Issue",
-			filters={"opening_date": ["between", [start, end]], "agreement_status": ["in", ["Fulfilled", "Failed"]]},
+			filters={
+				"opening_date": ["between", [start, end]],
+				"sla_resolution_by": ["is", "set"],
+				"sla_resolution_date": ["is", "set"],
+			},
 			or_filters=or_filters,
-			fields=["agreement_status"],
+			fields=["sla_resolution_date", "sla_resolution_by"],
 		)
 		result[key] = frappe._dict(
 			responses=len(responded),
@@ -226,7 +233,9 @@ def _sla(team, windows):
 			if with_target
 			else None,
 			resolutions=len(resolved),
-			resolutions_in_time=round(sum(1 for r in resolved if r.agreement_status == "Fulfilled") / len(resolved) * 100, 1)
+			resolutions_in_time=round(
+				sum(1 for r in resolved if r.sla_resolution_date <= r.sla_resolution_by) / len(resolved) * 100, 1
+			)
 			if resolved
 			else None,
 		)

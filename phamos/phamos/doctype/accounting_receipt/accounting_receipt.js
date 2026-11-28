@@ -763,7 +763,7 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     show_datev_send_dialog: function(frm) {
-        // Fetch info needed for confirmation dialog
+        // Fetch info needed for the send dialog
         frappe.call({
             method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.get_datev_send_info",
             args: { accounting_receipt_name: frm.doc.name },
@@ -776,19 +776,9 @@ frappe.ui.form.on("Accounting Receipt", {
                     });
                     return;
                 }
-                
+
                 const info = r.message;
-                
-                // Validate recipient
-                if (!info.recipient) {
-                    frappe.msgprint({
-                        title: __("Configuration Error"),
-                        indicator: "red",
-                        message: __("DATEV recipient email is not configured. Please contact system administrator.")
-                    });
-                    return;
-                }
-                
+
                 // DATEV only accepts registered senders: send from the user's own account or not at all
                 if (!info.sender) {
                     frappe.msgprint({
@@ -808,51 +798,91 @@ frappe.ui.form.on("Accounting Receipt", {
                     });
                     return;
                 }
-                
-                // Build dialog message
-                let dialog_message = `
-                    <div style="margin-bottom: 15px;">
-                        <p><strong>${__("From")}:</strong> ${info.sender}</p>
-                        <p><strong>${__("Recipient")}:</strong> ${info.recipient}</p>
-                        <p><strong>${__("PDF File")}:</strong> ${info.pdf_name}</p>
-                    </div>
-                `;
-                
-                if (info.already_sent) {
-                    dialog_message += `
-                        <div style="padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 15px;">
-                            <p style="margin: 0; color: #856404;">
-                                <strong>${__("Warning")}:</strong> ${__("This document was already sent on")} 
-                                ${frappe.datetime.str_to_user(info.sent_at)} ${__("by")} ${info.sent_by}.
-                            </p>
-                            ${info.email_queue_ref ? `<p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
-                                ${__("Email Queue")}: ${info.email_queue_ref}
-                            </p>` : ''}
-                        </div>
-                    `;
-                }
-                
-                dialog_message += `<p>${__("Are you sure you want to send this document to DATEV?")}</p>`;
-                
-                // Show confirmation dialog
-                frappe.confirm(
-                    dialog_message,
-                    function() {
-                        // User confirmed - send email
-                        frm.events.send_to_datev_now(frm);
-                    },
-                    function() {
-                        // User cancelled
-                    }
-                );
+
+                frm.events.open_datev_send_dialog(frm, info);
             }
         });
     },
 
-    send_to_datev_now: function(frm) {
+    // From, an editable To and the PDF exactly as DATEV gets it (#1828).
+    // Another address than the configured one is a test send: the receipt is not marked as sent.
+    open_datev_send_dialog: function(frm, info) {
+        const configured = (info.recipient || "").trim().toLowerCase();
+        const is_test = (value) => Boolean(value) && value.trim().toLowerCase() !== configured;
+
+        let warning = "";
+        if (info.already_sent) {
+            warning = `
+                <div style="padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 10px; color: #856404;">
+                    <strong>${__("Warning")}:</strong> ${__("This document was already sent on {0} by {1}.", [
+                        frappe.datetime.str_to_user(info.sent_at), frappe.utils.escape_html(info.sent_by || "")
+                    ])}
+                    ${info.email_queue_ref ? `<div style="font-size: 12px; margin-top: 4px;">${__("Email Queue")}: ${frappe.utils.escape_html(info.email_queue_ref)}</div>` : ""}
+                </div>`;
+        }
+
+        const dialog = new frappe.ui.Dialog({
+            title: __("Send to DATEV"),
+            size: "large",
+            fields: [
+                { fieldname: "sender", fieldtype: "Data", label: __("From"), read_only: 1, default: info.sender },
+                { fieldname: "col", fieldtype: "Column Break" },
+                {
+                    fieldname: "recipient", fieldtype: "Data", options: "Email", label: __("To"), reqd: 1,
+                    default: info.recipient || "",
+                    description: info.recipient ? __("DATEV address: {0}", [frappe.utils.escape_html(info.recipient)]) : __("No DATEV address is configured."),
+                    onchange: () => update_test_note(),
+                },
+                { fieldname: "sec", fieldtype: "Section Break" },
+                { fieldname: "test_note", fieldtype: "HTML" },
+                { fieldname: "warning", fieldtype: "HTML", options: warning },
+                { fieldname: "pdf", fieldtype: "HTML", options: `<p class="text-muted">${__("Building the PDF…")}</p>` },
+            ],
+            primary_action_label: __("Send"),
+            primary_action: (values) => {
+                dialog.hide();
+                frm.events.send_to_datev_now(frm, values.recipient);
+            },
+        });
+
+        function update_test_note() {
+            const value = dialog.get_value("recipient") || "";
+            const test = is_test(value);
+            dialog.fields_dict.test_note.$wrapper.html(test
+                ? `<div style="padding: 8px 10px; background: var(--blue-50, #eff6ff); border-radius: 4px; margin-bottom: 10px;">${__("Test send: the receipt is not marked as sent to DATEV.")}</div>`
+                : "");
+            dialog.set_primary_action(test ? __("Send test") : __("Send"), dialog.primary_action);
+        }
+
+        dialog.show();
+        update_test_note();
+
+        // The PDF that goes out: the stamped copy when the receipt has a note, else the original.
+        frappe.call({
+            method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.preview_datev_pdf",
+            args: { accounting_receipt_name: frm.doc.name },
+            callback: function(r) {
+                const res = r.message || {};
+                if (!res.file_url) return;
+                const url = encodeURI(res.file_url);
+                const name = frappe.utils.escape_html(res.file_url.split("/").pop());
+                dialog.fields_dict.pdf.$wrapper.html(`
+                    <div style="margin-bottom: 6px;">
+                        <strong>${__("PDF File")}:</strong> <a href="${url}" target="_blank" rel="noopener">${name}</a>
+                        ${res.stamped ? `<span class="text-muted"> · ${__("with the note for the accounting office")}</span>` : ""}
+                    </div>
+                    <iframe src="${url}" style="width: 100%; height: 60vh; border: 1px solid var(--border-color); border-radius: 4px;"></iframe>`);
+            },
+            error: function() {
+                dialog.fields_dict.pdf.$wrapper.html(`<p class="text-danger">${__("Could not build the DATEV PDF.")}</p>`);
+            },
+        });
+    },
+
+    send_to_datev_now: function(frm, recipient) {
         frappe.call({
             method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.send_to_datev",
-            args: { accounting_receipt_name: frm.doc.name },
+            args: { accounting_receipt_name: frm.doc.name, recipient: recipient || null },
             freeze: true,
             freeze_message: __("Sending to DATEV..."),
             callback: function(r) {

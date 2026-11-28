@@ -125,27 +125,37 @@ export function useReceiptDetail({ onChanged } = {}) {
 		}
 	}
 
-	async function sendToDatev() {
+	// What the send dialog shows (#1828); null with a toast when the receipt can't be sent.
+	// A missing DATEV address is fine here: the user may still send a test to another address.
+	async function prepareDatevSend() {
 		if (pendingNoteSave) await pendingNoteSave
-		if (!receipt.value) return false
+		if (!receipt.value) return null
 		const info = await call(`${RECEIPT_DOC}.get_datev_send_info`, { accounting_receipt_name: receipt.value.name })
-		if (!info?.ok || !info.recipient || !info.pdf_url) {
-			failToast(info?.message || (!info?.recipient ? "No DATEV recipient is configured." : "PDF attachment is missing."))
-			return false
+		if (!info?.ok || !info.pdf_url) {
+			failToast(info?.message || "PDF attachment is missing.")
+			return null
 		}
 		if (!info.sender) {
 			failToast(info.sender_missing_message)
-			return false
+			return null
 		}
-		const question = info.already_sent
-			? `Already sent on ${info.sent_at} by ${info.sent_by}. Send ${info.pdf_name} from ${info.sender} to ${info.recipient} again?`
-			: `Send ${info.pdf_name} from ${info.sender} to ${info.recipient}?`
-		if (!window.confirm(question)) return false
-		const res = await call(`${RECEIPT_DOC}.send_to_datev`, { accounting_receipt_name: receipt.value.name })
+		return info
+	}
+
+	// Returns the server's answer ({ok, message, test_send}) or null.
+	async function sendToDatev(recipient) {
+		if (!receipt.value) return null
+		let res = null
+		try {
+			res = await call(`${RECEIPT_DOC}.send_to_datev`, { accounting_receipt_name: receipt.value.name, recipient })
+		} catch (e) {
+			failToast(errorText(e, "Sending failed."))
+			return null
+		}
 		;(res?.ok ? okToast : failToast)(res?.message || (res?.ok ? "Queued for DATEV." : "Sending failed."))
 		await refresh()
 		onChanged?.({ quiet: true })
-		return Boolean(res?.ok)
+		return res
 	}
 
 	// Leaving the note field (e.g. by clicking Send to DATEV) saves it; send and preview
@@ -187,6 +197,7 @@ export function useReceiptDetail({ onChanged } = {}) {
 		setReceipt,
 		runExtract,
 		setStatus,
+		prepareDatevSend,
 		sendToDatev,
 		saveNote,
 		previewDatev,

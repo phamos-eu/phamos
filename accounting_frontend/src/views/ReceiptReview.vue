@@ -16,7 +16,7 @@
 				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Don't pay (x)" @click="decide('Do Not Pay', 'Marked: do not pay')">
 					Don't pay
 				</button>
-				<button type="button" class="btn-primary" :disabled="!detail.receipt.value?.has_pdf || busy" title="Send to DATEV (d)" @click="sendAndNext">
+				<button type="button" class="btn-primary" :disabled="!detail.receipt.value?.has_pdf || busy" title="Send to DATEV (d)" @click="openDatevSend(true)">
 					Send to DATEV
 				</button>
 			</div>
@@ -36,7 +36,7 @@
 			@review-correct="detail.showCompare.value = true"
 			@run-extract="detail.runExtract(false)"
 			@rerun-extract="detail.runExtract(true)"
-			@send-to-datev="detail.sendToDatev"
+			@send-to-datev="openDatevSend(false)"
 			@save-note="detail.saveNote"
 			@preview-datev="detail.previewDatev"
 		/>
@@ -49,6 +49,14 @@
 		/>
 		<ApproveDialog v-if="detail.receipt.value && showApprove" v-model="showApprove" :receipt="detail.receipt.value" @approved="onApproved" />
 		<PaidDialog v-if="detail.receipt.value && showPaid" v-model="showPaid" :receipt="detail.receipt.value" @paid="onPaid" />
+		<DatevSendDialog
+			v-if="detail.receipt.value && datevSend"
+			v-model="showDatevSend"
+			:receipt-name="detail.receipt.value.name"
+			:info="datevSend.info"
+			:sending="busy"
+			@send="sendToDatev"
+		/>
 	</div>
 </template>
 
@@ -57,6 +65,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
 import ApproveDialog from "../components/ApproveDialog.vue"
+import DatevSendDialog from "../components/DatevSendDialog.vue"
 import ExtractDiffDialog from "../components/ExtractDiffDialog.vue"
 import PaidDialog from "../components/PaidDialog.vue"
 import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
@@ -165,11 +174,32 @@ async function decide(status, label) {
 	}
 }
 
-async function sendAndNext() {
+// Send to DATEV opens the send dialog; from the review bar (button, d) a real send moves on
+// to the next receipt, a test send stays here.
+const datevSend = ref(null)
+const showDatevSend = ref(false)
+
+async function openDatevSend(andNext) {
+	if (!detail.receipt.value?.has_pdf) return
 	busy.value = true
 	try {
 		await flushEdits()
-		if (await detail.sendToDatev()) await next()
+		const info = await detail.prepareDatevSend()
+		if (!info) return
+		datevSend.value = { info, andNext }
+		showDatevSend.value = true
+	} finally {
+		busy.value = false
+	}
+}
+
+async function sendToDatev(recipient) {
+	busy.value = true
+	try {
+		const res = await detail.sendToDatev(recipient)
+		if (!res?.ok) return
+		showDatevSend.value = false
+		if (datevSend.value?.andNext && !res.test_send) await next()
 	} finally {
 		busy.value = false
 	}
@@ -190,7 +220,7 @@ function onKey(event) {
 		a: approve,
 		p: openPaid,
 		x: () => decide("Do Not Pay", "Marked: do not pay"),
-		d: () => sendAndNext(),
+		d: () => openDatevSend(true),
 	}
 	const action = actions[event.key]
 	if (action) {

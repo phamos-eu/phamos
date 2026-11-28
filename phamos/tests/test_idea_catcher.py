@@ -216,3 +216,18 @@ class TestIdeaCatcher(FrappeTestCase):
 		frappe.set_user(OTHER)
 		with self.assertRaises(frappe.ValidationError):
 			catcher.undo_append(result["undo"])
+
+	# the app's idea page (#2210)
+
+	def test_add_to_idea_appends_with_a_date_line(self):
+		target = self._mine("Target", "<p>old</p>")
+		idea = catcher.add_to_idea(target, "A further thought")
+		self.assertTrue(idea["content"].startswith("<p>old</p><p><em>"))
+		self.assertIn("<p>A further thought</p>", idea["content"])
+
+	def test_add_to_idea_only_on_my_ideas(self):
+		frappe.set_user(OTHER)
+		theirs = self._mine("Theirs")
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			catcher.add_to_idea(theirs, "Not mine")
