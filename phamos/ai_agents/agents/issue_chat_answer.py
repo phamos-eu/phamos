@@ -52,13 +52,13 @@ def named_in_message(field, value, text):
 	if title_field:
 		names.add(cstr(frappe.db.get_value(SETTABLE_FIELDS[field], value, title_field)).lower())
 	# whole words only, so a short title such as "AG" isn't "named" inside another word (AI review on !1386)
-	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text) for n in names)
+	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text, re.IGNORECASE) for n in names)
 
 
 def person_named(user, full_name, text):
 	"""Whether the colleague's message names the person: e-mail, full name or first name, as whole words."""
 	names = {cstr(user).lower(), cstr(full_name).lower(), cstr(full_name).split(" ")[0].lower()}
-	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text) for n in names)
+	return any(n and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text, re.IGNORECASE) for n in names)
 
 
 CHAT_SYSTEM = (

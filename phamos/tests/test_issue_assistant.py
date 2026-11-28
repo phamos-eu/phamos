@@ -919,7 +919,7 @@ class TestChat(IssueAssistantTestCase):
 		with patch("frappe.desk.form.assign_to.notify_assignment"):
 			run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
 			self.assertNotIn(DESK_USER, self.assignees(doc))
-			self.answer(doc, self.reply_in_thread(brief, f"please assign {DESK_USER}"))
+			self.answer(doc, self.reply_in_thread(brief, f"Please assign {DESK_USER.upper()}"))
 		self.assertIn(DESK_USER, self.assignees(doc))
 
 	def test_a_failed_reply_still_records_the_changes(self):
