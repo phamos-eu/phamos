@@ -2924,15 +2924,18 @@ function upsertFlag(flag) {
 	flags.value = [...flags.value.filter((f) => f.user !== flag.user), flag]
 }
 
-async function saveFlag(args, { thump = false } = {}) {
-	const before = flags.value
+// `previous` is my flag as it was before the optimistic update (null: none planted), so a
+// refusal can put it back. Only my own entry is restored: other people's flags may have
+// changed meanwhile through realtime and must stay as they are.
+async function saveFlag(args, { thump = false, previous = null } = {}) {
 	try {
 		const flag = await call(`${API}.set_my_flag`, args)
 		upsertFlag(flag)
 		// A soft thump as it goes into the ground (PM, 2026-11-27): for me only; the bell mutes it.
 		if (thump) encounterAlert.thump()
 	} catch (e) {
-		flags.value = before
+		const mine = me.value?.user
+		flags.value = [...flags.value.filter((f) => f.user !== mine), ...(previous ? [previous] : [])]
 		toast({ title: errorText(e) || __("Your flag could not be planted."), icon: "alert-circle" })
 	}
 }
@@ -2945,8 +2948,9 @@ function plantFlag(cell) {
 		return
 	}
 	// Planted where it lands right away; the server's answer (or its refusal) follows.
+	const previous = myFlag.value || null
 	upsertFlag({ ...(myFlag.value || flagLook.value), user: me.value.user, full_name: me.value.full_name, ...cell })
-	saveFlag({ x: cell.x, y: cell.y }, { thump: true })
+	saveFlag({ x: cell.x, y: cell.y }, { thump: true, previous })
 }
 
 function moveFlag(cell) {
@@ -2957,8 +2961,9 @@ function moveFlag(cell) {
 
 function setFlagLook(look) {
 	if (!myFlag.value) return
+	const previous = myFlag.value
 	upsertFlag({ ...myFlag.value, ...look })
-	saveFlag(look)
+	saveFlag(look, { previous })
 }
 
 async function takeDownFlag() {

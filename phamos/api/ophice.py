@@ -772,7 +772,8 @@ def set_my_flag(x=None, y=None, color=None, pattern=None):
 	if x is not None or y is not None:
 		try:
 			x, y = int(float(x)), int(float(y))
-		except (TypeError, ValueError):
+		# OverflowError: "inf" / "1e999" pass float() but not int().
+		except (TypeError, ValueError, OverflowError):
 			frappe.throw(_("Choose a spot on the map."))
 		if not (0 <= x < _cols() and 0 <= y < _rows()):
 			frappe.throw(_("Choose a spot on the map."))

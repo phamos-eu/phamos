@@ -1885,6 +1885,10 @@ class OphiceFlagTestCase(FrappeTestCase):
 			ophice.set_my_flag(0, 0, color="gold")
 		with self.assertRaises(frappe.ValidationError):
 			ophice.set_my_flag(0, 0, pattern="tartan")
+		# Not a number int() can hold: the same friendly error, not a 500.
+		for bad in ("inf", "1e999", "nan", "abc"):
+			with self.assertRaises(frappe.ValidationError):
+				ophice.set_my_flag(bad, 0)
 
 	def test_disabled_users_flags_are_gone(self):
 		frappe.set_user(self.other)
