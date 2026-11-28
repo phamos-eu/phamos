@@ -182,3 +182,37 @@ class TestIdeaCatcher(FrappeTestCase):
 				catcher.link_idea(caught, target, "append")
 		self.assertEqual(frappe.db.get_value("Idea", child, "spawned_from"), caught)
 		self.assertEqual(frappe.db.get_value("Idea", grandchild, "spawned_from"), child)
+
+	# undo after "Add to it" (#2209)
+
+	def test_undo_puts_both_ideas_back(self):
+		target = self._mine("Target", "<p>old text</p>")
+		caught = catcher.save_idea("One more thought")["name"]
+		child = self._mine("Child")
+		catcher.link_idea(child, caught, "spawned")
+		result = catcher.link_idea(caught, target, "append")
+		restored = catcher.undo_append(result["undo"])
+		self.assertEqual(restored["name"], caught)
+		self.assertEqual(frappe.db.get_value("Idea", caught, "title"), "One more thought")
+		self.assertEqual(frappe.db.get_value("Idea", caught, "user"), USER)
+		self.assertEqual(frappe.db.get_value("Idea", target, "content"), "<p>old text</p>")
+		self.assertEqual(frappe.db.get_value("Idea", child, "spawned_from"), caught)
+		with self.assertRaises(frappe.ValidationError):  # only once
+			catcher.undo_append(result["undo"])
+
+	def test_undo_refuses_when_the_target_changed(self):
+		target = self._mine("Target", "<p>old text</p>")
+		caught = catcher.save_idea("Thought")["name"]
+		result = catcher.link_idea(caught, target, "append")
+		ideas.update_idea(target, content="<p>edited elsewhere</p>")
+		with self.assertRaises(frappe.ValidationError):
+			catcher.undo_append(result["undo"])
+		self.assertFalse(frappe.db.exists("Idea", caught))
+
+	def test_undo_token_is_per_user(self):
+		target = self._mine("Target")
+		caught = catcher.save_idea("Thought")["name"]
+		result = catcher.link_idea(caught, target, "append")
+		frappe.set_user(OTHER)
+		with self.assertRaises(frappe.ValidationError):
+			catcher.undo_append(result["undo"])

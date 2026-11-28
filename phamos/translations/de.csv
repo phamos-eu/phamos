@@ -3241,6 +3241,8 @@ Grew out of this idea,Aus dieser Idee entstanden
 {0} grew out of this idea. Link it instead of adding it.,"{0} ist aus dieser Idee entstanden. Verknüpfen Sie sie, statt sie zu ergänzen."
 Install app,App installieren
 "Add to your Home Screen: tap Share, then 'Add to Home Screen'.","Zum Home-Bildschirm hinzufügen: auf Teilen tippen, dann „Zum Home-Bildschirm“."
+Too late to undo. Change the idea in the Personal Cockpit instead.,Zu spät zum Rückgängigmachen. Ändern Sie die Idee stattdessen im Personal Cockpit.
+"{0} was changed in the meantime, so this cannot be undone.","{0} wurde inzwischen geändert, daher lässt sich das nicht rückgängig machen."
 Team Assignment,Teamzuordnung
 Co-Lead,Co-Lead
 Empty while the assignment is open.,"Leer, solange die Zuordnung offen ist."
@@ -3277,3 +3279,51 @@ Chat Message,Chat-Nachricht
 The Raven Message the assistant answered (#2116).,"Die Raven-Nachricht, auf die der Assistent geantwortet hat (#2116)."
 Switch an Implementation on,Implementierung einschalten
 applies to all document types: the assistant can't read Issues of other Implementations. Set Applicable For to Implementation.,gilt für alle Dokumenttypen: Der Assistent kann Anfragen anderer Implementierungen nicht lesen. „Anwendbar für“ auf Implementierung setzen.
+Actual hours per month; the line is the predicted hours per month,Ist-Stunden pro Monat; die Linie zeigt die geplanten Stunden pro Monat
+Billable rate,Abrechenbare Quote
+Billable · non-billable,Abrechenbar · nicht abrechenbar
+"Billable, non-billable customer work and internal hours; the line below each month is the booked rate.",Abrechenbare und nicht abrechenbare Kundenarbeit sowie interne Stunden; unter jedem Monat steht die Buchungsquote.
+Booked rate,Buchungsquote
+Could not load the implementations.,Die Implementierungen konnten nicht geladen werden.
+Could not load the statistics.,Die Statistik konnte nicht geladen werden.
+Health,Zustand
+Hours on this project count as internal in the Team Cockpit's statistics.,Stunden auf diesem Projekt zählen in der Statistik des Team-Cockpits als intern.
+Hours per FTE,Stunden pro VZÄ
+Hours this month,Stunden in diesem Monat
+Is Internal Project,Internes Projekt
+Last 6 months,Letzte 6 Monate
+Level {0},Stufe {0}
+Loading implementations…,Implementierungen werden geladen…
+Loading statistics…,Statistik wird geladen…
+Logged / available,Gebucht / verfügbar
+Logged against available hours,Gebuchte gegenüber verfügbaren Stunden
+Logged hours — 12 months,Gebuchte Stunden – 12 Monate
+"Maturity level, forecast and trend","Reifegrad, Prognose und Trend"
+Members this month,Mitglieder in diesem Monat
+No hours to show.,Keine Stunden vorhanden.
+No limit,Kein Limit
+No open implementation belongs to this team.,Zu diesem Team gehört keine offene Implementierung.
+Non-billable customer work,Nicht abrechenbare Kundenarbeit
+Open implementations,Offene Implementierungen
+Over their time limit,Über dem Zeitlimit
+Predicted per month,Geplant pro Monat
+Predicted: {0} h per month,Geplant: {0} h pro Monat
+Show member hours to team leads,Stunden der Mitglieder für Teamleitungen anzeigen
+Sold · delivered · left,Verkauft · geliefert · offen
+Sold · delivered · remaining hours,Verkaufte · gelieferte · verbleibende Stunden
+Sorted by name. Rates against each person's available hours after leave and holidays.,Nach Name sortiert. Quoten bezogen auf die verfügbaren Stunden jeder Person nach Urlaub und Feiertagen.
+Team leads and co-leads see logged and available hours of each member on the Team Cockpit's Statistics page. Members always see their own. Switch on only after the privacy owner has confirmed it (#1975).,"Teamleitung und Co-Leitung sehen auf der Statistikseite des Team-Cockpits die gebuchten und verfügbaren Stunden jedes Mitglieds. Mitglieder sehen immer ihre eigenen. Erst einschalten, wenn die Datenschutzverantwortliche Person es bestätigt hat (#1975)."
+"The team's implementations, in hours","Die Implementierungen des Teams, in Stunden"
+"Year to date: {0} h logged, booked rate {1}","Seit Jahresbeginn: {0} h gebucht, Buchungsquote {1}"
+Your hours this month,Ihre Stunden in diesem Monat
+from the 3-month prediction,aus der 3-Monats-Planung
+of logged hours,der gebuchten Stunden
+of {0} with a limit,von {0} mit Limit
+so far,bisher
+"so far, all implementations","bisher, alle Implementierungen"
+vs last year,ggü. Vorjahr
+vs {0},ggü. {0}
+{0} of {1} at target,{0} von {1} am Ziel
+{0} of {1} h,{0} von {1} h
+"{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
+"{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"
