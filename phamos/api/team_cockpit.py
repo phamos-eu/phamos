@@ -446,7 +446,7 @@ def _sees_member_rows(team, employee):
 
 
 def _sees_missing_hours(team, employee):
-	"""Who has no working hours set is a data-quality notice for lead, co-lead and HR."""
+	"""Data-quality notices (missing working hours, unmatched GitLab items) are for lead, co-lead and HR."""
 	return teams.sees_all_teams() or "HR Manager" in frappe.get_roles() or _leads_team(team, employee)
 
 
@@ -549,3 +549,20 @@ def get_team_implementations():
 	# Team members see their team's implementations here (#1975), but only those who may read
 	# Implementation get the link to its Desk form.
 	return {"team": team, "implementations": rows, "can_open": bool(frappe.has_permission("Implementation", "read"))}
+
+
+@frappe.whitelist()
+@_require_access
+def get_gitlab_statistics():
+	"""GitLab figures of the active team's people and the SLA figures of its Issues (#1976). Team
+	totals only, no figures per person. The count of unmatched items in the team's own projects is a
+	data-quality notice for lead, co-lead and HR, like the missing working hours."""
+	from phamos.cockpits import team_gitlab
+
+	team = teams.require_active_team()
+	employee = teams._employee(frappe.session.user)
+	data = team_gitlab.team_gitlab_statistics(team)
+	if not _sees_missing_hours(team, employee):
+		data.unmatched_own_items = None
+	data.team = team
+	return data

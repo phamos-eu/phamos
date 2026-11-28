@@ -128,7 +128,14 @@ class TestTeamCockpitWiring(FrappeTestCase):
 			name.replace("get_software_development_settings", tc.CONFIG.settings_method_name)
 			for name in _whitelisted(software_development_spa)
 		}
-		own = {"get_teams", "set_active_team"}
+		own = {
+			"get_teams",
+			"set_active_team",
+			# statistics and implementations (#1975, #1976)
+			"get_hours_statistics",
+			"get_team_implementations",
+			"get_gitlab_statistics",
+		}
 		self.assertEqual(set(_whitelisted(tc)), expected | own)
 
 	def test_every_endpoint_checks_access(self):

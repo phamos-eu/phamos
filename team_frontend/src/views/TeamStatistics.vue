@@ -92,9 +92,9 @@ const error = ref("")
 const data = ref(null)
 
 const GROUP_COLORS = {
-	billable: "var(--ink-green-3)",
-	non_billable: "var(--ink-blue-3)",
-	internal: "var(--ink-gray-4)",
+	billable: "var(--chart-series-1)",
+	non_billable: "var(--chart-series-2)",
+	internal: "var(--chart-series-3)",
 }
 const seriesLegend = [
 	{ label: __("Billable"), color: GROUP_COLORS.billable },
