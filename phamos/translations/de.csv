@@ -3667,3 +3667,5 @@ Which {0} do you mean: {1}?,Welche/n {0} meinen Sie: {1}?
 Whom do you mean: {0}?,Wen meinen Sie: {0}?
 Shall I set {0} to {1}? Answer yes and I will.,"Soll ich {0} auf {1} setzen? Antworten Sie mit ja, dann mache ich es."
 "you wrote ""{0}""",Sie schrieben „{0}“
+setting {0} without you writing it; please write which one,"{0} setzen, ohne dass Sie es schreiben; bitte schreiben Sie, welche"
+changing {0}: you didn't ask for it,{0} ändern: danach haben Sie nicht gefragt

@@ -31,8 +31,17 @@ TEXT_TYPES = ("Data", "Small Text", "Text", "Long Text", "Text Editor", "Markdow
 # fields that decide whose Issue it is → the doctype of the value and its title field
 NAMED_FIELDS = {"customer": ("Customer", "customer_name"), "contact": ("Contact", "full_name"),
 	"custom_implementation": ("Implementation", None), "project": ("Project", "project_name")}
-YES_WORDS = {"yes", "ja", "jep", "yep", "ok", "okay", "sure", "klar", "gerne", "bitte", "do", "it", "mach", "das",
-	"go", "ahead", "close", "schließen", "schliessen"}
+# a confirmation is the whole message, one of these (AI review on !1407: "das ist falsch" must not close)
+YES_PHRASES = {"yes", "y", "ja", "j", "jep", "yep", "ok", "okay", "sure", "klar", "gerne", "ja bitte", "yes please",
+	"mach das", "mach", "do it", "go ahead", "close it", "schließen", "schliessen", "ja schließen", "ja, schließen"}
+# kept by the system or deciding who sees the Issue: never set from the chat (AI review on !1407)
+SYSTEM_FIELDS = {"company", "email_account", "service_level_agreement", "first_responded_on", "response_by",
+	"resolution_by", "agreement_status", "sla_resolution_by", "sla_resolution_date", "via_customer_portal", "lead",
+	"opening_date", "opening_time", "resolution_date", "resolution_time", "user_resolution_time",
+	"avg_response_time", "on_hold_since", "total_hold_time"}
+# whose Issue it is in the portal: the colleague must write the address itself
+NAMED_TEXT_FIELDS = ("raised_by",)
+SHORT_NAME = 4  # names up to this length only count when written exactly ("Tim" ≠ "time")
 
 
 # --- which fields ---------------------------------------------------------------------------------
@@ -46,9 +55,9 @@ def writable_fields(issue, user):
 	levels = set(meta.get_permlevel_access("write", user=user)) | {0}
 	return {
 		df.fieldname: df for df in meta.fields
-		if df.fieldtype not in no_value_fields and df.fieldtype not in table_fields
-		and not df.read_only and not df.hidden and (df.permlevel or 0) in levels
-		and df.fieldname not in ("naming_series", "amended_from")
+		if df.fieldtype not in no_value_fields and df.fieldtype not in table_fields and df.fieldtype != "Dynamic Link"
+		and not df.read_only and not df.hidden and not df.read_only_depends_on and (df.permlevel or 0) in levels
+		and df.fieldname not in SYSTEM_FIELDS and df.fieldname not in ("naming_series", "amended_from")
 	}
 
 
@@ -68,16 +77,18 @@ def describe(issue, fields):
 # --- values ---------------------------------------------------------------------------------------
 
 
-def check_value(df, value):
+def check_value(df, value, user=None):
 	"""(the value to save, None) or (None, the reason it can't be saved)."""
 	text = cstr(value).strip()
 	if text in ("", "null", "None") and not df.reqd:
 		return None, None
 	try:
 		if df.fieldtype == "Link":
-			if not frappe.db.exists(df.options, text):
+			name = frappe.db.get_value(df.options, text, "name")
+			if not name or (user and not frappe.has_permission(df.options, "read", doc=name, user=user)):
+				# not readable is answered like not found, so the chat reveals nothing (AI review on !1407)
 				return None, _("{0} {1} does not exist").format(_(df.options), text)
-			return text, None
+			return name, None  # its exact spelling, not the model's casing
 		if df.fieldtype == "Select":
 			options = [o for o in cstr(df.options).split("\n") if o]
 			if text not in options:
@@ -85,8 +96,12 @@ def check_value(df, value):
 			return text, None
 		if df.fieldtype == "Date":
 			return str(getdate(text)), None
-		if df.fieldtype in ("Datetime", "Time"):
+		if df.fieldtype == "Datetime":
 			return str(get_datetime(text)), None
+		if df.fieldtype == "Time":
+			from frappe.utils import get_time
+
+			return str(get_time(text)), None
 		if df.fieldtype == "Check":
 			if text.lower() not in ("0", "1", "true", "false", "yes", "no"):
 				return None, _("{0} must be yes or no").format(_(df.label))
@@ -94,7 +109,10 @@ def check_value(df, value):
 		if df.fieldtype == "Int":
 			return cint(float(text)), None
 		if df.fieldtype in ("Float", "Currency", "Percent", "Duration"):
-			float(text)
+			import math
+
+			if not math.isfinite(float(text)):
+				raise ValueError(text)
 			return flt(text), None
 		if df.fieldtype in TEXT_TYPES or df.fieldtype in ("Phone", "Data", "Rating", "Color"):
 			return text[: (df.length or 140)] if df.fieldtype in ("Data", "Phone") else text, None
@@ -107,12 +125,14 @@ def check_value(df, value):
 
 
 def says_yes(text):
-	words = re.findall(r"[\wäöüß]+", cstr(text).lower())
-	return 0 < len(words) <= 4 and words[0] in YES_WORDS | {"y", "j"} and not {"no", "nein", "nicht"} & set(words)
+	"""Only a clear yes on its own: the whole message is one of YES_PHRASES."""
+	return " ".join(re.findall(r"[\wäöüß]+", cstr(text).lower())) in {
+		" ".join(re.findall(r"[\wäöüß]+", p)) for p in YES_PHRASES}
 
 
-def pending_close(issue_name, asker):
-	"""The status the assistant asked this person about closing to, if they asked within the last minutes."""
+def pending_close(issue_name, asker, channel=None):
+	"""The status the assistant asked this person about closing to, within the last minutes and in the same chat
+	or thread (an "ok" elsewhere is no answer to it, AI review on !1407)."""
 	from frappe.utils import add_to_date, now_datetime
 
 	from phamos.ai_agents.agents.issue_chat_answer import CHAT_TRIGGER
@@ -124,7 +144,10 @@ def pending_close(issue_name, asker):
 	if not run:
 		return None
 	chat = (frappe.parse_json(run[0].analysis or "{}") or {}).get("chat") or {}
-	return chat.get("pending_close")
+	pending = chat.get("pending_close")
+	if not isinstance(pending, dict) or (channel and pending.get("channel") != channel):
+		return None
+	return pending.get("status")
 
 
 # --- naming, tolerant of typos --------------------------------------------------------------------
@@ -135,15 +158,21 @@ def _norm(text):
 
 
 def _score(name, words):
-	"""Best similarity of `name` with any run of words of the same length (±1) in the message."""
+	"""Best similarity of `name` with any run of words of the same length (±1) in the message. Short names only
+	count when written exactly; cheap upper bounds skip most comparisons."""
 	target = _norm(name)
 	if not target:
 		return 0
+	if len(target) <= SHORT_NAME:
+		return 1.0 if target in words or target in " ".join(words).split() else 0
 	n = len(target.split())
 	best = 0
 	for size in {max(1, n - 1), n, n + 1}:
 		for i in range(0, max(1, len(words) - size + 1)):
-			best = max(best, difflib.SequenceMatcher(None, target, " ".join(words[i:i + size])).ratio())
+			matcher = difflib.SequenceMatcher(None, target, " ".join(words[i:i + size]))
+			if matcher.real_quick_ratio() < CLOSE_MATCH or matcher.quick_ratio() < CLOSE_MATCH:
+				continue
+			best = max(best, matcher.ratio())
 	return best
 
 
@@ -168,7 +197,7 @@ def resolve_named(field, value, text):
 		return {"ok": False, "note": None, "suggestions": []}
 	fields = ["name"] + ([title_field] if title_field else [])
 	rivals = []
-	for row in frappe.get_all(doctype, fields=fields, limit_page_length=5000):
+	for row in frappe.get_all(doctype, fields=fields, limit_page_length=0):
 		if row.name == value:
 			continue
 		rival = max(_score(row.name, words), _score(row.get(title_field), words) if title_field else 0)
@@ -186,15 +215,15 @@ def resolve_person(user, full_name, text):
 	names = [user, full_name, cstr(full_name).split(" ")[0]]
 	if any(_exact(n, text) for n in names):
 		return {"ok": True, "note": None, "suggestions": []}
+	names = [user, full_name]  # a first name only when written exactly (AI review on !1407)
 	words = _norm(text).split()
-	score = max(_score(n, words) for n in names if n)
+	score = max((_score(n, words) for n in names if n), default=0)
 	if score < CLOSE_MATCH:
 		return {"ok": False, "note": None, "suggestions": []}
 	rivals = []
 	for row in frappe.get_all("User", filters={"enabled": 1, "user_type": "System User", "name": ("!=", user)},
-			fields=["name", "full_name"], limit_page_length=5000):
-		rival = max(_score(n, words) for n in (row.name, row.full_name, cstr(row.full_name).split(" ")[0]) if n) \
-			if row.full_name else _score(row.name, words)
+			fields=["name", "full_name"], limit_page_length=0):
+		rival = max(_score(n, words) for n in (row.name, row.full_name) if n)
 		if rival >= max(CLOSE_MATCH, score - CLEAR_LEAD):
 			rivals.append((rival, row.full_name or row.name))
 	if rivals:
@@ -218,3 +247,26 @@ def _closest_phrase(names, words):
 				if ratio > best:
 					best, phrase = ratio, candidate
 	return _("you wrote \"{0}\"").format(phrase) if phrase else None
+
+
+def asked_for(df, value, text):
+	"""Whether the colleague's message asks for this change: it mentions the field (its label or name) or the
+	value. Keeps text in the customer's Issue from steering the model to fields nobody asked about (AI review on
+	!1407). Clearing a field needs the field mentioned."""
+	words = _norm(text).split()
+	field_named = any(_exact(n, text) or (len(_norm(n)) > SHORT_NAME and _score(n, words) >= CLOSE_MATCH)
+		for n in (_(df.label), df.label, df.fieldname.replace("_", " ")) if n)
+	if field_named:
+		return True
+	if value in (None, ""):
+		return False
+	shown = cstr(value)
+	if df.fieldtype == "Link":
+		title_field = frappe.get_meta(df.options).get_title_field()
+		title = frappe.db.get_value(df.options, value, title_field) if title_field and title_field != "name" else None
+		return any(_exact(n, text) or _score(n, words) >= CLOSE_MATCH for n in (shown, title, _(shown)) if n)
+	if df.fieldtype == "Select":
+		# "close it" asks for Closed, "auf erledigt" for its translation
+		return any(_exact(n, text) or (len(_norm(n)) > SHORT_NAME and _score(n, words) >= CLOSE_MATCH)
+			for n in (shown, _(shown)) if n)
+	return False

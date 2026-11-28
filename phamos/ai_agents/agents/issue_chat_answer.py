@@ -181,7 +181,7 @@ def compose_answer(issue, message, asker, agent, result):
 	from phamos.ai_agents.agents.issue import gate_text, model_allowed
 
 	# the colleague's yes to "Shall I close …?": done in code, no model needed (#2239)
-	status = fields.pending_close(issue.name, asker)
+	status = fields.pending_close(issue.name, asker, message.channel_id)
 	if status and fields.says_yes(strip_html_tags(cstr(message.text))):
 		apply_action(issue.name, {"type": "set", "field": "status", "value": status}, asker, result, confirmed=True)
 		lines = [_("Set on {0}'s request: {1}").format(frappe.utils.get_fullname(asker), d["text"]) for d in result["applied"]]
@@ -205,6 +205,7 @@ def compose_answer(issue, message, asker, agent, result):
 	answer = answer if isinstance(answer, dict) else {}
 	lines = [cstr(answer.get("answer")).strip() or _("I have no answer to that.")]
 	result["message_text"] = html.unescape(strip_html_tags(cstr(message.text))).lower()
+	result["chat_channel"] = message.channel_id
 	if not answer.get("ask_back"):
 		for action in answer.get("actions") or []:
 			if isinstance(action, dict):
@@ -238,12 +239,20 @@ def apply_action(issue_name, action, asker, result, confirmed=False):
 				result["refused"].append(_("changing {0}: you may not change it, or it can't be changed here").format(label))
 				return
 			df = writable[field]
-			value, reason = fields.check_value(df, action.get("value"))
+			value, reason = fields.check_value(df, action.get("value"), asker)
 			if reason:
 				result["refused"].append(reason)
 				return
 			label = _(df.label)
 			note = None
+			text = result.get("message_text", "")
+			if field in fields.NAMED_TEXT_FIELDS and value and not fields._exact(value, text):
+				# who sees the Issue in the portal: only the address the colleague wrote (AI review on !1407)
+				result["refused"].append(_("setting {0} without you writing it; please write which one").format(label))
+				return
+			if not confirmed and field not in fields.NAMED_FIELDS and not fields.asked_for(df, value, text):
+				result["refused"].append(_("changing {0}: you didn't ask for it").format(label))
+				return
 			if field in fields.NAMED_FIELDS:
 				# the Issue's own text (from the customer) must never pick these: the colleague names the value,
 				# a close spelling counts when only one record is close (#2230 decision 4)
@@ -258,7 +267,7 @@ def apply_action(issue_name, action, asker, result, confirmed=False):
 				note = named["note"]
 			if field == "status" and value in fields.CLOSING and not confirmed:
 				# closing asks back first (#2230 decision 3)
-				result["pending_close"] = value
+				result["pending_close"] = {"status": value, "channel": result.get("chat_channel")}
 				result.setdefault("questions", []).append(_("Shall I set {0} to {1}? Answer yes and I will.").format(
 					issue_name, _(value)))
 				return

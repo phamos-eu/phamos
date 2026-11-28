@@ -772,8 +772,9 @@ class TestChat(IssueAssistantTestCase):
 		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 1)
 		if not frappe.db.exists("User", self.CHAT_USER):
 			frappe.get_doc({"doctype": "User", "email": self.CHAT_USER, "first_name": "Chat Colleague",
-				"send_welcome_email": 0, "roles": [{"role": "Support Team"}, {"role": "Raven User"}]}).insert(
-				ignore_permissions=True)
+				"send_welcome_email": 0, "roles": [{"role": "Support Team"}, {"role": "Raven User"},
+				# a colleague who may read the customers and projects they link (#2239 checks read on links)
+				{"role": "Sales User"}, {"role": "Projects User"}]}).insert(ignore_permissions=True)
 		self.project = frappe.db.exists("Project", {"project_name": self.PROJECT}) or frappe.get_doc(
 			{"doctype": "Project", "project_name": self.PROJECT, "status": "Open"}).insert(ignore_permissions=True).name
 		from phamos.ai_agents.agents import issue_chat_answer as chat
@@ -940,7 +941,7 @@ class TestChat(IssueAssistantTestCase):
 		doc, channel, brief = self.issue_with_brief()
 		self.llm.return_value = ({"answer": "Done.", "actions": [{"type": "set", "field": "resolution_details",
 			"value": "Reprinted with the new template."}]}, "mistral-test")
-		run, reply = self.answer(doc, self.reply_in_thread(brief, "note the resolution: reprinted"))
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "set the resolution details: reprinted"))
 		self.assertEqual(run.status, "Completed", run.error)
 		self.assertIn("Reprinted", frappe.db.get_value("Issue", doc.name, "resolution_details") or "")
 		self.assertEqual(frappe.db.get_value("Issue", doc.name, "modified_by"), self.CHAT_USER)
@@ -994,6 +995,66 @@ class TestChat(IssueAssistantTestCase):
 		run, reply = self.answer(doc, self.reply_in_thread(brief, "customer is Issue Assistant Test Custmer"))
 		self.assertFalse(frappe.db.get_value("Issue", doc.name, "customer"))
 		self.assertIn(twin, reply)
+
+	def test_injected_or_unasked_changes_are_refused(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		raised_by = frappe.db.get_value("Issue", doc.name, "raised_by")
+		# e.g. the customer's text told the model to do this; the colleague only asked a question
+		self.llm.return_value = ({"answer": "ok", "actions": [
+			{"type": "set", "field": "raised_by", "value": "attacker@evil.example"},
+			{"type": "set", "field": "priority", "value": frappe.db.get_value("Issue Priority", {}, "name")},
+			{"type": "set", "field": "first_responded_on", "value": "2026-01-01 10:00:00"}]}, "mistral-test")
+		run, reply = self.answer(doc, self.reply_in_thread(brief, "what do you think?"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "raised_by"), raised_by)
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "first_responded_on"))
+		self.assertEqual(reply.count(frappe._("I can't do that here: {0}").split(":")[0]), 3, reply)
+
+	def test_clearing_needs_the_field_named(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		frappe.db.set_value("Issue", doc.name, "resolution_details", "<p>old</p>")
+		self.llm.return_value = ({"answer": "ok", "actions": [{"type": "set", "field": "resolution_details",
+			"value": ""}]}, "mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "ok thanks"))
+		self.assertTrue(frappe.db.get_value("Issue", doc.name, "resolution_details"))
+		self.answer(doc, self.reply_in_thread(brief, "please empty the resolution details"))
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "resolution_details"))
+
+	def test_only_a_clear_yes_in_the_same_thread_closes(self):
+		frappe.db.set_value("Customer", CUSTOMER, setup.AI_ALLOWED_FIELD, 1)
+		doc, channel, brief = self.issue_with_brief()
+		self.llm.return_value = ({"answer": "OK.", "actions": [{"type": "set", "field": "status", "value": "Closed"}]},
+			"mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "close it"))
+		self.llm.return_value = ({"answer": "noted", "actions": []}, "mistral-test")
+		self.answer(doc, self.reply_in_thread(brief, "das ist falsch"))
+		self.answer(doc, self.reply_in_thread(brief, "bitte offen lassen"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "status"), "Open")
+		# a yes somewhere else (the main chat) is no answer to it
+		self.answer(doc, self.say(channel, "ok"))
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "status"), "Open")
+
+	def test_field_list_and_value_checks(self):
+		from phamos.ai_agents.agents import issue_chat_fields as fields
+
+		doc, channel, brief = self.issue_with_brief()
+		writable = fields.writable_fields(doc, self.CHAT_USER)
+		self.assertNotIn("first_responded_on", writable)  # kept by the system
+		self.assertNotIn("company", writable)
+		self.assertFalse([f for f, df in writable.items() if df.hidden or df.read_only])
+		meta = frappe.get_meta("Issue")
+		check = next((df for df in meta.fields if df.fieldtype == "Check"), None)
+		if check:
+			self.assertEqual(fields.check_value(check, "yes"), (1, None))
+			self.assertTrue(fields.check_value(check, "maybe")[1])
+		date = next((df for df in meta.fields if df.fieldtype == "Date"), None)
+		if date:
+			self.assertEqual(fields.check_value(date, "2026-11-28"), ("2026-11-28", None))
+			self.assertTrue(fields.check_value(date, "someday")[1])
+		self.assertEqual(fields._score("Tim", ["time"]), 0)  # short names only when exact
+		self.assertTrue(fields.says_yes("Ja"))
+		self.assertFalse(fields.says_yes("ok, warte noch"))
 
 	def test_named_means_a_whole_word(self):
 		from phamos.ai_agents.agents import issue_chat_fields as fields
