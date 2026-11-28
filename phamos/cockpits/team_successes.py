@@ -70,18 +70,29 @@ class Context:
 		self.implementations = frappe.get_all("Implementation", filters={"team": team}, pluck="name")
 		self.projects = teams.team_projects(team)
 		self._gitlab = None
+		self._gitlab_error = None
 		self._team_gitlab = team_gitlab
+		self._people = None
 
 	@property
 	def gitlab(self):
+		"""The GitLab statistics, computed once; a failure is kept, so the next rule fails fast."""
+		if self._gitlab_error:
+			raise self._gitlab_error
 		if self._gitlab is None:
-			self._gitlab = self._team_gitlab.team_gitlab_statistics(self.team, today=self.today)
+			try:
+				self._gitlab = self._team_gitlab.team_gitlab_statistics(self.team, today=self.today)
+			except Exception as e:
+				self._gitlab_error = e
+				raise
 		return self._gitlab
 
 	def member(self, user):
-		"""The Employee of `user` if they are in the team today."""
+		"""The Employee of `user` if they are in the team today (Team Assignment, as for kudos)."""
+		if self._people is None:
+			self._people = _team_employees(self.team, self.today)
 		employee = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "name")
-		return employee if employee and user in {row["name"] for row in teams.team_users(self.team)} else None
+		return employee if employee in self._people else None
 
 
 def _success(key, success_type, title, text="", employee=None, reference=None):
@@ -144,10 +155,11 @@ def milestone_on_time(ctx):
 		)
 		for m in frappe.get_all(
 			"GitLab Milestones",
-			filters={"gitlab_project": ["in", list(own)], "state": "closed", "modified": [">=", ctx.recent_from]},
-			fields=["name", "title", "due_date", "modified"],
+			# closed_on: set when the sync sees the state change (the sync saves every milestone daily)
+			filters={"gitlab_project": ["in", list(own)], "state": "closed", "closed_on": [">=", ctx.recent_from]},
+			fields=["name", "title", "due_date", "closed_on"],
 		)
-		if m.due_date and getdate(m.modified) <= getdate(m.due_date)
+		if m.due_date and getdate(m.closed_on) <= getdate(m.due_date)
 	]
 
 
@@ -155,9 +167,12 @@ def milestone_on_time(ctx):
 def record_month(ctx):
 	"""The last full month had the most closed items, or the shortest median closing time, of the year."""
 	months = ctx.gitlab.months[:-1]  # the current month is still running
-	if len(months) < 3:
+	if not months:
 		return []
-	last, earlier = months[-1], months[:-1]
+	# compare only with months that had data: a new team must not get a record from one item
+	last, earlier = months[-1], [m for m in months[:-1] if m.closed_total]
+	if len(earlier) < 3:
+		return []
 	key_month = _month_key(last.start)
 	found = []
 	if last.closed_total and last.closed_total > max(m.closed_total or 0 for m in earlier):
@@ -222,22 +237,24 @@ def _changes(doctype, names, field, since):
 def implementation_steps(ctx):
 	"""A maturity level raised or a forecast improved in the last days."""
 	found = []
-	for version, implementation, old, new, _owner in _changes("Implementation", ctx.implementations, MATURITY_FIELD, ctx.recent_from):
+	for _version, implementation, old, new, _owner in _changes("Implementation", ctx.implementations, MATURITY_FIELD, ctx.recent_from):
 		if _level(old) is not None and _level(new) is not None and _level(new) > _level(old):
 			found.append(
 				_success(
-					f"maturity:{version}",
+					# per level reached: up, down and up again is one success
+					f"maturity:{implementation}:{_level(new)}",
 					"Implementations",
 					_("{0} reached maturity level {1}").format(implementation, _level(new)),
 					reference=("Implementation", implementation),
 				)
 			)
-	for version, implementation, old, new, _owner in _changes("Implementation", ctx.implementations, FORECAST_FIELD, ctx.recent_from):
+	for _version, implementation, old, new, _owner in _changes("Implementation", ctx.implementations, FORECAST_FIELD, ctx.recent_from):
 		# 1 ☀️ is the best forecast
 		if _level(old) is not None and _level(new) is not None and _level(new) < _level(old):
 			found.append(
 				_success(
-					f"forecast:{version}",
+					# at most one per forecast level and month, however often it goes back and forth
+					f"forecast:{implementation}:{_level(new)}:{_month_key(ctx.today)}",
 					"Implementations",
 					_("{0}: the forecast improved").format(implementation),
 					reference=("Implementation", implementation),
@@ -248,23 +265,35 @@ def implementation_steps(ctx):
 
 @rule
 def module_at_target(ctx):
-	"""A module of the team's implementations reached its target level in the last days."""
+	"""A module of the team's implementations reached its target level in the last days: its current
+	level crossed the target in a saved change (Version row_changed). Not the rows' `modified`: Frappe
+	sets it on every child row at each save of the Implementation."""
 	if not ctx.implementations:
 		return []
-	return [
-		_success(
-			f"module:{row.name}:{row.target_level}",
-			"Implementations",
-			_("{0}: {1} reached level {2}").format(row.parent, row.module, row.target_level),
-			reference=("Implementation", row.parent),
-		)
-		for row in frappe.get_all(
-			"Implementation Item",
-			filters={"parenttype": "Implementation", "parent": ["in", ctx.implementations], "modified": [">=", ctx.recent_from]},
-			fields=["name", "parent", "module", "current_level", "target_level"],
-		)
-		if cint(row.target_level) and cint(row.current_level) >= cint(row.target_level)
-	]
+	found = []
+	for version in frappe.get_all(
+		"Version",
+		filters={"ref_doctype": "Implementation", "docname": ["in", ctx.implementations], "creation": [">=", ctx.recent_from]},
+		fields=["docname", "data"],
+		order_by="creation asc",
+	):
+		data = frappe.parse_json(version.data or "{}")
+		for table, _idx, row_name, changed in data.get("row_changed") or []:
+			level = next((c for c in changed or [] if c and c[0] == "current_level"), None)
+			if table != "modules" or not level:
+				continue
+			row = frappe.db.get_value("Implementation Item", row_name, ["module", "target_level"], as_dict=True)
+			target = cint(row.target_level) if row else 0
+			if target and cint(level[1]) < target <= cint(level[2]):
+				found.append(
+					_success(
+						f"module:{row_name}:{target}",
+						"Implementations",
+						_("{0}: {1} reached level {2}").format(version.docname, row.module or _("a module"), target),
+						reference=("Implementation", version.docname),
+					)
+				)
+	return found
 
 
 def _implementation_hours(implementation, start, end):
@@ -296,8 +325,11 @@ def implementation_hours(ctx):
 	):
 		if impl.enable_time_limit and impl.recurring_monthly and impl.limit_hours:
 			months = [get_first_day(add_months(start, -i)) for i in range(3)]
-			if all(
-				_implementation_hours(impl.name, m, getdate(get_last_day(m))) <= impl.limit_hours for m in months
+			hours = [_implementation_hours(impl.name, m, getdate(get_last_day(m))) for m in months]
+			# worked on in every month (0 h is no achievement), at most once per three months
+			earlier = [_key(ctx.team, f"budget:{impl.name}:{_month_key(m)}") for m in months[1:]]
+			if all(0 < h <= impl.limit_hours for h in hours) and not frappe.db.exists(
+				"Team Success", {"dedupe_key": ["in", earlier]}
 			):
 				found.append(
 					_success(
@@ -309,7 +341,7 @@ def implementation_hours(ctx):
 				)
 		predicted = frappe.db.get_value(
 			"Prediction",
-			{"parent": impl.name, "parenttype": "Implementation", "month_and_year": start.strftime("%B %Y")},
+			{"parent": impl.name, "parenttype": "Implementation", "month_and_year": _month_key(start)},
 			"prediction",
 		)
 		if predicted:
@@ -370,11 +402,14 @@ def complete_timesheets(ctx):
 			break
 		streak += 1
 	if streak >= STREAK_MIN_WEEKS:
+		# once at 4, 8 and 12 weeks of the same streak (keyed by its first week), not every week
+		reached = streak - streak % STREAK_MIN_WEEKS
+		streak_start = week_start - timedelta(weeks=streak - 1)
 		found.append(
 			_success(
-				f"timesheets_streak:{week_start}",
+				f"timesheets_streak:{streak_start}:{reached}",
 				"Timesheets",
-				_("{0} complete weeks in a row").format(streak),
+				_("{0} complete weeks in a row").format(reached),
 				_("The team booked at least {0} % of its available hours every week.").format(BOOKED_TARGET),
 			)
 		)
@@ -434,7 +469,15 @@ def picked_up(ctx):
 			order_by="creation desc",
 			limit=1,
 		)
-		last_activity = previous[0].creation if previous else issue.creation
+		# customer mails and replies are Communications, not Versions: they count as activity too
+		mails = frappe.get_all(
+			"Communication",
+			filters={"reference_doctype": "Issue", "reference_name": version.docname, "creation": ["<", version.creation]},
+			fields=["creation"],
+			order_by="creation desc",
+			limit=1,
+		)
+		last_activity = max([previous[0].creation if previous else issue.creation] + ([mails[0].creation] if mails else []))
 		if (getdate(version.creation) - getdate(last_activity)).days < idle_days:
 			continue
 		found.append(
@@ -455,29 +498,49 @@ def picked_up(ctx):
 
 @rule
 def sla_successes(ctx):
-	"""Quick response (first response within its SLA time) and resolved in time (Fulfilled), in the
-	last days; only while SLA tracking is on (decision 2)."""
+	"""Quick responses (first response within its SLA time) and Issues resolved in time (Fulfilled)
+	of last week, as one count each, not a post per Issue; only while SLA tracking is on (decision 2)."""
 	if not frappe.db.get_single_value("Support Settings", "track_service_level_agreement"):
 		return []
+	week_start = ctx.today - timedelta(days=ctx.today.weekday() + 7)  # Monday of last week
+	week_after = week_start + timedelta(days=7)
 	or_filters = [["custom_team", "=", ctx.team]]
 	if ctx.projects:
 		or_filters.append(["project", "in", ctx.projects])
+	responded = [
+		issue
+		for issue in frappe.get_all(
+			"Issue",
+			filters=[["first_responded_on", ">=", week_start], ["first_responded_on", "<", week_after], ["response_by", "is", "set"]],
+			or_filters=or_filters,
+			fields=["name", "first_responded_on", "response_by"],
+		)
+		if issue.first_responded_on <= issue.response_by
+	]
+	resolved = frappe.get_all(
+		"Issue",
+		# sla_resolution_date, not modified: a later comment on an old Issue must not count it again
+		filters=[["agreement_status", "=", "Fulfilled"], ["sla_resolution_date", ">=", week_start], ["sla_resolution_date", "<", week_after]],
+		or_filters=or_filters,
+		pluck="name",
+	)
 	found = []
-	for issue in frappe.get_all(
-		"Issue",
-		filters={"first_responded_on": [">=", ctx.recent_from], "response_by": ["is", "set"]},
-		or_filters=or_filters,
-		fields=["name", "subject", "first_responded_on", "response_by"],
-	):
-		if issue.first_responded_on <= issue.response_by:
-			found.append(_success(f"sla_response:{issue.name}", "SLA", _("Quick response: {0}").format(issue.subject), reference=("Issue", issue.name)))
-	for issue in frappe.get_all(
-		"Issue",
-		filters={"agreement_status": "Fulfilled", "status": ["in", ["Resolved", "Closed"]], "modified": [">=", ctx.recent_from]},
-		or_filters=or_filters,
-		fields=["name", "subject"],
-	):
-		found.append(_success(f"sla_resolved:{issue.name}", "SLA", _("Resolved in time: {0}").format(issue.subject), reference=("Issue", issue.name)))
+	if responded:
+		found.append(
+			_success(
+				f"sla_response:{week_start}",
+				"SLA",
+				_("Quick responses: {0} Issues answered within their SLA time last week").format(len(responded)),
+			)
+		)
+	if resolved:
+		found.append(
+			_success(
+				f"sla_resolved:{week_start}",
+				"SLA",
+				_("Resolved in time: {0} Issues within their SLA last week").format(len(resolved)),
+			)
+		)
 	return found
 
 
@@ -527,12 +590,15 @@ def record_success(team, success, given_by=None, customer=None, day=None, post=T
 	doc.flags.ignore_links = True
 	doc.insert(ignore_permissions=True)
 	if post:
+		# a failing post rolls back only itself, not the success or the team's other successes
+		frappe.db.savepoint("team_success_post")
 		try:
 			line = f"🎉 <strong>{escape_html(doc.title)}</strong>"
 			if doc.text:
-				line += f"<br>{escape_html(doc.text)}"
+				line += "<br>" + escape_html(doc.text).replace("\n", "<br>")
 			_post_in_team_chat(team, f"<p>{line}</p>")
 		except Exception:
+			frappe.db.rollback(save_point="team_success_post")
 			frappe.log_error(title=f"Team success not posted in the chat of {team}")
 	return doc.name
 
@@ -541,6 +607,8 @@ def run_rules(team, day=None):
 	"""Run every rule for one team; returns the names of the new successes. A failing rule is logged
 	and skipped, the others still run."""
 	ctx = Context(team, day or today())
+	# The first run finds every month rule at once: write those successes, but post nothing.
+	post = bool(frappe.db.exists("Team Success", {"team": team}))
 	created = []
 	for fn in RULES:
 		try:
@@ -550,7 +618,14 @@ def run_rules(team, day=None):
 			continue
 		for candidate in candidates:
 			candidate.source = fn.__name__
-			name = record_success(team, candidate, day=ctx.today)
+			# one failing insert (e.g. a parallel run wrote the key first) skips only that success
+			frappe.db.savepoint("team_success")
+			try:
+				name = record_success(team, candidate, day=ctx.today, post=post)
+			except Exception:
+				frappe.db.rollback(save_point="team_success")
+				frappe.log_error(title=f"Team success {candidate.key} not written for {team}")
+				continue
 			if name:
 				created.append(name)
 	return created
@@ -612,10 +687,10 @@ def add_customer_praise(team, customer, text, employee=None):
 	return record_success(team, success, given_by=frappe.session.user, customer=customer)
 
 
-def _team_employees(team):
+def _team_employees(team, day=None):
 	from phamos.cockpits.team_status import _people
 
-	return set(_people(team, getdate()))
+	return set(_people(team, getdate(day)))
 
 
 def list_successes(team, success_type=None, limit=200):

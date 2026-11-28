@@ -31,11 +31,11 @@
 		<div v-if="error" class="m-4 rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
 		<section v-else class="min-h-0 flex-1 overflow-auto">
 			<div v-if="loading" class="px-4 py-10 text-center text-sm text-ink-gray-5">{{ __("Loading successes…") }}</div>
-			<p v-else-if="!shown.length" class="px-4 py-10 text-center text-sm text-ink-gray-5">
+			<p v-else-if="!rows.length" class="px-4 py-10 text-center text-sm text-ink-gray-5">
 				{{ __("No successes yet. The daily rules add them as the team delivers; kudos and praise you can add now.") }}
 			</p>
 			<ul v-else class="divide-y divide-outline-gray-1 bg-surface-white">
-				<li v-for="row in shown" :key="row.name" class="flex items-start gap-3 px-4 py-2.5">
+				<li v-for="row in rows" :key="row.name" class="flex items-start gap-3 px-4 py-2.5">
 					<span class="mt-0.5 text-lg leading-none" aria-hidden="true">{{ ICONS[row.success_type] || "🎉" }}</span>
 					<div class="min-w-0 flex-1">
 						<div class="text-sm font-medium text-ink-gray-9">{{ row.title }}</div>
@@ -71,7 +71,7 @@
 		<Dialog v-model="praiseOpen" :options="{ title: __('Customer praise'), size: 'lg' }">
 			<template #body-content>
 				<div class="space-y-3">
-					<FormControl v-model="praise.customer" :label="__('Customer')" type="select" size="sm" :options="customerOptions" />
+					<FormControl v-model="praise.customer" :label="__('Customer')" type="select" size="sm" :options="customerOptions()" />
 					<FormControl v-model="praise.text" :label="__('What they said')" type="textarea" size="sm" :rows="4" />
 					<FormControl v-model="praise.employee" :label="__('About (optional)')" type="select" size="sm" :options="peopleOptions(true)" />
 					<ErrorMessage v-if="dialogError" :message="dialogError" />
@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { onMounted, ref, watch } from "vue"
 import { Button, Dialog, ErrorMessage, FeatherIcon, FormControl, call } from "frappe-ui"
 import { formatDate } from "@spa/utils/datetime"
 import { __ } from "@spa/utils/i18n.js"
@@ -129,8 +129,7 @@ const praise = ref({ customer: "", text: "", employee: "" })
 const saving = ref(false)
 const dialogError = ref("")
 
-const shown = computed(() => (filter.value ? rows.value.filter((r) => r.success_type === filter.value) : rows.value))
-const customerOptions = computed(() => [{ label: __("Pick a customer…"), value: "" }, ...options.value.customers])
+const customerOptions = () => [{ label: __("Pick a customer…"), value: "" }, ...options.value.customers]
 
 function peopleOptions(optional) {
 	const people = options.value.people.filter((p) => optional || !p.me)
@@ -143,8 +142,9 @@ function formatDay(value) {
 
 async function load() {
 	try {
+		// filtered on the server: the list holds the newest 200, older ones of a type would be missing
 		const [data, opts] = await Promise.all([
-			call(`${spaConfig.api}.get_team_successes`),
+			call(`${spaConfig.api}.get_team_successes`, { success_type: filter.value }),
 			call(`${spaConfig.api}.get_success_options`),
 		])
 		rows.value = data.successes || []
@@ -186,6 +186,11 @@ async function save(method, args, dialog) {
 const saveKudos = () => save("give_kudos", { employee: kudos.value.employee, text: kudos.value.text }, kudosOpen)
 const savePraise = () =>
 	save("add_customer_praise", { customer: praise.value.customer, text: praise.value.text, employee: praise.value.employee }, praiseOpen)
+
+watch(filter, () => {
+	loading.value = true
+	load()
+})
 
 onMounted(load)
 </script>

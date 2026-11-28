@@ -3484,9 +3484,10 @@ Picked up,Aufgegriffen
 Picked up: idle days,Aufgegriffen: Tage ohne Aktivität
 Picked up: {0},Aufgegriffen: {0}
 Praise from {0},Lob von {0}
-Quick response: {0},Schnelle Antwort: {0}
+Quick responses: {0} Issues answered within their SLA time last week,Schnelle Antworten: {0} Issues letzte Woche innerhalb ihrer SLA-Zeit beantwortet
 Record month: {0} items closed,Rekordmonat: {0} Einträge geschlossen
-Resolved in time: {0},Rechtzeitig gelöst: {0}
+Resolved in time: {0} Issues within their SLA last week,Rechtzeitig gelöst: {0} Issues letzte Woche innerhalb ihrer SLA
+a module,ein Modul
 SLA,SLA
 Say what the kudos are for.,"Sagen Sie, wofür die Kudos sind."
 Shipped: {0},Ausgeliefert: {0}

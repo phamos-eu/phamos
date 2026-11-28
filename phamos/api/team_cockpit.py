@@ -816,7 +816,8 @@ def get_team_successes(success_type=None):
 	team = teams.require_active_team()
 	rows = team_successes.list_successes(team, success_type or None)
 	for row in rows:
-		row["given_by_name"] = frappe.utils.get_fullname(row.given_by) if row.given_by else None
+		# the name only: the giver's e-mail address is not for the team
+		row["given_by_name"] = frappe.utils.get_fullname(row.pop("given_by")) if row.given_by else None
 		row["customer_name"] = frappe.db.get_value("Customer", row.customer, "customer_name") if row.customer else None
 	return {"team": team, "successes": rows}
 
