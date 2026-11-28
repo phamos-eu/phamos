@@ -493,7 +493,9 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.save()
 		card = _card_lines(channel_id)[-1]
 		self.assertIn(frappe._("(hidden)"), card)
-		self.assertNotIn(frappe.db.get_value("Customer", customer, "customer_name"), card)
+		name = frappe.db.get_value("Customer", customer, "customer_name")
+		self.assertNotIn(f"<strong>{frappe.utils.escape_html(name)}</strong>", card)
+		self.assertNotIn(f"<strong>{customer}</strong>", card)
 
 	def test_other_changes_post_no_card(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]

@@ -781,8 +781,8 @@ PILL_FALLBACK = {
 	"amber": ("#fef3c7", "#92400e"), "red": ("#fee2e2", "#991b1b"),
 }
 PILL_FIELDS = ("status", "priority")
-# links that name a customer's records; master data (priority, issue type) is never hidden
-PRIVATE_LINKS = ("customer", "custom_implementation", "project", "contact")
+# card links that name a customer's records; master data (priority, issue type) is never hidden
+PRIVATE_LINKS = ("customer", "custom_implementation", "project")
 
 
 def _pill(text, value):
@@ -808,11 +808,14 @@ def _chat_readers(channel_id):
 
 def _card_value_html(doc, fieldname, value, readers=()):
 	"""A changed value for the card's message: status and priority as the card's pills, others in bold. A linked
-	record only by name when everyone in the chat may read it (AI review on !1401; #2230 decision 1)."""
+	record only by name when everyone in the chat may read it (AI review on !1401; #2230 decision 1). Checked
+	when the message is posted: someone who joins later sees it as it was written; Raven's card below the
+	message checks each viewer's permissions itself."""
 	field = doc.meta.get_field(fieldname)
-	if value and fieldname in PRIVATE_LINKS and readers and not all(
+	if value and fieldname in PRIVATE_LINKS and (not readers or not all(
 		frappe.has_permission(field.options, "read", doc=value, user=user) for user in readers
-	):
+	)):
+		# nobody known in the chat: hidden too (fail closed, AI review on !1401)
 		return escape_html(_("(hidden)"))
 	text = _card_value(doc, fieldname, value)
 	if value and fieldname in PILL_FIELDS:
