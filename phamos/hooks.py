@@ -470,6 +470,10 @@ doc_events = {
 		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
 		"on_update": "phamos.api.issue_chat.on_record_update",
 	},
+    "Raven Poll Vote": {
+		# the first vote by someone who may write the Issue answers the assistant's question (#2232)
+		"after_insert": "phamos.ai_agents.agents.issue_polls.on_poll_vote",
+	},
     "Raven Message": {
 		# Mentioned people join the record chat before Raven notifies them (#1620), and are
 		# assigned to the record once the message is saved (#1784).

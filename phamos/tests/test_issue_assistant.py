@@ -353,6 +353,84 @@ class TestBriefThread(IssueAssistantTestCase):
 		self.assertEqual(assistant.source_text(frappe._dict(raised_by=WEBSITE_USER)), frappe._("E-mail"))
 
 
+class TestPolls(IssueAssistantTestCase):
+	"""#2232: the brief's open questions as Raven polls; the first writer's vote applies."""
+
+	IMPLEMENTATION = "IA-POLLS"
+	READER_ONLY = "issue-assistant-poll-reader@example.com"
+
+	def setUp(self):
+		super().setUp()
+		if "raven" not in frappe.get_installed_apps() or not frappe.get_all("Raven Workspace", limit=1):
+			self.skipTest("Raven with a workspace is needed")
+		frappe.db.set_single_value("phamos Settings", "enable_issue_chat", 1)
+		self.implementation(self.IMPLEMENTATION)
+		frappe.db.set_value("Implementation", self.IMPLEMENTATION, "account_manager", DESK_USER)
+		frappe.get_doc("User", DESK_USER).add_roles("Raven User")
+		if not frappe.db.exists("User", self.READER_ONLY):
+			frappe.get_doc({"doctype": "User", "email": self.READER_ONLY, "first_name": "Poll Reader",
+				"send_welcome_email": 0, "roles": [{"role": "Raven User"}]}).insert(ignore_permissions=True)
+		self.projects = [frappe.get_doc({"doctype": "Project", "project_name": f"Poll Project {i}", "status": "Open",
+			"custom_implementation": self.IMPLEMENTATION}).insert(ignore_permissions=True).name for i in (1, 2)]
+		from phamos.ai_agents.agents import issue_polls
+
+		self.polls = issue_polls
+
+	def run_with_question(self):
+		doc = self.issue(raised_by=WEBSITE_USER, custom_implementation=self.IMPLEMENTATION)
+		run = self.run_assistant(doc)
+		polls = (frappe.parse_json(run.analysis or "{}") or {}).get("polls") or {}
+		self.assertEqual(len(polls), 1, polls)
+		poll, entry = next(iter(polls.items()))
+		return doc, poll, entry
+
+	def vote(self, poll, entry, value, user=DESK_USER):
+		option = next(o for o, v in entry["values"].items() if v == value)
+		self.addCleanup(frappe.set_user, "Administrator")
+		frappe.set_user(user)
+		raven_user = frappe.db.get_value("Raven User", {"user": user}, "name") or user
+		frappe.get_doc({"doctype": "Raven Poll Vote", "poll_id": poll, "user_id": raven_user,
+			"vote_selection": [{"option": option}]}).insert(ignore_permissions=True)
+		frappe.set_user("Administrator")
+
+	def test_open_project_question_becomes_a_poll(self):
+		doc, poll, entry = self.run_with_question()
+		self.assertEqual(entry["field"], "project")
+		self.assertEqual(sorted(v for v in entry["values"].values() if v != self.polls.NONE), sorted(self.projects))
+		self.assertIn(self.polls.NONE, entry["values"].values())
+		poll_doc = frappe.get_doc("Raven Poll", poll)
+		self.assertEqual((poll_doc.is_multi_choice, poll_doc.is_anonymous, len(poll_doc.options)), (0, 0, 3))
+		bot_user = frappe.db.get_value("Raven Bot", setup.ASSISTANT_NAME, "raven_user")
+		self.assertEqual(frappe.db.get_value("Raven Message", entry["message"], "owner"), bot_user)
+
+	def test_first_writers_vote_sets_the_project_and_closes(self):
+		doc, poll, entry = self.run_with_question()
+		self.vote(poll, entry, self.projects[1])
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), self.projects[1])
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "modified_by"), DESK_USER)
+		self.assertEqual(frappe.db.get_value("Raven Poll", poll, "is_disabled"), 1)
+		# a colleague's later vote changes nothing
+		second = "issue-assistant-poll-writer@example.com"
+		if not frappe.db.exists("User", second):
+			frappe.get_doc({"doctype": "User", "email": second, "first_name": "Poll Writer", "send_welcome_email": 0,
+				"roles": [{"role": "Raven User"}, {"role": "Support Team"}]}).insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError):  # Raven refuses votes on a closed poll
+			self.vote(poll, entry, self.projects[0], user=second)
+		self.assertEqual(frappe.db.get_value("Issue", doc.name, "project"), self.projects[1])
+
+	def test_vote_without_write_changes_nothing(self):
+		doc, poll, entry = self.run_with_question()
+		self.vote(poll, entry, self.projects[0], user=self.READER_ONLY)
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "project"))
+		self.assertFalse(frappe.db.get_value("Raven Poll", poll, "is_disabled"))
+
+	def test_none_of_these_only_closes(self):
+		doc, poll, entry = self.run_with_question()
+		self.vote(poll, entry, self.polls.NONE)
+		self.assertFalse(frappe.db.get_value("Issue", doc.name, "project"))
+		self.assertEqual(frappe.db.get_value("Raven Poll", poll, "is_disabled"), 1)
+
+
 class TestManualRun(IssueAssistantTestCase):
 	def checks(self, doc):
 		return {c["key"]: c for c in assistant.get_manual_run_info(doc.name)["checks"]}

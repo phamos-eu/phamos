@@ -317,7 +317,13 @@ def brief_lines(ctx):
 	person = result.get("person")
 	if person:
 		text = _("Assigned {0}: {1}") if person["assigned"] else _("Suggested person: {0}: {1}")
-		lines.append(text.format(person["name"], person["reason"]))
+		line = text.format(person["name"], person["reason"])
+		if not person["assigned"]:
+			from phamos.ai_agents.agents.issue_identify import _polls_follow
+
+			if _polls_follow(ctx):
+				line += " " + _("Vote in the poll below.")
+		lines.append(line)
 	if result.get("images"):
 		lines.append(_("The screenshot was read too."))
 	return lines

@@ -344,15 +344,24 @@ def finalize(ctx):
 		ctx.flags.append({"code": "brief_not_posted", "severity": "warn",
 			"message": _("The brief could not be posted in the Issue chat.")})
 		return
-	if not (brief and reader):
-		return
-	frappe.db.savepoint("issue_assistant_thread")
-	try:
-		open_thread(brief, ctx.agent.raven_bot, reader)
-	except Exception:
-		# the brief stays; people can still open the thread themselves
-		frappe.db.rollback(save_point="issue_assistant_thread")
-		frappe.log_error(title=f"Issue Assistant: could not open the thread under the brief on {ctx.doc.name}")
+	if brief and reader:
+		frappe.db.savepoint("issue_assistant_thread")
+		try:
+			open_thread(brief, ctx.agent.raven_bot, reader)
+		except Exception:
+			# the brief stays; people can still open the thread themselves
+			frappe.db.rollback(save_point="issue_assistant_thread")
+			frappe.log_error(title=f"Issue Assistant: could not open the thread under the brief on {ctx.doc.name}")
+	if brief:
+		frappe.db.savepoint("issue_assistant_polls")
+		try:
+			from phamos.ai_agents.agents.issue_polls import post_polls
+
+			post_polls(ctx)  # the brief's open questions to click on (#2232)
+		except Exception:
+			frappe.db.rollback(save_point="issue_assistant_polls")
+			ctx.analysis.pop("polls", None)
+			frappe.log_error(title=f"Issue Assistant: could not post the polls on {ctx.doc.name}")
 
 
 def open_thread(brief, bot_name, reader):

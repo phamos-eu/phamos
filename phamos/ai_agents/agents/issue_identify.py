@@ -204,10 +204,19 @@ def brief_lines(ctx):
 		elif item["confidence"] == REVIEW:
 			names = [_label(key, c) for c in item["candidates"]]
 			line = _("Which {0} is it: {1}?").format(label, " / ".join(names))
+			if _polls_follow(ctx):
+				line += " " + _("Vote in the poll below.")
 			if item["via"] == "erpnext":
 				line += " " + _("(ERPNext picked {0})").format(item["value"])
 			lines.append(line)
 	return lines
+
+
+def _polls_follow(ctx):
+	"""Whether the open questions also come as polls in the Issue chat (#2232)."""
+	from phamos.api.issue_chat import is_enabled
+
+	return bool(ctx.agent.raven_bot) and is_enabled()
 
 
 def _label(key, name):
