@@ -38,7 +38,9 @@
 			v-for="person in stripPeople"
 			:key="person.user"
 			class="relative flex-shrink-0 rounded-full"
-			:class="{ 'opacity-50': !person.online }"
+			:class="{ 'opacity-50': !person.online, 'people__picked': isSelected(person) }"
+			@click.stop="pickFromStrip(person, $event)"
+			@mousedown="$event.shiftKey && $event.preventDefault()"
 			:title="`${person.full_name} · ${lineOf(person).text}`"
 			data-testid="person"
 		>
@@ -105,10 +107,12 @@
 				<button
 					type="button"
 					class="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-surface-gray-2"
-					:class="{ 'opacity-60': !person.online }"
+					:class="{ 'opacity-60': !person.online, 'bg-surface-gray-3 ring-1 ring-inset ring-outline-gray-3': isSelected(person) }"
 					:disabled="person.user === me"
+					:aria-selected="isSelected(person)"
 					data-testid="person"
-					@click="$emit('pick', person, $event)"
+					@mousedown="$event.shiftKey && $event.preventDefault()"
+					@click="$emit('pick', person, $event, shown.map((p) => p.user))"
 				>
 					<span class="relative flex-shrink-0">
 						<span
@@ -208,8 +212,19 @@ const props = defineProps({
 	autoCockpit: { type: Boolean, default: true },
 	/** Kept open; otherwise folded to the chips, unfolding on hover (#2091). */
 	pinned: { type: Boolean, default: false },
+	/** Selected people (PM, 2026-11-22): ⌘/Ctrl-click adds one, Shift-click a range. */
+	selected: { type: Array, default: () => [] },
 })
-defineEmits(["pick", "hide", "auto-cockpit", "pin"])
+const emit = defineEmits(["pick", "hide", "auto-cockpit", "pin"])
+
+function isSelected(person) {
+	return props.selected.includes(person.user)
+}
+/** A chip in the strip: shows where they are on the map (no menu) and opens the list. */
+function pickFromStrip(person, event) {
+	unfold()
+	if (person.user !== props.me) emit("pick", person, event, stripPeople.value.map((p) => p.user), { menu: false })
+}
 
 // Folded: the strip of chips; in a meeting always (the people there huddle above the chat).
 const folded = computed(() => Boolean(props.meeting) || !props.pinned)
@@ -323,6 +338,11 @@ button:hover > .people__keys {
 	margin-top: 0;
 	background: var(--surface-white);
 	border: 1px solid var(--outline-gray-2);
+}
+/* Selected in the strip: a ring around the chip. */
+.people__picked {
+	outline: 2px solid #3b82f6;
+	outline-offset: 3px;
 }
 /* Unfolded, the list takes its own room: the map moves aside (PM, 2026-11-22). */
 .people {

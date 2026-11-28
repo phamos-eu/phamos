@@ -410,3 +410,10 @@ class TestIssueAnalysis(FrappeTestCase):
         self.assertIn("last_changed_by", code)
         self.assertNotIn("last_changed_by_v16", code)
         self.assertGreaterEqual(kept, 1)
+
+    def test_the_analysis_prompt_uses_the_functional_consultant(self):
+        script = _ci_script()
+        text = script.system_prompt("bug")
+        self.assertIn("# Senior Functional Consultant", text)
+        self.assertIn("This is a bug report", text)
+        self.assertNotIn("disable-model-invocation", text)

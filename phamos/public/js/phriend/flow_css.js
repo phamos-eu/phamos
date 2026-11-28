@@ -49,10 +49,11 @@ button.btn[hidden] { display: none; }
 button.btn.with-icon { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; font-size: 13px; }
 button.btn.with-icon svg { flex: none; }
 .field { display: block; font-size: 13px; color: var(--ph-muted); margin: 0 0 6px; }
-input.input, textarea.input { width: 100%; padding: 9px 11px; border: 1px solid var(--ph-border-strong); border-radius: 8px;
+input.input, textarea.input, select.input { width: 100%; padding: 9px 11px; border: 1px solid var(--ph-border-strong); border-radius: 8px;
 	background: var(--ph-bg); color: var(--ph-text); font: inherit; font-size: 15px; outline: none; }
 textarea.input { resize: vertical; min-height: 120px; line-height: 1.5; }
-input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-shadow: 0 0 0 2px var(--ph-focus); }
+select.input { max-width: 320px; cursor: pointer; }
+input.input:focus, textarea.input:focus, select.input:focus { border-color: var(--ph-focus); box-shadow: 0 0 0 2px var(--ph-focus); }
 .input::placeholder { color: var(--ph-muted); opacity: 1; }
 .gap { height: 16px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -65,7 +66,9 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-sha
 .chip.on small { color: var(--ph-chip-text); }
 .chip.slim { min-width: 0; padding: 7px 16px; }
 .reported { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ph-border); min-height: 64px; }
-.reported[hidden] { display: none; }
+.reported[hidden], .chip[hidden], [data-test-box][hidden], [data-priority-box][hidden] { display: none; }
+[data-test-from] { margin-top: 6px; }
+[data-test-from].warn { color: #c0392b; }
 .reported-head { margin: 0 0 8px; font-size: 13px; color: var(--ph-muted); display: flex; align-items: baseline; gap: 6px; }
 .reported-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--ph-surface);
 	color: var(--ph-text); font-size: 12px; text-align: center; }

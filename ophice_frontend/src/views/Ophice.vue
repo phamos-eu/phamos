@@ -1,104 +1,14 @@
 <template>
 	<!-- Ophice (#2053, #2070): its own app at /ophice, full screen. -->
 	<div class="flex h-full min-h-0 flex-col bg-surface-gray-1 text-ink-gray-9">
-		<header class="flex h-12 flex-shrink-0 items-center gap-3 border-b border-outline-gray-2 px-5">
-			<div class="flex items-center gap-2 text-base font-semibold tracking-tight">
-				<img :src="OPHICE_ICON" alt="" class="h-6 w-6 rounded-md" />
-				{{ __("Ophice") }}
-			</div>
-			<!-- One line; shortened when the text is large or the window small (#2091). -->
-			<div
-				class="ml-auto min-w-0 truncate text-sm text-ink-gray-5"
-				:title="__('Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)')"
-			>
-				{{ __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)") }}
-			</div>
-			<!-- Text size (#2091): for weaker eyes and small screens; the map has its own zoom. -->
-			<div
-				v-if="me"
-				class="flex items-center rounded-lg border border-outline-gray-2 bg-surface-white p-0.5 text-xs"
-				:title="__('Text size of Ophice and the cockpits in it')"
-				data-testid="text-size"
-			>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale <= UI_SCALES[0]" :title="__('Smaller text')" data-testid="text-smaller" @click="stepUiScale(-1)">
-					<span class="text-[11px] font-semibold">A−</span>
-				</button>
-				<button type="button" class="ophice-zoom__button w-11 tabular-nums text-ink-gray-7" :title="__('Normal text size')" data-testid="text-reset" @click="setUiScale(1)">
-					{{ Math.round(uiScale * 100) }} %
-				</button>
-				<button type="button" class="ophice-zoom__button" :disabled="uiScale >= UI_SCALES[UI_SCALES.length - 1]" :title="__('Larger text')" data-testid="text-larger" @click="stepUiScale(1)">
-					<span class="text-sm font-semibold">A+</span>
-				</button>
-			</div>
-			<!-- My status (#2053): be right back / away, shown above my chip. -->
-			<Button
-				v-if="me"
-				:variant="statusOpen ? 'solid' : 'subtle'"
-				:title="__('Set a status: be right back, or away until a time')"
-				data-testid="status-button"
-				@click="toggleStatus()"
-			>
-				<template #prefix>
-					<FeatherIcon :name="me.status?.kind === 'away' ? 'moon' : me.status ? 'coffee' : 'check-circle'" class="h-4 w-4" />
-				</template>
-				{{ me.status?.kind === "away" ? __("Away") : me.status ? __("Be right back") : __("Available") }}
-			</Button>
-			<!-- Meeting areas (#2060): edit mode = drag to draw, click an area to edit it. Map editors only (#2071). -->
-			<Button
-				v-if="canEditMap"
-				:variant="editingAreas ? 'solid' : 'subtle'"
-				:title="__('Draw and edit meeting areas, for everyone')"
-				:aria-pressed="editingAreas"
-				@click="editingAreas = !editingAreas"
-			>
-				<template #prefix><FeatherIcon name="video" class="h-4 w-4" /></template>
-				{{ editingAreas ? __("Done") : __("Meeting areas") }}
-			</Button>
-			<!-- Ophice's background, one for everyone (#2053). -->
-			<input
-				ref="backgroundInput"
-				type="file"
-				accept="image/png,image/jpeg,image/webp,image/gif"
-				class="hidden"
-				@change="uploadBackground"
-			/>
-			<Button
-				v-if="canEditMap"
-				variant="subtle"
-				:loading="backgroundBusy"
-				:title="__('Upload an image as the background of Ophice, for everyone')"
-				@click="backgroundInput?.click()"
-			>
-				<template #prefix><FeatherIcon name="image" class="h-4 w-4" /></template>
-				{{ __("Background") }}
-			</Button>
-			<Button
-				v-if="canEditMap"
-				:variant="adjustingBackground ? 'solid' : 'subtle'"
-				:title="__('Size and position of the background image on the grid, for everyone')"
-				:aria-pressed="adjustingBackground"
-				@click="adjustingBackground = !adjustingBackground"
-			>
-				<template #prefix><FeatherIcon name="maximize-2" class="h-4 w-4" /></template>
-				{{ __("Adjust") }}
-			</Button>
-			<Button
-				v-if="canEditMap && background"
-				variant="ghost"
-				:disabled="backgroundBusy"
-				:title="__('Remove the background, for everyone')"
-				@click="removeBackground"
-			>
-				{{ __("Remove") }}
-			</Button>
-			<!-- Debug (#2072): replays things on my own screen only, for testing. Map editors only. -->
-			<Dropdown v-if="canEditMap" :options="debugOptions" placement="right">
-				<Button variant="ghost" :title="__('Debug: simulate things on your own screen only')" data-testid="debug-menu">
-					<template #prefix><FeatherIcon name="tool" class="h-4 w-4" /></template>
-					{{ __("Debug") }}
-				</Button>
-			</Dropdown>
-		</header>
+		<!-- Ophice's background, one for everyone (#2053); the button is in the right sidebar. -->
+		<input
+			ref="backgroundInput"
+			type="file"
+			accept="image/png,image/jpeg,image/webp,image/gif"
+			class="hidden"
+			@change="uploadBackground"
+		/>
 
 		<div class="flex min-h-0 flex-1">
 		<!-- People (#2063): everyone with Raven, online first; click one to chat. -->
@@ -114,11 +24,16 @@
 			:meeting="meetingArea"
 			:area-of="areaOfUser"
 			:auto-cockpit="autoCockpit"
+			:selected="selectedUsers"
 			@auto-cockpit="setAutoCockpit"
-			@pick="(person, event) => openChatWith(person, event)"
+			@pick="onPersonClick"
 			@hide="setHideDetails"
 		/>
-		<div ref="stage" class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+		<div
+			id="ophice-stage"
+			ref="stage"
+			class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
+		>
 			<!--
 				Adjust (#2058, #2089): the image in grid tiles (drag it on the map, or nudge it here), the
 				grid's size, and everyone's starting zoom. Top left; everyone sees the changes.
@@ -259,7 +174,7 @@
 					:area="meetingArea"
 					:people="huddle"
 					:me="me.user"
-					@pick="(person, event) => openChatWith(person, event)"
+					@pick="onPersonClick"
 				/>
 				<!-- Guest and customer meeting areas: the guest chat, kept only for a short while (#2083). -->
 				<GuestChat
@@ -318,6 +233,52 @@
 					@save="saveEncounter(notice)"
 				/>
 			</div>
+			<!-- Placing a meeting point (PM, 2026-11-22): the next click on the map sets it. -->
+			<p
+				v-if="placingPin"
+				class="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-xs text-white"
+				data-testid="pin-hint"
+			>
+				{{ __("Click on the map where you want to meet · Esc to cancel") }}
+			</p>
+			<!-- Selected people (PM, 2026-11-22): go to them, or set a meeting point for all. -->
+			<div
+				v-if="me && selectedUsers.length && !placingPin"
+				class="absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-sm text-ink-gray-9 shadow-xl"
+				data-no-pan
+				data-testid="selection-bar"
+			>
+				<span class="flex -space-x-1.5">
+					<span v-for="person in selectedPeople.slice(0, 5)" :key="person.user" class="rounded-full ring-2 ring-surface-white">
+						<UserAvatar :name="person.user" :label="person.full_name" :image="person.user_image" size="sm" />
+					</span>
+				</span>
+				<span class="whitespace-nowrap text-ink-gray-7" data-testid="selection-count">
+					{{ selectedUsers.length === 1 ? selectedPeople[0]?.full_name : __("{0} people", [selectedUsers.length]) }}
+				</span>
+				<GoToButton up :disabled="!selectedOnMap.length" @go="(mode) => goTo(selectedOnMap, mode)" />
+				<Button
+					size="sm"
+					variant="subtle"
+					:disabled="!selectedPeople.some((p) => !p.guest)"
+					:title="__('Set a meeting point for you and the people selected')"
+					class="whitespace-nowrap"
+					data-testid="selection-meeting-point"
+					@click="startPinPlacing(selectedUsers)"
+				>
+					<template #prefix><FeatherIcon name="map-pin" class="h-3.5 w-3.5" /></template>
+					{{ __("Meeting point") }}
+				</Button>
+				<button
+					type="button"
+					class="rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+					:title="__('Clear the selection (Esc)')"
+					data-testid="selection-clear"
+					@click="clearSelection()"
+				>
+					<FeatherIcon name="x" class="h-4 w-4" />
+				</button>
+			</div>
 			<!--
 				The map (#2089): a view onto a canvas that can be bigger than the window. Drag or scroll to
 				look around (it bounces at the edges), Ctrl/⌘ + scroll or the buttons to zoom. In a meeting
@@ -327,7 +288,10 @@
 			<div
 				v-if="me"
 				class="ophice-viewport overflow-hidden"
-				:class="meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0'"
+				:class="[
+					meetingArea ? (inTiles ? 'z-20 rounded-xl bg-surface-gray-2' : 'absolute z-20 rounded-lg border border-outline-gray-2 bg-surface-gray-2 shadow-xl') : 'absolute inset-0',
+					{ 'cursor-crosshair': placingPin },
+				]"
 				:style="viewportStyle"
 				data-testid="map-viewport"
 				@pointerdown="onViewportDown"
@@ -335,6 +299,7 @@
 				@pointerup="camera().onPointerUp"
 				@pointercancel="camera().onPointerUp"
 				@click.capture="camera().onClickCapture"
+				@click="onViewportClick"
 				@dblclick="onViewportDblclick"
 				@wheel="onViewportWheel"
 			>
@@ -398,7 +363,8 @@
 					class="ophice-chip ophice-chip--remote absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[other.user] }"
 					:style="chipStyle(other)"
-					@click="openChatWith(other, $event)"
+					:data-selected="selectedSet.has(other.user) ? '1' : undefined"
+					@click="onPersonClick(other, $event)"
 					:title="
 						other.guest
 							? __('Guest · {0}', [other.full_name])
@@ -409,6 +375,9 @@
 					data-testid="other-chip"
 				>
 					<span v-if="beams[other.user]" :key="beams[other.user]" class="ophice-beam" aria-hidden="true" />
+					<!-- Found (PM, 2026-11-22): a glow when picked, a ring while selected. -->
+					<span v-if="selectedSet.has(other.user)" class="ophice-picked" aria-hidden="true" data-testid="chip-selected" />
+					<span v-if="glows[other.user]" :key="`glow-${glows[other.user]}`" class="ophice-glow" aria-hidden="true" data-testid="chip-glow" />
 					<span v-if="lifts[other.user]" :key="`shadow-${lifts[other.user]}`" class="ophice-lift-shadow" aria-hidden="true" />
 					<span
 						:key="`chip-${beams[other.user] || 0}-${lifts[other.user] || 0}`"
@@ -428,24 +397,45 @@
 						/>
 					</span>
 				</div>
-				<EncounterBubble
+				<!-- With the call (#2108) the bubble leaves the map: it sits on the stage where the user
+				     last dragged it, and the map can move below it. -->
+				<Teleport
 					v-for="bubble in bubbleList"
 					:key="bubble.user"
-					:ref="(el) => setBubbleRef(bubble.user, el)"
-					:peer="bubble.peer"
-					:me="me.user"
-					:messages="bubble.messages"
-					:loading="bubble.loading"
-					:error="bubble.error"
-					:sending="bubble.sending"
-					:video="bubble.user === videoUser ? bubble.video : null"
-					:display-name="me.full_name"
-					:style="{ ...bubbleStyle(bubble), zIndex: zOf(`chat:${bubble.user}`) }"
-					data-no-pan
-					@pointerdown.capture="raise(`chat:${bubble.user}`)"
-					@send="(text, done) => sendMessage(bubble, text, done)"
-					@close="closeBubble(bubble.user)"
-				/>
+					to="#ophice-stage"
+					:disabled="!isCallBubble(bubble)"
+					defer
+				>
+					<EncounterBubble
+						:ref="(el) => setBubbleRef(bubble.user, el)"
+						:peer="bubble.peer"
+						:me="me.user"
+						:messages="bubble.messages"
+						:loading="bubble.loading"
+						:error="bubble.error"
+						:sending="bubble.sending"
+						:video="bubble.user === videoUser ? bubble.video : null"
+						:display-name="me.full_name"
+						:in-window="!!bubble.inWindow"
+						:movable="isCallBubble(bubble)"
+						:dragging="callDrag !== null"
+						:video-width="isCallBubble(bubble) ? callLayout.videoW : 0"
+						:call-starts-off="bubble.callOff"
+						:me-chip="me"
+						:style="{
+							...(isCallBubble(bubble) ? callBubbleStyle() : bubbleStyle(bubble)),
+							zIndex: zOf(`chat:${bubble.user}`),
+						}"
+						data-no-pan
+						@pointerdown.capture="raise(`chat:${bubble.user}`)"
+						@send="(text, done) => sendMessage(bubble, text, done)"
+						@close="closeBubble(bubble.user)"
+						@call="openEncounterCall(bubble)"
+						@move-start="startCallDrag"
+						@resize-start="startCallDrag"
+						@split-by="splitCallBy"
+					/>
+				</Teleport>
 				<div
 					class="ophice-chip absolute flex cursor-pointer items-center justify-center"
 					:class="{ 'ophice-chip--lift': lifts[me.user] }"
@@ -545,6 +535,35 @@
 						/>
 					</div>
 				</template>
+				<!-- Meeting points (PM, 2026-11-22): a bouncing pin; a click flies me there. -->
+				<div
+					v-for="pin in visiblePins"
+					:key="`pin-${pin.by}`"
+					class="ophice-pin absolute"
+					:style="pinStyle(pin)"
+					data-no-pan
+					data-testid="meeting-pin"
+				>
+					<button
+						type="button"
+						class="ophice-pin__icon"
+						:title="__('Meeting point of {0}: click to fly there', [pin.by === me.user ? __('you') : pin.by_name])"
+						@click.stop="goToPin(pin)"
+					>
+						<FeatherIcon name="map-pin" class="h-full w-full" />
+					</button>
+					<span class="ophice-pin__label">
+						{{ pin.by === me.user ? __("Your meeting point") : __("Meeting point · {0}", [pin.by_name]) }}
+						<button
+							v-if="pin.by === me.user"
+							type="button"
+							class="ml-1 rounded-full px-1 hover:bg-white/20"
+							:title="__('Remove the meeting point, for everyone')"
+							data-testid="meeting-pin-remove"
+							@click.stop="removePin()"
+						>×</button>
+					</span>
+				</div>
 				<!-- Statuses float above their chips, under the chat bubbles. -->
 				<StatusTag
 					v-for="chip in statusChips"
@@ -566,6 +585,42 @@
 					:ratio="backgroundRatio"
 					@change="(place) => setLayout({ fit: false, ...place })"
 				/>
+			</div>
+			<!--
+				Off the visible map (PM, 2026-11-22, 2026-11-23): a marker at the edge for everyone, in
+				their direction, smaller the farther away; the selected and meeting points glow. A click
+				looks there.
+			-->
+			<div
+				v-for="marker in edgeMarkers"
+				:key="marker.key"
+				class="ophice-edge-at absolute"
+				:style="{ left: `${marker.x}px`, top: `${marker.y}px`, transform: `scale(${marker.scale})` }"
+			>
+				<button
+					type="button"
+					class="ophice-edge"
+					:class="{ 'ophice-edge--pin': marker.kind === 'pin', 'ophice-edge--picked': marker.picked }"
+					:style="{ '--pin-hue': marker.hue, '--ring-hue': marker.kind === 'person' ? ringHue(marker.items[0].person.user) : 0 }"
+					:title="marker.title"
+					:data-scale="marker.scale.toFixed(2)"
+					data-no-pan
+					data-testid="edge-marker"
+					@click.stop="lookAt(marker.items[0])"
+				>
+					<span class="ophice-edge__arrow" :style="{ transform: `rotate(${marker.angle}deg)` }" aria-hidden="true" />
+					<span class="ophice-edge__face">
+						<FeatherIcon v-if="marker.kind === 'pin'" name="map-pin" class="h-4 w-4" />
+						<UserAvatar
+							v-else
+							:name="marker.items[0].person.user"
+							:label="marker.items[0].person.full_name"
+							:image="marker.items[0].person.user_image"
+							size="sm"
+						/>
+					</span>
+					<span v-if="marker.items.length > 1" class="ophice-edge__count">{{ marker.items.length }}</span>
+				</button>
 			</div>
 			<!-- A small map switches on a double click (#2091); a faint hint says so. -->
 			<div
@@ -602,14 +657,35 @@
 			</div>
 			<div v-else-if="error" class="text-sm text-ink-red-4">{{ error }}</div>
 		</div>
-		<!-- Shortcut bar (#2073): the cockpits in a column at the right edge, part of the page like
-		     the people list (PM: not floating over the map); they open inside Ophice. -->
-		<CockpitBar
+		<!-- Right sidebar (#2073, PM 2026-11-25): cockpits, my status and the testing settings; it
+		     replaced the top bar. Part of the page like the people list, not floating over the map. -->
+		<OphiceSidebar
 			v-if="me"
-			class="flex-shrink-0 border-l border-outline-gray-2 bg-surface-white"
+			v-model:collapsed="sideCollapsed"
+			:icon="OPHICE_ICON"
 			:cockpits="barCockpits"
 			:open-route="openRoute"
+			:status="me.status"
+			:status-open="statusOpen"
+			:bell="bell"
+			:bell-title="bellTitle"
+			:ui-scale="uiScale"
+			:scales="UI_SCALES"
+			:can-edit-map="canEditMap"
+			:editing-areas="editingAreas"
+			:adjusting-background="adjustingBackground"
+			:has-background="Boolean(background)"
+			:background-busy="backgroundBusy"
+			:debug-options="debugOptions"
 			@open="openCockpit"
+			@status="toggleStatus()"
+			@bell="clickBell"
+			@text-step="stepUiScale"
+			@text-reset="setUiScale(1)"
+			@areas="editingAreas = !editingAreas"
+			@background="backgroundInput?.click()"
+			@adjust="adjustingBackground = !adjustingBackground"
+			@remove-background="removeBackground"
 		/>
 		</div>
 		<!-- Over an open cockpit (#2074): the office small, with pings and quick replies. -->
@@ -628,6 +704,7 @@
 			:meeting="Boolean(meetingArea)"
 			:float-target="pipBody"
 			@slots="(slots) => (dockRects = slots)"
+			@keys-back="giveKeysToCockpit"
 			@float="floatAll"
 			@fullscreen="emit('back-to-map')"
 			@reply="quickReply"
@@ -642,18 +719,27 @@
 			:at="guestInvite.at"
 			@close="guestInvite = null"
 		/>
-		<ChatWithMenu v-if="chatWith" :key="chatWith.person.user" :person="chatWith.person" :at="chatWith.at" @close="chatWith = null" />
+		<ChatWithMenu
+			v-if="chatWith"
+			:key="chatWith.person.user"
+			:person="chatWith.person"
+			:at="chatWith.at"
+			:on-map="isOnMap(chatWith.person.user)"
+			@close="chatWith = null"
+			@go="(mode) => goTo([chatWith.person.user], mode)"
+			@pin="startPinPlacing([chatWith.person.user])"
+		/>
 	</div>
 </template>
 
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
-import { Button, call, Dropdown, FeatherIcon, toast } from "frappe-ui"
+import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import ChipFigure from "../components/ChipFigure.vue"
 import EncounterBubble from "../components/EncounterBubble.vue"
 import BurnNotice from "../components/BurnNotice.vue"
 import BatchNotice from "../components/BatchNotice.vue"
-import CockpitBar from "../components/CockpitBar.vue"
+import OphiceSidebar from "../components/OphiceSidebar.vue"
 import GuestChat from "../components/GuestChat.vue"
 import GuestInviteMenu from "../components/GuestInviteMenu.vue"
 import MiniMap from "../components/MiniMap.vue"
@@ -662,8 +748,22 @@ import BackgroundImage from "../components/BackgroundImage.vue"
 import { useMapCamera } from "../composables/useMapCamera.js"
 import { imagePlacement } from "../utils/ophiceView.js"
 import { myZone } from "../utils/ophiceTime.js"
-import { canFloat, openFloatingWindow } from "../utils/pip.js"
+import { ringHue } from "../utils/ophiceColor.js"
+import { openFloatingWindow } from "../utils/pip.js"
 import { dropSpotOutside } from "../utils/ophiceDrop.js"
+import { areaUnder, isTyping, isWalkKey, walkedOut } from "../utils/ophiceWalkOut.js"
+import { stepBlocked } from "../utils/ophiceStep.js"
+import { bellState, createEncounterAlert } from "../utils/encounterAlert.js"
+import {
+	CALL_DEFAULT,
+	callBox,
+	encounterCallWindowName,
+	encounterOpening,
+	jitsiCallUrl,
+	resizeCall,
+	splitCall,
+} from "../utils/ophiceCall.js"
+import { stopTimer } from "../utils/ophiceStop.js"
 import MeetingHuddle from "../components/MeetingHuddle.vue"
 import AreaLayer from "../components/AreaLayer.vue"
 import AreaDialog from "../components/AreaDialog.vue"
@@ -671,6 +771,8 @@ import MeetingPanel from "../components/MeetingPanel.vue"
 import AreaChat from "../components/AreaChat.vue"
 import PeopleSidebar from "../components/PeopleSidebar.vue"
 import ChatWithMenu from "../components/ChatWithMenu.vue"
+import GoToButton from "../components/GoToButton.vue"
+import UserAvatar from "@spa/components/UserAvatar.vue"
 import StatusTag from "../components/StatusTag.vue"
 import StatusMenu from "../components/StatusMenu.vue"
 import { __ } from "@spa/utils/i18n.js"
@@ -752,7 +854,6 @@ const ENCOUNTER_DISTANCE = 2
 const PART_DISTANCE = 2.4
 const PERIMETER_RADIUS = ENCOUNTER_DISTANCE / 2
 const BUBBLE_WIDTH = 288
-const BUBBLE_WIDTH_VIDEO = 384
 
 // The cockpit's realtime socket (as in useUserRealtime); without it Ophice still works alone.
 const instance = getCurrentInstance()
@@ -895,7 +996,11 @@ const imageBox = computed(() =>
 /** A press on the map pans it (after a few px), unless a tool or a panel owns the press. */
 function onViewportDown(event) {
 	if (editingAreas.value || adjustingBackground.value) return
-	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) return
+	if (event.target.closest?.("[data-no-pan], button, a, input, textarea, select")) {
+		// A finger on a chip does not pan, but it can pinch with a second finger (#2213).
+		camera().onChipPointerDown(event)
+		return
+	}
 	camera().onPointerDown(event)
 }
 
@@ -963,6 +1068,7 @@ const mainCam = useMapCamera({
 	storageKey: "phamos_ophice_zoom",
 	startZoom: () => backgroundLayout.value?.zoom || 1,
 	minTile: 8,
+	fillHeight: true,
 })
 const miniCam = useMapCamera({
 	view: () => miniView.value,
@@ -1073,7 +1179,12 @@ const perimeterList = computed(() => {
 		x: chip.x,
 		y: chip.y,
 		mine: chip.mine,
-		contact: chips.some((o) => o.user !== chip.user && Math.hypot(o.x - chip.x, o.y - chip.y) < ENCOUNTER_DISTANCE),
+		// No contact in a space with a call: no encounter starts there.
+		contact:
+			!inCallArea(chip) &&
+			chips.some(
+				(o) => o.user !== chip.user && !inCallArea(o) && Math.hypot(o.x - chip.x, o.y - chip.y) < ENCOUNTER_DISTANCE
+			),
 	}))
 })
 
@@ -1179,15 +1290,13 @@ let lastTime = 0
 let saveTimer = null
 let saved = null
 
-function isTyping(target) {
-	if (!target) return false
-	const tag = target.tagName
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
-}
 
 function onKeydown(event) {
 	shift = event.shiftKey
-	if (props.cockpitOpen) return
+	// Over a cockpit only walking and jumping (#2155). The keys reach this page as long as nobody
+	// clicked into the cockpit: right after a cockpit space opened it, or with the pointer on the
+	// mini map. So a cockpit space never locks me in; walking out of it brings the map back.
+	if (props.cockpitOpen && !isWalkKey(event, DIRECTIONS)) return
 	// Cmd/Ctrl+F: find a person (#2091), instead of the browser's find while Ophice is in front.
 	if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key?.toLowerCase() === "f" && me.value) {
 		event.preventDefault()
@@ -1204,12 +1313,21 @@ function onKeydown(event) {
 		return
 	}
 	if (!me.value || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return
+	// Esc: stop placing a meeting point, then clear the selection (PM, 2026-11-22).
+	if (event.key === "Escape" && (placingPin.value || (selectedUsers.value.length && !chatWith.value))) {
+		event.preventDefault()
+		if (placingPin.value) placingPin.value = null
+		else clearSelection()
+		return
+	}
 	if (event.key === "Escape" && meetingArea.value && !Object.keys(bubbles).length && !document.fullscreenElement) {
 		event.preventDefault()
 		if (!meetingPanel.value?.exitFill()) leaveMeeting(true)
 		return
 	}
 	if (!held.size && !event.repeat) {
+		// Started typing in the pause after a stop (#2171): that is a stop, open now.
+		if (event.key.length === 1 && event.code !== "Space" && !DIRECTIONS[event.key.toLowerCase()]) pendingStop.flush()
 		// Typed while the chat that just opened is still loading: keep it for the chat.
 		if (bufferWhileOpening(event)) return
 		// Esc said "walk on"; Enter brings the chat back while still next to the person.
@@ -1224,6 +1342,7 @@ function onKeydown(event) {
 		event.preventDefault()
 		spaceHeld = true
 		if (event.repeat) return
+		stopTravel(true)
 		backFromStatus()
 		// Moving my chip folds the people list back (#2091).
 		peopleSidebar.value?.fold()
@@ -1234,9 +1353,13 @@ function onKeydown(event) {
 	const key = event.key.toLowerCase()
 	if (!DIRECTIONS[key]) return
 	event.preventDefault()
+	// A key takes over from Go to: the chip comes down where it is.
+	stopTravel(true)
 	backFromStatus()
 	peopleSidebar.value?.fold()
 	held.add(key)
+	// Walking on: the stop before opens nothing (#2171).
+	pendingStop.cancel()
 	heldCount.value = held.size
 	if (!event.repeat) tapped.add(key)
 	if (!frame) {
@@ -1263,23 +1386,42 @@ function onKeyup(event) {
 
 /** The nearest chip within the encounter distance, or null. */
 function nearestInRange() {
+	// A space with a call has its own call and chat: no encounters in it, from either side.
+	if (inCallArea(me.value)) return null
 	let best = null
 	for (const other of others.value) {
 		// Guests (#2082) talk in the guest area's chat and meeting, not in encounters.
-		if (other.offline || other.guest) continue
+		if (other.offline || other.guest || inCallArea(other)) continue
 		const distance = distanceTo(other)
 		if (distance < ENCOUNTER_DISTANCE && (!best || distance < best.distance)) best = { other, distance }
 	}
 	return best?.other || null
 }
 
-/** Stopped walking: next to someone, the chat opens (or gets the keyboard if already open). */
+/** The chat bubble with this person, unless it only shows why it could not be opened. */
+function liveBubble(user) {
+	const bubble = bubbles[user]
+	return bubble && (bubble.loading || bubble.encounter) ? bubble : null
+}
+
+// Passing by (#2171): a stop opens the chat, call or meeting only after a short pause (STOP_DELAY);
+// walking on, jumping or Go to within it opens nothing.
+const pendingStop = stopTimer(openOnStop, () => !held.size && !flying.value && !jump && !travel)
 function chatOnStop() {
+	pendingStop.stopped()
+}
+
+/** Stood still after a stop: next to someone, the chat opens (or gets the keyboard if already open). */
+function openOnStop() {
 	joinAreaIfInside()
+	// Walked from the mini map over a cockpit (#2155): no chat opens behind the cockpit; the
+	// other person can still start one, which the mini map pings.
+	if (props.cockpitOpen) return
 	openCockpitSpace()
 	const other = nearestInRange()
 	if (!other || dismissed.has(other.user)) return
-	const bubble = bubbles[other.user]
+	const bubble = liveBubble(other.user)
+	// No chat yet, or the last try failed (#2161): try again.
 	if (!bubble) openBubble(other, { focus: true })
 	else if (!bubble.loading) focusBubble(other.user)
 	else bubble.focusOnOpen = true
@@ -1303,6 +1445,8 @@ function reopenDismissed() {
 
 // Leaving the window drops every held key, or the chip would keep sailing.
 function releaseAll() {
+	// A flight comes down where it is, like on a key (AI review of !1303).
+	stopTravel(true)
 	held.clear()
 	heldCount.value = 0
 	tapped.clear()
@@ -1423,6 +1567,7 @@ function onRemoteMove(message) {
 	lastSeen.set(other.user, Date.now())
 	// Only a lift that changes the place: a resent lift (its first answer got lost) plays once.
 	if (message.lift && (other.x !== message.x || other.y !== message.y)) playLift(other.user)
+	if (message.beam) playBeam(other.user)
 	other.x = message.x
 	other.y = message.y
 	other.moving = true
@@ -1487,6 +1632,135 @@ const videoUser = computed(() => {
 	return best?.user || null
 })
 
+// The encounter call in its own Jitsi window (#2108): bigger, and without the 5-minute cap of
+// embedded meet.jit.si calls. The bubble then leaves its embedded call (no double join). The
+// window stays open when the two walk apart: the call is the person's own from then on.
+const callWindows = {}
+function openEncounterCall(bubble) {
+	// Approached (#2165): in its own window, too, mic and camera off until I turn them on.
+	const url = jitsiCallUrl(bubble.video, me.value?.full_name || "", { startOff: !!bubble.callOff })
+	if (!url) return
+	const name = encounterCallWindowName(bubble.video)
+	const open = callWindows[name]
+	if (open && !open.closed) {
+		open.focus()
+		return
+	}
+	const win = window.open(url, name, "popup,width=1200,height=800")
+	if (!win) {
+		toast({ title: __("The browser blocked the new window. Please allow pop-ups for this site."), icon: "alert-circle" })
+		return
+	}
+	// The call page must not steer Ophice's tab (reverse tabnabbing).
+	try {
+		win.opener = null
+	} catch {
+		// some browsers do not allow it
+	}
+	callWindows[name] = win
+	bubble.inWindow = true
+}
+
+// The bubble with the embedded call (#2108): on the stage, where and how big this user last left
+// it. Kept per browser and user, like the meeting window's place; the place as share of the free
+// room, so it stays inside the stage at every window size. Default: centred at the top. The size
+// rules (video between 16:9 and 1:1, chat at least 144px, a dragged chat width narrows the video
+// to 1:1 at most, #2135) are in callBox / resizeCall / splitCall.
+const CALL_POS_KEY = "phamos_ophice_call_pos"
+const callPos = ref({ x: 0.5, y: 0, w: CALL_DEFAULT.w, h: CALL_DEFAULT.h })
+const callDrag = ref(null)
+function isCallBubble(bubble) {
+	return bubble.user === videoUser.value && !!bubble.video && !bubble.inWindow
+}
+function callPosKey() {
+	return `${CALL_POS_KEY}:${me.value?.user || ""}`
+}
+watch(
+	() => me.value?.user,
+	(user) => {
+		if (!user) return
+		try {
+			const pos = JSON.parse(localStorage.getItem(callPosKey()) || "null")
+			if (pos && [pos.x, pos.y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+				callPos.value = {
+					x: pos.x,
+					y: pos.y,
+					w: Number.isFinite(pos.w) ? pos.w : CALL_DEFAULT.w,
+					h: Number.isFinite(pos.h) ? pos.h : CALL_DEFAULT.h,
+					...(Number.isFinite(pos.chat) ? { chat: pos.chat } : {}),
+				}
+			}
+		} catch {
+			// private window: the default place
+		}
+	},
+	{ immediate: true }
+)
+// Place and size as shown: px on the stage.
+const callLayout = computed(() => {
+	const box = callBox(callPos.value, view)
+	const freeW = Math.max(0, view.width - box.w)
+	const freeH = Math.max(0, view.height - box.h)
+	return { ...box, left: callPos.value.x * freeW, top: callPos.value.y * freeH }
+})
+function callBubbleStyle() {
+	const box = callLayout.value
+	return { left: `${box.left}px`, top: `${box.top}px`, width: `${box.w}px`, height: `${box.h}px` }
+}
+function setCallBox({ left, top, w, h }) {
+	const freeW = Math.max(0, view.width - w)
+	const freeH = Math.max(0, view.height - h)
+	left = Math.max(0, Math.min(freeW, left))
+	top = Math.max(0, Math.min(freeH, top))
+	callPos.value = { ...callPos.value, x: freeW ? left / freeW : 0.5, y: freeH ? top / freeH : 0, w, h }
+}
+function setCallChat(chatW, dx) {
+	callPos.value = { ...callPos.value, chat: splitCall(callPos.value, chatW, dx, view) }
+}
+// Arrow keys on the line between chat and video (#2135).
+function splitCallBy(dx) {
+	setCallChat(callLayout.value.chatW, dx)
+	saveCallPos()
+}
+// Moved by a press anywhere on it, resized by its edges and corners; the call's frame ignores the
+// pointer meanwhile (else Jitsi takes the moves).
+function startCallDrag(event, kind = "move") {
+	if (event.button !== 0) return
+	event.preventDefault()
+	const { left, top, w, h, chatW } = callLayout.value
+	callDrag.value = { kind, x: event.clientX, y: event.clientY, from: { left, top, w, h, chatW } }
+	window.addEventListener("pointermove", moveCall)
+	window.addEventListener("pointerup", stopCallDrag)
+	window.addEventListener("pointercancel", stopCallDrag)
+}
+function moveCall(event) {
+	const drag = callDrag.value
+	if (!drag) return
+	const dx = event.clientX - drag.x
+	const dy = event.clientY - drag.y
+	if (drag.kind === "move") setCallBox({ ...drag.from, left: drag.from.left + dx, top: drag.from.top + dy })
+	else if (drag.kind === "split") setCallChat(drag.from.chatW, dx)
+	else setCallBox(resizeCall(drag.from, drag.kind, dx, dy, view))
+}
+function stopCallDrag() {
+	callDrag.value = null
+	window.removeEventListener("pointermove", moveCall)
+	window.removeEventListener("pointerup", stopCallDrag)
+	window.removeEventListener("pointercancel", stopCallDrag)
+	saveCallPos()
+}
+function saveCallPos() {
+	try {
+		localStorage.setItem(callPosKey(), JSON.stringify(callPos.value))
+	} catch {
+		// private window: the place lasts until the reload
+	}
+}
+// Ophice closed in the middle of a drag: no listeners left behind.
+onBeforeUnmount(() => {
+	if (callDrag.value) stopCallDrag()
+})
+
 function setBubbleRef(user, el) {
 	if (el) bubbleRefs[user] = el
 	else delete bubbleRefs[user]
@@ -1498,13 +1772,12 @@ function bubbleStyle(bubble) {
 	const t = tile.value
 	const gridWidth = t * me.value.cols
 	const centreX = ((me.value.x + other.x) / 2 + 0.5) * t
-	// With the video call the bubble is wider and about 200px taller (#2059).
-	const withVideo = bubble.user === videoUser.value
-	const width = withVideo ? BUBBLE_WIDTH_VIDEO : BUBBLE_WIDTH
+	// Only the chat sits here; with the call the bubble is on the stage (callBubbleStyle, #2108).
+	const width = BUBBLE_WIDTH
 	const left = Math.max(width / 2 + 4, Math.min(gridWidth - width / 2 - 4, centreX))
 	const top = Math.min(me.value.y, other.y)
 	// Near the top edge the bubble hangs below the chips instead (their legs need ~0.5 tile).
-	if (top * t < (withVideo ? 520 : 270)) {
+	if (top * t < 270) {
 		return { left: `${left}px`, top: `${(Math.max(me.value.y, other.y) + 1.6) * t}px`, transform: "translateX(-50%)" }
 	}
 	return { left: `${left}px`, top: `${(top - 0.1) * t}px`, transform: "translate(-50%, -100%)" }
@@ -1535,7 +1808,8 @@ function checkEncounters() {
 	}
 }
 
-async function openBubble(other, { focus = false, fromPeer = false } = {}) {
+async function openBubble(other, { focus = false, fromPeer = false, answer = false } = {}) {
+	const opening = encounterOpening({ fromPeer, answer })
 	const bubble = reactive({
 		pendingText: "",
 		focusOnOpen: focus,
@@ -1546,9 +1820,13 @@ async function openBubble(other, { focus = false, fromPeer = false } = {}) {
 		loading: true,
 		error: "",
 		sending: false,
+		// The other person walked up (#2165): my call joins at once, with mic and camera off.
+		callOff: opening.callOff,
 	})
 	bubbles[other.user] = bubble
 	try {
+		// Starting a chat myself means I'm back (#2168): only Available people meet.
+		if (opening.backToAvailable) await backFromStatus()
 		// The server checks that we really stand together: my latest spot goes first.
 		await call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y) })
 		const data = await call(`${API}.open_encounter`, { with_user: other.user })
@@ -1577,16 +1855,70 @@ async function focusBubble(user, text = "") {
 	if (text) bubbleRefs[user]?.insert(text)
 }
 
+// --- Encounter alert (#2135): someone started a chat with me. Chime, tab title while the tab is
+// hidden, browser notification while I look elsewhere. Only for me, not for the one who started it.
+
+const encounterAlert = createEncounterAlert({
+	win: window,
+	doc: document,
+	storage: (() => {
+		try {
+			return window.localStorage
+		} catch {
+			return null
+		}
+	})(),
+	Notify: typeof Notification === "undefined" ? null : Notification,
+	Audio: window.AudioContext || window.webkitAudioContext || null,
+})
+const alertMuted = ref(encounterAlert.isMuted())
+const alertPermission = ref(encounterAlert.permission())
+const bell = computed(() => bellState(alertMuted.value, alertPermission.value))
+const bellTitle = computed(
+	() =>
+		({
+			ask: __("Get a sound and a browser notification when someone starts a chat with you"),
+			on: __("Sound and notification on when someone starts a chat with you. Click to mute."),
+			blocked: __("Sound on when someone starts a chat with you. Browser notifications are blocked in this browser. Click to mute."),
+			muted: __("Muted: no sound or notification when someone starts a chat with you. Click to turn on."),
+		})[bell.value]
+)
+
+async function clickBell() {
+	encounterAlert.unlock()
+	if (bell.value === "ask") {
+		alertPermission.value = await encounterAlert.requestPermission()
+	} else {
+		encounterAlert.setMuted(!alertMuted.value)
+		alertMuted.value = encounterAlert.isMuted()
+	}
+}
+
+function alertEncounter(other) {
+	alertPermission.value = encounterAlert.permission()
+	encounterAlert.notify(__("{0} wants to chat", [other.full_name]), { icon: other.user_image || OPHICE_ICON })
+}
+
+// Browsers play sound only after a key press or click on the page. On every one, not just the
+// first: some browsers (Safari) suspend the sound again while the tab is in the background.
+const unlockAudio = () => encounterAlert.unlock()
+
 // The other person started the chat (open_encounter tells this page): open it here too.
 function onEncounterStarted(message) {
+	// Away or be right back (#2168): nothing opens, no call (the server refuses it too).
+	if (me.value?.status) return
 	const other = others.value.find((o) => o.user === message?.with)
 	// In a cockpit (#2074): the mini map pings; the chat opens when I go back to the map.
 	if (other && props.cockpitOpen) {
+		// Already chatting with them (the bubble stays open behind the cockpit), or Esc closed it: no alert.
+		if (!bubbles[other.user] && !dismissed.has(other.user)) alertEncounter(other)
 		pingWalkUp(other)
 		return
 	}
-	if (!other || bubbles[other.user] || dismissed.has(other.user)) return
-	if (distanceTo(other) > PART_DISTANCE) return
+	// A bubble that failed to open (e.g. they were reloading) gives way to their chat (#2161).
+	if (!other || liveBubble(other.user) || dismissed.has(other.user)) return
+	if (distanceTo(other) > PART_DISTANCE || inCallArea(me.value) || inCallArea(other)) return
+	alertEncounter(other)
 	openBubble(other, { fromPeer: true })
 }
 
@@ -1671,6 +2003,11 @@ function areaAt(chip) {
 	)
 }
 
+/** Inside a meeting space with a call (Jitsi link): no encounters there, the space's call and chat collide with them. */
+function inCallArea(chip) {
+	return !!areaAt(chip)?.jitsi_room
+}
+
 // Who stands in which area, from the chips on the map (#2067): the sidebar groups and colours by it.
 const areaOfUser = computed(() => {
 	const map = {}
@@ -1715,13 +2052,11 @@ function openCockpitSpace() {
 }
 
 /**
- * Open a cockpit (shortcut bar or cockpit space). Where the browser has it, the mini map goes
- * straight into its floating window, so it can be pulled out of the browser without a second click
- * (PM, 2026-11-22). The browser only allows that right after a click or key press; walking is key
- * presses, so stopping in a cockpit space still counts. Otherwise it stays over the cockpit.
+ * Open a cockpit (shortcut bar or cockpit space). The mini map stays in the page, docked in the
+ * cockpit's sidebar (#2155); since the call is embedded (#2108) it needs no window of its own.
+ * Its "Float" button still puts it on top of other windows.
  */
 function openCockpit(cockpit) {
-	if (canFloat && !pipBody.value && navigator.userActivation?.isActive) floatAll()
 	emit("open-cockpit", cockpit)
 }
 
@@ -1818,7 +2153,9 @@ let windowWatch = null
 function popOut() {
 	const area = meetingArea.value
 	if (!area) return
-	const url = `https://${area.jitsi_domain}/${encodeURIComponent(area.jitsi_room)}`
+	// Straight in, mic and camera on, my name filled in (#2108).
+	const url = jitsiCallUrl({ domain: area.jitsi_domain, room: area.jitsi_room }, me.value?.full_name || "")
+	if (!url) return
 	if (meetingWindow && !meetingWindow.closed && poppedOut.value === area.name) {
 		// Brings it to the front once; only picture-in-picture keeps a video in front.
 		meetingWindow.focus()
@@ -1935,6 +2272,33 @@ watch(
 	}
 )
 
+// Over a cockpit, walking from the mini map out of the area I stood in when the cockpit opened
+// takes me back to the map (PM, 2026-11-25, #2155). The keys stay held, so the chip walks on there.
+// Opened outside any area: walking keeps the cockpit. Opened by a reload of /open/..., my chip
+// and the areas arrive after the cockpit: the start area is taken once both are there.
+let cockpitArea = null
+watch(
+	() => (props.cockpitOpen && me.value && areas.value.length ? areas.value : null),
+	(loaded) => {
+		cockpitArea = loaded ? areaUnder(loaded, me.value)?.name || null : null
+	},
+	{ immediate: true }
+)
+watch(
+	() => me.value && [me.value.x, me.value.y],
+	() => {
+		if (!props.cockpitOpen || !walkedOut(cockpitArea, areas.value, me.value)) return
+		cockpitArea = null
+		emit("back-to-map")
+	}
+)
+
+// --- The mini map (#2155) hands the keyboard back when the pointer leaves it.
+/** The pointer left the mini map: the keyboard goes back to the cockpit page. */
+function giveKeysToCockpit() {
+	document.querySelector("iframe[data-ophice-frame]")?.focus()
+}
+
 const pipBody = ref(null)
 /** From the mini map: the map, and in a meeting the call and chat with it, in one floating window. */
 async function floatAll() {
@@ -1964,6 +2328,7 @@ const areaChatStyle = computed(() => (tileRects.value?.chat ? rectStyle(tileRect
 // --- People list (#2063) and "chat with" (list or map).
 
 const PEOPLE_KEY = "phamos_ophice_people_open"
+const SIDEBAR_KEY = "phamos_ophice_sidebar_open"
 const PEOPLE_REFRESH_MS = 15000
 const people = ref([])
 const hideDetails = ref(false)
@@ -2021,6 +2386,16 @@ function readFlag(key, fallback) {
 	}
 }
 
+// The right sidebar (PM, 2026-11-25): folded to icons by default, remembered in this browser.
+const sideCollapsed = ref(!readFlag(SIDEBAR_KEY, false))
+watch(sideCollapsed, (value) => {
+	try {
+		localStorage.setItem(SIDEBAR_KEY, value ? "0" : "1")
+	} catch {
+		// private window: folded again after a reload
+	}
+})
+
 /** Keep the people list open, or fold it back to its chips (#2091). */
 function setPeoplePinned(value) {
 	showPeople.value = Boolean(value)
@@ -2070,6 +2445,343 @@ function openChatWith(person, event) {
 	// A chip on the map: the list knows more (what they work on).
 	const known = people.value.find((p) => p.user === person.user)
 	chatWith.value = { person: known || person, at: { x: event?.clientX ?? 200, y: event?.clientY ?? 200 } }
+}
+
+// --- Finding people (PM, 2026-11-22): a click on a person (list or map) selects them and their
+// chip glows; ⌘/Ctrl-click adds or removes one, Shift-click in the list a range. Off the visible
+// map, a marker at the edge points to them. Go to flies (or beams) my chip next to them; a
+// meeting point is a bouncing pin for me and them. Esc or a click on the empty map clears it.
+
+const GLOW_MS = 2000
+const selectedUsers = ref([])
+const selectedSet = computed(() => new Set(selectedUsers.value))
+let selectAnchor = null
+const glows = reactive({})
+
+function glow(user) {
+	const started = Date.now()
+	glows[user] = started
+	setTimeout(() => {
+		if (glows[user] === started) delete glows[user]
+	}, GLOW_MS)
+}
+
+/** The chip of someone on the map right now (not away with the page closed). */
+function chipOnMap(user) {
+	return others.value.find((o) => o.user === user && !o.offline) || null
+}
+function isOnMap(user) {
+	return Boolean(chipOnMap(user))
+}
+
+const selectedPeople = computed(() =>
+	selectedUsers.value.map((user) => people.value.find((p) => p.user === user) || others.value.find((o) => o.user === user) || { user, full_name: user })
+)
+const selectedOnMap = computed(() => selectedUsers.value.filter(isOnMap))
+
+/**
+ * A person was clicked. `order`: the users in the list's order (for Shift ranges);
+ * `options.menu` false: only select and show them (the folded strip), no chat menu.
+ */
+function onPersonClick(person, event, order = null, options = {}) {
+	// Placing a meeting point: a chip on the map only places it (onViewportClick); a click
+	// anywhere else (the list) stops placing and selects as usual.
+	if (placingPin.value) {
+		if (event?.target?.closest?.("[data-testid=other-chip]")) return
+		placingPin.value = null
+	}
+	if (!person?.user || person.user === me.value?.user) return
+	if (event?.metaKey || event?.ctrlKey) {
+		const at = selectedUsers.value.indexOf(person.user)
+		if (at >= 0) selectedUsers.value.splice(at, 1)
+		else {
+			selectedUsers.value.push(person.user)
+			glow(person.user)
+		}
+		selectAnchor = person.user
+		chatWith.value = null
+		guestInvite.value = null
+		return
+	}
+	if (event?.shiftKey && order && selectAnchor && order.includes(selectAnchor) && order.includes(person.user)) {
+		const from = order.indexOf(selectAnchor)
+		const to = order.indexOf(person.user)
+		const range = order.slice(Math.min(from, to), Math.max(from, to) + 1).filter((user) => user !== me.value?.user)
+		selectedUsers.value = [...new Set([...selectedUsers.value, ...range])]
+		range.forEach(glow)
+		chatWith.value = null
+		guestInvite.value = null
+		return
+	}
+	selectedUsers.value = [person.user]
+	selectAnchor = person.user
+	glow(person.user)
+	if (options.menu !== false) openChatWith(person, event)
+}
+
+function clearSelection() {
+	selectedUsers.value = []
+	selectAnchor = null
+}
+
+/** A click on the map: sets the meeting point while placing one; on empty ground it clears the selection. */
+function onViewportClick(event) {
+	if (placingPin.value) {
+		placePin(event)
+		return
+	}
+	if (event.target.closest?.("[data-testid=other-chip], [data-testid=my-chip], [data-no-pan], button")) return
+	if (!event.metaKey && !event.ctrlKey && !event.shiftKey) clearSelection()
+}
+
+// Edge markers: everyone off the visible map (PM, 2026-11-23), and the meeting points. The
+// selected and the ones glowing right now stand out. The farther away, the smaller the marker.
+const EDGE_MARGIN = 24
+const EDGE_GROUP_PX = 30
+// Tiles beyond the edge at which a marker reaches its smallest size.
+const EDGE_FAR_TILES = 30
+const EDGE_MIN_SCALE = 0.45
+const EDGE_MIN_SCALE_PICKED = 0.75
+
+const edgeMarkers = computed(() => {
+	if (!me.value || meetingArea.value || !tile.value) return []
+	const width = view.width
+	const height = view.height
+	if (!width || !height) return []
+	const targets = []
+	for (const chip of others.value) {
+		if (chip.offline) continue
+		const picked = selectedSet.value.has(chip.user) || Boolean(glows[chip.user])
+		targets.push({ key: chip.user, kind: "person", x: chip.x + 0.5, y: chip.y + 0.5, person: chip, picked, title: chip.full_name })
+	}
+	for (const pin of visiblePins.value) {
+		targets.push({ key: `pin:${pin.by}`, kind: "pin", x: pin.x + 0.5, y: pin.y + 0.5, hue: ringHue(pin.by), title: __("Meeting point · {0}", [pin.by_name]) })
+	}
+	const cx = width / 2
+	const cy = height / 2
+	const placed = []
+	for (const target of targets) {
+		const at = mainCam.toView(target.x, target.y)
+		if (at.x >= 0 && at.x <= width && at.y >= 0 && at.y <= height) continue
+		const dx = at.x - cx
+		const dy = at.y - cy
+		// Along the line from the middle of the view to them, up to the edge.
+		const reach = Math.min((cx - EDGE_MARGIN) / Math.max(Math.abs(dx), 1e-6), (cy - EDGE_MARGIN) / Math.max(Math.abs(dy), 1e-6))
+		const x = cx + dx * reach
+		const y = cy + dy * reach
+		// How far beyond the edge, in tiles: the farther, the smaller.
+		const far = Math.hypot(at.x - x, at.y - y) / tile.value
+		const min = target.picked || target.kind === "pin" ? EDGE_MIN_SCALE_PICKED : EDGE_MIN_SCALE
+		const scale = Math.max(min, 1 - ((1 - min) * far) / EDGE_FAR_TILES)
+		placed.push({ ...target, at: { x, y }, angle: (Math.atan2(dy, dx) * 180) / Math.PI, far, scale })
+	}
+	// The picked and the nearest first: they lead a group of markers that meet at the edge.
+	placed.sort((a, b) => Number(Boolean(b.picked)) - Number(Boolean(a.picked)) || a.far - b.far)
+	const markers = []
+	for (const target of placed) {
+		const near = markers.find((m) => m.kind === target.kind && Math.hypot(m.x - target.at.x, m.y - target.at.y) < EDGE_GROUP_PX * Math.max(m.scale, target.scale))
+		if (near) {
+			near.items.push(target)
+			near.scale = Math.max(near.scale, target.scale)
+			near.picked = near.picked || target.picked
+			near.title = near.items.map((item) => item.title).join(", ")
+			continue
+		}
+		markers.push({
+			key: target.key,
+			kind: target.kind,
+			x: target.at.x,
+			y: target.at.y,
+			angle: target.angle,
+			hue: target.hue,
+			scale: target.scale,
+			picked: Boolean(target.picked),
+			title: target.title,
+			items: [target],
+		})
+	}
+	return markers
+})
+
+/** Look at someone (or a pin) off the visible map: the view glides there; my next step brings it back. */
+function lookAt(target) {
+	const cam = camera()
+	cam.followPaused.value = true
+	cam.springing.value = true
+	cam.centerOn(target.x, target.y)
+	setTimeout(() => (cam.springing.value = false), 450)
+	if (target.person) glow(target.person.user)
+}
+
+// --- Go to: fly (with wings, over everyone) or beam (at once) to a free spot next to them.
+
+const FLY_TILES_PER_SECOND = 14
+const FLY_MIN_MS = 500
+const FLY_MAX_MS = 2600
+let travel = null
+
+function occupied(x, y) {
+	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE + 0.2)
+}
+
+/** A free spot next to these points (their middle), on the side facing me; the middle itself for a pin. */
+function spotNear(points, { first = 1.1 } = {}) {
+	const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length
+	const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length
+	const maxX = me.value.cols - 1
+	const maxY = me.value.rows - 1
+	const facing = Math.atan2(me.value.y - cy, me.value.x - cx) || 0
+	for (let radius = first; radius <= 6; radius += 0.6) {
+		const steps = radius ? 16 : 1
+		for (let k = 0; k < steps; k++) {
+			// Alternating around the side facing me: 0, +1, −1, +2, −2 …
+			const angle = facing + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * ((2 * Math.PI) / steps)
+			const x = cx + Math.cos(angle) * radius
+			const y = cy + Math.sin(angle) * radius
+			if (x < 0 || y < 0 || x > maxX || y > maxY) continue
+			if (!occupied(x, y)) return { x, y }
+		}
+	}
+	return { x: Math.max(0, Math.min(maxX, cx)), y: Math.max(0, Math.min(maxY, cy)) }
+}
+
+function goTo(users, mode = "fly") {
+	const chips = users.map(chipOnMap).filter(Boolean)
+	if (!me.value || !chips.length) {
+		toast({ title: __("Not on the map right now."), icon: "info" })
+		return
+	}
+	travelTo(spotNear(chips), mode)
+}
+
+function goToPin(pin) {
+	travelTo(spotNear([pin], { first: 0 }), "fly")
+}
+
+function travelTo(spot, mode) {
+	if (!me.value || lifting) return
+	chatWith.value = null
+	stopTravel()
+	backFromStatus()
+	peopleSidebar.value?.fold()
+	held.clear()
+	tapped.clear()
+	jump = null
+	jumping.value = false
+	if (mode === "beam") {
+		moveTo(spot.x, spot.y)
+		playBeam(me.value.user)
+		camera().place(me.value.x, me.value.y)
+		clearTimeout(sendTimer)
+		sendTimer = null
+		lastSent = performance.now()
+		call(`${API}.move`, { x: round(me.value.x), y: round(me.value.y), beam: 1 }).catch(() => {})
+		land()
+		return
+	}
+	const from = { x: me.value.x, y: me.value.y }
+	const distance = Math.hypot(spot.x - from.x, spot.y - from.y)
+	if (distance < 0.05) return
+	lastDir = [(spot.x - from.x) / distance, (spot.y - from.y) / distance]
+	flying.value = true
+	moving.value = true
+	travel = { from, to: spot, started: performance.now(), ms: Math.max(FLY_MIN_MS, Math.min(FLY_MAX_MS, (distance / FLY_TILES_PER_SECOND) * 1000)), frame: null }
+	travel.frame = requestAnimationFrame(travelStep)
+}
+
+function travelStep(now) {
+	if (!travel || !me.value) return
+	const t = Math.min(1, (now - travel.started) / travel.ms)
+	// Ease in and out: lifts off, glides, sets down.
+	const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
+	moveTo(travel.from.x + (travel.to.x - travel.from.x) * e, travel.from.y + (travel.to.y - travel.from.y) * e)
+	camera().followChip(me.value.x, me.value.y)
+	queueMove()
+	if (t < 1) {
+		travel.frame = requestAnimationFrame(travelStep)
+		return
+	}
+	travel = null
+	moving.value = false
+	land()
+}
+
+/** A key takes over: the chip comes down where it is. */
+function stopTravel(landHere = false) {
+	if (!travel) return
+	cancelAnimationFrame(travel.frame)
+	travel = null
+	moving.value = false
+	if (landHere) land()
+}
+
+// --- Meeting points: a pin for me and the people I chose (one per person who sets it).
+
+const ARRIVED_TILES = 2
+const pins = ref([])
+// The people to meet while I choose the spot, or null.
+const placingPin = ref(null)
+
+function startPinPlacing(users) {
+	chatWith.value = null
+	placingPin.value = users.filter((user) => !people.value.find((p) => p.user === user)?.guest && !others.value.find((o) => o.user === user)?.guest)
+	if (!placingPin.value.length) placingPin.value = null
+}
+
+async function placePin(event) {
+	const users = placingPin.value
+	placingPin.value = null
+	const cam = camera()
+	if (!cam.tile.value || !me.value) return
+	const box = event.currentTarget.getBoundingClientRect()
+	const x = (event.clientX - box.left - cam.pan.x - cam.origin.value.x) / cam.tile.value - 0.5
+	const y = (event.clientY - box.top - cam.pan.y - cam.origin.value.y) / cam.tile.value - 0.5
+	try {
+		upsertPin(await call(`${API}.set_meeting_pin`, { users, x: round(x), y: round(y) }))
+	} catch (e) {
+		toast.error(errorText(e) || __("The meeting point could not be set."))
+	}
+}
+
+function upsertPin(pin) {
+	if (!pin?.by) return
+	const known = pins.value.some((p) => p.by === pin.by && p.until === pin.until)
+	pins.value = [...pins.value.filter((p) => p.by !== pin.by), pin]
+	if (!known && pin.by !== me.value?.user) toast({ title: __("{0} set a meeting point", [pin.by_name]), icon: "map-pin" })
+}
+
+function onPinRemoved(message) {
+	pins.value = pins.value.filter((p) => p.by !== message?.by)
+}
+
+async function removePin() {
+	onPinRemoved({ by: me.value?.user })
+	await call(`${API}.remove_meeting_pin`).catch(() => {})
+}
+
+function positionOf(user) {
+	return user === me.value?.user ? me.value : chipOnMap(user)
+}
+function everyoneArrived(pin) {
+	return pin.users.every((user) => {
+		const chip = positionOf(user)
+		return chip && Math.hypot(chip.x - pin.x, chip.y - pin.y) <= ARRIVED_TILES
+	})
+}
+const visiblePins = computed(() => (me.value ? pins.value.filter((pin) => pin.until * 1000 > clock.value && !everyoneArrived(pin)) : []))
+// My own pin: once everyone is there, it goes away for all.
+watch(
+	() => pins.value.find((pin) => pin.by === me.value?.user && everyoneArrived(pin)),
+	(pin) => pin && removePin()
+)
+
+function pinStyle(pin) {
+	return {
+		width: `${tile.value}px`,
+		height: `${tile.value}px`,
+		transform: `translate(${pin.x * tile.value}px, ${pin.y * tile.value}px)`,
+		"--pin-hue": ringHue(pin.by),
+	}
 }
 
 function nameOf(user) {
@@ -2154,7 +2866,7 @@ function toggleStatus(event) {
 // For "back in 20 minutes": a slow clock is enough.
 const clock = ref(Date.now())
 const clockTimer = setInterval(() => (clock.value = Date.now()), 30000)
-let statusClearing = false
+let statusClearing = null
 
 const statusChips = computed(() => {
 	if (!me.value) return []
@@ -2181,14 +2893,15 @@ async function saveStatus(values) {
 	}
 }
 
-/** Moving means I'm back: the status goes. */
+/** Moving means I'm back: the status goes. Resolves once the server knows. */
 function backFromStatus() {
-	if (!me.value?.status || statusClearing) return
-	statusClearing = true
+	if (statusClearing) return statusClearing
+	if (!me.value?.status) return Promise.resolve()
 	me.value.status = null
-	call(`${API}.set_status`, { kind: "" })
+	statusClearing = call(`${API}.set_status`, { kind: "" })
 		.catch(() => {})
-		.finally(() => (statusClearing = false))
+		.finally(() => (statusClearing = null))
+	return statusClearing
 }
 
 function onRemoteStatus(message) {
@@ -2353,21 +3066,33 @@ function queueMove() {
 	else if (!sendTimer) sendTimer = setTimeout(sendMove, wait)
 }
 
+let beatOnce = false
 function heartbeat() {
 	if (!me.value) return
-	call(`${API}.heartbeat`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
+	const first = !beatOnce
+	beatOnce = true
+	call(`${API}.heartbeat`, { x: round(me.value.x), y: round(me.value.y) })
+		.then((chip) => {
+			// Back on the map after dropping off (sleep, lost connection): beamed in again. The
+			// first beat after loading is the beam the page already showed.
+			if (chip?.beam && !first && me.value && !beams[me.value.user]) playBeam(me.value.user)
+		})
+		.catch(() => {})
 	pruneOthers()
 }
 
 // On tab close the component never unmounts: tell the server with a request that outlives the page.
 function leaveOnPagehide() {
+	stopTravel()
 	// Ophice closes: the call in its own window ends with it.
 	if (poppedOut.value) closeMeetingWindow()
 	try {
+		// With the spot it stands on: the delayed save may not have gone out yet (PM, 2026-11-23).
 		fetch(`/api/method/${API}.leave`, {
 			method: "POST",
 			keepalive: true,
-			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "" },
+			headers: { "X-Frappe-CSRF-Token": window.csrf_token || "", "Content-Type": "application/json" },
+			body: JSON.stringify(me.value ? { x: round(me.value.x), y: round(me.value.y) } : {}),
 		})
 	} catch {
 		// The presence TTL removes the chip anyway.
@@ -2400,7 +3125,7 @@ function pingWalkUp(other) {
 /** Someone stops next to my chip while I work in a cockpit. */
 function noticeWalkUp(other) {
 	if (!props.cockpitOpen || other.guest || other.offline || !me.value) return
-	const near = distanceTo(other) < ENCOUNTER_DISTANCE
+	const near = distanceTo(other) < ENCOUNTER_DISTANCE && !inCallArea(me.value) && !inCallArea(other)
 	if (near && !nearMe.has(other.user)) pingWalkUp(other)
 	if (near) nearMe.add(other.user)
 	else nearMe.delete(other.user)
@@ -2454,7 +3179,8 @@ async function sendFromPing(ping, text, done) {
 		} else {
 			const other = others.value.find((o) => o.user === ping.user)
 			if (!other) throw new Error(__("{0} has left.", [ping.name || nameOf(ping.user)]))
-			if (!bubbles[other.user]?.encounter) await openBubble(other)
+			// Answering someone who came over (#2165): my call starts with mic and camera off.
+			if (!bubbles[other.user]?.encounter) await openBubble(other, { answer: ping.kind === "walkup" })
 			const bubble = bubbles[other.user]
 			if (!bubble?.encounter) throw new Error(bubble?.error || __("The chat could not be opened."))
 			addMessage(bubble, await call(`${API}.send_encounter_message`, { encounter: bubble.encounter, text }))
@@ -2475,7 +3201,7 @@ function openFromPing(ping) {
 	if (!other) return
 	nextTick(() => {
 		if (bubbles[other.user]) focusBubble(other.user)
-		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true })
+		else if (distanceTo(other) < PART_DISTANCE) openBubble(other, { focus: true, answer: ping.kind === "walkup" })
 	})
 }
 
@@ -2495,6 +3221,8 @@ const SOCKET_EVENTS = [
 	["ophice_guest_chat", onMeetingMessage],
 	["ophice_presence", upsertOther],
 	["ophice_move", onRemoteMove],
+	["ophice_pin", upsertPin],
+	["ophice_pin_removed", onPinRemoved],
 	["ophice_leave", onRemoteLeave],
 	["ophice_message", onEncounterMessage],
 	["ophice_encounter_started", onEncounterStarted],
@@ -2531,6 +3259,12 @@ function blocked(x, y) {
 	// In the air nothing blocks: that is the point of jumping.
 	if (jump || flying.value) return false
 	return others.value.some((o) => !o.offline && Math.hypot(o.x - x, o.y - y) < MIN_DISTANCE)
+}
+
+/** Walking from where my chip stands to x, y is blocked: only a step closer to someone, never away (#2160). */
+function stepBlockedTo(x, y) {
+	if (jump || flying.value) return false
+	return stepBlocked(others.value, me.value, { x, y }, MIN_DISTANCE)
 }
 
 // --- Jump (Space): a short hop forward that passes over other chips.
@@ -2639,8 +3373,9 @@ function tick(now) {
 		const y = rawY < 0 ? maxY : rawY > maxY ? 0 : rawY
 		const wrapped = x !== rawX || y !== rawY
 		// Each axis on its own, so a chip slides along another one instead of sticking to it.
-		if (!blocked(x, me.value.y)) me.value.x = x
-		if (!blocked(me.value.x, y)) me.value.y = y
+		// Too close to someone already (e.g. both stepped at once): any step away is allowed (#2160).
+		if (!stepBlockedTo(x, me.value.y)) me.value.x = x
+		if (!stepBlockedTo(me.value.x, y)) me.value.y = y
 		// The view follows my chip near its edge (#2089); after a wrap it jumps to the other side.
 		if (wrapped) camera().place(me.value.x, me.value.y)
 		else camera().followChip(me.value.x, me.value.y)
@@ -2689,6 +3424,8 @@ onMounted(async () => {
 	resizeObserver = new ResizeObserver(measure)
 	if (stage.value) resizeObserver.observe(stage.value)
 	window.addEventListener("keydown", onKeydown)
+	window.addEventListener("keydown", unlockAudio, { capture: true })
+	window.addEventListener("pointerdown", unlockAudio, { capture: true })
 	window.addEventListener("keyup", onKeyup)
 	window.addEventListener("blur", releaseAll)
 	window.addEventListener("pagehide", leaveOnPagehide)
@@ -2708,6 +3445,7 @@ onMounted(async () => {
 		canEditMap.value = Boolean(data.can_edit_map)
 		autoCockpit.value = data.auto_cockpit !== false
 		for (const notice of data.notices || []) upsertNotice(notice)
+		pins.value = data.pins || []
 		for (const chip of data.others || []) upsertOther(chip)
 	} catch (e) {
 		error.value = __("Ophice could not be loaded.")
@@ -2759,6 +3497,7 @@ function pinPhriend() {
 }
 
 onBeforeUnmount(() => {
+	pendingStop.cancel()
 	clearInterval(phriendTimer)
 	phriend?.ball?.pin(null)
 	clearInterval(clockTimer)
@@ -2766,6 +3505,9 @@ onBeforeUnmount(() => {
 	clearTimeout(peopleSoon)
 	window.removeEventListener("resize", onViewportResize)
 	window.removeEventListener("keydown", onKeydown)
+	window.removeEventListener("keydown", unlockAudio, { capture: true })
+	window.removeEventListener("pointerdown", unlockAudio, { capture: true })
+	encounterAlert.stop()
 	window.removeEventListener("keyup", onKeyup)
 	window.removeEventListener("blur", releaseAll)
 	window.removeEventListener("pagehide", leaveOnPagehide)
@@ -2775,7 +3517,9 @@ onBeforeUnmount(() => {
 	clearInterval(nowTimer)
 	clearTimeout(sendTimer)
 	for (const timer of movingTimers.values()) clearTimeout(timer)
-	if (me.value) call(`${API}.leave`).catch(() => {})
+	// A flight still running would send moves after the leave (AI review of !1303).
+	stopTravel()
+	if (me.value) call(`${API}.leave`, { x: round(me.value.x), y: round(me.value.y) }).catch(() => {})
 	if (frame) cancelAnimationFrame(frame)
 	resizeObserver?.disconnect()
 	if (saveTimer) {
@@ -2966,6 +3710,166 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
 	.ophice-chip--remote {
 		transition: none;
+	}
+}
+/* Finding people (PM, 2026-11-22): the glow when picked, the ring while selected. */
+.ophice-glow {
+	position: absolute;
+	inset: -70%;
+	z-index: -1;
+	border-radius: 9999px;
+	pointer-events: none;
+	background: radial-gradient(circle, rgb(253 224 71 / 0.85) 0%, rgb(250 204 21 / 0.45) 38%, transparent 68%);
+	animation: ophice-glow 2000ms ease-out forwards;
+}
+@keyframes ophice-glow {
+	0% { opacity: 0; transform: scale(0.5); }
+	15% { opacity: 1; transform: scale(1.1); }
+	40% { transform: scale(0.92); }
+	65% { opacity: 1; transform: scale(1.06); }
+	100% { opacity: 0; transform: scale(1.2); }
+}
+.ophice-picked {
+	position: absolute;
+	inset: -3px;
+	z-index: -1;
+	border-radius: 9999px;
+	pointer-events: none;
+	box-shadow: 0 0 0 2px #3b82f6, 0 0 12px 3px rgb(59 130 246 / 0.5);
+}
+/* At the edge of the view: where someone (or a meeting point) is, off the visible map. */
+/* Placed on the edge and sized by distance; the button inside pulses on its own. */
+.ophice-edge-at {
+	z-index: 25;
+	width: 36px;
+	height: 36px;
+	margin: -18px 0 0 -18px;
+	transition: transform 200ms ease-out;
+}
+/* Everyone: a quiet ring in their own colour. */
+.ophice-edge {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	background: var(--surface-white, #fff);
+	color: hsl(var(--ring-hue) 80% 40%);
+	opacity: 0.9;
+	box-shadow: 0 0 0 2px hsl(var(--ring-hue) 80% 45%), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+.ophice-edge:hover {
+	opacity: 1;
+}
+/* Selected or just picked: glowing and pulsing. */
+.ophice-edge--picked {
+	color: #2563eb;
+	opacity: 1;
+	box-shadow: 0 0 0 2px #3b82f6, 0 0 16px 5px rgb(59 130 246 / 0.55);
+	animation: ophice-edge 1400ms ease-in-out infinite;
+}
+.ophice-edge--pin {
+	opacity: 1;
+	animation: ophice-edge 1400ms ease-in-out infinite;
+	color: hsl(var(--pin-hue) 80% 40%);
+	box-shadow: 0 0 0 2px hsl(var(--pin-hue) 80% 45%), 0 0 16px 5px hsl(var(--pin-hue) 80% 50% / 0.55);
+}
+.ophice-edge__arrow {
+	position: absolute;
+	inset: -11px;
+	pointer-events: none;
+}
+.ophice-edge__arrow::after {
+	content: "";
+	position: absolute;
+	right: 0;
+	top: 50%;
+	margin-top: -6px;
+	border-left: 9px solid hsl(var(--ring-hue) 80% 45%);
+	border-top: 6px solid transparent;
+	border-bottom: 6px solid transparent;
+}
+.ophice-edge--picked .ophice-edge__arrow::after {
+	border-left-color: #3b82f6;
+}
+.ophice-edge--pin .ophice-edge__arrow::after {
+	border-left-color: hsl(var(--pin-hue) 80% 45%);
+}
+.ophice-edge__face {
+	display: flex;
+	overflow: hidden;
+	border-radius: 9999px;
+}
+.ophice-edge__count {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 3px;
+	border-radius: 8px;
+	background: #2563eb;
+	color: #fff;
+	font-size: 10px;
+	line-height: 16px;
+	text-align: center;
+}
+@keyframes ophice-edge {
+	50% { transform: scale(1.1); }
+}
+/* Meeting point: a bouncing pin with a little shadow and its label. */
+.ophice-pin {
+	z-index: 12;
+	pointer-events: none;
+}
+.ophice-pin::before {
+	content: "";
+	position: absolute;
+	left: 28%;
+	right: 28%;
+	top: 82%;
+	height: 14%;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 0.25);
+}
+.ophice-pin__icon {
+	position: absolute;
+	left: 10%;
+	top: 0;
+	width: 80%;
+	height: 85%;
+	pointer-events: auto;
+	color: hsl(var(--pin-hue) 80% 45%);
+	filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
+	animation: ophice-pin-bounce 1100ms ease-in-out infinite;
+}
+@keyframes ophice-pin-bounce {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-40%); }
+}
+.ophice-pin__label {
+	position: absolute;
+	left: 50%;
+	top: 100%;
+	transform: translateX(-50%);
+	margin-top: 2px;
+	padding: 1px 8px;
+	border-radius: 9999px;
+	white-space: nowrap;
+	font-size: 11px;
+	line-height: 16px;
+	pointer-events: auto;
+	background: hsl(var(--pin-hue) 70% 38%);
+	color: #fff;
+	box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+	.ophice-glow,
+	.ophice-edge,
+	.ophice-pin__icon {
+		animation: none;
 	}
 }
 </style>

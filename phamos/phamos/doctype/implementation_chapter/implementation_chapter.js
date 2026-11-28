@@ -64,6 +64,7 @@ const PROGRESS_COLORS = {
 	"On Track": "#2f9e44",
 	"At Risk": "#f2b705",
 	"Off Track": "#e03131",
+	"Complete": "#0b7285",
 };
 
 function chapter_history_pill(text, colors) {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { TAIL_H, bubble_path, jitter } from "./bubble.js"
 
@@ -28,5 +29,17 @@ describe("the speech bubble (PM, 2026-11-21)", () => {
 			expect(Math.abs(j.tail)).toBeLessThanOrEqual(6)
 		}
 		expect(jitter(() => 0)).not.toEqual(jitter(() => 1))
+	})
+})
+
+describe("a shown bubble (#2095)", () => {
+	const ball_source = readFileSync(new URL("./ball.js", import.meta.url), "utf8")
+	it("tilts only on the way in and rests horizontal", () => {
+		const shown = ball_source.match(/\.bubble\.show \{[^}]*\}/)[0]
+		expect(shown).toContain("rotate(0deg)")
+		expect(shown).not.toContain("var(--jr)")
+	})
+	it("redraws its outline when its size changes, so it never stays without background", () => {
+		expect(ball_source).toMatch(/new ResizeObserver\([\s\S]*?draw_bubble\(false\)[\s\S]*?\.observe\(this\.bubble\)/)
 	})
 })

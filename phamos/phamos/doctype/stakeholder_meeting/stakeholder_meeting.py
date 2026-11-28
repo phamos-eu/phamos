@@ -45,6 +45,20 @@ CHAPTER_SNAPSHOT_FIELDS = (
 	"target_date",
 )
 IMPLEMENTATION_SNAPSHOT_FIELDS = ("last_stakeholder_meeting", "last_reviewed_on", "next_review_due")
+# Chapter fields read to fill a Chapter Review row.
+CHAPTER_REVIEW_SOURCE_FIELDS = (
+	"name",
+	"implementation",
+	"chapter_title",
+	"current_revision",
+	"status",
+	"current_level",
+	"target_level",
+	"planned_start",
+	"target_date",
+	"last_meeting",
+	"last_reviewed_on",
+)
 
 
 class StakeholderMeeting(Document):
@@ -54,6 +68,21 @@ class StakeholderMeeting(Document):
 
 	def validate(self):
 		self.validate_chapter_reviews()
+
+	@frappe.whitelist()
+	def fetch_from_implementation(self):
+		"""Fill attendees and chapter reviews as soon as the Implementation is
+		picked, so the chair sees them before the first save. Replaces any rows
+		seeded for a previously picked Implementation."""
+		if self.name and frappe.db.exists(self.doctype, self.name):
+			frappe.throw(frappe._("Attendees and Chapter Reviews are only filled in before the first save."))
+		if self.implementation:
+			frappe.has_permission("Implementation", "read", self.implementation, throw=True)
+
+		self.set("attendees", [])
+		self.set("chapter_reviews", [])
+		self.seed_attendees_from_implementation()
+		self.seed_chapter_reviews_from_implementation()
 
 	def validate_chapter_reviews(self):
 		"""Each Chapter may be reviewed once per meeting and must belong to this
@@ -67,22 +96,7 @@ class StakeholderMeeting(Document):
 			seen.add(row.chapter)
 
 			chapter = frappe.db.get_value(
-				"Implementation Chapter",
-				row.chapter,
-				[
-					"name",
-					"implementation",
-					"chapter_title",
-					"current_revision",
-					"status",
-					"current_level",
-					"target_level",
-					"planned_start",
-					"target_date",
-					"last_meeting",
-					"last_reviewed_on",
-				],
-				as_dict=True,
+				"Implementation Chapter", row.chapter, CHAPTER_REVIEW_SOURCE_FIELDS, as_dict=True
 			)
 			if not chapter:
 				continue
@@ -304,6 +318,10 @@ class StakeholderMeeting(Document):
 			if new_revision_name:
 				row_updates.update(previous_revision=row.current_revision, current_revision=new_revision_name)
 				created_revisions.append((chapter.name, new_revision_name))
+			elif chapter.current_revision and row.current_revision != chapter.current_revision:
+				# Record the Revision actually reviewed, e.g. when the row was added
+				# while the Chapter was still Draft, so the Chapter history shows it.
+				row_updates["current_revision"] = chapter.current_revision
 			row.db_set(row_updates, update_modified=False)
 
 		self.notify_created_revisions(created_revisions)
@@ -394,29 +412,19 @@ class StakeholderMeeting(Document):
 		chapters = frappe.get_all(
 			"Implementation Chapter",
 			filters={"implementation": self.implementation, "status": ["in", CHAPTER_REVIEW_STATUSES]},
-			fields=[
-				"name",
-				"chapter_title",
-				"current_revision",
-				"status",
-				"current_level",
-				"target_level",
-				"planned_start",
-				"target_date",
-				"last_meeting",
-				"last_reviewed_on",
-			],
+			fields=list(CHAPTER_REVIEW_SOURCE_FIELDS),
 		)
 		for chapter in chapters:
-			self.append(
-				"chapter_reviews",
-				{
-					"chapter": chapter.name,
-					"current_level": chapter.current_level,
-					"target_level": chapter.target_level,
-					**self.get_chapter_review_snapshot(chapter),
-				},
-			)
+			self.append("chapter_reviews", self.get_new_chapter_review_values(chapter))
+
+	def get_new_chapter_review_values(self, chapter):
+		"""A fresh review row for this Chapter: its live levels plus the snapshot going into the meeting."""
+		return {
+			"chapter": chapter.name,
+			"current_level": chapter.current_level,
+			"target_level": chapter.target_level,
+			**self.get_chapter_review_snapshot(chapter),
+		}
 
 	def get_chapter_review_snapshot(self, chapter):
 		"""The Chapter's state going into this meeting, as stored on its review row."""
@@ -496,6 +504,24 @@ class StakeholderMeeting(Document):
 			else frappe._("Changed since the last submitted meeting:")
 		)
 		return 1, heading + " " + "; ".join(changes)
+
+
+@frappe.whitelist()
+def get_chapter_review_row(implementation, chapter):
+	"""Values for a Chapter Review row the chair adds or changes by hand, so its
+	dates, levels and revision show before saving."""
+	frappe.has_permission("Implementation Chapter", "read", chapter, throw=True)
+	chapter_values = frappe.db.get_value(
+		"Implementation Chapter", chapter, CHAPTER_REVIEW_SOURCE_FIELDS, as_dict=True
+	)
+	if not chapter_values or chapter_values.implementation != implementation:
+		frappe.throw(
+			frappe._("Chapter {0} does not belong to Implementation {1}.").format(chapter, implementation)
+		)
+
+	meeting = frappe.new_doc("Stakeholder Meeting")
+	meeting.implementation = implementation
+	return meeting.get_new_chapter_review_values(chapter_values)
 
 
 def get_db_snapshot(doctype, name, fieldnames):

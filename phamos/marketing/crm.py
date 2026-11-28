@@ -58,6 +58,22 @@ def lead_for_email(email):
 	return frappe.db.get_value("Lead", {"email_id": email}, "name")
 
 
+def employee_for_email(email):
+	"""The active Employee with this address (User id, company or personal e-mail), or None (#2112).
+
+	Names a likely sender only: an e-mail address proves nothing (the From header can be forged)."""
+	email = normalize_email(email, throw=False)
+	if not email or not frappe.db.exists("DocType", "Employee"):
+		return None
+	user = frappe.db.get_value("User", {"email": email}, "name")
+	for filters in ({"user_id": user} if user else None, {"company_email": email}, {"personal_email": email}):
+		if filters:
+			employee = frappe.db.get_value("Employee", {**filters, "status": "Active"}, "name")
+			if employee:
+				return employee
+	return None
+
+
 def customer_for_email(email):
 	"""The Customer of a Contact with this email (in the Contact or its email rows), or None."""
 	customers = customers_for_email(email)

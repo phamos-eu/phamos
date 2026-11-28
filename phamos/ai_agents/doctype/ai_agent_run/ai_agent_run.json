@@ -13,6 +13,8 @@
   "trigger",
   "mode",
   "triggered_by",
+  "manual_override",
+  "override_reasons",
   "result_section",
   "summary",
   "decision",
@@ -100,6 +102,24 @@
    "fieldtype": "Link",
    "label": "Triggered By",
    "options": "User",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Started by hand although the automatic start or the AI gate would not have run it.",
+   "fieldname": "manual_override",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Manual Override",
+   "read_only": 1
+  },
+  {
+   "depends_on": "manual_override",
+   "description": "The checks the manual start went past.",
+   "fieldname": "override_reasons",
+   "fieldtype": "Small Text",
+   "label": "Override Reasons",
    "read_only": 1
   },
   {
@@ -248,7 +268,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 22:00:00.000000",
+ "modified": "2026-11-25 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI Agents",
  "name": "AI Agent Run",

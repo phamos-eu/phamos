@@ -9,6 +9,9 @@
 //   count_reports()           optional: Promise of the open reports for this page (the badge)
 //   open_reports()            optional: show those reports
 //   open_status(ctx)          optional: where the reports about this place (or ctx.issue) stand, in the Implementation Cockpit
+//   testing_tickets()         optional: Promise of { count, url, about, color }: the open GitLab
+//                             issues labelled Testing on Production that mention this page's
+//                             DocType or page (about); a click opens url, that list in GitLab
 //   on_route_change(cb)       optional
 //   shortcut                  the user's shortcut ("Mod+P"; "" when off)
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"
@@ -380,6 +383,7 @@ class Phriend {
 				this.host.open_status
 					? this.host.open_status(this.host.page_context() || {})
 					: this.host.open_reports && this.host.open_reports(),
+			on_testing_badge_click: () => this.open_testing(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
 			pinned: !!this.host.pinned,
@@ -581,6 +585,33 @@ class Phriend {
 					)
 				)
 				.catch(() => {});
+			this.refresh_testing();
 		}, 400);
+	}
+
+	// ---- the second badge: open GitLab issues labelled Testing on Production; a click opens
+	// GitLab's issue list filtered by that label
+
+	refresh_testing() {
+		if (!this.host.testing_tickets) return;
+		Promise.resolve(this.host.testing_tickets())
+			.then((data) => {
+				const url = data && /^https?:\/\//.test(data.url || "") ? data.url : null;
+				const count = url ? Number(data.count) || 0 : 0;
+				this.testing_url = url;
+				this.ball.set_testing_badge(
+					count,
+					this.__("{0} GitLab issues about {1} are Testing on Production (opens the list in GitLab)", [
+						count,
+						data.about || "",
+					]),
+					data && data.color
+				);
+			})
+			.catch(() => {});
+	}
+
+	open_testing() {
+		if (this.testing_url) window.open(this.testing_url, "_blank", "noopener");
 	}
 }

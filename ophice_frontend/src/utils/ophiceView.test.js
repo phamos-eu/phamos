@@ -3,6 +3,7 @@ import {
 	canvasRect,
 	clamp,
 	coverPlacement,
+	fillHeightTile,
 	fitTile,
 	follow,
 	imagePlacement,
@@ -17,6 +18,15 @@ describe("Ophice map camera (#2089)", () => {
 	it("fits the whole grid into the view", () => {
 		expect(fitTile(1032, 532, 40, 25)).toBe(20)
 		expect(fitTile(0, 500, 40, 25)).toBe(0)
+	})
+
+	it("fills the view's height with the whole map, never short of it", () => {
+		expect(fillHeightTile(800, 25)).toBe(32)
+		// 700 / 30 = 23.333…: rounded up, so the map reaches the bottom edge
+		expect(fillHeightTile(700, 30)).toBe(23.34)
+		expect(fillHeightTile(700, 30) * 30).toBeGreaterThanOrEqual(700)
+		expect(fillHeightTile(40, 25, 8)).toBe(8)
+		expect(fillHeightTile(0, 25)).toBe(0)
 	})
 
 	it("covers the grid with a wide or tall image, centred", () => {

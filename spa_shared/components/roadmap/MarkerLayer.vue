@@ -1,6 +1,8 @@
 <template>
 	<!-- Markers (#2034): GitLab milestones and releases as diamonds in the strip at the top,
-	     with a thin line down through the rows. The tooltip names the marker and its date. -->
+	     with a thin line down through the rows. The tooltip names the marker and its date.
+	     A marker with `url` opens it in a new tab (#2035); one with `late` features gets a red
+	     dot, and the tooltip lists them. -->
 	<div class="roadmap-markers" :style="{ height: `${height}px` }">
 		<div
 			v-for="marker in placed"
@@ -10,7 +12,17 @@
 			:style="{ left: `${marker.x}px` }"
 		>
 			<span class="roadmap-marker__line" />
-			<span class="roadmap-marker__diamond" role="img" :aria-label="marker.title" :title="marker.title" />
+			<a
+				v-if="marker.url"
+				:href="marker.url"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="roadmap-marker__diamond roadmap-marker__diamond--link"
+				:aria-label="marker.title"
+				:title="marker.title"
+			/>
+			<span v-else class="roadmap-marker__diamond" role="img" :aria-label="marker.title" :title="marker.title" />
+			<span v-if="marker.late" class="roadmap-marker__late" aria-hidden="true" />
 		</div>
 	</div>
 </template>
@@ -22,7 +34,10 @@ import { formatDate } from "@spa/utils/datetime.js"
 import { dateToX, isoDay } from "@spa/utils/roadmapLayout.js"
 
 const props = defineProps({
-	/** [{ name, type: "milestone" | "release", title, date }] */
+	/**
+	 * [{ name, type: "milestone" | "release", title, date, url?, late? }]
+	 * url: opened in a new tab on click; late: titles of the features that miss this date
+	 */
 	markers: { type: Array, default: () => [] },
 	timeline: { type: Object, required: true },
 	/** full height of the rows below, so the lines reach the bottom */
@@ -41,11 +56,17 @@ const placed = computed(() => {
 		const x = dateToX(props.timeline, marker.date)
 		if (x === null || x < 0 || x >= props.timeline.totalWidth) continue
 		const type = marker.type === "release" ? "release" : "milestone"
+		const late = (marker.late || []).filter(Boolean)
+		const lines = [`${TYPE_LABEL[type]()}: ${marker.title || marker.name} · ${formatDate(isoDay(marker.date))}`]
+		if (late.length) lines.push(__("Late: {0}", [late.join(", ")]))
 		out.push({
 			key: `${type}:${marker.name}`,
 			type,
 			x: x + columnWidth / 2,
-			title: `${TYPE_LABEL[type]()}: ${marker.title || marker.name} · ${formatDate(isoDay(marker.date))}`,
+			title: lines.join("\n"),
+			// only http(s): a `javascript:` address typed into the source record must not run here
+			url: /^https?:\/\//i.test(marker.url || "") ? marker.url : null,
+			late: late.length > 0,
 		})
 	}
 	return out
@@ -93,5 +114,26 @@ const placed = computed(() => {
 	background: var(--marker-color);
 	pointer-events: auto;
 	cursor: default;
+}
+
+.roadmap-marker__diamond--link {
+	cursor: pointer;
+}
+
+.roadmap-marker__diamond--link:focus-visible {
+	outline: 2px solid var(--outline-gray-4);
+	outline-offset: 1px;
+}
+
+.roadmap-marker__late {
+	position: absolute;
+	top: -1px;
+	left: 3px;
+	width: 6px;
+	height: 6px;
+	border: 1px solid var(--surface-white);
+	border-radius: 50%;
+	background: var(--ink-red-3);
+	pointer-events: none;
 }
 </style>

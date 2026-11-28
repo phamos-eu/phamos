@@ -8,6 +8,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { badgeArgs, pageContext } from "@spa/utils/phriendPage.js"
 
 const COUNT_METHOD = "phamos.phriend.api.count_open_reports"
+const TESTING_METHOD = "phamos.phriend.api.get_testing_on_production"
 // Desk's Issue list, filtered to open Phriend reports (the cockpit Issue lists have no
 // filter for that yet). "Open" means what the badge counts: not Resolved or Closed.
 const REPORTS_URL =
@@ -66,6 +67,7 @@ export function mountPhriend(router, heading, socket, extra = {}) {
 		open_reports: () => window.open(reportsUrl(current()), "_blank", "noopener"),
 		// where the reports about this place stand, for users who may open the Implementation Cockpit (#1671)
 		open_status: boot().phriend.implementation_cockpit ? (ctx) => openStatus(router, ctx) : null,
+		testing_tickets: () => call(TESTING_METHOD, badgeArgs(current()), window.csrf_token),
 		on_route_change: (callback) => router.afterEach(() => callback()),
 		// the user's own shortcut, else the site's (Phriend Settings); "" when off
 		shortcut: boot().phriend.shortcut || "",
