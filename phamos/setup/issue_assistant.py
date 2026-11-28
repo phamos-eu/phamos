@@ -269,11 +269,14 @@ COMMUNICATION_FIELDS = [
 		"insert_after": "", "collapsible": 0},
 	{"fieldname": "custom_draft", "label": "Draft (not sent)", "fieldtype": "Check", "default": "0", "read_only": 1,
 		"insert_after": CUSTOMER_SECTION, "no_copy": 1,
-		"description": "An e-mail draft by the Issue Assistant (#2229). It goes out only when a person presses Send on the Issue."},
+		"description": "An e-mail draft by the Issue Assistant (#2229). A person reviews and sends it from the Issue; nothing goes out by itself."},
 	{"fieldname": "custom_draft_issue", "label": "Draft for Issue", "fieldtype": "Link", "options": "Issue",
 		"read_only": 1, "insert_after": "custom_draft", "no_copy": 1},
 	{"fieldname": "custom_ai_agent_run", "label": "AI Agent Run", "fieldtype": "Link", "options": "AI Agent Run",
 		"read_only": 1, "insert_after": "custom_draft_issue", "no_copy": 1},
+	# Communication starts with plain fields (subject): without this break they'd fall into our section
+	{"fieldname": "custom_implementation_specific_end", "fieldtype": "Section Break",
+		"insert_after": "custom_ai_agent_run"},
 ]
 
 

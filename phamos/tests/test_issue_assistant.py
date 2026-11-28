@@ -1035,6 +1035,15 @@ class TestDrafts(ChatTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			self.drafts.check_email(doc.name, "x", "<p>x</p>", "a@b.example")
 
+	def test_communication_section_ends_before_the_standard_fields(self):
+		setup.ensure_communication_fields()
+		frappe.clear_cache(doctype="Communication")
+		names = [f.fieldname for f in frappe.get_meta("Communication").fields]
+		start = names.index("custom_implementation_specific")
+		self.assertEqual(names[start:start + 5], ["custom_implementation_specific", "custom_draft",
+			"custom_draft_issue", "custom_ai_agent_run", "custom_implementation_specific_end"])
+		self.assertLess(names.index("custom_implementation_specific_end"), names.index("subject"))
+
 	def test_discard_deletes_the_draft(self):
 		doc, draft, _reply = self.draft_via_chat()
 		self.addCleanup(frappe.set_user, "Administrator")
