@@ -102,6 +102,13 @@ def on_raven_message(doc, method=None):
 		issue = frappe.get_doc("Issue", issue_name)
 		if not assistant_works_on(issue):
 			return
+		if asks_for_silence(doc):
+			silence(issue_name, asker)
+			return
+		if is_silent(issue_name):
+			if not mentions_bot(doc):
+				return
+			wake(issue_name)  # an explicit @mention calls it back
 		queue_answer(issue, doc.name, asker)
 	except Exception:
 		frappe.log_error(title=f"Issue Assistant: could not handle chat message {doc.name}")
@@ -126,30 +133,78 @@ def addressed_issue(message):
 	channel = _chat_channel_of(message.channel_id)
 	if not channel or channel.linked_doctype != "Issue":
 		return None
-	bot_raven_user = frappe.db.get_value("Raven Bot", bot_name, "raven_user")
-	mentioned = bool(bot_raven_user) and any(m.user == bot_raven_user for m in (message.get("mentions") or []))
-	if mentioned or replies_to_bot(message, bot_name) or follows_up(message, frappe.session.user):
+	if mentions_bot(message) or replies_to_bot(message, bot_name) or follows_up(message, channel.linked_document):
 		return channel.linked_document
 	return None
 
 
-def follows_up(message, user):
-	"""Whether the assistant answered `user` in this chat or thread within the follow-up window, so their next
-	message needs no @mention (Issue Assistant Settings, "Follow-up window (minutes)", #2231). Only the same
-	person: a colleague talking to them is not addressed to the assistant."""
+def mentions_bot(message):
+	bot_name, _agent = assistant_bot()
+	bot_raven_user = frappe.db.get_value("Raven Bot", bot_name, "raven_user") if bot_name else None
+	return bool(bot_raven_user) and any(m.user == bot_raven_user for m in (message.get("mentions") or []))
+
+
+def follows_up(message, issue_name):
+	"""Whether the assistant answered in this chat or thread within the follow-up window, so the next message
+	needs no @mention (Issue Assistant Settings, "Follow-up window (minutes)", #2231). Anyone's message counts:
+	the assistant takes part in the colleagues' conversation (PM, 2026-11-28); "stop" silences it."""
 	from phamos.ai_agents.agents.issue import SETTINGS
 
 	minutes = cint(frappe.db.get_single_value(SETTINGS, "chat_follow_up_minutes"))
-	if minutes <= 0 or not user:
+	if minutes <= 0 or not issue_name:
 		return False
 	since = add_to_date(now_datetime(), minutes=-minutes)
-	runs = frappe.get_all("AI Agent Run", filters={"trigger": CHAT_TRIGGER, "triggered_by": user, "status": "Completed",
-		"finished_at": (">=", since), "chat_message": ("is", "set")}, pluck="chat_message", limit=20)
+	runs = frappe.get_all("AI Agent Run", filters={"trigger": CHAT_TRIGGER, "reference_doctype": "Issue",
+		"reference_name": issue_name, "status": "Completed", "finished_at": (">=", since),
+		"chat_message": ("is", "set")}, pluck="chat_message", limit=20)
 	for asked in runs:
 		# the answer went into the asked message's thread, or the thread the question was in
 		if message.channel_id == asked or message.channel_id == frappe.db.get_value("Raven Message", asked, "channel_id"):
 			return True
 	return False
+
+
+# --- silencing (PM, 2026-11-28) ------------------------------------------------------------------
+# A short message to the assistant with one of these words silences it in that Issue chat: it confirms
+# once and then answers only explicit @mentions; an @mention wakes it up again.
+SILENCE_WORDS = {"stop", "quiet", "silence", "mute", "shush", "ruhe", "stopp", "leise", "psst"}
+SILENCE_MAX_WORDS = 3  # "stop", "be quiet", "Ruhe bitte"; longer messages are questions
+
+
+def asks_for_silence(message):
+	words = re.findall(r"[\wäöüß]+", html.unescape(strip_html_tags(cstr(message.text))).lower())
+	words = [w for w in words if not w.startswith("phamos") and w not in ("issue", "assistant", "please", "bitte")]
+	return bool(words) and len(words) <= SILENCE_MAX_WORDS and any(w in SILENCE_WORDS for w in words)
+
+
+def _silence_key(issue_name):
+	return f"issue_assistant_silent::{issue_name}"
+
+
+def is_silent(issue_name):
+	return bool(frappe.db.get_global(_silence_key(issue_name)))
+
+
+def silence(issue_name, user):
+	frappe.db.set_global(_silence_key(issue_name), user)
+	_say_in_chat(issue_name, _("OK, I'll stay quiet in this chat. @mention me when you need me."))
+
+
+def wake(issue_name):
+	frappe.db.set_global(_silence_key(issue_name), None)
+
+
+def _say_in_chat(issue_name, text):
+	from phamos.api.issue_chat import find_channel
+
+	bot_name, _agent = assistant_bot()
+	channel = find_channel("Issue", issue_name)
+	if not bot_name or not channel:
+		return
+	bot = frappe.get_doc("Raven Bot", bot_name)
+	name = bot.send_message(channel.name, f"<p>{escape_html(text)}</p>")
+	if bot.raven_user:
+		frappe.db.set_value("Raven Message", name, "owner", bot.raven_user, update_modified=False)
 
 
 def replies_to_bot(message, bot_name):
