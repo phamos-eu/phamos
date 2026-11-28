@@ -321,7 +321,7 @@ function trendWord(t) {
 // Follows the loaded figures, not the tab, so a tab switch never splits figures of one direction.
 const byDirection = computed(() => Boolean(data.value) && !data.value.direction)
 
-const CHART_VIEW_KEY = "phamos.sales.leadOverview.chartView"
+const CHART_VIEW_KEY = "phamos-sales-lead-overview-chart-view"
 const chartViewOptions = [
 	{ value: "side", label: __("Side by side") },
 	{ value: "stacked", label: __("Stacked") },
