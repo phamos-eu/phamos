@@ -3301,3 +3301,28 @@ vs {0},ggü. {0}
 {0} of {1} h,{0} von {1} h
 "{0} without working hours (no Weekly Working Hours, no contract): left out of the rates.","{0} ohne Arbeitszeit (keine Wochenarbeitszeit, kein Vertrag): in den Quoten nicht berücksichtigt."
 "{0} · this month to {1}, compared with the same days of the previous month and of last year","{0} · dieser Monat bis {1}, verglichen mit denselben Tagen des Vormonats und des Vorjahres"
+Average first response,Durchschnittliche erste Antwort
+Closed items — 12 months,Geschlossene Einträge – 12 Monate
+Closing time this month,Durchlaufzeit in diesem Monat
+"Closing time, parent items","Durchlaufzeit, übergeordnete Einträge"
+"Closing time, work items","Durchlaufzeit, Arbeitseinträge"
+Closing times and SLA of the team,Durchlaufzeiten und SLA des Teams
+Comments per closed item,Kommentare pro geschlossenem Eintrag
+Every item that is not a parent of others,"Jeder Eintrag, der keinem anderen übergeordnet ist"
+First responses in time,Erste Antworten rechtzeitig
+"GitLab items assigned to the team's people, wherever they work; this month to {0}, compared with the same days of the previous month and of last year.","GitLab-Einträge, die Personen des Teams zugewiesen sind, egal wo sie arbeiten; dieser Monat bis {0}, verglichen mit denselben Tagen des Vormonats und des Vorjahres."
+Items other items point to,"Einträge, auf die andere Einträge verweisen"
+Median,Median
+Open items,Offene Einträge
+Other implementations,Andere Implementierungen
+Own implementations,Eigene Implementierungen
+"Own implementations, other implementations and internal repositories; opened items under each month.","Eigene Implementierungen, andere Implementierungen und interne Repositories; unter jedem Monat die eröffneten Einträge."
+Parent items,Übergeordnete Einträge
+Resolutions in time,Lösungen rechtzeitig
+SLA of the team's Issues,SLA der Issues des Teams
+SLA tracking is switched off in Support Settings.,Die SLA-Nachverfolgung ist in den Support-Einstellungen ausgeschaltet.
+Work items,Arbeitseinträge
+median,Median
+"median age {0}, oldest {1}","Alter im Median {0}, ältester {1}"
+{0} items in the team's own implementations have an assignee that matches no employee by email; they are not counted.,"{0} Einträge in den eigenen Implementierungen des Teams haben eine zugewiesene Person, die per E-Mail keinem Mitarbeiter zugeordnet werden kann; sie werden nicht gezählt."
+{0} opened,{0} eröffnet
