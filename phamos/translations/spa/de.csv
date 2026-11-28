@@ -24,3 +24,51 @@ Accounting Receipt,Buchhaltungsbeleg
 Monthly Implementation Summary,Monatliche Implementierungsübersicht
 Employment Contract,Arbeitsvertrag
 Implementation,Implementierung
+Loading…,Lädt…
+In the last {0} days people corrected {1} of {2} AI runs.,In den letzten {0} Tagen wurden {1} von {2} KI-Läufen korrigiert.
+Most often:,Am häufigsten:
+Suggested rules,Vorgeschlagene Regeln
+↑ ↓ pick a rule · Enter uses it · Del dismisses it,↑ ↓ Regel wählen · Enter übernimmt sie · Entf verwirft sie
+No suggestions yet.,Noch keine Vorschläge.
+Dismiss,Verwerfen
+Use this rule,Regel übernehmen
+E-mails from {0},E-Mails von {0}
+When,Wenn
+Then,Dann
+May quote the customer's Issue: check the wording before using it.,Kann Text aus der Anfrage des Kunden enthalten: Wortlaut vor dem Übernehmen prüfen.
+Corrected how often,Wie oft korrigiert
+Step or field,Schritt oder Feld
+Set by the AI,Von der KI gesetzt
+Corrected,Korrigiert
+Recent runs,Letzte Läufe
+No runs yet.,Noch keine Läufe.
+Corrections,Korrekturen
+No corrections yet.,Noch keine Korrekturen.
+Field,Feld
+AI set,KI setzte
+Corrected to,Korrigiert auf
+By,Von
+Party,Partei
+Record,Datensatz
+Could not load what the AI learned,"Konnte nicht laden, was die KI gelernt hat"
+Rule on: {0},Regel aktiv: {0}
+Could not use the rule,Regel konnte nicht übernommen werden
+"Dismiss the suggestion ""{0}""? It won't be suggested again.",Vorschlag „{0}“ verwerfen? Er wird nicht wieder vorgeschlagen.
+Could not dismiss the suggestion,Vorschlag konnte nicht verworfen werden
+Accepted,Akzeptiert
+Open,Offen
+What the Issue Assistant learns from your corrections. A suggested rule applies only after a trainer uses it.,"Was der Anfrage-Assistent aus Ihren Korrekturen lernt. Eine vorgeschlagene Regel gilt erst, wenn ein Trainer sie übernimmt."
+"No suggestions. When someone changes what the assistant set on an Issue, a rule is suggested here.","Keine Vorschläge. Wenn jemand ändert, was der Assistent in einer Anfrage gesetzt hat, wird hier eine Regel vorgeschlagen."
+Customer,Kunde
+Issue,Anfrage
+Contact,Kontakt
+Project,Projekt
+Issue Type,Anfragetyp
+Priority,Priorität
+Person,Person
+Identify (sender and links),Erkennen (Absender und Verknüpfungen)
+Classify (type and priority),Einordnen (Typ und Priorität)
+Suggested person,Vorgeschlagene Person
+Issue Assistant,Anfrage-Assistent
+What the assistant learns from corrections,Was der Assistent aus Korrekturen lernt
+AI learning,KI-Lernen

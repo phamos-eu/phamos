@@ -218,6 +218,10 @@ def run_sender_mapping(ctx, skill):
 	return issue_identify.run_sender_mapping(ctx, skill)
 
 
+# steps of the correction rates in the learning view (#2225, #2226)
+LEARNING_GROUPS = {"customer": "identify", "contact": "identify", "custom_implementation": "identify",
+	"project": "identify", "issue_type": "classify", "priority": "classify", "person": "person"}
+
 SKILLS = {"check_gate": run_check_gate, "identify": run_identify, "classify": run_classify,
 	"sender_mapping": run_sender_mapping}
 

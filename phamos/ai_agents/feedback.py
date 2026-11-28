@@ -164,4 +164,5 @@ def rates(agent, days, groups=None):
 		total["set"] += entry["set"]
 		total["corrected"] += entry["corrected"]
 	return {"runs": len(rows), "corrected_runs": sum(1 for r in rows if r.outcome == CORRECTED),
-		"fields": fields, "groups": grouped, "days": cint(days)}
+		"fields": fields, "groups": grouped, "field_groups": {f: (groups or {}).get(f, f) for f in fields},
+		"days": cint(days)}

@@ -971,8 +971,8 @@ class TestChat(IssueAssistantTestCase):
 		self.assertNotIn("Another customer's secret Issue", prompt)
 
 
-class TestLearning(IssueAssistantTestCase):
-	"""#2225: the assistant learns from people correcting it; nothing applies before a trainer accepts."""
+class LearningTestCase(IssueAssistantTestCase):
+	"""Fixtures for #2225 / #2226: a customer with one contact, Implementation and project, and a trainer."""
 
 	CUSTOMER = "Issue Assistant Learning Customer"
 	SENDER = "issue-assistant-learning@learning.example"
@@ -1024,6 +1024,11 @@ class TestLearning(IssueAssistantTestCase):
 		frappe.set_user("Administrator")
 		return frappe.get_doc("AI Agent Run", frappe.db.get_value("AI Agent Run", {"reference_name": doc.name}, "name",
 			order_by="creation desc"))
+
+
+
+class TestLearning(LearningTestCase):
+	"""#2225: the assistant learns from people correcting it; nothing applies before a trainer accepts."""
 
 	def test_settings_have_the_learning_defaults(self):
 		frappe.db.sql("delete from `tabSingles` where doctype=%s and field in ('accept_after_days', 'stats_window_days')",
@@ -1225,3 +1230,37 @@ class TestLearning(IssueAssistantTestCase):
 		rates = self.learning.rates()
 		self.assertGreaterEqual(rates["groups"]["identify"]["corrected"], 1)
 		self.assertGreaterEqual(rates["fields"]["project"]["set"], 1)
+
+
+class TestLearningView(LearningTestCase):
+	"""#2226: the shared learning view's API for the Issue Assistant."""
+
+	def test_issue_learning_needs_the_trainer_role(self):
+		from phamos.api import ai_skills
+
+		self.as_user(DESK_USER)
+		with self.assertRaises(frappe.PermissionError):
+			ai_skills.get_learning("Issue")
+		self.assertEqual(ai_skills.can_see_learning("Issue"), 0)
+		frappe.set_user(self.TRAINER)
+		data = ai_skills.get_learning("Issue")
+		self.assertEqual(ai_skills.can_see_learning("Issue"), 1)
+		self.assertEqual((data["can_write"], data["days"]), (1, 90))
+		self.assertEqual(set(data["rates"]) >= {"groups", "fields", "field_groups"}, True)
+		self.assertIn("recent_runs", data)
+
+	def test_trainer_accepts_with_edited_wording(self):
+		from phamos.api import ai_skills
+
+		doc = self.issue(raised_by=self.SENDER, priority="High")
+		self.run_with(doc, {"person": {"user": DESK_USER, "confidence": "strong", "reason": "project member"}})
+		from frappe.desk.form.assign_to import remove
+
+		remove("Issue", doc.name, DESK_USER)
+		name = frappe.db.get_value("AI Skill", {"suggestion_key": ("like", f"Issue::rule::{doc.customer}::person::%")})
+		self.as_user(self.TRAINER)
+		suggestion = next(s for s in ai_skills.get_learning("Issue")["suggestions"] if s["name"] == name)
+		rule = dict(suggestion["rules"][0], case_description="Payroll exports", action="Suggest nobody.")
+		ai_skills.accept_suggestion(name, prompt_rules=frappe.as_json([rule]), modified=suggestion["modified"])
+		skill = frappe.get_doc("AI Skill", name)
+		self.assertEqual((skill.origin, skill.enabled, skill.prompt_rules[0].action), ("Learned", 1, "Suggest nobody."))

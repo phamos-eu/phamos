@@ -2,6 +2,7 @@ import { createSpaRouter } from "@spa/router.js"
 import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
 import TasksGanttPage from "./views/TasksGanttPage.vue"
 import AppointmentsPage from "./views/AppointmentsPage.vue"
+import IssueAssistantPage from "./views/IssueAssistantPage.vue"
 import spaConfig from "./config"
 
 export default createSpaRouter({
@@ -29,6 +30,12 @@ export default createSpaRouter({
 			path: "/appointments",
 			name: "Appointments",
 			component: AppointmentsPage,
+		},
+		// The Issue Assistant's learning, for trainers and System Managers (#2226)
+		{
+			path: "/issue-assistant",
+			name: "IssueAssistant",
+			component: IssueAssistantPage,
 		},
 	],
 })

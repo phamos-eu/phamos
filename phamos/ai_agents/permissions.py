@@ -4,8 +4,8 @@
 """Who may change which agent's AI Skills (#2225).
 
 The Issue Assistant Trainer role reads and writes AI Skill, but only the Issue Assistant's: its
-suggestions are what trainers accept, edit or dismiss. Changing the Issue Assistant's skills needs
-that role or System Manager, so the Accounting roles don't edit them. AI agents never accept their own
+suggestions are what trainers accept, edit or dismiss. Reading or changing the Issue Assistant's skills
+needs that role or System Manager, so the Accounting roles don't see them (they quote customers' Issues). AI agents never accept their own
 suggestions (checked in phamos/ai_agents/feedback.py).
 """
 
@@ -13,7 +13,6 @@ import frappe
 
 TRAINER_ROLE = "Issue Assistant Trainer"
 ACCOUNTING_ROLES = {"Accounts Manager", "Accounts User", "AI Accountant"}
-READ = ("read", "select", "print", "report", "export")
 
 
 def _issue_agent():
@@ -34,7 +33,8 @@ def ai_skill_has_permission(doc, ptype=None, user=None, debug=False):
 	if "System Manager" in roles:
 		return True
 	if doc.get("agent") == _issue_agent():
-		return True if (ptype or "read") in READ else TRAINER_ROLE in roles
+		# its suggestions quote customers' Issues: trainers (and System Manager) only, also for reading (#2226)
+		return TRAINER_ROLE in roles
 	return not _trainer_only(roles)
 
 

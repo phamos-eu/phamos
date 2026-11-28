@@ -7,14 +7,15 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { useRoute } from "vue-router"
+import { call } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 
 const route = useRoute()
 
-const navItems = [
+const baseNavItems = [
 	{
 		name: "Issues",
 		label: "Issues",
@@ -56,7 +57,19 @@ const navItems = [
 	},
 ]
 
+// The Issue Assistant's learning shows for trainers and System Managers only (#2226)
+const showIssueAssistant = ref(false)
+call("phamos.api.ai_skills.can_see_learning", { doctype: "Issue" })
+	.then((ok) => (showIssueAssistant.value = !!ok))
+	.catch(() => (showIssueAssistant.value = false))
+const navItems = computed(() =>
+	showIssueAssistant.value
+		? [...baseNavItems, { name: "IssueAssistant", label: "Issue Assistant", icon: "cpu", match: ["IssueAssistant"] }]
+		: baseNavItems
+)
+
 const pageTitle = computed(() => {
+	if (route.name === "IssueAssistant") return "Issue Assistant"
 	if (route.name === "Appointments") return "Appointments"
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
@@ -66,6 +79,7 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "IssueAssistant") return "What the assistant learns from corrections"
 	if (route.name === "Appointments") return "Company-wide appointments, sent as calendar invites"
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "General Management department tasks"
