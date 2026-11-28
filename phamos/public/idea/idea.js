@@ -590,6 +590,12 @@
 		}
 	}
 
+	// A dropped answer leaves the busy mark to the newer load of the same view, if that view is
+	// still shown; otherwise nobody would clear it.
+	function dropBusy(view, name) {
+		if (currentView !== name) view.removeAttribute("aria-busy")
+	}
+
 	function route() {
 		newLoad() // whatever was loading for the previous view is now stale
 		var hash = location.hash.replace(/^#\/?/, "")
@@ -638,13 +644,22 @@
 	// highlights), so an own idea edited here loses as little as possible.
 	var ALLOWED =
 		/^(P|BR|HR|B|STRONG|I|EM|U|S|DEL|STRIKE|MARK|SUB|SUP|UL|OL|LI|H1|H2|H3|H4|H5|H6|BLOCKQUOTE|CODE|PRE|A|SPAN|DIV|IMG|TABLE|THEAD|TBODY|TR|TH|TD)$/
-	// A path on this site ("/files/…"); "//host" and "/\host" would point to another host.
-	var SITE_PATH = /^\/(?![\/\\])/
+	// The URL as the browser reads it: it drops tabs and line breaks anywhere and control characters
+	// and spaces at the ends, so "/&#9;/host" would load from "//host". Check that, not the raw text.
+	function plainUrl(value) {
+		return value.replace(/[\t\n\r]/g, "").replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+	}
+	// A path or URL on this site ("/files/…"); "//host" and "/\host" resolve to another host.
 	function sameSite(value) {
-		return SITE_PATH.test(value) || value.indexOf(location.origin + "/") === 0
+		try {
+			var url = new URL(plainUrl(value), location.href)
+			return url.origin === location.origin && /^https?:$/.test(url.protocol)
+		} catch (e) {
+			return false
+		}
 	}
 	function keepAttribute(tag, name, value) {
-		if (tag === "A" && name === "href") return /^(https?:|mailto:)/i.test(value) || SITE_PATH.test(value)
+		if (tag === "A" && name === "href") return /^(https?:|mailto:)/i.test(plainUrl(value)) || sameSite(value)
 		// Images only from this site: one from another host would tell it who read the idea.
 		if (tag === "IMG" && name === "src") return sameSite(value)
 		if (tag === "IMG" && name === "alt") return true
@@ -797,12 +812,13 @@
 		var stale = newLoad()
 		Promise.all([call(PC + "get_idea", { name: name }), getOptions()])
 			.then(function (results) {
-				if (stale()) return
+				if (stale()) return dropBusy(view, "detail")
 				renderDetail(results[0])
 				view.removeAttribute("aria-busy")
 			})
 			.catch(function (error) {
-				if (stale()) return
+				if (stale()) return dropBusy(view, "detail")
+				view.removeAttribute("aria-busy")
 				toast(error.message || __("No connection. Your ideas show when you are online."))
 			})
 	}
@@ -981,12 +997,13 @@
 		var stale = newLoad()
 		call(PC + "get_idea_for_vote", { name: name })
 			.then(function (row) {
-				if (stale()) return
+				if (stale()) return dropBusy(view, "vote-detail")
 				renderVoteDetail(row)
 				view.removeAttribute("aria-busy")
 			})
 			.catch(function (error) {
-				if (stale()) return
+				if (stale()) return dropBusy(view, "vote-detail")
+				view.removeAttribute("aria-busy")
 				toast(error.message || __("No connection. Try again when you are online."))
 			})
 	}
