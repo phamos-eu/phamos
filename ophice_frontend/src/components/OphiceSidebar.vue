@@ -75,6 +75,20 @@
 				<span v-if="!collapsed" class="truncate">{{ statusLabel }}</span>
 			</button>
 			<p v-if="!collapsed" class="ophice-side__hint">{{ __("Be right back, or away until a time. Shown above your chip.") }}</p>
+			<!-- Encounter alert (#2135): asks for browser notifications, mutes chime and notification. -->
+			<button
+				type="button"
+				class="ophice-side__row"
+				:class="{ 'ophice-side__row--icon': collapsed }"
+				:title="bellTitle"
+				:aria-label="collapsed ? bellTitle : undefined"
+				:aria-pressed="bell === 'on' || bell === 'blocked'"
+				data-testid="encounter-bell"
+				@click="$emit('bell')"
+			>
+				<FeatherIcon :name="bell === 'muted' ? 'bell-off' : 'bell'" class="h-4 w-4 flex-shrink-0" />
+				<span v-if="!collapsed" class="truncate">{{ bellLabel }}</span>
+			</button>
 		</div>
 
 		<!-- Settings we use while testing, a section of their own -->
@@ -218,6 +232,9 @@ const props = defineProps({
 	hasBackground: { type: Boolean, default: false },
 	backgroundBusy: { type: Boolean, default: false },
 	debugOptions: { type: Array, default: () => [] },
+	/** the encounter alert (#2135): "ask", "on", "blocked" or "muted", and its tooltip */
+	bell: { type: String, default: "ask" },
+	bellTitle: { type: String, default: "" },
 })
 defineEmits([
 	"update:collapsed",
@@ -229,11 +246,21 @@ defineEmits([
 	"background",
 	"adjust",
 	"remove-background",
+	"bell",
 ])
 
 const statusIcon = computed(() => (props.status?.kind === "away" ? "moon" : props.status ? "coffee" : "check-circle"))
 const statusLabel = computed(() =>
 	props.status?.kind === "away" ? __("Away") : props.status ? __("Be right back") : __("Available")
+)
+const bellLabel = computed(
+	() =>
+		({
+			ask: __("Allow chat notifications"),
+			on: __("Chat notifications on"),
+			blocked: __("Chat sound on"),
+			muted: __("Chat notifications muted"),
+		})[props.bell]
 )
 const moveHint = __("Move with WASD or the arrow keys, Shift to go faster, Space to jump (twice: double jump, hold: fly)")
 </script>

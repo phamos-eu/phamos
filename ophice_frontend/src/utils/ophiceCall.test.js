@@ -2,16 +2,64 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
 	CALL_CHAT_MIN,
 	CALL_DEFAULT,
+	CALL_HEADER,
 	CALL_MIN_W,
+	JITSI_TOOLBAR_BUTTONS,
 	callBox,
 	callMaxHeight,
+	jitsiStartConfig,
+	splitCall,
 	encounterCallWindowName,
+	encounterOpening,
 	jitsiCallUrl,
 	nextQualityLevel,
 	qualityLevel,
 	qualitySync,
 	resizeCall,
 } from "./ophiceCall.js"
+
+describe("JITSI_TOOLBAR_BUTTONS", () => {
+	it("always has screen sharing next to mic, camera and hang-up", () => {
+		expect(JITSI_TOOLBAR_BUTTONS).toEqual(expect.arrayContaining(["microphone", "camera", "desktop", "hangup"]))
+	})
+
+	it("leaves Jitsi's performance settings out: our own quality button does that", () => {
+		expect(JITSI_TOOLBAR_BUTTONS).not.toContain("videoquality")
+	})
+})
+
+describe("jitsiStartConfig", () => {
+	it("starts with mic and camera on, without the pre-join screen, for whoever walks up", () => {
+		expect(jitsiStartConfig()).toEqual({
+			startWithAudioMuted: false,
+			startWithVideoMuted: false,
+			prejoinPageEnabled: false,
+			prejoinConfig: { enabled: false },
+		})
+	})
+
+	it("starts the approached person with both off, and no device touched (#2165)", () => {
+		const config = jitsiStartConfig({ startOff: true })
+		expect(config.startWithAudioMuted).toBe(true)
+		expect(config.startWithVideoMuted).toBe(true)
+		expect(config.disableInitialGUM).toBe(true)
+		expect(config.prejoinConfig).toEqual({ enabled: false })
+	})
+})
+
+describe("encounterOpening (#2165, #2168)", () => {
+	it("I start it: mic and camera on, my status goes", () => {
+		expect(encounterOpening()).toEqual({ callOff: false, backToAvailable: true })
+	})
+
+	it("the other person walked up: mic and camera off, my status stays", () => {
+		expect(encounterOpening({ fromPeer: true })).toEqual({ callOff: true, backToAvailable: false })
+	})
+
+	it("I answer a walk-up ping: mic and camera off, but my status goes (else the server refuses)", () => {
+		expect(encounterOpening({ answer: true })).toEqual({ callOff: true, backToAvailable: true })
+	})
+})
 
 describe("jitsiCallUrl", () => {
 	const ON = "config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false"
@@ -25,6 +73,15 @@ describe("jitsiCallUrl", () => {
 		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }).split("#")[1])
 		expect(settings.get("config.startWithAudioMuted")).toBe("false")
 		expect(settings.get("config.startWithVideoMuted")).toBe("false")
+		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
+		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
+	})
+
+	it("starts the approached person with both off and no device touched, also in its own window (#2165)", () => {
+		const settings = new URLSearchParams(jitsiCallUrl({ domain: "meet.jit.si", room: "r" }, "", { startOff: true }).split("#")[1])
+		expect(settings.get("config.startWithAudioMuted")).toBe("true")
+		expect(settings.get("config.startWithVideoMuted")).toBe("true")
+		expect(settings.get("config.disableInitialGUM")).toBe("true")
 		expect(settings.get("config.prejoinConfig.enabled")).toBe("false")
 		expect(settings.get("config.prejoinPageEnabled")).toBe("false")
 	})
@@ -68,13 +125,47 @@ describe("callBox", () => {
 	it("never lets the video get wider than 16:9; the chat takes the rest", () => {
 		const box = callBox({ w: 2000, h: CALL_DEFAULT.h }, big)
 		expect(box.videoW).toBe(768)
-		expect(box.chatW).toBe(2000 - 1 - 16 - 41 - 768)
+		expect(box.chatW).toBe(2000 - 1 - 16 - 768)
+	})
+
+	it("has room for the top bar above the video (#2135)", () => {
+		const box = callBox(null, big)
+		expect(box.h - box.videoH).toBe(CALL_HEADER + 16)
+	})
+
+	it("a wider chat narrows the video, but not below 1:1 (#2135)", () => {
+		const box = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 400 }, big)
+		expect(box.chatW).toBe(400)
+		expect(box.videoW).toBe(CALL_DEFAULT.w - 17 - 400)
+		const most = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 900 }, big)
+		expect(most.videoW).toBe(432) // square
+		expect(most.chatW).toBe(CALL_DEFAULT.w - 17 - 432)
+	})
+
+	it("a narrower chat than the 16:9 video leaves stays at what is left", () => {
+		const box = callBox({ w: CALL_DEFAULT.w, h: CALL_DEFAULT.h, chat: 150 }, big)
+		expect(box.videoW).toBe(768)
+		expect(box.chatW).toBe(288)
 	})
 
 	it("stays inside the stage", () => {
 		const box = callBox({ w: 2000, h: 1200 }, { width: 900, height: 500 })
 		expect(box.w).toBeLessThanOrEqual(900)
 		expect(box.h).toBeLessThanOrEqual(500)
+	})
+})
+
+describe("splitCall", () => {
+	const big = { width: 3000, height: 2000 }
+	const size = { w: CALL_DEFAULT.w, h: CALL_DEFAULT.h }
+
+	it("moves the line between chat and video", () => {
+		expect(splitCall(size, 288, -50, big)).toBe(288) // the video is already 16:9
+		expect(splitCall(size, 288, 100, big)).toBe(388)
+	})
+
+	it("stores the 1:1 limit, not the overshoot", () => {
+		expect(splitCall(size, 288, 2000, big)).toBe(CALL_DEFAULT.w - 17 - 432)
 	})
 })
 

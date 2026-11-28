@@ -1,5 +1,6 @@
 <template>
-	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Joined with mic and camera on (#2108). -->
+	<!-- A Jitsi video call: encounter (#2059), meeting area (#2060), guests. Joined with mic and camera on
+	     (#2108); the person being approached joins at once, hears the other, and turns them on (#2165). -->
 	<div
 		class="relative w-full overflow-hidden bg-surface-gray-7"
 		:class="{ 'aspect-video': !fill }"
@@ -70,7 +71,14 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { QUALITY_LEVELS, nextQualityLevel, qualityLevel, qualitySync } from "../utils/ophiceCall.js"
+import {
+	JITSI_TOOLBAR_BUTTONS,
+	QUALITY_LEVELS,
+	jitsiStartConfig,
+	nextQualityLevel,
+	qualityLevel,
+	qualitySync,
+} from "../utils/ophiceCall.js"
 
 const props = defineProps({
 	/** Jitsi host, for example meet.jit.si */
@@ -79,6 +87,8 @@ const props = defineProps({
 	displayName: { type: String, default: "" },
 	/** Fill the parent's height instead of keeping 16:9 (meeting view, #2061). */
 	fill: { type: Boolean, default: false },
+	/** Join with mic and camera off and no device touched (approached, #2165). Read once. */
+	startOff: { type: Boolean, default: false },
 })
 const emit = defineEmits(["joined", "toggled", "stolen"])
 
@@ -91,6 +101,8 @@ let api = null
 let disposed = false
 // Mic and camera start on: whoever joins a call wants to talk (#2108, replaces the start-off
 // decision of 2026-11-21). The browser still asks once for the permission. Jitsi reports every change.
+// Not for the person being approached (#2165): they join at once and hear the other, with mic and
+// camera off; they turn them on themselves (#2165, PM 2026-11-27).
 const ready = ref(false)
 // A click into Jitsi's frame moves the focus there: the page's window loses it (blur). Without
 // the pointer over the video it was Jitsi itself (it focuses on load): that is not a click,
@@ -104,8 +116,8 @@ function onWindowBlur() {
 		else emit("stolen")
 	})
 }
-const audioMuted = ref(false)
-const videoMuted = ref(false)
+const audioMuted = ref(props.startOff)
+const videoMuted = ref(props.startOff)
 
 function toggle(command) {
 	api?.executeCommand(command)
@@ -167,12 +179,9 @@ onMounted(async () => {
 		height: "100%",
 		userInfo: { displayName: props.displayName },
 		configOverwrite: {
-			startWithAudioMuted: false,
-			startWithVideoMuted: false,
-			prejoinPageEnabled: false,
-			prejoinConfig: { enabled: false },
+			...jitsiStartConfig({ startOff: props.startOff }),
 			disableDeepLinking: true,
-			toolbarButtons: ["microphone", "camera", "videoquality", "tileview", "hangup"],
+			toolbarButtons: JITSI_TOOLBAR_BUTTONS,
 			toolbarConfig: { alwaysVisible: true },
 		},
 		interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false },
