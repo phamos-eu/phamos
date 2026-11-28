@@ -19,6 +19,7 @@ import { call, toast } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { __ } from "@spa/utils/i18n.js"
+import { IDEA_ICON } from "@spa/utils/icons.js"
 import spaConfig from "./config"
 
 const route = useRoute()
@@ -31,7 +32,7 @@ const navItems = [
 	// appointments with leave and public holidays (#1979)
 	{ name: "TeamAppointments", label: "Appointments", icon: "calendar", match: ["TeamAppointments"] },
 	// ideas shared with the team (#1980)
-	{ name: "TeamIdeas", label: "Ideas", icon: "zap", match: ["TeamIdeas"] },
+	{ name: "TeamIdeas", label: "Ideas", icon: IDEA_ICON, match: ["TeamIdeas"] },
 	// successes: daily rules, kudos, customer praise (#1981)
 	{ name: "TeamSuccesses", label: "Successes", icon: "award", match: ["TeamSuccesses"] },
 	{
