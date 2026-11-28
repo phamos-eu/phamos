@@ -9,6 +9,9 @@ is cached with the items (``sections.CACHE_SECONDS``); every order re-validates 
 clears the cache.
 """
 
+import html
+import re
+
 import frappe
 from babel.dates import format_date, format_time
 from babel.numbers import format_currency
@@ -223,6 +226,20 @@ def _organizer(record, stakeholders):
 		"website": normalize_url(record.organizer_website_link)} if record.organizer_name else {}
 
 
+# Line breaks and block edges in text editor HTML; each becomes a space so words of two
+# paragraphs don't run together once the tags are gone.
+_BLOCK_BREAK = re.compile(r"<br\b[^>]*>|</?(?:p|div|li|ul|ol|h[1-6]|blockquote|tr|td|th)\b[^>]*>", re.IGNORECASE)
+
+
+def _plain_text(value):
+	"""Text editor HTML as one line of plain text: tags removed, paragraphs and line breaks turned
+	into single spaces, entities such as &amp; or &nbsp; decoded.
+
+	The template escapes the result again, so decoding here is safe and keeps "&amp;" from showing literally."""
+	text = html.unescape(strip_html(_BLOCK_BREAK.sub(" ", value or "")))
+	return " ".join(text.replace("\xa0", " ").split())
+
+
 def _sponsor(row, stakeholders):
 	if row.stakeholder:
 		page = stakeholders.get(row.stakeholder)
@@ -336,7 +353,8 @@ def build(item, lang):
 	if d.get("sponsors"):
 		blocks.append({"kind": "logos", "title": _("Sponsors"), "entries": [
 			{"title": s["name"], "image": s["logo"], "url": s.get("url"), "external": s.get("external"),
-				"subtitle": s.get("label"), "initials": "".join(w[0] for w in (s["name"] or "?").split()[:2]).upper()}
+				"subtitle": s.get("label"), "initials": "".join(w[0] for w in (s["name"] or "?").split()[:2]).upper(),
+				"info": _plain_text(s.get("info"))}
 			for s in d["sponsors"]]})
 
 	hero = {"image": item.image, "badge": item.get("badge"), "lines": [

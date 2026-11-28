@@ -245,19 +245,23 @@
 {%- endmacro %}
 
 {#- Speakers as people cards (same card as /people: round photo, name, topic; clickable when linked to a
-    person profile) and sponsors as logo cards (clickable when the stakeholder has a page). -#}
+    person profile) and sponsors as full-width banners with the logo beside name, additional information
+    and label (clickable when the stakeholder has a page). -#}
 {% macro profile_blocks(blocks) -%}
 {%- for block in blocks %}
 <section class="wp-related" aria-labelledby="wp-block-{{ loop.index }}">
 	<div class="wp-related-head"><h2 id="wp-block-{{ loop.index }}">{{ block.title | e }}</h2></div>
-	<ul class="wp-grid wp-grid-compact{% if block.kind == 'logos' %} wp-grid-sponsors{% endif %}">
+	<ul class="wp-grid {% if block.kind == 'logos' %}wp-grid-sponsors{% else %}wp-grid-compact{% endif %}">
 		{%- for entry in block.entries %}
 		<li class="wp-tile-item">
 			{%- if block.kind == "logos" %}
 			<div class="wp-tile wp-tile-sponsor{% if not entry.url %} wp-tile-static{% endif %}">
 				<span class="wp-sponsor-logo" aria-hidden="true">{% if entry.image %}<img src="{{ entry.image | e }}" alt="" loading="lazy">{% else %}<span class="wp-avatar wp-avatar-md">{{ entry.initials | e }}</span>{% endif %}</span>
+				<span class="wp-sponsor-text">
 				<h3 class="wp-tile-title">{% if entry.url %}<a class="wp-stretched-link" href="{{ entry.url | e }}"{% if entry.external %} rel="noopener" target="_blank"{% endif %}>{{ entry.title | e }}</a>{% else %}{{ entry.title | e }}{% endif %}</h3>
+				{%- if entry.info %}<span class="wp-tile-subtitle">{{ entry.info | e }}</span>{% endif %}
 				{%- if entry.subtitle %}<span class="wp-chips"><span class="wp-chip">{{ entry.subtitle | e }}</span></span>{% endif %}
+				</span>
 			</div>
 			{%- else %}
 			<div class="wp-tile wp-tile-person{% if not entry.url %} wp-tile-static{% endif %}">

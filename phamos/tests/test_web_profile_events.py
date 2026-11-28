@@ -392,6 +392,32 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertIn("wp-tile-person", html)
 		self.assertNotIn("wp-rows", html)
 
+	def test_sponsor_info_is_plain_text(self):
+		# The Additional Information comes from a text editor: tags go, entities are decoded and escaped once on output
+		self.event.reload()
+		self.event.append("sponsors", {"published": 1, "sponsor_name": "Café Test",
+			"additional_information": "<p>Kaffee&nbsp;&amp; Kuchen &lt;frisch&gt;</p>"})
+		self.event.save()
+		reset_items()
+		logos = next(b for b in build_profile(self.item(), "en")["blocks"] if b["kind"] == "logos")
+		self.assertEqual(logos["entries"][0]["info"], "Kaffee & Kuchen <frisch>")
+		frappe.set_user("Guest")
+		html = get_html_for_route(f"/en/events/{self.event.route}")
+		self.assertIn("Kaffee &amp; Kuchen &lt;frisch&gt;", html)
+		self.assertNotIn("&amp;amp;", html)
+
+	def test_sponsor_info_keeps_words_of_paragraphs_apart(self):
+		# Paragraphs and line breaks from the text editor become single spaces, not glued words
+		from phamos.web_profile.events import _plain_text
+
+		self.assertEqual(_plain_text("<p>Line one</p><p>Line two</p>"), "Line one Line two")
+		self.assertEqual(_plain_text("Foo<br>Bar<BR/>Baz"), "Foo Bar Baz")
+		self.assertEqual(_plain_text('Foo<br class="x">Bar<br style="clear:both"/>Baz'), "Foo Bar Baz")
+		self.assertEqual(_plain_text("<ul><li>A</li><li>B</li></ul>"), "A B")
+		self.assertEqual(_plain_text("<p>Kaffee&nbsp;&amp;\n Kuchen</p>"), "Kaffee & Kuchen")
+		self.assertEqual(_plain_text("<b>Fett</b>gedruckt"), "Fettgedruckt")  # inline tags join, as written
+		self.assertEqual(_plain_text(None), "")
+
 	def test_reminders(self):
 		future = add_days(now_datetime(), 3)
 		at = ",".join([future.strftime("%Y-%m-%dT09:00"), future.strftime("%Y-%m-%dT09:00"),
