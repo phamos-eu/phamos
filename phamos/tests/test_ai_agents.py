@@ -260,6 +260,9 @@ class TestAgentRights(FrappeTestCase):
 		self.assertIn("extract_document", get_handlers(ACCOUNTING_AGENT))
 
 	def test_accounts_manager_cannot_change_who_the_agent_runs_as(self):
+		meta = frappe.get_meta("AI Agent")
+		self.assertEqual(meta.get_field("user").permlevel, 1, "AI Agent not migrated: user should be on level 1")
+		self.assertEqual(meta.get_field("handler_module").permlevel, 1)
 		before = frappe.db.get_value("AI Agent", ACCOUNTING_AGENT, ["user", "handler_module"])
 		frappe.set_user(self.user_with("agent-rights-am@example.com", ["Accounts Manager"]))
 		agent = frappe.get_doc("AI Agent", ACCOUNTING_AGENT)
