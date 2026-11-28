@@ -117,6 +117,7 @@
   "column_break_team_window",
   "team_glow",
   "team_picked_up_idle_days",
+  "team_attention_summary",
   "team_attention_idle_days",
   "team_attention_sla_due_hours",
   "team_glow_top",
@@ -843,6 +844,13 @@
    "description": "An Issue with no team counts as picked up when it had no activity for this many days before a team took it on (#1981)."
   },
   {
+   "default": "1",
+   "fieldname": "team_attention_summary",
+   "fieldtype": "Check",
+   "label": "Needs attention: morning summary in the team chat",
+   "description": "On weekdays at 07:30, one message per team with what newly needs attention (#2235)."
+  },
+  {
    "default": "10",
    "fieldname": "team_attention_idle_days",
    "fieldtype": "Int",
@@ -977,7 +985,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-28 14:30:00.000000",
+ "modified": "2026-11-28 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",

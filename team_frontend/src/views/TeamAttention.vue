@@ -11,7 +11,7 @@
 				}}
 			</p>
 			<span v-if="!loading && items.length" class="ml-auto rounded bg-surface-gray-2 px-2 py-0.5 text-xs text-ink-gray-7">
-				{{ items.length }}
+				{{ truncated ? `${items.length}+` : items.length }}
 			</span>
 		</div>
 
@@ -36,6 +36,9 @@
 					</router-link>
 				</li>
 			</ul>
+			<p v-if="truncated" class="px-4 py-3 text-center text-xs text-ink-gray-5">
+				{{ __("Only the first {0} are shown.", [items.length]) }}
+			</p>
 		</section>
 	</div>
 </template>
@@ -60,6 +63,7 @@ const error = ref("")
 const items = ref([])
 const idleDays = ref(10)
 const slaOn = ref(false)
+const truncated = ref(false)
 
 function recordRoute(item) {
 	return item.doctype === "Task"
@@ -73,6 +77,7 @@ async function load() {
 		items.value = data.items || []
 		idleDays.value = data.idle_days
 		slaOn.value = data.sla_on
+		truncated.value = Boolean(data.truncated)
 		error.value = ""
 	} catch (e) {
 		error.value = e.messages?.[0] || e.message || __("Could not load what needs attention.")

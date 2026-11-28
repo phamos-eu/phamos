@@ -875,13 +875,18 @@ def get_team_attention():
 	on), then open Issues and Tasks idle for N days. Records, never a figure per person."""
 	from phamos.cockpits import team_attention
 
+	frappe.has_permission("Issue", "read", throw=True)
 	team = teams.require_active_team()
-	idle_days, due_hours = team_attention._settings()
-	items = team_attention.attention_items(team)
+	idle_days, _due_hours = team_attention._settings()
+	# as the user: records they cannot read stay out (Task rights, User Permissions)
+	items = team_attention.attention_items(team, as_user=True)
+	truncated = len(items) > team_attention.LIST_LIMIT
+	items = items[: team_attention.LIST_LIMIT]
 	return {
 		"team": team,
 		"idle_days": idle_days,
 		"sla_on": team_attention.sla_on(),
+		"truncated": truncated,
 		"items": [
 			{
 				"doctype": i.doctype,
@@ -889,7 +894,6 @@ def get_team_attention():
 				"title": i.title,
 				"kind": i.kind,
 				"detail": i.detail,
-				"since": i.since,
 				"assignees": i.assignees,
 			}
 			for i in items

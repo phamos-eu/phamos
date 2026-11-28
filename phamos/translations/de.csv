@@ -3656,3 +3656,6 @@ Could not load what needs attention.,"Konnte nicht laden, was Aufmerksamkeit bra
 Not assigned,Nicht zugewiesen
 Needs attention: idle days,Braucht Aufmerksamkeit: Tage ohne Aktivität
 Needs attention: SLA due within hours,Braucht Aufmerksamkeit: SLA fällig innerhalb von Stunden
+Only the first {0} are shown.,Nur die ersten {0} werden gezeigt.
+Needs attention: morning summary in the team chat,Braucht Aufmerksamkeit: Morgenübersicht im Team-Chat
+Team Attention Notice,Team-Aufmerksamkeitshinweis
